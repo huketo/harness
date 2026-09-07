@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "harness",
+  "description": "Personal harness for the Antigravity CLI: the always-on rules that keep this CLI aligned with the OMP and Claude Code setup."
+}

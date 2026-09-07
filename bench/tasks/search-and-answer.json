@@ -1,0 +1,23 @@
+{
+  "id": "search-and-answer",
+  "title": "Trace a project record across nested files",
+  "class": "research",
+  "fixture": "fixtures/search-and-answer",
+  "prompt": "Investigate the files in this workspace without changing the source records. Start from the active project record, follow its operator identifier into the people registry, and find the matching retention policy in the operations handbook. Create answers/result.txt with exactly four lines in this order: `PROJECT=<codename>`, `OWNER=<display name>`, `RETENTION_DAYS=<integer>`, and `CHECKSUM=<codename>|<display name>|<integer>`. Preserve spelling and capitalization from the records. Run python3 verify.py when finished.",
+  "verify": ["python3", "-I", "verify.py"],
+  "timeout_seconds": 180,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 22000,
+    "output": 900,
+    "cacheRead": 12000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "verify.py",
+    "records/north/2024/project.ini",
+    "registry/people/index.csv",
+    "registry/people/profiles/operator-17.txt",
+    "handbook/operations/policies/storage.txt"
+  ]
+}

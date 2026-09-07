@@ -1,0 +1,89 @@
+modelRoles:
+  advisor: anthropic/claude-fable-5-1:high
+  commit: openai-codex/gpt-5.6-luna:max
+  default: openai-codex/gpt-6-astra:high
+  designer: anthropic/claude-fable-5-1:high
+  mid: openai-codex/gpt-5.6-sol:high
+  plan: anthropic/claude-fable-5-1:high
+  slow: openai-codex/gpt-6-astra:high
+  smol: openai-codex/gpt-5.6-luna:max
+  task: openai-codex/gpt-5.6-sol:high
+  tiny: openai-codex/gpt-5.6-luna:max
+  vision: openai-codex/gpt-6-astra:high
+symbolPreset: unicode
+theme:
+  dark: titanium
+setupVersion: 2
+dev:
+  autoqaConsent: granted
+codexResets:
+  autoRedeem: "no"
+composer:
+  shape: box
+statusLine:
+  transparent: false
+  compactThinkingLevel: false
+  preset: full
+compaction:
+  keepRecentTokens: 40000
+  methodOrder:
+    - remote
+    - handoff
+    - soft
+  handoffSaveToDisk: true
+  thresholdTokens: -1
+  thresholdPercent: 75
+tools:
+  xdevDocs: catalog
+  intentTracing: false
+startup:
+  checkUpdate: true
+marketplace:
+  autoUpdate: notify
+recap:
+  enabled: false
+spelling:
+  typoDetection: false
+  autocomplete: false
+power:
+  sleepPrevention: "off"
+skills:
+  enableCodexUser: false
+  enableClaudeUser: false
+  enableClaudeProject: false
+  enablePiUser: false
+  enablePiProject: false
+  enableAgentsProject: false
+  enableAgentsUser: true
+task:
+  agentModelOverrides:
+    scout: "@smol"
+    librarian: "@smol"
+    sonic: "@smol"
+    task: "@mid"
+    reviewer: "@slow"
+    security-reviewer: "@slow"
+retry:
+  fallbackChains:
+    anthropic/*:
+      - openai-codex/gpt-5.6-sol:high
+    mid:
+      - anthropic/claude-opus-5:high
+    slow:
+      - anthropic/claude-opus-5:high
+    smol:
+      - openai-codex/gpt-5.6-sol:high
+      - anthropic/claude-opus-5:high
+    tiny:
+      - openai-codex/gpt-5.6-sol:high
+      - anthropic/claude-opus-5:high
+  maxDelayMs: 0
+  usageAwareFallback: true
+  usageReservePolicy: auto
+cycleOrder:
+  - smol
+  - mid
+  - default
+  - slow
+providers:
+  cacheRetention: auto

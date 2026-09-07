@@ -1,0 +1,27 @@
+{
+  "id": "docs-api-reference",
+  "title": "Write the missing API reference for feed-client 3.0.0",
+  "class": "docs-technical",
+  "fixture": "fixtures/docs-api-reference",
+  "prompt": "feed-client 3.0.0 라이브러리에 API 참조 문서가 없다. 공개 API는 `src/index.ts`가 재수출하는 이름 전체이고, 3.0.0에서 이름이 바뀌거나 사라진 이름은 `CHANGELOG.md`에만 남아 있다. 문서를 읽는 사람은 2.x를 쓰던 호출자이며 이 문서 하나만 보고 현재 공개 API를 다 쓸 수 있어야 한다. 문서에 적는 선언은 소스가 실제로 공개하는 것과 같아야 한다.\n\n산출물: `docs/API.md` 한 파일. 소스와 `CHANGELOG.md`, `facts.json`, `verify.py`는 고치지 않는다.\n\n수용 기준:\n- `docs/API.md`가 존재하고 80줄 이상이다.\n- 공개 export마다 그 이름을 그대로 쓴 `## <export 이름>` 절을 두고, 그 절 안의 `ts` 코드 블록에 그 export의 선언을 적는다. 클래스와 인터페이스는 공개 멤버(생성자·메서드·게터·공개 프로퍼티)의 선언까지 적는다.\n- `facts.json`에 적힌 12개 사실이 모두 문서에 담긴다. 각 항목의 `hint`가 무엇을 문서화해야 하는지 말하고, 기대값은 `src/`의 선언이 정본이다.\n- 3.0.0에서 제거된 식별자는 문서에 나타나지 않는다. 어떤 이름이 제거되었는지는 `CHANGELOG.md`가 말한다.\n- `python3 -I verify.py`가 종료 코드 0으로 끝난다.",
+  "verify": ["python3", "-I", "verify.py"],
+  "timeout_seconds": 300,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 32000,
+    "output": 4200,
+    "cacheRead": 20000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "verify.py",
+    "facts.json",
+    "CHANGELOG.md",
+    "src/index.ts",
+    "src/client.ts",
+    "src/cache.ts",
+    "src/errors.ts",
+    "src/retry.ts",
+    "src/types.ts"
+  ]
+}

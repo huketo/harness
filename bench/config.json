@@ -1,0 +1,29 @@
+{
+	"candidates": [
+		"anthropic/claude-opus-5:high",
+		"openai-codex/gpt-5.6-sol:high",
+		"openai-codex/gpt-5.6-sol:xhigh",
+		"openai-codex/gpt-5.6-luna:xhigh",
+		"openai-codex/gpt-5.6-luna:max",
+		"openai-codex/gpt-6-astra:medium",
+		"openai-codex/gpt-6-astra:high",
+		"openai-codex/gpt-6-astra:xhigh",
+		"openai-codex/gpt-6-astra:max",
+		"anthropic/claude-fable-5-1:medium",
+		"anthropic/claude-fable-5-1:high",
+		"anthropic/claude-fable-5-1:xhigh",
+		"anthropic/claude-fable-5-1:max",
+		"agy/gemini-3.8-flash-high"
+	],
+	"variants": {
+		"cache-long": {
+			"providers.cacheRetention": "long"
+		},
+		"compact-150k": {
+			"compaction.thresholdTokens": 150000
+		}
+	},
+	"judge": "anthropic/claude-opus-5:high",
+	"default_budget_usd": 1.0,
+	"minimum_samples_warning": 5
+}

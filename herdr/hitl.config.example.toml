@@ -1,0 +1,20 @@
+# Copy this example to ~/.config/herdr-hitl/config.toml and replace placeholders.
+# Never commit the real file: it contains bot credentials in plaintext.
+
+# Where a question goes (herdr-hitl 0.2.0 and later). "messenger" always sends
+# to Telegram or Discord, "terminal" never sends and makes `ask` and `notify`
+# exit 5, and "auto" sends only while the away marker set by `herdr-hitl away`
+# is present. This environment uses "auto".
+channel = "auto"
+
+[telegram]
+bot_token = "REPLACE_WITH_TELEGRAM_BOT_TOKEN"
+chat_id = "REPLACE_WITH_TELEGRAM_CHAT_ID"
+allowed_user_ids = ["REPLACE_WITH_TELEGRAM_USER_ID"]
+api_base = "REPLACE_WITH_TELEGRAM_API_BASE_OR_REMOVE_THIS_LINE"
+
+[discord]
+bot_token = "REPLACE_WITH_DISCORD_BOT_TOKEN"
+channel_id = "REPLACE_WITH_DISCORD_CHANNEL_ID_OR_REMOVE_THIS_LINE"
+user_id = "REPLACE_WITH_DISCORD_USER_ID_OR_REMOVE_THIS_LINE"
+allowed_user_ids = ["REPLACE_WITH_DISCORD_USER_ID"]

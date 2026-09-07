@@ -1,0 +1,19 @@
+# synthetic sample log, 18 records
+2024-05-01T00:00:01Z INFO api service started on port 9101
+2024-05-01T00:00:02Z INFO auth token cache warmed
+2024-05-01T00:00:03Z DEBUG db pool opened 4 connections
+2024-05-01T00:00:04Z INFO api GET /orders 200
+2024-05-01T00:00:05Z WARN cache eviction rate above target
+2024-05-01T00:00:06Z INFO worker queue drained
+2024-05-01T00:00:07Z ERROR db query timeout after 3000ms
+2024-05-01T00:00:08Z INFO api GET /orders 200
+2024-05-01T00:00:09Z WARN auth refresh token reused
+2024-05-01T00:00:10Z DEBUG cache prefetch skipped
+2024-05-01T00:00:11Z INFO api POST /orders 201
+2024-05-01T00:00:12Z ERROR auth signature mismatch
+2024-05-01T00:00:13Z INFO mailer digest queued
+2024-05-01T00:00:14Z WARN worker retry scheduled
+2024-05-01T00:00:15Z DEBUG cache compaction finished
+2024-05-01T00:00:16Z INFO api DELETE /orders 204
+2024-05-01T00:00:17Z ERROR db replica lag 820ms
+2024-05-01T00:00:18Z WARN auth rate limit near threshold

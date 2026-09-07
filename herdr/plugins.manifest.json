@@ -1,0 +1,30 @@
+[
+  {
+    "plugin_id": "huketo.herdr-cron",
+    "source_slug": "huketo/herdr-cron",
+    "requested_ref": "v0.2.2",
+    "resolved_commit": "3805d2cd5419edd640bb0dbe49cfc46198ddb7e8",
+    "version": "0.2.2"
+  },
+  {
+    "plugin_id": "huketo.hitl",
+    "source_slug": "huketo/herdr-hitl",
+    "requested_ref": "v0.2.0",
+    "resolved_commit": "5ecdaf116d311bb7d4d373c82b9792f16b689a10",
+    "version": "0.2.0"
+  },
+  {
+    "plugin_id": "huketo.sheep",
+    "source_slug": "huketo/herdr-sheep",
+    "requested_ref": "v0.3.1",
+    "resolved_commit": "dc60164e7430e2f44118df9766b0526fba738f16",
+    "version": "0.3.1"
+  },
+  {
+    "plugin_id": "usagebar",
+    "source_slug": "huketo/herdr-agent-usage",
+    "requested_ref": "7cdbc13a3443d3868496d3d3f821bca2710b4b81",
+    "resolved_commit": "7cdbc13a3443d3868496d3d3f821bca2710b4b81",
+    "version": "0.5.12"
+  }
+]

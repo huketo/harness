@@ -1,0 +1,4 @@
+# Public showcase: no host schedules or automatic publication jobs are shipped.
+# Create only the jobs you explicitly want in your own herdr-cron installation.
+version: 1
+jobs: []

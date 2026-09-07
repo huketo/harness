@@ -1,0 +1,16 @@
+{
+  "colorScheme": "tokyo night",
+  "model": "Claude Opus 4.6 (Thinking)",
+  "permissions": {
+    "deny": [
+      "command(sudo)"
+    ]
+  },
+  "statusLine": {
+    "type": "",
+    "command": "",
+    "enabled": true
+  },
+  "toolPermission": "always-proceed",
+  "trustedWorkspaces": []
+}

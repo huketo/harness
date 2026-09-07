@@ -1,0 +1,1 @@
+Stay within the requested change. Keep updates and final prose concise. Verify the changed behavior at its real boundary; do not repeatedly recheck the same evidence. Delegate only independent substantive slices, not cleanup.

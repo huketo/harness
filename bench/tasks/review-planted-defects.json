@@ -1,0 +1,30 @@
+{
+  "id": "review-planted-defects",
+  "title": "Report planted defects in a TypeScript change",
+  "class": "dev-review",
+  "fixture": "fixtures/review-planted-defects",
+  "prompt": "이 작업 디렉터리는 코드 리뷰 대상입니다. `repo/`는 변경 전 TypeScript 코드이고 `diff/change.patch`는 그 위에 적용될 변경입니다. 저장소 규약은 `conventions.md`에, 쓸 수 있는 지적 코드와 보고 형식은 `codes.md`에 있습니다.\n\n목표: 이 변경이 들여오는 결함을 찾아 기계가 읽을 수 있는 지적 목록으로 보고합니다.\n\n수용 기준\n- `answers/findings.txt`를 만들고 한 줄에 하나씩 `FINDING=<파일>:<줄>:<코드>` 형식으로 적는다. 경로·줄 번호·코드의 정의는 `codes.md`를 따르며, 파일과 줄 번호는 변경 후 기준이다.\n- 이 변경에는 서로 다른 결함이 6개 있고 모두 diff의 추가된 줄(`+`)에 있다. 각 결함은 `codes.md`의 코드 하나로 분류된다.\n- 줄 번호는 결함이 있는 줄에서 ±2줄까지 맞는 것으로 본다.\n- 채점은 재현율과 정밀도를 함께 본다. 확신이 없는 줄까지 넉넉히 나열하면 정밀도에서 불합격한다.\n- 패치를 실제로 적용하지 않는다. `repo/`, `diff/change.patch`, `conventions.md`, `codes.md`, `verify.py`는 고치지 않는다.\n- `python3 -I verify.py`가 종료 코드 0으로 끝난다.\n\n산출물: `answers/findings.txt`.",
+  "verify": ["python3", "-I", "verify.py"],
+  "timeout_seconds": 300,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 30000,
+    "output": 1500,
+    "cacheRead": 18000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "verify.py",
+    "conventions.md",
+    "codes.md",
+    "diff/change.patch",
+    "repo/src/cache.ts",
+    "repo/src/errors.ts",
+    "repo/src/handler.ts",
+    "repo/src/queue.ts",
+    "repo/src/server.ts",
+    "repo/src/watcher.ts",
+    "repo/src/util/page.ts",
+    "repo/src/util/time.ts"
+  ]
+}

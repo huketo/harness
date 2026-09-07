@@ -1,0 +1,3 @@
+# Active project retention
+ORCHID.retention_days=45
+AMBER.retention_days=7

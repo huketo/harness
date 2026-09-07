@@ -1,0 +1,49 @@
+# Generated audit and benchmark data
+var/*
+!var/.gitkeep
+
+# Migration backups
+*.bak
+
+# Environment and secret material
+.env
+.env.*
+*.secret
+*.secrets
+**/secrets.*
+**/credentials.*
+**/*token*.toml
+**/*token*.json
+herdr/hitl.config.toml
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.gpg
+*.kdbx
+
+# Runtime state, databases and logs
+*.db
+*.db3
+*.sqlite
+*.sqlite3
+*.log
+# Synthetic benchmark input, not a collected host log.
+!bench/fixtures/report-draft-ko/input/commits.log
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

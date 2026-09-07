@@ -1,0 +1,5 @@
+interface:
+  display_name: "Wait What"
+  short_description: "방금 그 설명, 맥락을 붙여서 명확한 한국어로 다시 설명해 주세요"
+policy:
+  allow_implicit_invocation: false

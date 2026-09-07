@@ -1,0 +1,7 @@
+# 진행 중 항목 (2026-03-12 18:00 기준)
+# format: <구분> | <대상> | <상태>
+MR | atlas-portal !31 | 리뷰 대기, 리뷰어 코멘트 2건 미반영
+MR | cobalt-cli !12 | 리뷰 통과, 병합 대기
+carryover | beacon-api /records 커서 페이지네이션 2부 | 1부만 반영됨, 2부 미착수
+carryover | atlas-portal 필터 프리셋 저장 | 착수 전
+결정 예정 | beacon-api 내부 스키마 버전 4 배포 시점 | 커서 페이지네이션 2부와 같은 배포로 올릴지 미정

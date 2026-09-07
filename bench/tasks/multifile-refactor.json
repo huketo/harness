@@ -1,0 +1,17 @@
+{
+  "id": "multifile-refactor",
+  "title": "Refactor discount APIs across three modules",
+  "class": "dev-refactor",
+  "fixture": "fixtures/multifile-refactor",
+  "prompt": "Refactor all three production modules to the new percentage-discount contract and update every production call site. In pricing.py replace apply_discount(amount, discount_amount) with discounted_total(subtotal, discount_rate), where the rate is between 0 and 1 inclusive, an invalid rate raises ValueError, and the final result is rounded to two decimals. In invoice.py replace total_after_discount(line_prices, discount_amount) with invoice_total(line_prices, discount_rate). In report.py replace render_summary with render_invoice and return exactly `Invoice total: $N.NN`. Remove the old public names rather than keeping compatibility aliases. Do not edit the tests. Run python3 -m unittest to verify the refactor.",
+  "verify": ["python3", "-m", "unittest"],
+  "timeout_seconds": 240,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 26000,
+    "output": 1800,
+    "cacheRead": 14000,
+    "cacheWrite": 0
+  },
+  "protected_paths": ["test_refactor.py"]
+}

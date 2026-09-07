@@ -1,0 +1,40 @@
+{
+  "id": "report-draft-ko",
+  "title": "Draft the Korean daily report from a commit log and a calendar",
+  "class": "docs-business",
+  "fixture": "fixtures/report-draft-ko",
+  "prompt": "2026-03-12 하루치 일일 업무보고 초안을 쓴다. 입력은 `input/commits.log`(그날의 커밋), `input/schedule.txt`(오늘과 내일 일정), `input/open-items.txt`(진행 중 MR·carryover·결정 예정 항목), `input/template.md`(제출 양식과 HTML 인코딩 규칙) 네 파일이다. 읽는 사람은 팀장이며 이 보고서만 보고 그날 무엇이 진행되었고 다음 날 무엇을 하는지 알 수 있어야 한다.\n\n산출물: `answers/report.md`(보고 본문)와 `answers/report.html`(제출 시스템에 넣을 HTML 조각). 입력 파일과 `verify.py`는 고치지 않는다.\n\n수용 기준:\n- `answers/report.md`가 `input/template.md`의 절 구성과 절마다의 필수 항목을 지킨다.\n- `answers/report.html`이 `input/template.md`의 HTML 인코딩 규칙을 지킨다.\n- 입력에 있는 작업과 일정은 빠뜨리지 않고, 입력에 없는 작업은 만들어 넣지 않는다.\n- `python3 -I verify.py`가 종료 코드 0으로 끝난다. 이 검사는 구조만 보고 문장 품질은 보지 않으므로, 통과했다는 것이 양식을 잘 지켰다는 뜻은 아니다.",
+  "verify": ["python3", "-I", "verify.py"],
+  "timeout_seconds": 300,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 20000,
+    "output": 2600,
+    "cacheRead": 10000,
+    "cacheWrite": 0
+  },
+  "rubric": {
+    "output": "answers/report.md",
+    "reference": "references/report-draft-ko/report.md",
+    "criteria": [
+      "토픽 그루핑: 0 = 모든 항목을 평탄한 1-depth 목록으로 나열. 1 = 일부만 주제별로 묶음. 2 = 주제 헤딩 3–6개에 각 헤딩 아래 leaf 1–4개(근거 §1.1, §1.4).",
+      "항목 문장 형식: 0 = 영문 커밋 메시지를 그대로 붙임. 1 = 한국어 명사형 종결과 short SHA 표기가 혼재. 2 = 모든 leaf가 한국어 명사형으로 끝나고 끝에 7자 short SHA 또는 MR iid가 붙음(근거 §1.2).",
+      "계획 절: 0 = 출처 순서를 무시하거나 항목이 5개를 넘음. 1 = 순서는 맞지만 \"추가 작업\" 같은 막연한 항목이 있음. 2 = 확정 일정 → carryover → 진행 중 항목 순으로 3–5개이고 모든 항목이 구체적 대상을 지목(근거 §2.1–2.3).",
+      "입력 충실도: 0 = 입력에 없는 작업을 만들어 넣었거나 입력 항목을 2건 이상 빠뜨림. 1 = 누락 1건. 2 = 창작 없고 누락 없음."
+    ],
+    "context": [
+      "input/commits.log",
+      "input/schedule.txt",
+      "input/open-items.txt",
+      "input/template.md"
+    ],
+    "pass_threshold": 0.7
+  },
+  "protected_paths": [
+    "verify.py",
+    "input/commits.log",
+    "input/schedule.txt",
+    "input/template.md",
+    "input/open-items.txt"
+  ]
+}

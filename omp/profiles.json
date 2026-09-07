@@ -1,0 +1,115 @@
+{
+	"version": 1,
+	"_comment": "Model-specific saved effort + named purpose profiles, independent of OMP's built-in modelRoles. Owned by omp/extensions/profiles + omp/profiles.ts. Exact catalog IDs/contextWindow/maxTokens verified against the installed `omp models --json` catalog on 2026-09-07 (not vendor-advertised specs, which run higher for the openai-codex models below -- the installed catalog figure is what the running session actually budgets against). Effort values marked 'starting point' are NOT claimed optima; adjust via /effort or `bun omp/profiles.ts effort set`.",
+	"models": {
+		"fable-5-1": {
+			"provider": "anthropic",
+			"model": "claude-fable-5-1",
+			"effort": "high",
+			"prompt": "prompts/claude-fable-5-1.txt",
+			"compaction": { "thresholdPercent": 75 }
+		},
+		"opus-5": {
+			"provider": "anthropic",
+			"model": "claude-opus-5",
+			"effort": "high",
+			"prompt": "prompts/claude-opus-5.txt",
+			"compaction": { "thresholdPercent": 75 }
+		},
+		"gpt-6-astra": {
+			"provider": "openai-codex",
+			"model": "gpt-6-astra",
+			"effort": "high",
+			"prompt": "prompts/gpt-6-astra.txt",
+			"compaction": { "thresholdPercent": 70 }
+		},
+		"gpt-5.6-sol": {
+			"provider": "openai-codex",
+			"model": "gpt-5.6-sol",
+			"effort": "high",
+			"prompt": "prompts/gpt-5.6-sol.txt",
+			"compaction": { "thresholdPercent": 70 }
+		},
+		"gpt-5.6-luna": {
+			"provider": "openai-codex",
+			"model": "gpt-5.6-luna",
+			"effort": "max",
+			"prompt": "prompts/gpt-5.6-luna.txt",
+			"compaction": { "thresholdPercent": 70 }
+		},
+		"agy-flash": {
+			"provider": "agy",
+			"model": "gemini-3.8-flash-medium",
+			"effort": "medium",
+			"prompt": "",
+			"compaction": { "thresholdPercent": null }
+		},
+		"agy-opus-thinking": {
+			"provider": "agy",
+			"model": "claude-opus-4-6-thinking",
+			"effort": "medium",
+			"prompt": "",
+			"compaction": { "thresholdPercent": null }
+		}
+	},
+	"profiles": {
+		"frontend": {
+			"model": "fable-5-1",
+			"purpose": "Fable 5.1 for frontend/UI-facing work and general daily driving"
+		},
+		"orchestrate": {
+			"model": "fable-5-1",
+			"purpose": "Fable 5.1 orchestrating parallel subagents / task delegation"
+		},
+		"hard-code": {
+			"model": "fable-5-1",
+			"purpose": "Fable 5.1 for difficult coding and implementation"
+		},
+		"code": {
+			"model": "gpt-5.6-sol",
+			"purpose": "Sol for routine coding work"
+		},
+		"general": {
+			"model": "gpt-5.6-sol",
+			"effort": "medium",
+			"purpose": "Sol at reduced (medium) effort for general/noncoding tasks"
+		},
+		"opus-code": {
+			"model": "opus-5",
+			"purpose": "Opus 5 for everyday coding at high effort"
+		},
+		"opus-general": {
+			"model": "opus-5",
+			"effort": "medium",
+			"purpose": "Opus 5 for noncoding work at medium effort"
+		},
+		"best": {
+			"model": "gpt-6-astra",
+			"purpose": "Astra for the user's highest-quality general-purpose work"
+		},
+		"economical": {
+			"model": "gpt-5.6-luna",
+			"purpose": "Luna at max effort for economical general-purpose work"
+		},
+		"mechanical": {
+			"model": "agy-flash",
+			"purpose": "AGY Flash for mechanical, well-defined edits"
+		},
+		"search": {
+			"model": "agy-flash",
+			"purpose": "AGY Flash for search/research tasks"
+		},
+		"media": {
+			"model": "agy-flash",
+			"purpose": "AGY Flash for media processing tasks"
+		},
+		"automation": {
+			"model": "agy-flash",
+			"purpose": "AGY Flash for cron/automation jobs"
+		},
+		"fallback": {
+			"model": "agy-opus-thinking",
+			"purpose": "AGY Opus 4.6 Thinking as an explicit-budget fallback when other models/budgets are exhausted"
+		}
+	}
+}

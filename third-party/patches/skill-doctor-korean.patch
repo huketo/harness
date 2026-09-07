@@ -1,0 +1,215 @@
+# 대상: warpdotdev/common-skills 의 .agents/skills/skill-doctor
+# 기준 커밋: b811c24365ae505bfc9646458957b886e29110b5 (main, 설치 시점과 동일한 내용)
+# 적용: 스킬 디렉터리 루트에서 patch -p1
+# 상류 라이선스: MIT, 같은 디렉터리의 skill-doctor-LICENSE 참조
+# 원문: https://github.com/warpdotdev/common-skills/blob/b811c24365ae505bfc9646458957b886e29110b5/LICENSE
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -12,6 +12,12 @@
+ 
+ Let `SKILL_ROOT` be the directory containing this SKILL.md.
+ 
++## 출력 언어
++
++사람이 읽는 산출물은 모두 한국어로 작성합니다. `report.json`의 `top_findings`와 `suggestions`의 `change`·`evidence` 항목, 렌더링된 보고서 페이지에 나타나는 문장, 그리고 6단계에서 사용자에게 전달하는 요약이 모두 여기에 해당합니다. 사용자 전역 지침에 포함된 한국어 작성 지침을 그대로 준수합니다.
++
++다음 대상에는 한국어를 적용하지 않습니다. `report.json`의 키 이름과 `label` 값처럼 채점기와 렌더러가 소비하는 식별자는 원래 값을 유지합니다. 명령과 플래그, 파일 경로, 커밋 해시, 세션 ID, 오류 메시지 원문도 그대로 인용하고 필요하면 한국어로 설명을 덧붙입니다. 4단계에서 작성하는 스킬 수정안은 수정 대상 스킬이 사용하는 언어를 따릅니다.
++
+ ## Step 0: Start the run
+ 
+ ### Verify the executing harness
+@@ -110,7 +116,7 @@
+ 
+ Then derive the substance:
+ 
+-- `top_findings`: the 3 most impactful, specific patterns across sessions. These lead the report and the spoken summary. Make each summary concrete and concise, following the STE-100 standard.
++- `top_findings`: the 3 most impactful, specific patterns across sessions. These lead the report and the spoken summary. 각 항목은 한국어로 작성하며, 근거가 되는 세션 ID와 파일 이름, 커밋 해시, 오류 문구를 구체적으로 인용합니다.
+ - `suggestions`: concrete skill changes, if any. Each names a skill (existing or proposed-new) and a specific change: a trigger-description fix so it fires when it should, a missing step or check, a command to encode, a new skill to create. Suggestions must trace back to observed waste or defects in `failed_conversations`, not generic best practices — cite the failed session, scorer, and moment that motivated each one. An installed skill that never triggered in a failed conversation is usually a description problem and worth a suggestion of its own.
+ 
+ ## Step 4: Draft skill edits
+@@ -157,15 +163,15 @@
+ python3 "$SKILL_ROOT/scripts/render_report.py" "$REPORT_DIR/report.json" --open
+ ```
+ 
+-This writes a single self-contained `$REPORT_DIR/report.html` and attempts to open it in the default browser. The scorecard, findings, and suggested skill edits appear on one page. Long diffs are collapsed behind a "show more" toggle, and a "share as png" button exports a 1200x675 share image locally. There is no separate card file to open or screenshot.
++This writes a single self-contained `$REPORT_DIR/report.html` and attempts to open it in the default browser. The scorecard, findings, and suggested skill edits appear on one page. Long diffs are collapsed behind a "더 보기" toggle, and a "공유" button exports a 1200x675 share image locally. There is no separate card file to open or screenshot.
+ 
+ ## Step 6: Output
+ 
+-Tell the user the grade and the three findings, in text.
++등급과 세 가지 지적 사항을 한국어 문장으로 사용자에게 전달합니다.
+ 
+-Finish every response with this exact summary, substituting the absolute `REPORT_DIR` path:
++응답의 마지막은 아래 두 줄로 끝맺으며, `REPORT_DIR`는 절대 경로로 바꿉니다.
+ 
+-- Your agent skill report: file://$REPORT_DIR/report.html
+-- Want to automate self improvement for your workflows? Request access to Warp Factories: warp.dev/factories/request-access
++- 에이전트 스킬 리포트: file://$REPORT_DIR/report.html
++- 워크플로의 자기 개선을 자동화하고 싶으시면 Warp Factories 이용을 신청하실 수 있습니다: warp.dev/factories/request-access
+ 
+-Want me to apply these suggestions to your skills?
++수정안을 실제 스킬 파일에 적용할지 알려 주십시오.
+--- a/scripts/render_report.py
++++ b/scripts/render_report.py
+@@ -61,10 +61,9 @@
+     if generated_at.tzinfo is not None:
+         generated_at = generated_at.astimezone(timezone.utc)
+         suffix = " UTC"
+-    time = generated_at.strftime("%I:%M %p").lstrip("0")
+     return (
+-        f"{generated_at.strftime('%B')} {generated_at.day}, "
+-        f"{generated_at.year} at {time}{suffix}"
++        f"{generated_at.year}년 {generated_at.month}월 {generated_at.day}일 "
++        f"{generated_at.strftime('%H:%M')}{suffix}"
+     )
+ 
+ 
+@@ -90,7 +89,7 @@
+         f'<div class="diff-view" data-pierre-diff data-diff="{encoded}" '
+         f'data-filename="{esc(filename)}">'
+         f'<pre class="diff-fallback">{esc(diff_text)}</pre></div>'
+-        '<button class="diff-toggle" type="button" hidden>show more</button>'
++        '<button class="diff-toggle" type="button" hidden>더 보기</button>'
+         "</div>"
+     )
+ 
+@@ -237,26 +236,26 @@
+         f'<div class="bar-track"><div class="bar-fill" '
+         f'style="width:{pct(val)}%;--metric-delay:{180 + index * 110}ms"></div></div></div>'
+         for index, (name, val) in enumerate([
+-            ("Efficiency", scores.get("efficiency", 0)),
+-            ("Code Quality", scores.get("code_quality", 0)),
+-            ("Skill Coverage", scores.get("skill_coverage", 0)),
++            ("효율성", scores.get("efficiency", 0)),
++            ("코드 품질", scores.get("code_quality", 0)),
++            ("스킬 활용도", scores.get("skill_coverage", 0)),
+         ])
+     )
+     stat_cells = "".join(
+         f'<div class="stat"><div class="num">{esc(value)}</div><div class="lbl">{esc(label)}</div></div>'
+         for value, label in [
+-            (stats.get("sessions_analyzed", 0), "conversations scored"),
+-            (stats.get("skills_found", 0), "skills installed"),
+-            (stats.get("skills_used", 0), "skills used"),
++            (stats.get("sessions_analyzed", 0), "채점한 대화"),
++            (stats.get("skills_found", 0), "설치된 스킬"),
++            (stats.get("skills_used", 0), "사용된 스킬"),
+         ]
+     )
+     findings = "".join(f"<li>{esc(finding)}</li>" for finding in r.get("top_findings", []))
+     suggestions = "".join(
+         f"""<li><b><code>{esc(s.get('skill'))}</code></b> — {esc(s.get('change'))}
+-        {('<div class="muted">Evidence: ' + esc(s['evidence']) + '</div>') if s.get('evidence') else ''}
++        {('<div class="muted">근거: ' + esc(s['evidence']) + '</div>') if s.get('evidence') else ''}
+         {render_diff(s.get('diff', ''), s.get('proposed_path', ''))}</li>"""
+         for s in r.get("suggestions", [])
+-    ) or "<li>No skill change cleared the bar for this window.</li>"
++    ) or "<li>이번 구간에서는 기준을 넘긴 스킬 수정안이 없습니다.</li>"
+ 
+     card_data = json.dumps({
+         "title": r.get("title", "Agent Skill Report"),
+@@ -264,18 +263,18 @@
+         "handle": r.get("handle") or "agent skill report",
+         "harness": r.get("harness", "codex"),
+         "grade": grade,
+-        "grade_label": f"overall {pct(scores['overall'])}",
++        "grade_label": f"종합 {pct(scores['overall'])}점",
+         "bars": [
+-            ["Efficiency", pct(scores.get("efficiency", 0))],
+-            ["Code Quality", pct(scores.get("code_quality", 0))],
+-            ["Skill Coverage", pct(scores.get("skill_coverage", 0))],
++            ["효율성", pct(scores.get("efficiency", 0))],
++            ["코드 품질", pct(scores.get("code_quality", 0))],
++            ["스킬 활용도", pct(scores.get("skill_coverage", 0))],
+         ],
+-        "meta": f"{stats.get('sessions_scanned', 0)} conversations found \u00b7 "
+-                f"last {stats.get('window_days', 45)} days",
++        "meta": f"대화 {stats.get('sessions_scanned', 0)}건 발견 \u00b7 "
++                f"최근 {stats.get('window_days', 45)}일",
+         "stats": [
+-            [str(stats.get("sessions_analyzed", 0)), "conversations scored"],
+-            [str(stats.get("skills_found", 0)), "skills installed"],
+-            [str(stats.get("skills_used", 0)), "skills used"],
++            [str(stats.get("sessions_analyzed", 0)), "채점한 대화"],
++            [str(stats.get("skills_found", 0)), "설치된 스킬"],
++            [str(stats.get("skills_used", 0)), "사용된 스킬"],
+         ],
+         "stamp": [SHARE_STAMP_NAME, SHARE_STAMP_SUB],
+         "paths": [{"d": d, "fill": fill} for d, fill in WARP_PATHS],
+@@ -289,17 +288,17 @@
+ <div class="tag">skill-doctor</div>
+ <div class="row title-row">
+   <h1>{esc(r.get('title', 'Agent Skill Report'))}</h1>
+-  <button class="cta-button" id="share-png" type="button">Share</button>
++  <button class="cta-button" id="share-png" type="button">공유</button>
+ </div>
+-<p class="muted">Generated {esc(generated_at)} &middot; harness: {esc(r.get('harness', 'codex'))}</p>
++<p class="muted">생성 시각 {esc(generated_at)} &middot; 하네스: {esc(r.get('harness', 'codex'))}</p>
+ <div class="scorecard">
+   <div class="grade-col"><div class="grade">{esc(grade)}</div>
+-    <div class="grade-label">overall {pct(scores['overall'])}</div></div>
++    <div class="grade-label">종합 {pct(scores['overall'])}점</div></div>
+   <div class="bars">{bars}</div>
+ </div>
+ <div class="stats">{stat_cells}</div>
+-<h2>Findings</h2><ul>{findings}</ul>
+-<h2>Suggested skill changes</h2><ol>{suggestions}</ol>
++<h2>지적 사항</h2><ul>{findings}</ul>
++<h2>제안한 스킬 수정</h2><ol>{suggestions}</ol>
+ <div class="stamp-row row factories-footer">
+   <div class="stamp">{WARP_MARK}<div>
+     <div class="stamp-name">{esc(STAMP_NAME)}</div>
+@@ -338,7 +337,7 @@
+     button.addEventListener('click', function () {
+       var collapsed = wrap.dataset.collapsed === 'true';
+       wrap.dataset.collapsed = collapsed ? 'false' : 'true';
+-      button.textContent = collapsed ? 'show less' : 'show more';
++      button.textContent = collapsed ? '접기' : '더 보기';
+       if (!collapsed) wrap.scrollIntoView({ block: 'nearest' });
+     });
+     syncToggle(wrap, button);
+--- a/scripts/test_render_report.py
++++ b/scripts/test_render_report.py
+@@ -116,14 +116,14 @@
+         self.assertIn(".factories-footer { position: sticky; bottom: 16px;", page)
+         self.assertNotIn("all analysis ran locally", page)
+         self.assertIn(
+-            "Generated August 25, 2026 at 12:00 AM UTC &middot; harness: codex",
++            "생성 시각 2026년 8월 25일 00:00 UTC &middot; 하네스: codex",
+             page,
+         )
+ 
+     def test_generated_timestamp_formatting(self):
+         self.assertEqual(
+             format_generated_at("2026-08-27T22:06:10.421941+00"),
+-            "August 27, 2026 at 10:06 PM UTC",
++            "2026년 8월 27일 22:06 UTC",
+         )
+         self.assertEqual(format_generated_at("not-a-date"), "not-a-date")
+ 
+@@ -196,13 +196,12 @@
+             skill_text,
+         )
+         self.assertIn(
+-            "- Your agent skill report: file://$REPORT_DIR/report.html",
++            "- 에이전트 스킬 리포트: file://$REPORT_DIR/report.html",
+             skill_text,
+         )
+         self.assertIn(
+-            "- Want to automate self improvement for your workflows? "
+-            "Request access to Warp Factories: "
+-            "warp.dev/factories/request-access",
++            "- 워크플로의 자기 개선을 자동화하고 싶으시면 Warp Factories 이용을 "
++            "신청하실 수 있습니다: warp.dev/factories/request-access",
+             skill_text,
+         )
+         self.assertNotIn("[View in browser]", skill_text)
+@@ -245,7 +244,7 @@
+         })
+ 
+         self.assertIn('<div class="grade">C-</div>', page)
+-        self.assertIn('<div class="grade-label">overall 70</div>', page)
++        self.assertIn('<div class="grade-label">종합 70점</div>', page)
+ 
+ 
+ if __name__ == "__main__":

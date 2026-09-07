@@ -1,0 +1,1 @@
+For frontend work, reuse the project's UI conventions and verify the rendered surface. Give progress updates at milestones or blockers. Batch independent tool calls; keep dependent edits ordered. Preserve the append-only conversation and existing cache prefix.

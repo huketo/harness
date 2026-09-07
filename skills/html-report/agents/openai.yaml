@@ -1,0 +1,3 @@
+interface:
+  display_name: "HTML Report"
+  short_description: "Write a self-contained single-file HTML report"

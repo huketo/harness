@@ -1,0 +1,143 @@
+# 하네스 통합 레포의 확인된 사실
+
+이 문서는 공개 가능한 기술 관측과 그 한계를 기록합니다. 현재 유지하는 환경은 Linux/WSL2, OMP 18.1.13, Bun 1.3.14입니다. 날짜가 있는 관측은 다른 버전이나 호스트의 성능 보장이 아닙니다.
+
+## 1. 도구 가용성
+
+- 설치기와 런타임 패치는 `@oh-my-pi/pi-coding-agent` 18.1.13을 명시적으로 요구합니다. 다른 버전이나 예상과 다른 source layout은 거부합니다.
+- Bun 1.3.14가 설치기, TypeScript extension, `omp-profile`, `harness-run`, cost audit, host-sync의 기준 환경입니다.
+- Python 3 표준 라이브러리의 `sqlite3`와 `json`은 benchmark와 collector에 사용됩니다. `sqlite3`나 `jq` CLI가 모든 Herdr/cron 환경에 있다고 가정하지 않습니다.
+- 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL에서 Windows Chrome을 연결하는 기능은 전체 Windows 설치 지원과 별개입니다.
+
+## 2. OMP 비대화형 실행
+
+OMP 18.1.13의 비대화형 실행에서 사용하는 공개 계약은 다음과 같습니다.
+
+- `omp -p "<프롬프트>"`는 프롬프트를 처리하고 종료합니다.
+- `--config <파일>`은 현재 실행의 config overlay이며 반복 지정할 수 있습니다. 공유 설정을 적용하는 명령이 아닙니다.
+- `--profile <이름>`은 인증, 세션, 설정, 캐시를 분리하는 OMP 실행 프로필입니다. Harness의 용도별 `/profile`과 다른 개념입니다.
+- `--session-dir`, `--model`, `--thinking`, `--mode json`, `--max-time`, `--auto-approve`, `--no-skills`, `--skills <glob>`은 runner가 목적에 맞게 명시합니다.
+- `--mode json`의 완성 응답과 usage는 `message_end`의 `message`에 있습니다. 이벤트가 한 줄 JSON이라는 사실만으로 성공을 판단하지 않고 종료 상태와 최종 message를 함께 확인합니다.
+
+Benchmark는 session usage를 사후 집계하므로 후보 실행에 session을 유지합니다. 별도의 rubric judge처럼 구조화 출력에서 usage를 직접 읽는 경계만 session 없이 실행할 수 있습니다.
+
+## 3. 로컬 데이터 원천과 개인정보 경계
+
+### 3-1. `~/.omp/stats.db`
+
+`omp stats --summary`가 session 기록을 증분 적재합니다. `messages`에는 model/provider, timestamp, latency, token classes, catalog-derived cost와 agent type이 있고, `tool_calls`에는 tool name과 입출력 크기가 있습니다.
+
+이 데이터베이스는 프롬프트 본문을 직접 싣지 않더라도 작업 폴더, 모델 사용 패턴, 시간대, 비용을 통해 개인 활동을 드러낼 수 있습니다. 원본 row나 folder별 집계를 공개 문서·fixture로 복사하지 않습니다.
+
+### 3-2. 세션 JSONL
+
+세션에는 대화, 도구 인자와 결과, model 변경, credential pin, compaction 상태, usage가 저장됩니다. Subagent 기록과 큰 tool output은 sidecar 파일로 나뉠 수 있습니다. Benchmark runner는 session metadata로 main/subagent usage를 구분하지만 원문은 공개 산출물이 아닙니다.
+
+### 3-3. `~/.omp/agent/models.db`
+
+`model_cache`에는 provider별 model ID, catalog cost, context window, max output, thinking mode와 effort, 장문 구간이 저장됩니다. 카탈로그는 OMP 시점의 metadata이며 공급자 공식 가격이나 실제 청구서와 다를 수 있습니다. [PRICING](PRICING.md)은 이 차이와 공식 문서를 함께 기록합니다.
+
+### 3-4. `~/.omp/agent/agent.db`
+
+`model_perf`는 local latency와 generation throughput 표본, `usage_history`는 subscription quota 상태, `command_usage`는 command/skill 사용 횟수를 담습니다. 계정 식별값과 raw row는 공개하지 않습니다. 속도와 quota는 host, provider load, account plan에 따라 바뀌므로 routing 품질의 독립 증거가 아닙니다.
+
+## 4. 개인 비용 관측에서 남길 수 있는 결론
+
+2026-09 초의 개인 OMP 사용 창을 project와 volume을 식별할 수 없게 집계했을 때 다음 패턴을 확인했습니다.
+
+- OMP가 기록한 비용은 OAuth subscription 사용의 현금 청구액이 아니라 catalog 단가로 환산한 **명목 비용**입니다.
+- 명목 비용 구성은 cache read 약 71%, cache write 약 14%, output 약 13%, uncached input 약 2%였습니다.
+- token 기준 cache hit 비율은 약 98%였지만, 큰 cache rewrite가 함께 존재했습니다. 높은 hit rate 하나만으로 cache 정책이 최적이라고 결론 내릴 수 없습니다.
+- 요청 context는 중위 약 158K, p90 약 466K, 최대 약 622K였습니다. 평균값만 보면 장문 임계와 compaction 압력을 놓칩니다.
+- main과 subagent의 명목 비용 비중은 대략 68:32였습니다. 위임 횟수보다 각 subagent가 반복한 context와 model 선택이 비용을 크게 좌우했습니다.
+- 동일한 조사 유형에서 큰 model subagent 한 번과 작은 model subagent 한 번 사이에 수백 배의 명목 비용 차이가 관측되었습니다. 이 결과는 품질 동등성 증거가 아니므로 낮은 가격만으로 routing을 바꾸지 않습니다.
+- 5분 유휴 cache와 1시간 cache를 비교할 때, 긴 TTL은 더 비싼 cache write를 유휴 복귀의 재사용으로 회수해야 합니다. 짧은 session에서는 `long`이 자동으로 유리하지 않았으므로 기본값은 provider-aware `auto`를 유지합니다.
+
+이 수치는 개인 harness 튜닝의 방향만 설명합니다. 실제 project 이름, 요청 총량, 실제 보고·업무 records, folder별 집계는 공개 근거가 아닙니다.
+
+## 5. 모델 라우팅과 상태 경계
+
+현재 용도별 선택의 정본은 `omp/profiles.json`이며 `omp-profile list`와 `omp-profile show <이름>`으로 확인합니다. 문서에 과거 host의 전체 `modelRoles` snapshot을 복사하지 않습니다.
+
+확인된 상태 경계는 다음과 같습니다.
+
+- 역할 selector의 effort suffix는 agent frontmatter의 `thinking-level`보다 우선합니다.
+- `task.agentModelOverrides`의 role alias는 OMP의 model role로 해석됩니다.
+- `modelRoles.default`는 session이 현재 model을 바꿀 때 갱신할 수 있으므로 declarative drift 비교에서 예외로 둡니다.
+- 같은 provider의 OAuth account pinning이 먼저 작동하고, provider/model fallback은 그 다음 경계입니다. `/account`는 엄격한 billing lock이 아닙니다.
+- `/effort high`는 현재 session과 현재 model의 override입니다. `--profile`을 명시한 effort 명령과 `omp-profile effort set`만 공유 profile state를 수정합니다.
+- Candidate profile을 config에 적는 일은 benchmark 실행이나 최적성의 증거가 아닙니다. 실제 task, repetitions, failures, cost semantics를 함께 봅니다.
+
+## 6. 벤치마크 해석
+
+이 레포의 benchmark는 작은 개인 decision tool입니다. 결과를 보편적인 model leaderboard로 해석하지 않습니다.
+
+- model 비교에서는 harness, task, timeout, tools, skills, context policy, effort를 고정합니다.
+- harness 비교에서는 model과 task를 고정합니다. 둘을 동시에 바꾼 결과에 model 단독 원인을 붙이지 않습니다.
+- 합격률은 반복과 산포를 함께 보고, best run만 대표값으로 고르지 않습니다.
+- `Catalog est/task`, session-recorded `Actual/task`, subscription quota는 서로 다른 값입니다. 현금 청구액처럼 섞지 않습니다.
+- Public fixtures와 examples는 처음부터 synthetic이어야 합니다. Private work나 report를 이름만 바꿔 public corpus로 만들지 않습니다.
+- Oracle, protected path, clean-fixture preflight는 grading leakage와 broken task를 막지만 model contamination 전체를 보장하지 않습니다.
+
+외부 benchmark 방법론은 [BENCH-SURVEY](BENCH-SURVEY.md), 가격과 cache/long-context caveat는 [PRICING](PRICING.md), runner contract는 [bench README](../bench/README.md)에 있습니다.
+
+## 7. 공개 하네스 자산과 통합 관측
+
+- `skills/`는 personal/adopted skill source이고, `third-party/adopted-skills.json`은 provenance를 기록합니다. 외부 manager-owned skills는 public pins만 `third-party/skills.lock.json`에 남깁니다.
+- `herdr/plugins.manifest.json`은 public plugin repositories와 pins를 기록합니다. Managed checkout이나 binaries를 source tree에 복사하지 않습니다.
+- `herdr/cron/jobs.snapshot.yaml`은 intentionally empty입니다. Cost audit와 host-sync source가 존재한다는 사실은 scheduled job이 installed 또는 enabled라는 뜻이 아닙니다.
+- `agy/settings.snapshot.json`의 permissive policy는 personal example입니다. File-tool permission rules는 arbitrary shell access를 막는 sandbox가 아닙니다.
+- `harness-run`은 retained Herdr tab에서 long-running command와 independent agent를 시작하고 state/log를 XDG state directory에 둡니다. `--detach`는 handle만 반환하며 readiness를 증명하지 않습니다.
+- Built-in task agents는 OMP Agent Hub에 남습니다. `harness-run agent`는 별도 conversation이므로 explicit brief가 필요합니다.
+
+### WSL에서 Windows Chrome
+
+기록된 NAT-mode WSL 환경에서 Windows Chrome은 remote-debugging address를 지정해도 loopback에만 listen했고 WSL-to-host gateway access가 차단되었습니다. `skills/windows-chrome/scripts/windows-chrome.js`는 Windows `node.exe` relay를 process마다 interop으로 연결해 이를 우회합니다.
+
+WSL과 Windows가 같은 port를 쓰면 localhost forwarding과 relay가 서로 되돌아오는 loop가 생길 수 있어 WSL 9222와 Windows 19222를 분리합니다. Chrome이 반환하는 WebSocket URL은 request `Host` header를 따르므로 relay가 client-facing host로 normalize합니다. 이는 관측한 WSL/Chrome 조합의 mechanism이며 모든 network mode의 보장이 아닙니다.
+
+### Herdr와 AGY
+
+AGY의 print mode는 process cwd와 별도의 workspace를 선택할 수 있으므로 automation은 작업 directory를 명시해야 합니다. Model UI display name과 `--model` ID의 형식도 같다고 가정하지 않습니다.
+
+Herdr의 화면 기반 완료 감지는 integration마다 신뢰도가 다릅니다. Detached process, screen marker, or scheduler `success`는 실제 service readiness, final response, or remote publication proof가 아닙니다. `harness-run`은 exit state와 log를 보존하지만 caller가 intended outcome을 따로 확인해야 합니다.
+
+## 8. 모델 프로필·컨텍스트 정책의 근거 (2026-09-07)
+
+현재 정책의 정본은 `omp/profiles.json`입니다. Model guide, OMP catalog, runtime behavior를 분리해 해석합니다.
+
+- [OpenAI Compaction](https://developers.openai.com/api/docs/guides/compaction)의 `context_management`는 Responses request field입니다. 문서 예시 threshold는 보편적인 optimum이 아닙니다. Standalone compaction의 반환 window는 일부 item만 골라내지 않고 전체를 다음 request에 전달해야 합니다.
+- [Claude Compaction](https://platform.claude.com/docs/en/build-with-claude/compaction)은 beta와 strategy를 request와 replay 양쪽에 요구합니다. Minimum input token 조건에 못 미친 요청은 성공한 compaction으로 표시하지 않습니다.
+- Opaque provider state는 다른 provider로 그대로 옮기지 않습니다. Provider를 건널 때에는 human-readable portable handoff를 사용합니다.
+- Context trigger는 advertised maximum만이 아니라 effective window와 output reserve를 고려합니다. `extendedContext`가 false이면 premium long-context threshold가 있는 OMP catalog model의 effective window가 먼저 줄 수 있습니다.
+- [Codex config reference](https://learn.chatgpt.com/docs/config-file/config-reference)의 key는 Codex config contract입니다. 같은 model을 쓴다는 이유로 OMP config에 복사하지 않습니다.
+- Prompting guidance는 model-specific overlay에 필요한 차이만 둡니다. Common repository rules와 skills 전체를 모든 request에 중복 삽입하지 않습니다.
+
+### 적용·검증 결과
+
+기록된 구현 검증은 Bun 1.3.14와 OMP 18.1.13 compatibility source를 대상으로 했습니다.
+
+- Profile tests cover purpose/model effort precedence, session override isolation, shared-profile opt-in, context reserve, and protected provider switching.
+- Account tests cover provider-scoped selection, shared pin state, automatic selection return, and token non-copying.
+- `harness-run` tests cover argument preservation, nonzero exit, detached state, and independent-agent invocation.
+- Benchmark unit tests exercise selection, fixture protection, grading, cost-accounting boundaries, and dry-run without model calls.
+
+이 기록은 실제 사용자 계정의 model availability, provider uptime, paid API quality, 모든 host 조합을 증명하지 않습니다.
+
+### 기본 effort 명령의 세션 격리
+
+기본 `/effort <level>`은 현재 대화와 model에만 적용되고 shared OMP config를 쓰지 않습니다. `/effort reset`은 그 override를 제거합니다. `/profile`로 용도를 다시 고르면 선택한 model의 session override를 정리하고 profile value를 적용합니다.
+
+Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort 변경이 다른 쪽이나 shared config를 바꾸지 않는지를 확인합니다. Session replay는 `harness-session-effort` conversation entry를 사용합니다. `--profile`을 명시한 변경은 이 격리 계약의 의도적인 예외입니다.
+
+### 네이티브 compaction 구현·검증
+
+`omp/extensions/native-compaction`은 OMP 18.1.13의 compaction hook과 final request transform을 사용합니다. Opaque state는 session의 `preserveData.harnessNativeCompaction`에 chunk와 integrity hash로 보존하여 serialization truncation을 피합니다. `/clear` 이후에는 이전 state를 재사용하지 않습니다.
+
+- General OpenAI Responses adapter는 standalone compaction 반환 window 전체를 보존합니다. Codex transport에서 standalone endpoint가 지원되지 않은 관측 때문에 installed OMP의 native Responses transport와 trigger를 사용합니다.
+- Claude request와 replay 양쪽에 필요한 beta와 strategy를 포함합니다. Pause response를 committed compaction entry로 만든 뒤 다음 request에 replay합니다.
+- Manual native compaction 뒤 짧은 conversation에서도 portable handoff hook에 도달하도록 OMP 18.1.13 runtime patch가 event timeout과 hook gate를 조정합니다. 다른 event timeout은 넓히지 않습니다.
+- Usage for compaction iteration is stored separately in compaction details. Existing `omp stats` message total에 자동으로 합산된다고 주장하지 않습니다.
+- Regression tests cover full-window preservation, tool-call/result pairs, provider errors, cancellation, chunk integrity, session replay, usage accounting, and existing profile/account behavior.
+
+설치된 OMP process는 extension과 runtime patch를 읽도록 재시작해야 합니다. Upgrade 뒤에는 patch와 regression boundary를 다시 확인하며, 다른 OMP version에 자동 적용하지 않습니다.

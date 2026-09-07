@@ -1,0 +1,16 @@
+# git log --oneline (author: me) for 2026-03-12
+# format: <sha7> <type>(<scope>): <message>
+9a1c4f2 feat(atlas-portal): add order list filter panel skeleton (MR !31)
+2b7e5d1 feat(atlas-portal): wire the status and period filters to query params (MR !31)
+c48b0a6 fix(atlas-portal): keep pagination cursor when active filters change
+71d3e88 style(atlas-portal): align order table header spacing
+5f2a9c3 docs(atlas-portal): document filter query params in README
+a0c6b17 feat(beacon-api): add cursor pagination to /records, part 1 of 2 (MR !47)
+e93f4d5 test(beacon-api): cover cursor pagination boundaries
+bd15c72 fix(beacon-api): return 400 on a malformed cursor instead of 500
+36ae9f0 refactor(beacon-api): extract the cursor codec into its own module
+c7b48e2 chore(beacon-api): bump the internal schema version to 4
+48f0d29 feat(cobalt-cli): add the summarize subcommand
+1e6c3b4 feat(cobalt-cli): add --format json to summarize
+d52a7e1 fix(cobalt-cli): exit non-zero when the input file is missing
+0b4c1f6 docs(cobalt-cli): add summarize usage examples (MR !12)

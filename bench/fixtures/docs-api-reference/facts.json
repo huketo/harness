@@ -1,0 +1,52 @@
+{
+  "facts": [
+    {
+      "id": "factory-signature",
+      "hint": "createFeedClient의 전체 시그니처(매개변수 이름과 타입, 반환 타입)."
+    },
+    {
+      "id": "get-record-signature",
+      "hint": "FeedClient.getRecord의 전체 시그니처."
+    },
+    {
+      "id": "retry-signature",
+      "hint": "retryWithBackoff의 전체 시그니처(제네릭, 콜백 매개변수, 기본값이 있는 인수)."
+    },
+    {
+      "id": "cache-set-signature",
+      "hint": "MemoryCache.set의 전체 시그니처."
+    },
+    {
+      "id": "error-code-field",
+      "hint": "FeedError가 모든 인스턴스에 실어 보내는 필드의 선언(이름과 타입)."
+    },
+    {
+      "id": "timeout-error-parent",
+      "hint": "FeedTimeoutError의 클래스 선언과 상위 클래스."
+    },
+    {
+      "id": "decode-error-parent",
+      "hint": "FeedDecodeError의 클래스 선언과 상위 클래스."
+    },
+    {
+      "id": "closed-error-parent",
+      "hint": "닫힌 클라이언트를 다시 쓸 때 던지는 오류의 클래스 선언과 상위 클래스."
+    },
+    {
+      "id": "default-cache-ttl",
+      "hint": "기본 캐시 TTL 상수의 선언과 값(밀리초)."
+    },
+    {
+      "id": "default-cache-capacity",
+      "hint": "기본 캐시 용량 상수의 선언과 값(엔트리 수)."
+    },
+    {
+      "id": "default-retry-attempts",
+      "hint": "기본 재시도 횟수 상수의 선언과 값(첫 시도를 포함한 총 시도 수)."
+    },
+    {
+      "id": "backoff-schedule",
+      "hint": "지수 백오프의 기본 간격과 상한(밀리초). 두 값 모두 문서에 적는다."
+    }
+  ]
+}

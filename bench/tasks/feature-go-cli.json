@@ -1,0 +1,23 @@
+{
+  "id": "feature-go-cli",
+  "title": "Add a component ranking subcommand to a Go log CLI",
+  "class": "dev-feature",
+  "fixture": "fixtures/feature-go-cli",
+  "prompt": "로그 요약 CLI `logsum`에 컴포넌트 상위 집계 서브커맨드를 추가한다.\n\n## 목표\n지금 이 모듈은 `logsum levels <로그파일>` 하나만 지원한다. 어떤 컴포넌트가 로그를 가장 많이 만드는지 보려면 컴포넌트별 건수 상위 목록이 필요하고, 결과를 다른 도구에 넘길 수 있게 출력 형식도 고를 수 있어야 한다.\n\n## 수용 기준\n1. `logsum top [-n <건수>] [-format text|json|csv] <로그파일>` 서브커맨드가 동작한다. 주어진 로그 파일의 컴포넌트별 레코드 건수를 세어 건수 내림차순으로, 같은 건수면 컴포넌트 이름 오름차순으로 낸다. `-n`의 기본값은 5이고 0 이하이면 모든 컴포넌트를 낸다. 레코드가 없으면 행도 없다.\n2. 집계는 `internal/summary`에 두고, 출력 형식 렌더링은 새 패키지 `internal/format`에 둔다. 공개 계약은 다음과 같다. `summary.Top(records []parse.Record, limit int) []ComponentCount`, 필드가 `Component string`·`Count int`이고 JSON 태그가 각각 `component`·`count`인 `summary.ComponentCount`, `format.Components(w io.Writer, counts []summary.ComponentCount, name string) error`, 그리고 알 수 없는 출력 형식을 알리는 `format.ErrUnknown`.\n3. 출력은 다음 형식이다. `text`는 줄마다 `<컴포넌트> <건수>`. `json`은 객체 배열 하나를 한 줄로 쓰고 뒤에 개행 하나를 붙인다. 객체는 `component`(문자열)와 `count`(숫자) 키만 갖고 키 순서는 자유다. `csv`는 첫 줄이 `component,count`이고 이어지는 줄마다 `<컴포넌트>,<건수>`이며 줄 끝은 LF이다. 레코드가 없으면 `text`는 아무것도 쓰지 않고, `json`은 `null`이 아니라 `[]`를 쓰고, `csv`는 헤더 줄만 쓴다.\n4. 종료 코드는 이렇게 갈린다. `-format` 값이 text·json·csv가 아니면 2이고 이때 표준 출력에는 아무것도 쓰지 않는다. 로그 파일에 형식이 어긋난 줄이 있으면 `top`과 `levels` 둘 다 2다. 파일을 열 수 없으면 1이고, 모르는 서브커맨드도 1이다.\n5. 기존 동작은 그대로 남는다. `logsum levels <로그파일>`은 지금과 같은 텍스트 출력을 내고, `internal/parse`와 `internal/summary`의 기존 공개 함수 계약도 바뀌지 않는다.\n\n## 산출물 위치\n`main.go`, `internal/summary/`, 새 패키지 `internal/format/`. `cmd_test.go`, `internal/parse/parse_test.go`, `internal/summary/summary_test.go`, `testdata/`는 고치지 않는다.\n\n`go test ./...`로 확인할 수 있다.",
+  "verify": ["go", "test", "./..."],
+  "timeout_seconds": 420,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 36000,
+    "output": 3600,
+    "cacheRead": 21000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "cmd_test.go",
+    "internal/parse/parse_test.go",
+    "internal/summary/summary_test.go",
+    "testdata/app.txt",
+    "testdata/malformed.txt"
+  ]
+}

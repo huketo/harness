@@ -1,0 +1,47 @@
+{
+  "skill_name": "tdd",
+  "evals": [
+    {
+      "id": 1,
+      "name": "browser-completion",
+      "prompt": "Playwright 테스트에서 await submit.click() 직후 expect(probe.orders).toHaveLength(1)가 가끔 []로 실패합니다. 동일 SHA 재시도는 통과합니다. 팀원이 retries를 3으로 올리고 failOnFlakyTests를 끄자고 합니다. 다른 테스트는 잠깐 나타나는 성공 토스트를 못 봅니다. 제품 코드 변경 권한은 있습니다. 지금은 코드를 실행하거나 수정하지 말고 원인 판정, 검증 가능한 수정 형태, 최초 실패를 남기는 실행 계획을 제시하세요. 로컬 20회 통과면 해결이라고 해도 되는지 포함하세요.",
+      "expected_output": "Distinguishes race evidence from cause; observes completion without retry masking; preserves toast contract; bounded no-retry trace plan.",
+      "files": [],
+      "expectations": [
+        "일반 배열은 즉시 단정임을 구분하고 await한 관측형 poll 또는 완료 경계를 제안한다.",
+        "동일 SHA 재시도 통과로 제품 결함을 배제하거나 미확인 원인을 확정하지 않는다.",
+        "정상 flake 게이트를 유지하며 retries 0과 최초 실패 trace 보존을 함께 계획한다.",
+        "유한 반복 통과를 무결함 증명으로 취급하지 않고 실행 조건·실패를 보존한다.",
+        "토스트가 계약이면 coverage를 보존하고 단순 주문 완료 관측과 구분한다."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "vitest-isolation",
+      "prompt": "Vitest 4.1에서 두 테스트 파일이 같은 PostgreSQL DB를 TRUNCATE하며 테스트합니다. 각 worktree는 별도 Node 프로세스입니다. 한 파일은 test.concurrent 안에서 vi.useFakeTimers와 vi.stubEnv를 쓰고 afterEach에서 vi.restoreAllMocks만 호출합니다. fork pool로 바꾸고 worker를 늘리면 해결될까요? 실 DB의 커밋 후 조회 계약과 background worker의 지연을 검증해야 합니다. 지금은 실행·편집 없이 자원 소유, cleanup, 시간 제어와 반복 실행 계획을 구체적으로 작성하세요.",
+      "expected_output": "Recognizes external sharing and concurrent fake-global hazards; correct restorations; real IO and completion contract not blindly polled.",
+      "files": [],
+      "expectations": [
+        "별도 invocation의 외부 DB 소유권과 TRUNCATE 범위를 분리한다.",
+        "restoreAllMocks와 별도로 useRealTimers 및 unstubAllEnvs 복원을 명시한다.",
+        "concurrent 전역 변경은 cleanup 추가만으로 안전해지지 않음을 반영한다.",
+        "커밋 완료 계약은 별도 적절한 연결에서 즉시 관측하고 직접 SQL을 허용한다.",
+        "미확인 runner 옵션을 확정 명령으로 제시하지 않는다."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "tdd-contract",
+      "prompt": "기존 createOrder API에 idempotency key 중복 요청 시 한 주문만 영속 저장되는 동작을 TDD로 추가하려고 합니다. 기존 통합 테스트는 격리 DB와 직접 SQL 조회를 사용하고 외부 결제는 fake입니다. 담당자가 테스트 경계를 매번 사용자에게 확인하고, DB 조회·호출 횟수 단정을 전부 없애고, 리팩터링은 리뷰 때만 하라고 합니다. 이번 요청은 설계 판단과 수행 절차만이며 파일 변경·실행은 하지 마세요. 어떤 지침을 따를지, red 판단, green 뒤 단계, 영속성·정확히 한 번 결제 검증을 제시하세요. 추가로 문서 오타 수정에도 새 테스트를 만들어야 하는지 답하세요.",
+      "expected_output": "Autonomous established seam; valid durable SQL and external charge assertions; meaningful red; refactor after green; no doc-only test invention.",
+      "files": [],
+      "expectations": [
+        "이미 확립된 테스트 경계를 자율 재사용하며 반복 승인을 요구하지 않는다.",
+        "영속성 계약의 직접 SQL 관측을 허용한다.",
+        "외부 fake/provider의 청구 효과를 관측하고 로컬 주문 상태와 구분한다.",
+        "green 후 필요한 리팩터링과 재검증을 TDD 사이클 안에 둔다.",
+        "행동 assertion 실패를 red로 구분하고 문서 오타에 행동 테스트를 강제하지 않는다."
+      ]
+    }
+  ]
+}

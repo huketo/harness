@@ -1,0 +1,77 @@
+onboarding = false
+[ui]
+agent_panel_sort = "spaces"
+show_agent_labels_on_pane_borders = true
+
+status_indicators = "symbols"
+[ui.toast]
+delivery = "system"
+
+[experimental]
+pane_history = true
+
+# --- Agent Usage (usagebar) plugin ---
+
+# $provider is the billing provider (claude / codex / …), $limit the shortest
+# remaining window, $context the pane's context occupancy.
+[ui.sidebar.agents]
+row_gap = 0
+rows = [
+  ["state_icon", "$title"],
+  ["$provider", "$limit"],
+  ["$context"],
+]
+
+# Single-instance toggle for the Agent Usage pane (right split, 64 columns).
+# Not usagebar.open-limits: that action only opens, always at ratio 0.5.
+#
+# Two bindings on purpose. Windows Terminal has no Kitty keyboard protocol, so
+# ctrl+shift+<letter> arrives as plain ctrl+<letter> and herdr never sees the
+# shift. prefix+u is herdr's own "most reliable" form; f9 is the single-press
+# convenience. Drop whichever one you do not use.
+[[keys.command]]
+key = "prefix+u"
+type = "shell"
+command = "bash \"$HOME/.config/herdr/scripts/usagebar-toggle.sh\""
+description = "Agent Usage: toggle limits pane"
+
+[[keys.command]]
+key = "f9"
+type = "shell"
+command = "bash \"$HOME/.config/herdr/scripts/usagebar-toggle.sh\""
+description = "Agent Usage: toggle limits pane"
+
+# --- Herdr Sheep (huketo.sheep) plugin ---
+#
+# Two ways in, because they want different things:
+#
+#   open-here    an overlay over the pane you pressed the key in. Herdr restores
+#                the previous layout and focus when the pasture closes, so this
+#                is the "look at the whole flock for a second" key.
+#   toggle-side  a right-hand split that stays. Pressing it again closes the one
+#                that is open, wherever it is, so there is never a second one.
+#
+# `y` for 양. prefix+s is herdr's settings and prefix+p is previous_tab, so
+# neither is available; f10 is the single-press form of prefix+y, the same pair
+# usagebar uses above (prefix+u / f9).
+[[keys.command]]
+key = "prefix+y"
+type = "plugin_action"
+command = "huketo.sheep.open-here"
+description = "Sheep: pasture over this pane"
+
+[[keys.command]]
+key = "f10"
+type = "plugin_action"
+command = "huketo.sheep.open-here"
+description = "Sheep: pasture over this pane"
+
+[[keys.command]]
+key = "prefix+shift+y"
+type = "plugin_action"
+command = "huketo.sheep.toggle-side"
+description = "Sheep: toggle pasture side pane"
+
+[theme]
+name = "tokyo-night"
+auto_switch = false

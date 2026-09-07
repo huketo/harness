@@ -1,0 +1,5 @@
+# synthetic sample log with one broken record on line 4
+2024-05-01T00:00:01Z INFO api service started on port 9101
+2024-05-01T00:00:02Z WARN cache eviction rate above target
+2024-05-01T00:00:03Z TRACE db pool opened 4 connections
+2024-05-01T00:00:04Z INFO api GET /orders 200

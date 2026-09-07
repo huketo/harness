@@ -1,0 +1,22 @@
+{
+  "id": "infra-service-health",
+  "title": "Repair a local service supervisor and its environment file",
+  "class": "dev-infra-ops",
+  "fixture": "fixtures/infra-service-health",
+  "prompt": "헬스 서비스가 운영 규격대로 돌지 않는다.\n\n## 증상\n`bash verify.sh`가 실패한다. `run.sh`는 설정을 읽어 서비스를 한 번 띄우려 하지만 `127.0.0.1:18080`은 접속을 받지 않고, 서비스가 죽어도 다시 뜨지 않으며 로그와 pid 파일도 남지 않는다.\n\n## 수용 기준\n`README-ops.md`의 기동 조건을 모두 만족해야 한다.\n\n1. 서비스가 `127.0.0.1:18080`에서 접속을 받는다.\n2. `GET /healthz`가 200과 `{\"status\":\"ok\", ...}` JSON을 준다.\n3. 서비스를 강제 종료하면 supervisor가 서비스를 다시 띄운다. 재시작은 최대 3회이고, 4번째 종료 뒤에는 다시 띄우지 않고 supervisor 자신도 종료한다.\n4. 서비스의 표준 출력과 표준 오류가 기동할 때마다 둘 다 `logs/service.log`에 붙여 쓰인다. 재시작해도 앞선 실행이 남긴 줄이 지워지지 않는다.\n5. 지금 돌고 있는 서비스 프로세스의 pid가 `logs/service.pid`에 한 줄로 있고 재시작마다 갱신된다.\n6. supervisor와 그 자식이 모두 supervisor의 프로세스 그룹 안에 있다. 세션이나 프로세스 그룹을 분리하지 않으므로 그룹을 통째로 정리하면 남는 프로세스가 없다.\n\n## 산출물 위치\n`service.env`와 `run.sh`. `service/server.js`, `README-ops.md`, `verify.sh`, `expected/`는 고치지 않는다.\n\n`bash verify.sh`로 확인할 수 있다. 검증기는 실제로 서비스를 띄우고 강제 종료해 보며, 끝나면 자기가 띄운 프로세스를 정리한다. 검증기를 여러 번 돌릴 수 있지만 이전 실행이 남긴 프로세스가 포트를 잡고 있으면 진단을 내고 실패한다.",
+  "verify": ["bash", "verify.sh"],
+  "timeout_seconds": 360,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 25000,
+    "output": 2600,
+    "cacheRead": 14000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "verify.sh",
+    "expected/contract.env",
+    "service/server.js",
+    "README-ops.md"
+  ]
+}

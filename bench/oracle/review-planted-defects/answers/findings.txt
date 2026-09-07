@@ -1,0 +1,6 @@
+FINDING=repo/src/queue.ts:82:RACE
+FINDING=repo/src/cache.ts:46:MISSING_CLEANUP
+FINDING=repo/src/handler.ts:43:WRONG_ERROR_TYPE
+FINDING=repo/src/util/page.ts:34:OFF_BY_ONE
+FINDING=repo/src/watcher.ts:35:UNHANDLED_REJECTION
+FINDING=repo/src/server.ts:11:CONVENTION

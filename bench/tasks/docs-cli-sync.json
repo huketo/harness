@@ -1,0 +1,21 @@
+{
+  "id": "docs-cli-sync",
+  "title": "Resync a CLI README option table with --help",
+  "class": "docs-technical",
+  "fixture": "fixtures/docs-cli-sync",
+  "prompt": "`README.md`가 실제 CLI와 어긋나 있다.\n\n## 목표\n`bin/tool`은 여러 번 손질되면서 플래그가 늘고 기본값도 바뀌었지만 `README.md`는 그대로 남았다. 문서를 읽고 쓴 값으로 실행한 사람이 잘못된 기본값과 없어진 옵션에 걸리는 일이 반복된다. 문서를 지금의 CLI에 맞춘다.\n\n## 수용 기준\n1. 옵션 표에는 `bin/tool --help`가 내는 플래그가 빠짐없이 있고, `--help`에 없는 플래그는 표에도 문서 서술에도 남지 않는다. 코드 펜스와 HTML 주석 안은 문서가 서술하는 사실로 보지 않는다.\n2. 옵션 표의 기본값 칸은 `--help`가 내는 기본값과, 설명 칸은 `--help`가 내는 설명과 문자 그대로 같다. 값과 경로를 백틱으로 감싸는 것은 상관없다.\n3. 종료 코드 표(`| 코드 | 뜻 |`)의 코드와 뜻이 `--help`가 내는 종료 코드 목록과 같다.\n4. `--help`의 사용법 한 줄이 코드 펜스와 HTML 주석 밖에 그대로 정확히 한 번 들어 있다.\n5. 옵션 표의 헤더는 `| 플래그 | 기본값 | 설명 |` 그대로 두고, 같은 플래그 행이나 같은 종료 코드 행이 두 번 나오지 않는다. 문서의 나머지 서술도 지금의 CLI 동작과 어긋나지 않는다.\n\n## 산출물 위치\n`README.md`. `bin/tool`, `bin/lib.sh`, `verify.sh`는 고치지 않는다.\n\n`bash verify.sh`로 확인할 수 있다.",
+  "verify": ["bash", "verify.sh"],
+  "timeout_seconds": 300,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 22000,
+    "output": 1800,
+    "cacheRead": 12000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "bin/tool",
+    "bin/lib.sh",
+    "verify.sh"
+  ]
+}

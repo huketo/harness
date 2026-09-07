@@ -1,0 +1,23 @@
+{
+  "id": "feature-ts-endpoint",
+  "title": "Add filtering, sorting and pagination to the order endpoint",
+  "class": "dev-feature",
+  "fixture": "fixtures/feature-ts-endpoint",
+  "prompt": "## 목표\n\n주문 조회 서비스의 `GET /orders`가 지금은 저장된 주문 전체를 그대로 돌려줍니다. 조회 파라미터로 걸러내고, 정렬하고, 페이지로 나눌 수 있게 만듭니다.\n\n## 수용 기준\n\n1. 필터: `status`는 `pending`·`paid`·`shipped`·`cancelled` 중 하나와 정확히 일치하는 주문만 남깁니다. `customer`는 고객 이름에 대한 대소문자 구분 없는 부분 문자열입니다. 두 파라미터는 함께 쓸 수 있고, 아무것도 걸리지 않으면 빈 목록으로 답합니다.\n2. 정렬: `sort`는 `id`·`total`·`created_at` 중 하나이고 앞에 `-`를 붙이면 내림차순입니다. 값이 같은 주문은 오름차순·내림차순 어느 쪽에서도 `id` 오름차순으로 놓습니다. `sort`가 없으면 `id` 오름차순입니다.\n3. 페이지네이션: `page`는 1부터 시작하고 기본값은 1, `per_page`는 기본값 50이고 최대 100입니다. 마지막 페이지보다 뒤의 페이지는 상태 200과 빈 `orders`로 답하고, 이때도 선택된 집합 기준의 `total`과 `total_pages`를 그대로 알려 줍니다.\n4. 응답 본문은 `orders`, `total`, `page`, `per_page`, `total_pages` 다섯 키를 담습니다. `total`은 페이지로 자르기 전 선택된 주문 수이고, `total_pages`는 최소 1입니다. 주문 레코드의 필드 이름과 값은 바꾸지 않습니다.\n5. 잘못된 요청은 상태 400과 `{\"error\": \"<설명>\"}` 본문으로 답합니다. 대상은 알 수 없는 `status` 값, 알 수 없는 `sort` 값, 정수가 아니거나 허용 범위를 벗어난 `page`·`per_page` 값, 그리고 알 수 없는 파라미터 이름입니다.\n\n단건 조회 `GET /orders/<id>`와 기존 404·405 응답은 그대로 유지합니다.\n\n## 산출물\n\n`src/` 아래 제품 코드만 고칩니다. `tests/` 아래 파일은 고치지 않습니다. 테스트는 서버를 포트 0으로 띄워 실제 HTTP 요청으로 검사하며, 확인은 프로젝트 루트에서 `bun test`로 합니다.",
+  "verify": [
+    "bun",
+    "test"
+  ],
+  "timeout_seconds": 600,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 40000,
+    "output": 4500,
+    "cacheRead": 26000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "tests/orders.test.ts",
+    "tests/query.test.ts"
+  ]
+}

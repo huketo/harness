@@ -1,0 +1,17 @@
+{
+  "id": "bugfix-ts-cancel",
+  "title": "Honour cancellation between retry attempts",
+  "class": "dev-fix",
+  "fixture": "fixtures/bugfix-ts-cancel",
+  "prompt": "## 목표\n\n재시도 백오프 유틸리티가 취소 요청을 받은 뒤에도 시도를 한 번 더 실행합니다. 취소가 요청된 순간부터는 새 시도가 시작되지 않아야 합니다.\n\n## 재현\n\n프로젝트 루트에서 `bun test`를 실행하면 취소 동작을 재는 테스트가 실패합니다. 나머지 테스트는 통과합니다.\n\n## 수용 기준\n\n- 취소가 요청된 뒤에는 재시도 대상 함수가 다시 호출되지 않습니다(호출 횟수가 취소 시점의 값에서 늘지 않습니다).\n- 취소로 끝난 `retry` 호출은 `RetryAbortedError`로 거절됩니다.\n- 백오프 대기는 취소되면 남은 시간을 기다리지 않고 즉시 끝납니다.\n- 이미 통과하던 테스트는 계속 통과합니다.\n\n## 산출물\n\n`src/` 아래 제품 코드만 고칩니다. `tests/retry.test.ts`는 고치지 않습니다. 확인은 `bun test`로 합니다.",
+  "verify": ["bun", "test"],
+  "timeout_seconds": 240,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 20000,
+    "output": 1200,
+    "cacheRead": 10000,
+    "cacheWrite": 0
+  },
+  "protected_paths": ["tests/retry.test.ts"]
+}

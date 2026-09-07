@@ -1,0 +1,17 @@
+{
+  "id": "bugfix-python",
+  "title": "Fix an inclusive interval boundary",
+  "class": "dev-fix",
+  "fixture": "fixtures/bugfix-python",
+  "prompt": "Work only in this small Python project. Fix the production bug that makes the unittest suite fail. The function must report the inclusive number of integer positions from start through end, return zero only when end is before start, and keep raising TypeError for non-integer arguments. Do not edit the tests. Run python3 -m unittest to verify the fix.",
+  "verify": ["python3", "-m", "unittest"],
+  "timeout_seconds": 180,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 18000,
+    "output": 1000,
+    "cacheRead": 8000,
+    "cacheWrite": 0
+  },
+  "protected_paths": ["test_intervals.py"]
+}

@@ -1,0 +1,1 @@
+Carry out the agreed plan directly. Keep acceptance criteria, file ownership, and observed verification results explicit. For noncoding work, answer the requested question without inventing implementation work.

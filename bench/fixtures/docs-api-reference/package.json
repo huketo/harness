@@ -1,0 +1,11 @@
+{
+  "name": "feed-client",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Synthetic feed record client used by a benchmark fixture.",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

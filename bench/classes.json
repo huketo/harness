@@ -1,0 +1,67 @@
+{
+  "classes": {
+    "dev-feature": {
+      "title": "기능 구현",
+      "weight": 0.23,
+      "grading": "verify",
+      "harness_roles": ["default", "mid"],
+      "agent_overrides": ["task"]
+    },
+    "docs-technical": {
+      "title": "기술 문서",
+      "weight": 0.218,
+      "grading": "verify",
+      "harness_roles": ["default", "smol"],
+      "agent_overrides": ["scout"]
+    },
+    "dev-infra-ops": {
+      "title": "인프라·운영 설정",
+      "weight": 0.162,
+      "grading": "verify",
+      "harness_roles": ["default"],
+      "agent_overrides": []
+    },
+    "docs-business": {
+      "title": "사업·보고 문서",
+      "weight": 0.084,
+      "grading": "rubric",
+      "harness_roles": ["default"],
+      "agent_overrides": []
+    },
+    "dev-refactor": {
+      "title": "리팩터링",
+      "weight": 0.079,
+      "grading": "verify",
+      "harness_roles": ["default", "mid"],
+      "agent_overrides": ["task"]
+    },
+    "dev-test-ci": {
+      "title": "테스트·CI",
+      "weight": 0.062,
+      "grading": "verify",
+      "harness_roles": ["default", "mid"],
+      "agent_overrides": ["task"]
+    },
+    "dev-fix": {
+      "title": "버그 수정",
+      "weight": 0.057,
+      "grading": "verify",
+      "harness_roles": ["default"],
+      "agent_overrides": []
+    },
+    "research": {
+      "title": "조사·근거 답변",
+      "weight": 0.054,
+      "grading": "verify",
+      "harness_roles": ["default", "smol"],
+      "agent_overrides": ["scout"]
+    },
+    "dev-review": {
+      "title": "코드 리뷰",
+      "weight": 0.054,
+      "grading": "verify",
+      "harness_roles": ["default", "slow"],
+      "agent_overrides": ["reviewer"]
+    }
+  }
+}

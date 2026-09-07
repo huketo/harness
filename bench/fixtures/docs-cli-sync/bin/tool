@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# tool — 텍스트 파일의 줄 수와 단어 수를 센다.
+set -u
+
+TOOL_DIR="${BASH_SOURCE[0]%/*}"
+[[ $TOOL_DIR == "${BASH_SOURCE[0]}" ]] && TOOL_DIR="."
+# shellcheck disable=SC1091
+source "$TOOL_DIR/lib.sh"
+
+die() { # $1 = 종료 코드, $2 = 메시지
+  printf 'tool: %s\n' "$2" >&2
+  exit "$1"
+}
+
+FORMAT=$(flag_default --format)
+OUTPUT=$(flag_default --output)
+INCLUDE=$(flag_default --include)
+EXCLUDE=$(flag_default --exclude)
+MIN_LINES=$(flag_default --min-lines)
+SORT_BY=$(flag_default --sort)
+RETRIES=$(flag_default --retries)
+CACHE_DIR=$(flag_default --cache-dir)
+VERBOSE=$(flag_default --verbose)
+QUIET=$(flag_default --quiet)
+FAIL_FAST=$(flag_default --fail-fast)
+
+set_option() { # $1 = 플래그, $2 = 값
+  case $1 in
+    --format) FORMAT=$2 ;;
+    --output) OUTPUT=$2 ;;
+    --include) INCLUDE=$2 ;;
+    --exclude) EXCLUDE=$2 ;;
+    --min-lines) MIN_LINES=$2 ;;
+    --sort) SORT_BY=$2 ;;
+    --retries) RETRIES=$2 ;;
+    --cache-dir) CACHE_DIR=$2 ;;
+    --verbose) VERBOSE=$2 ;;
+    --quiet) QUIET=$2 ;;
+    --fail-fast) FAIL_FAST=$2 ;;
+    *) die 2 "알 수 없는 옵션: $1" ;;
+  esac
+}
+
+inputs=()
+while (( $# > 0 )); do
+  case $1 in
+    --help)
+      print_help
+      exit 0
+      ;;
+    --*=*)
+      set_option "${1%%=*}" "${1#*=}"
+      shift
+      ;;
+    --verbose | --quiet | --fail-fast)
+      set_option "$1" true
+      shift
+      ;;
+    --format | --output | --include | --exclude | --min-lines | --sort | --retries | --cache-dir)
+      (( $# >= 2 )) || die 2 "$1 에는 값이 필요하다"
+      set_option "$1" "$2"
+      shift 2
+      ;;
+    --*) die 2 "알 수 없는 옵션: $1" ;;
+    *)
+      inputs+=("$1")
+      shift
+      ;;
+  esac
+done
+
+[[ $FORMAT == text || $FORMAT == json ]] || die 2 "--format 은 text 또는 json 이어야 한다: $FORMAT"
+[[ $SORT_BY == name || $SORT_BY == lines ]] || die 2 "--sort 은 name 또는 lines 이어야 한다: $SORT_BY"
+[[ $MIN_LINES =~ ^[0-9]+$ ]] || die 2 "--min-lines 는 0 이상 정수여야 한다: $MIN_LINES"
+[[ $RETRIES =~ ^[0-9]+$ ]] || die 2 "--retries 는 0 이상 정수여야 한다: $RETRIES"
+(( ${#inputs[@]} > 0 )) || die 2 '입력 파일이 하나 이상 필요하다'
+
+names=()
+line_counts=()
+word_counts=()
+
+for path in "${inputs[@]}"; do
+  base=${path##*/}
+  # shellcheck disable=SC2053
+  [[ $base == $INCLUDE ]] || continue
+  if [[ $EXCLUDE != - && $base == $EXCLUDE ]]; then
+    continue
+  fi
+  counts=""
+  attempt=0
+  while (( attempt <= RETRIES )); do
+    if [[ -r $path ]]; then
+      counts=$(count_file "$path")
+      break
+    fi
+    attempt=$(( attempt + 1 ))
+  done
+  if [[ -z $counts ]]; then
+    [[ $QUIET == true ]] || printf 'tool: 읽을 수 없다: %s\n' "$path" >&2
+    if [[ $FAIL_FAST == true ]]; then
+      exit 1
+    fi
+    continue
+  fi
+  read -r lines words <<< "$counts"
+  if [[ -d $CACHE_DIR ]]; then
+    printf '%s\n' "$lines" > "$CACHE_DIR/${base}.lines"
+  fi
+  [[ $VERBOSE == true ]] && printf 'tool: %s 처리 (줄 %s)\n' "$path" "$lines" >&2
+  (( lines < MIN_LINES )) && continue
+  index=${#names[@]}
+  while (( index > 0 )); do
+    if [[ $SORT_BY == name ]]; then
+      [[ ${names[index - 1]} > $base ]] || break
+    else
+      (( line_counts[index - 1] < lines )) || break
+    fi
+    names[index]=${names[index - 1]}
+    line_counts[index]=${line_counts[index - 1]}
+    word_counts[index]=${word_counts[index - 1]}
+    index=$(( index - 1 ))
+  done
+  names[index]=$base
+  line_counts[index]=$lines
+  word_counts[index]=$words
+done
+
+render() {
+  local i
+  if [[ $FORMAT == json ]]; then
+    printf '['
+    for (( i = 0; i < ${#names[@]}; i++ )); do
+      (( i > 0 )) && printf ','
+      printf '{"name":"%s","lines":%s,"words":%s}' "$(json_escape "${names[i]}")" "${line_counts[i]}" "${word_counts[i]}"
+    done
+    printf ']\n'
+    return
+  fi
+  for (( i = 0; i < ${#names[@]}; i++ )); do
+    printf '%s %s %s\n' "${names[i]}" "${line_counts[i]}" "${word_counts[i]}"
+  done
+}
+
+if [[ $OUTPUT == - ]]; then
+  render
+else
+  render > "$OUTPUT"
+fi

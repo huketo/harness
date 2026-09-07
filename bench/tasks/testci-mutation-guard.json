@@ -1,0 +1,33 @@
+{
+  "id": "testci-mutation-guard",
+  "title": "Guard the money module with mutation-killing tests",
+  "class": "dev-test-ci",
+  "fixture": "fixtures/testci-mutation-guard",
+  "prompt": "## 목표\n\n금액 계산 모듈 `src/money.ts`에는 테스트가 하나도 없습니다. 이 모듈의 동작을 고정하는 테스트를 작성합니다.\n\n## 모듈이 보장해야 하는 동작\n\n- 반올림: 금액을 통화별 소수 자리수에 맞춰 반올림합니다. 정확히 절반인 값은 `half-even` 모드에서 가장 가까운 짝수 자리로, `half-up` 모드에서는 0에서 먼 쪽으로 갑니다.\n- 통화 소수 자리수: 통화마다 0자리·2자리·3자리로 다릅니다. 표에 없는 통화 코드는 `RangeError`이고, 상속된 속성 이름도 통화가 아닙니다.\n- 환율 변환: 환율표에 실린 방향은 표의 값을 곱하고, 실리지 않은 방향은 그 역수를 씁니다. 같은 통화끼리의 환율은 1이고, 변환 결과는 목표 통화의 자리수로 반올림합니다.\n- 합산: 각 항목을 반올림한 뒤 더하고, 합계를 한 번 더 반올림합니다. 지정한 통화와 다른 통화의 항목이 섞여 있으면 `RangeError`입니다.\n- 부호와 0: 음수는 양수와 대칭으로 반올림하고, 결과가 0이면 부호 없는 0입니다.\n\n## 수용 기준\n\n1. 테스트는 `tests/` 아래 `*.test.ts` 파일로 두고, 원본 모듈에서 전부 통과합니다.\n2. 채점기는 `mutations/` 아래에 있는 변이 7종을 하나씩 `src/money.ts` 자리에 놓은 임시 사본에서 같은 테스트를 다시 돌립니다. 변이 7종 모두에서 **실제로 실패한 테스트가 1개 이상** 나와야 합격입니다. 프로세스를 강제 종료하거나 테스트가 로드되지 않아 생긴 비정상 종료는 검출로 세지 않습니다.\n3. 위 다섯 영역의 동작을 모두 덮습니다. 경계값(정확히 절반인 금액, 0, 음수, 자리수가 0인 통화와 3인 통화, 통화가 섞인 합산, 알 수 없는 통화 코드)을 포함합니다.\n\n## 산출물\n\n`tests/` 아래 테스트 파일만 만듭니다. `src/`, `mutations/`, `verify.py`는 고치지 않습니다. 확인은 프로젝트 루트에서 `python3 -I verify.py`로 합니다.",
+  "verify": [
+    "python3",
+    "-I",
+    "verify.py"
+  ],
+  "timeout_seconds": 360,
+  "default_repetitions": 1,
+  "estimated_usage": {
+    "input": 32000,
+    "output": 4500,
+    "cacheRead": 20000,
+    "cacheWrite": 0
+  },
+  "protected_paths": [
+    "src/money.ts",
+    "src/index.ts",
+    "verify.py",
+    "mutations/README.md",
+    "mutations/convert-unrounded.ts",
+    "mutations/currency-decimals.ts",
+    "mutations/negative-sign.ts",
+    "mutations/rate-inverse.ts",
+    "mutations/rounding-mode.ts",
+    "mutations/sum-mixed-currency.ts",
+    "mutations/unknown-currency-default.ts"
+  ]
+}
