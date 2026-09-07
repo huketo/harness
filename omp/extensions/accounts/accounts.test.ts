@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type * as AuthModule from "@oh-my-pi/pi-ai/auth-storage";
+import type * as CodingAgentModule from "@oh-my-pi/pi-coding-agent";
 import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
@@ -21,9 +22,18 @@ import extension from "./index";
 const omp = Bun.which("omp");
 if (!omp)
 	throw new Error("Account integration tests require an installed OMP CLI.");
+const codingAgent = (await import(
+	Bun.resolveSync("@oh-my-pi/pi-coding-agent", dirname(realpathSync(omp)))
+)) as typeof CodingAgentModule;
+const { ModelRegistry } = codingAgent;
 const { AuthStorage, SqliteAuthCredentialStore } = (await import(
 	Bun.resolveSync("@oh-my-pi/pi-ai/auth-storage", dirname(realpathSync(omp)))
 )) as typeof AuthModule;
+const requestModel = {
+	provider: "openai-codex",
+	baseUrl: "https://chatgpt.com/backend-api/codex",
+	id: "gpt-5.1-codex",
+} as Parameters<InstanceType<typeof ModelRegistry>["getApiKey"]>[0];
 async function fixture() {
 	const dir = mkdtempSync(join(tmpdir(), "harness-accounts-"));
 	const stores: AuthModule.AuthStorage[] = [];
@@ -52,8 +62,9 @@ async function fixture() {
 			email: `person-${id}@example.test`,
 		})),
 	);
-	async function session(id: string, agentDir = dir) {
+	async function session(id: string, agentDir = dir, providerSessionId = id) {
 		const auth = await open();
+		const modelRegistry = new ModelRegistry(auth, join(dir, "models.yml"));
 		type Hook = (
 			event: { type: string; messages: unknown[] },
 			ctx: ExtensionCommandContext,
@@ -66,8 +77,9 @@ async function fixture() {
 		let picked: string | undefined;
 		// The extension only uses the modeled host capabilities below.
 		const ctx = {
-			model: { provider: "openai-codex" },
-			modelRegistry: { authStorage: auth },
+			model: requestModel,
+			modelRegistry,
+			sessionId: providerSessionId,
 			sessionManager: { getSessionId: () => id, getBranch: () => entries },
 			isIdle: () => true,
 			hasUI: false,
@@ -102,11 +114,12 @@ async function fixture() {
 				picked = label;
 			},
 			active: () =>
-				auth.listOAuthAccounts("openai-codex", id).find((a) => a.active)
-					?.accountId,
+				auth
+					.listOAuthAccounts("openai-codex", providerSessionId)
+					.find((a) => a.active)?.accountId,
 			request: async () => {
 				await event("context");
-				return auth.getApiKey("openai-codex", id);
+				return modelRegistry.getApiKey(requestModel, providerSessionId);
 			},
 		};
 	}
@@ -120,21 +133,52 @@ async function fixture() {
 	};
 }
 
+test("session account selection follows the provider request identity and survives resume", async () => {
+	const f = await fixture();
+	try {
+		const a = await f.session("transcript-a", f.dir, "provider-a");
+		await a.command("2");
+		expect(await a.request()).toBe("fake-access-2");
+		expect(await a.request()).toBe("fake-access-2");
+		const resumed = await f.session("transcript-a", f.dir, "provider-a");
+		expect(await resumed.request()).toBe("fake-access-2");
+	} finally {
+		f.close();
+	}
+});
+
+test("a runtime without request identity cannot save a misleading shared selection", async () => {
+	const f = await fixture();
+	try {
+		const a = await f.session("transcript-a", f.dir, "provider-a");
+		Reflect.deleteProperty(a.ctx, "sessionId");
+		await a.command("2 --profile");
+		expect(
+			await Bun.file(
+				join(f.dir, "harness-accounts/openai-codex.json"),
+			).exists(),
+		).toBe(false);
+	} finally {
+		f.close();
+	}
+});
+
 test("profile account overrides existing sessions and survives a new extension instance", async () => {
 	const f = await fixture();
 	try {
-		const a = await f.session("a");
-		const b = await f.session("b");
-		await b.command("2");
-		await a.command("1 --profile");
-		expect(await b.request()).toBe("fake-access-1");
-		const c = await f.session("c");
-		expect(await c.request()).toBe("fake-access-1");
-		await b.command("2");
-		expect(await b.request()).toBe("fake-access-1");
-		await c.command("2 --profile");
-		expect(await a.request()).toBe("fake-access-2");
+		const a = await f.session("a", f.dir, "provider-a");
+		const b = await f.session("b", f.dir, "provider-b");
+		await b.command("1");
+		await a.command("2 --profile");
 		expect(await b.request()).toBe("fake-access-2");
+		expect(await b.request()).toBe("fake-access-2");
+		const c = await f.session("c", f.dir, "provider-c");
+		expect(await c.request()).toBe("fake-access-2");
+		await b.command("1");
+		expect(await b.request()).toBe("fake-access-2");
+		await c.command("1 --profile");
+		expect(await a.request()).toBe("fake-access-1");
+		expect(await b.request()).toBe("fake-access-1");
 	} finally {
 		f.close();
 	}
@@ -143,8 +187,8 @@ test("profile account overrides existing sessions and survives a new extension i
 test("shared auto releases every session once without erasing later local choices on resume", async () => {
 	const f = await fixture();
 	try {
-		const a = await f.session("a");
-		const b = await f.session("b");
+		const a = await f.session("a", f.dir, "provider-a");
+		const b = await f.session("b", f.dir, "provider-b");
 		await a.command("1 --profile");
 		await b.request();
 		await a.command("auto --profile");
@@ -152,8 +196,23 @@ test("shared auto releases every session once without erasing later local choice
 		expect(b.active()).toBeUndefined();
 		await b.command("2");
 		expect(await b.request()).toBe("fake-access-2");
-		const resumed = await f.session("b");
+		const resumed = await f.session("b", f.dir, "provider-b");
 		expect(await resumed.request()).toBe("fake-access-2");
+	} finally {
+		f.close();
+	}
+});
+
+test("a local selection after an unseen shared auto revision survives the next request", async () => {
+	const f = await fixture();
+	try {
+		const a = await f.session("a", f.dir, "provider-a");
+		const b = await f.session("b", f.dir, "provider-b");
+		await a.command("1 --profile");
+		await b.request();
+		await a.command("auto --profile");
+		await b.command("2");
+		expect(await b.request()).toBe("fake-access-2");
 	} finally {
 		f.close();
 	}

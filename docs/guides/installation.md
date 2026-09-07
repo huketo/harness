@@ -67,7 +67,7 @@ harness-run --help
 | `omp/extensions/{accounts,profiles,herdr,native-compaction}` | Four `harness-*` links under `~/.omp/agent/extensions/`. |
 | `omp/profiles.ts`, `herdr/scripts/harness-run.ts` | `~/.local/bin/omp-profile` and `~/.local/bin/harness-run`. |
 | `agy/config/plugins/harness/` | Plugin link under `~/.gemini/config/plugins/`. Shared skills and existing personal instructions are linked into AGY's global slots. |
-| `omp/native-runtime.ts` | Patches the installed OMP CLI bundle and SDK source files for native compaction. Originals remain beside them as `.harness-native-original`. |
+| `omp/native-runtime.ts` | Patches the installed OMP CLI bundle and SDK source files for native compaction and account selection by the actual provider request session ID. Originals remain beside them as `.harness-native-original`. |
 | `--with-config` only | Applies managed values through `omp config set`; it does not copy the example snapshot over live configuration. |
 
 Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, or real skill directory is a conflict, not permission to overwrite it. Correct links are left unchanged. See [ownership rules](../REPO.md).

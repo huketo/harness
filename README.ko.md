@@ -60,7 +60,7 @@ OMP 안에서:
 /native-compact portable
 ```
 
-- `/account`는 OMP의 기존 OAuth 세션 pin을 사용합니다. 공급자 fallback이 다른 계정을 선택할 수 있으므로 엄격한 과금 잠금은 아닙니다.
+- `/account`는 OMP의 기존 OAuth 세션 pin을 사용하며 런타임 호환 패치 설치가 필요합니다. 설치 후 OMP를 재시작하세요. 공급자 fallback이 다른 계정을 선택할 수 있으므로 엄격한 과금 잠금은 아닙니다.
 - `/effort high`는 현재 세션·모델만 변경합니다. `--profile`을 붙이면 공용 프로필 상태를 명시적으로 변경합니다.
 - 네이티브 압축은 유료 공급자 API를 호출할 수 있습니다. Portable 인계문은 공급자 이동용이며 공급자 고유 상태와 같은 형식이 아닙니다.
 

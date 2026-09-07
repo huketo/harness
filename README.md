@@ -60,7 +60,7 @@ Inside OMP:
 /native-compact portable
 ```
 
-- `/account` uses OMP's existing OAuth session pinning. Provider fallback can still select another account; this is not a strict billing lock.
+- `/account` uses OMP's existing OAuth session pinning and requires the installed runtime compatibility patch. Restart OMP after installation. Provider fallback can still select another account; this is not a strict billing lock.
 - `/effort high` changes the current session and model. Adding `--profile` explicitly changes shared profile state.
 - Native compaction can call paid provider APIs. A portable handoff is for crossing providers; it is not interchangeable with provider-native state.
 

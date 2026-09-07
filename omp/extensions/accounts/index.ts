@@ -39,6 +39,17 @@ interface ProfileAccount {
 }
 
 type SaveProfile = (credentialId: number | null) => void;
+
+function requestSessionId(ctx: ExtensionContext): string {
+	const sessionId = (ctx as ExtensionContext & { sessionId?: string })
+		.sessionId;
+	if (!sessionId)
+		throw new Error(
+			"Account routing requires the OMP runtime patch. Apply omp/native-runtime.ts and restart OMP.",
+		);
+	return sessionId;
+}
+
 const PROFILE_ENTRY = "harness-account-profile";
 
 function profilePath(agentDir: string, provider: string): string {
@@ -328,7 +339,7 @@ export default function accountsExtension(pi: ExtensionAPI): void {
 		const state = readProfile(agentDir, provider);
 		if (!state) return;
 		const auth = ctx.modelRegistry.authStorage;
-		const sessionId = ctx.sessionManager.getSessionId();
+		const sessionId = requestSessionId(ctx);
 		if (state.credentialId !== null) {
 			await auth.reload();
 			if (
@@ -443,7 +454,7 @@ export default function accountsExtension(pi: ExtensionAPI): void {
 					return;
 				}
 				await syncProfile(ctx);
-				const sessionId = ctx.sessionManager.getSessionId();
+				const sessionId = requestSessionId(ctx);
 				const authStorage = ctx.modelRegistry.authStorage;
 
 				// Refresh from the backing store (broker or local SQLite) before

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+	patchAccountSessionIdentity,
 	patchCompactionTimeout,
 	patchNativePreparation,
 } from "./native-runtime";
@@ -17,6 +18,22 @@ test("only native compaction receives the API deadline; shutdown and ordinary ho
 	expect(patchCompactionTimeout(patched)).toBe(patched);
 });
 
+test("extension contexts expose the provider request identity used by ModelRegistry", () => {
+	const source =
+		'class Runner{extensions;runtime;sessionManager;modelRegistry;settings;localProtocolOptions;constructor(e,t,s,n,o,r,i,a,l){this.extensions=e;this.runtime=t;this.sessionManager=n;this.modelRegistry=o;this.settings=i;this.localProtocolOptions=a;this.memory=r;this.snapshot=l??(()=>null)}createContext(){return{sessionManager:this.sessionManager,modelRegistry:this.modelRegistry}}}let ready=false,manager={getSessionId:()=>"transcript"},session={sessionId:"provider",getAsyncJobSnapshot:()=>null},extensions={extensions:[],runtime:{}};let runner=new Runner(extensions.extensions,extensions.runtime,"cwd",manager,{},()=>ready?{}:void 0,{},null,()=>ready?session.getAsyncJobSnapshot():null)';
+	const patched = patchAccountSessionIdentity(source);
+	const state = new Function(
+		`${patched};return {runner,activate:()=>{ready=true}}`,
+	)() as {
+		runner: { createContext(): { sessionId: string } };
+		activate(): void;
+	};
+	expect(state.runner.createContext().sessionId).toBe("transcript");
+	state.activate();
+	expect(state.runner.createContext().sessionId).toBe("provider");
+	expect(patchAccountSessionIdentity(patched)).toBe(patched);
+});
+
 test("unrecognized or ambiguous OMP runtime is not patched", () => {
 	expect(() =>
 		patchCompactionTimeout("function changed(){return 30000}"),
@@ -24,6 +41,9 @@ test("unrecognized or ambiguous OMP runtime is not patched", () => {
 	const source =
 		'function a(e){return e==="session_shutdown"?x:y}function b(e){return e==="session_shutdown"?x:y}';
 	expect(() => patchCompactionTimeout(source)).toThrow("구조가 변경");
+	expect(() => patchAccountSessionIdentity("class Changed {}")).toThrow(
+		"구조가 변경",
+	);
 });
 
 test("a persisted native window reaches the compaction hook even with a small new transcript", () => {

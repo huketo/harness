@@ -290,7 +290,7 @@ migrate_file "$REPO/herdr/plugins/usagebar.config.toml" "$HOME/.config/herdr/plu
 
 # OMP caps ordinary extension observers at 30s; native compaction needs its API deadline.
 if $DRY_RUN; then
-  echo "would apply OMP native compaction runtime compatibility patch"
+  echo "would apply OMP account routing and native compaction runtime compatibility patches"
 else
   bun "$REPO/omp/native-runtime.ts"
 fi

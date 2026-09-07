@@ -6,13 +6,13 @@
 
 ## 계정·모델·보이는 실행
 
-`bash install.sh`는 OMP 확장 네 개(accounts, profiles, herdr, native-compaction)와 `omp-profile`, `harness-run` 명령을 연결합니다. 설치 후 OMP를 재시작합니다. 계정 선택은 인증 저장소를 복제하지 않지만 네이티브 압축은 OMP 18.1.13 전용 런타임 호환 패치를 설치합니다.
+`bash install.sh`는 OMP 확장 네 개(accounts, profiles, herdr, native-compaction)와 `omp-profile`, `harness-run` 명령을 연결하고, 계정 선택·네이티브 압축을 위한 OMP 18.1.13 전용 런타임 호환 패치를 설치합니다. 인증 저장소를 복제하지 않습니다. 설치 후 OMP를 재시작합니다.
 
 ### 계정 선택
 
-OMP에서 `/account`를 입력하면 현재 모델의 provider에 등록된 OAuth 계정 선택기가 열립니다. `/account list`로 목록을 보고 `/account 1`처럼 번호로 선택할 수도 있습니다. `/account auto`는 자동 선택으로 돌립니다. API 키나 환경 변수 인증은 이 OAuth 계정 목록과 별개입니다.
+OMP에서 `/account`를 입력하면 현재 모델의 provider에 등록된 OAuth 계정 선택기가 열립니다. `/account list`로 목록을 보고 `/account 1`처럼 번호로 선택할 수도 있습니다. `/fresh` 등으로 대화 기록 ID와 모델 요청의 세션 ID가 달라진 상태에서도 `/account`는 실제 요청 ID에 선택을 적용합니다. `/account auto`는 자동 선택으로 돌립니다. API 키나 환경 변수 인증은 이 OAuth 계정 목록과 별개입니다.
 
-`/account 1 --profile`은 현재 provider의 계정을 **공용으로 저장하고 다른 세션에도 일괄 적용**합니다. 같은 OMP agent 디렉터리를 사용하는 기존 세션과 새 세션이 대상이며, 기존 세션별 선택보다 우선합니다. 현재 세션은 즉시, 다른 세션은 다음 모델 요청 전(도구 실행 후 이어지는 요청 포함)에 반영합니다. 진행 중인 요청은 중단하지 않습니다. 이미 실행 중인 세션에는 먼저 `/reload-plugins`로 새 확장을 로드해야 합니다.
+`/account 1 --profile`은 현재 provider의 계정을 **공용으로 저장하고 다른 세션에도 일괄 적용**합니다. 같은 OMP agent 디렉터리를 사용하는 기존 세션과 새 세션이 대상이며, 기존 세션별 선택보다 우선합니다. 현재 세션은 즉시, 다른 세션은 다음 모델 요청 전(도구 실행 후 이어지는 요청 포함)에 반영합니다. 진행 중인 요청은 중단하지 않습니다. **호환 패치 설치 전부터 실행 중인 OMP는 재시작해야 합니다.** `/reload-plugins`만으로는 CLI 런타임이 갱신되지 않으며, 요청 ID를 제공하지 않는 런타임에서는 계정 변경을 거부하고 설치·재시작을 안내합니다.
 
 `/account --profile`은 공용 계정 선택기, `/account list --profile`은 공용 선택 상태를 포함한 목록입니다. `/account auto --profile`은 공용 고정을 해제하고 다른 세션의 선택도 다음 요청 전 자동 선택으로 돌립니다. 이후 `/account 1` 같은 세션별 선택을 다시 사용할 수 있습니다. 공용 고정 중에는 `--profile` 없는 변경을 막고 해제 방법을 안내합니다.
 
@@ -55,7 +55,7 @@ Fable 5.1·Astra는 high를 비교 시작값으로 둡니다. Opus 5·Sol은 코
 
 Claude의 네이티브 압축에는 최소 50,000 입력 토큰이 필요합니다. 짧은 대화·API 오류·취소를 압축 성공으로 표시하지 않으며, 원본 대화를 유지합니다. 압축 상태는 세션에 청크와 무결성 해시로 저장하여 OMP의 긴 문자열 잘림을 피하고 재개 시 복원합니다. 압축 사용량은 compaction 엔트리의 `details.usage`와 `details.totals`에 기록합니다. Claude는 `usage.iterations`를 합산하며, 이 별도 압축 비용을 기존 `omp stats`의 메시지 비용 총액에 자동 합산하지는 않습니다.
 
-`bash install.sh`는 확장 링크와 **OMP 18.1.13 전용 호환 패치**를 설치합니다. 패치는 압축 이벤트만 180초까지 허용하고, 이미 압축된 짧은 대화도 portable 변환 훅에 도달하게 합니다. 확장의 인증·API 작업 제한은 합계 170초입니다. CLI 번들과 SDK 소스 원본은 각각 `.harness-native-original`로 보존합니다. 다른 버전·예상과 다른 코드에는 적용하지 않습니다.
+`bash install.sh`는 확장 링크와 **OMP 18.1.13 전용 호환 패치**를 설치합니다. 압축 관련 패치는 압축 이벤트만 180초까지 허용하고, 이미 압축된 짧은 대화도 portable 변환 훅에 도달하게 합니다. 같은 설치 경로가 위 계정 선택의 요청 세션 ID도 확장에 제공합니다. 확장의 인증·API 작업 제한은 합계 170초입니다. CLI 번들과 SDK 소스 원본은 각각 `.harness-native-original`로 보존합니다. 다른 버전·예상과 다른 코드에는 적용하지 않습니다.
 
 ```bash
 bun omp/native-runtime.ts --check

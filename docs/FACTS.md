@@ -68,6 +68,14 @@ Benchmark는 session usage를 사후 집계하므로 후보 실행에 session을
 - `/effort high`는 현재 session과 현재 model의 override입니다. `--profile`을 명시한 effort 명령과 `omp-profile effort set`만 공유 profile state를 수정합니다.
 - Candidate profile을 config에 적는 일은 benchmark 실행이나 최적성의 증거가 아닙니다. 실제 task, repetitions, failures, cost semantics를 함께 봅니다.
 
+### 계정 선택의 실제 요청 검증 (2026-09-07)
+
+OMP 18.1.13에서 `/fresh`, 컨텍스트 초기화, 명시적 provider session ID는 대화 기록 ID와 실제 요청 ID를 분리할 수 있습니다. 기존 확장은 기록 ID에만 계정을 고정해 이 조건에서 선택 표시와 실제 요청 계정이 달라졌습니다. 런타임 호환 패치가 실제 `AgentSession.sessionId`를 확장에 전달하며 `/account`는 그 ID로 pin·해제·공용 동기화를 수행합니다.
+
+`bun test omp/extensions/accounts/accounts.runtime.test.ts`는 compiled CLI를 별도 RPC 프로세스로 실행하고, 합성 OAuth와 loopback Codex Responses 서버에서 실제 `Authorization`을 관측합니다. 일반 동일-ID 경로는 수정 전에도 통과했고, 분리된 ID의 연속 요청·재개와 공용 선택의 기존/새 세션·도구 continuation 경로는 계정 2 대신 1을 보내 실패했습니다. 패치한 CLI 복사본과 수정 확장으로 같은 시나리오가 통과했습니다. 변경 후 sibling 격리와 기존 local 선택보다 공용 선택이 우선하는 경로도 검사합니다. 이는 실제 CLI 요청 경로의 증거이며, 실제 OAuth 계정이나 유료 서버의 인증·한도 복구를 실행한 결과는 아닙니다.
+
+설치 런타임에 패치를 적용한 뒤 두 배포 트리에서 `bun test omp/extensions omp/native-runtime.test.ts herdr/scripts/harness-run.test.ts`가 각각 **47 passed, 139 assertions**로 통과했습니다. `bun omp/native-runtime.ts --check`, 변경한 TypeScript 파일의 `biome check`, `bash -n install.sh`도 통과했습니다. 실제 CLI 회귀 3개는 합계 16개 HTTP 요청을 관측하며, 별도 시작 실패·ready timeout 주입에서 생성한 자식 프로세스가 모두 종료된 것도 확인했습니다.
+
 ## 6. 벤치마크 해석
 
 이 레포의 benchmark는 작은 개인 decision tool입니다. 결과를 보편적인 model leaderboard로 해석하지 않습니다.
