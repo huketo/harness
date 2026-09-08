@@ -34,14 +34,32 @@ herdr agent prompt <name> "Read <절대경로>/brief.md and carry it out exactly
 herdr agent read <name> --source recent-unwrapped --lines 120
 ```
 
-- `--wait`는 `idle`/`done`/`blocked` 중 첫 안정 상태에서 돌아온다. omp는 확장이 생명주기를 직접 보고하므로 이 값이 정확하다(응답의 `screen_detection_skipped: true`).
+- `--wait`는 `idle`/`done`/`blocked` 중 첫 안정 상태에서 돌아온다. omp 확장의 `screen_detection_skipped: true`는 생명주기 보고 경로를 뜻하며, 개별 요청의 산출물 완성을 증명하지 않는다. 실행 중 steering을 보냈다면 이전 생성의 종료와 인계 답변의 완료를 구분한다.
 - 여러 줄 프롬프트도 받지만, 브리프는 파일로 두고 프롬프트는 한 줄로 유지한다. agy와 같은 규약을 쓰기 위해서다.
 - `omp-profile`이 설치되어 있으면 `omp-profile list`로 용도를 고르고 `omp-profile selector <용도>`가 반환한 전체 `provider/model:effort`를 `--model`에 넘긴다. 없으면 `omp models`로 확인하여 전체 셀렉터와 effort를 명시한다. 리뷰어는 워커와 모델 계열이 다른 후보를 고른다. 역할 설정이나 전역 기본 모델은 바꾸지 않는다.
 - `--approval-mode yolo`는 승인창을 없앤다. 워크트리 안에서만 일하는 브리프에 쓴다.
 - 이미 `blocked`인 에이전트에 `prompt`를 보내면 `agent_blocked`로 거절된다. 먼저 `agent read`로 화면을 읽고 `send-keys`로 답한다.
-- 화면에 제공자 오류(예: `stream error ... Overloaded`)가 반복되고 상태가 `working`에서 돌아오지 않으면 그 세션은 회복하지 않는다. `send-keys <name> ctrl+c ctrl+c`로 종료하고 같은 페인에 `agent start`로 새 세션을 만들어 브리프를 다시 보낸다. `--resume`으로 이어 가지 않는다. 워크트리의 `git status`로 죽기 전 진행을 확인하고, 커밋되지 않은 변경이 있으면 새 워커의 프롬프트에 그 사실을 적는다.
-- 같은 오류가 두 세션 이상에서 나오면 제공자 장애다. 제공자 상태 페이지로 확인하고, 그 뒤로 새로 만드는 세션은 다른 제공자의 모델로 띄운다. 오케스트레이터 자신은 바꾸지 않는다. 계열이 바뀐 목소리·리뷰어는 이름과 기록에 실제 계열을 적어 다양성 부족을 숨기지 않는다.
+- 제공자 오류나 `working` 정체가 반복되면 `agent get`/`agent read`로 현재 오류·진행·대기 중 입력을 확인한다. timeout만으로 세션이 복구 불가능하다고 단정하거나 같은 요청을 반복 전송하지 않는다. 인계가 필요하면 원 agent가 편집을 멈춘 사실과 남은 범위·승인·프로세스를 확보한 뒤 소유권을 옮긴다. 긴 답변이 화면에서 잘리면 임시 인계 파일을 요청한다. 생성 취소와 프로세스 종료는 다르며, 원 세션·dirty work는 보존한다.
+- 제공자 전환은 실제 장애 근거와 기존 모델 승인 범위를 확인한 뒤 새 세션에서 한다. 오케스트레이터의 모델·effort를 임의로 바꾸지 않는다. 실제 모델 계열을 기록해 실행기만 다른 같은 계열을 독립된 목소리로 세지 않는다.
 - `send-keys <name> ctrl+c ctrl+c`는 omp와 agy 모두를 종료한다. 종료되면 에이전트 이름이 풀리고 페인은 셸 프롬프트로 돌아온다.
+
+## 제한 reviewer
+
+일반 `reviewer` 역할이나 `--approval-mode yolo`는 읽기 전용 권한 경계가 아니다. 리뷰에는 Harness SDK 진입점을 사용한다. PATH의 실제 `omp` 설치에서 SDK를 해석하므로 별도 패키지 다운로드나 설치본 패치가 필요하지 않다.
+
+```sh
+bun --no-install <harness>/omp/review.ts \
+  --cwd <worktree> --profile <purpose> --inspect-tools
+bun --no-install <harness>/omp/review.ts \
+  --cwd <worktree> --profile <purpose> \
+  --brief "Read <state>/slices/<slice>/review-brief.md and review its supplied diff."
+```
+
+`--inspect-tools`는 모델을 호출하지 않는다. enabled/registered/bridge 목록은 모두 `glob`, `grep`, `read`이며 mounted tools·extensions는 비고 MCP는 꺼져 있어야 한다. bridge 목록이 존재해도 eval 도구는 등록하지 않는다. 다른 capability가 보이면 진입점이 모델 호출 전에 거부한다.
+
+`--model <provider/id>`와 `--thinking <effort>`는 이번 reviewer에만 적용하는 명시적 override다. 그 외에는 프로필의 저장된 선택을 따른다. native 압축 순서는 이 프로세스의 읽기 전용 설정에서 `remote/handoff/soft`로 제한하며, 전역 설정과 계정·압축 확장을 변경하지 않는다. 파일·artifact 읽기는 유지한다.
+
+stdout의 최종 판정은 오케스트레이터가 review 파일로 저장한다. 실패한 프로세스나 빈 출력을 완료로 세지 않는다. 이 경로는 모델 도구의 capability 경계이며 OS 파일 읽기 sandbox나 자격증명 격리를 뜻하지 않는다.
 
 ## agy 에이전트
 
@@ -83,7 +101,7 @@ done
 
 `sleep`을 넣은 셸 루프, `agent list`·`pane read`·`wc`·`ps`를 반복하는 폴링은 쓰지 않는다. 상태 변화는 `agent wait`가 알려 준다. `agent list`는 웨이브 전체를 한 번 훑어볼 때만 쓴다.
 
-`agent wait`가 돌아오면 상태별로 처리한다. `done`이면 `report.md`의 마지막 줄이 `REPORT_DONE`인지 확인하고 슬라이스 루프로 넘긴다(agy는 화면 감지라 이 확인이 완료 판정이다). `blocked`면 `agent read`로 원인을 본다. `--timeout`으로 끝났으면 `agent read`로 진행을 확인하고, 같은 자리에서 맴돌면 `handoff.md`를 쓰게 한 뒤 교체한다. `unknown`은 완료의 증거가 아니다.
+`agent wait`가 돌아오면 상태별로 처리한다. `idle`/`done`이면 이번 요청의 `report.md`와 마지막 `REPORT_DONE`까지 확인한 뒤 슬라이스 루프로 넘긴다. `blocked`면 `agent read`로 원인을 본다. timeout은 승인·완료·종료의 증거가 아니다. 읽기에서 실제 진행이 확인되면 다시 기다리고, 같은 지점의 정체가 확인되면 원인 조사나 안전한 인계를 선택한다. `unknown`은 완료의 증거가 아니다.
 
 CLI 읽기는 `done`을 `idle`로 바꾸지 않는다. 사이드바에 `done`이 쌓이는 것은 정상이다.
 

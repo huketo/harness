@@ -15,11 +15,11 @@ description: Herdr에서 독립 구현을 여러 워크트리의 에이전트로
 | --- | --- | --- |
 | 오케스트레이터 | 이 세션 | 분해, 브리프, 감시, 검수 판정, 통합, 사람과의 유일한 접점 |
 | 워커 | omp | 슬라이스 하나를 자기 워크트리에서 구현하고 브랜치에 커밋, `report.md` 작성 |
-| 리뷰어 | 워커와 다른 모델 계열 | 워커의 대화를 모른 채 diff만 보고 [references/review.md](references/review.md) 기준으로 판정 |
+| 리뷰어 | 제한 SDK 진입점, 워커와 다른 모델 계열 | 미리 저장된 diff와 파일만 읽고 [references/review.md](references/review.md) 기준으로 stdout 판정 |
 | 스카우트 | agy 또는 omp | 웹·문서 조사. 출처 URL 필수 |
 | 쿼럼 | 세 계열 혼합 | 갈리는 기술 결정을 `herdr-quorum` 스킬로 결정 |
 
-실행기 선택. `herdr integration status`에서 `current`인 종류만 쓴다. 기본은 omp다. Herdr 확장이 omp의 생명주기(`idle`/`working`/`done`)를 직접 보고해 `--wait`가 정확하다. agy는 훅이 세션 식별자만 보고하고 상태는 화면 감지라서, 완료 판정은 `--wait`가 아니라 산출물 파일로 한다(launch.md). 웹 조사가 강한 실행기를 스카우트에, 나머지는 리뷰어·쿼럼의 다른 계열로 쓴다.
+실행기 선택. `herdr integration status`에서 `current`인 종류만 쓴다. 기본 워커는 omp다. Herdr의 생명주기와 산출물 완료는 구분한다. 실행·대기·인계 판정은 [launch.md](references/launch.md)가 소유하며, 리뷰는 그 문서의 제한 reviewer 경로를 따른다. 웹 조사에 적합한 실행기를 스카우트에 사용한다.
 
 모델 다양성. 독립 리뷰가 필요하면 워커와 다른 모델 계열과 새 컨텍스트를 우선한다. 독립성은 확인 가능한 근거를 대신하지 않는다. `omp models`와 `herdr integration status`로 후보를 확인하고 실제 모델 계열을 기록한다. AGY의 Claude와 OMP의 Claude를 다른 계열로 세지 않는다.
 
@@ -90,8 +90,8 @@ herdr agent prompt <run>-work-<slice> "Read <state>/slices/<slice>/brief.md and 
 슬라이스 하나는 평가-최적화 루프다. 회차마다 리뷰어는 새 컨텍스트다.
 
 1. `report.md`에 `REPORT_DONE`이 있고 브랜치에 커밋이 있는지 확인한다. 없으면 완료가 아니다.
-2. 수용 기준의 명령을 `verify:<slice>` 페인에서 직접 돌린다(`pane run` + `wait-output`). 워커의 "통과했다"는 근거가 아니라 주장이다.
-3. 리뷰어를 새로 띄우고 [references/review.md](references/review.md)의 리뷰어 브리프를 준다. 입력은 diff 명령, 브리프의 수용 기준, 저장소 관례 문서 경로다. 워커의 `report.md`는 리뷰어가 diff 판정을 끝낸 뒤에만 읽게 한다.
+2. 수용 기준의 명령을 직접 실행한다. 짧은 검증은 native 도구로, 오래 걸리거나 사람이 관찰·조작할 실행은 명시한 Herdr 페인으로 수행한다. 워커의 "통과했다"는 근거가 아니라 주장이다.
+3. [references/launch.md](references/launch.md)의 제한 reviewer를 새 컨텍스트로 실행하고 [references/review.md](references/review.md)의 브리프를 준다. 오케스트레이터가 저장한 diff와 커밋 목록, 수용 기준, 관례 문서 경로를 입력으로 제공하고 stdout 판정을 review 파일에 저장한다. 워커의 `report.md`는 첫 판정 뒤에만 대조한다.
 4. `review-<n>.md`의 `blocking`을 근거(`file:line`, 재현 명령, 참고 URL)로 판정한다. 확인되지 않은 주장을 그대로 워커에게 보내지 않는다. 확인된 `blocking`이 없으면 통과하며, 반복 검토는 새 결함·변경·근거가 있을 때만 한다. 사실은 먼저 직접 확인하고, 중요한 선택지가 근거로 계속 갈릴 때만 `herdr-quorum`을 사용한다.
 5. 같은 문제가 반복되면 재현과 실패 원인을 확인하고 접근을 바꾼다. 새 컨텍스트가 필요할 때만 `handoff.md`에 완료한 일·남은 범위·근거를 남기고 워커를 교체한다. 근거 없이 같은 리뷰를 다시 요청하지 않는다.
 6. 리뷰 3회차를 넘기면 루프를 멈추고 `run.md`에 막힌 이유를 적는다. 기술적 갈림이면 쿼럼, 요구사항 갈림이면 사람.

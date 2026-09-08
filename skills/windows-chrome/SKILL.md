@@ -17,25 +17,36 @@ WSL 안의 `playwright-cli`와 OMP `browser` 도구는 기본으로 Linux 헤드
 
    성공 출력은 `endpoint:`, `browser:`, `websocket:` 세 줄이다. 이후 모든 클라이언트는 `endpoint:` 값(`http://127.0.0.1:9222`)만 쓴다.
 
-2. **attach** — 도구별로 엔드포인트를 넘긴다.
+2. **attach** — 작업용 실제 탭을 먼저 정하고 도구별로 엔드포인트를 넘긴다. 기존 사용자 탭을 이동시키는 경우에는 그 탭의 사용 승인이 있어야 한다.
 
    ```bash
    playwright-cli -s=win attach --cdp=http://127.0.0.1:9222
-   playwright-cli -s=win goto https://example.com
+   # 새 탭을 띄울 때
+   playwright-cli -s=win open https://example.com
    ```
 
    ```javascript
-   const tab = await browser.open({ name: "win", url: "https://example.com", app: { cdp_url: "http://127.0.0.1:9222" } });
+   const tab = await browser.open({
+     name: "win-review",
+     app: { cdp_url: "http://127.0.0.1:9222", target: "https://example.com/review" },
+   });
+   console.log(await tab.url()); // 작업용으로 준비된 실제 탭인지 확인한 뒤 조작한다.
    ```
 
    `playwright-cli` 사용법은 `playwright-cli` 스킬을 따른다. 헤디드 브라우저라 포커스가 보장되지 않으므로 `type` 대신 ref나 locator를 받는 `fill`·`click`을 쓴다.
 
+   OMP의 `name`은 도구 핸들 이름이지 Chrome 탭 ID가 아니다. 같은 CDP 엔드포인트에서 이름만 바꿔 열면 같은 실제 탭을 다시 채택할 수 있다. `app.target`은 URL/제목 부분 문자열이므로 작업용 탭 하나만 식별하는 값을 쓴다. 여러 작업을 나눌 때는 실제 탭을 각각 준비하고 서로 다른 target을 지정한다. `url`을 함께 넘기면 채택한 탭을 이동시키므로 대상 확인 전에는 생략한다.
+
+   스크린샷에서 `The attached browser tab is not visible`이 나오면 URL/대상과 가시성을 확인한다. 사용자가 보고 있는 다른 탭의 픽셀을 읽지 않도록 하는 보호다. 작업 대상이 맞는지 해결한 뒤 공식 `tab.screenshot()`을 다시 쓰며, raw Puppeteer screenshot으로 보호를 우회하지 않는다.
+
 3. **해제** — 작업이 끝나면 세션만 떼고 Chrome은 남긴다. 사용자가 브라우저를 닫아 달라고 할 때만 `stop`을 쓴다.
 
    ```bash
-   playwright-cli -s=win detach            # Chrome은 그대로 둔다
+   playwright-cli -s=win close-session     # 브라우저는 그대로 두고 CLI 세션만 정리
    node scripts/windows-chrome.js stop     # Chrome을 닫고 브릿지를 내린다
    ```
+
+   OMP에서는 `await tab.close()`로 관리 핸들을 해제한다. CDP로 붙은 실제 Chrome 탭은 닫지 않는다.
 
 `status`는 브릿지와 Chrome의 상태를 보여 주며, 종료 코드 0은 연결 가능, 2는 브릿지만 살아 있음, 3은 둘 다 없음이다.
 
