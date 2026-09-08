@@ -15,14 +15,14 @@ Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OM
 | Shared skills | Repository-owned instructions linked into OMP, Claude Code, and AGY, with retained notices for adopted material. |
 | Model profiles | Purpose-based model and effort selection through `/profile` and `omp-profile`; `/effort` can remain local to one session. |
 | OAuth account selection | `/account` chooses among OMP's existing accounts, with optional shared selection. Tokens are not copied into this repository. |
-| Native compaction | Provider-specific context compaction and portable handoffs for supported models, plus an OMP 18.1.13 compatibility patch. |
+| Context compaction | OMP built-in compaction by default, portable migration of legacy native state, and an OMP 18.1.13/18.1.14 compatibility patch. |
 | Visible execution | `harness-run` launches and revisits commands or independent agents in Herdr without moving existing task subagents. |
 | Task-based evaluation | Replayable fixtures, protected grading material, cost accounting, and routing proposals—not a universal model leaderboard. |
 | Personal operations | Cost audits, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
 
 ## Recommended environment
 
-The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, OMP 18.1.13, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows, macOS, other OMP releases, and other Bun releases are not maintained compatibility targets.
+The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, OMP 18.1.13 or 18.1.14, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows, macOS, other OMP releases, and other Bun releases are not maintained compatibility targets.
 
 ```bash
 git clone https://github.com/huketo/harness.git
@@ -38,7 +38,7 @@ bun omp/native-runtime.ts --check
 bash omp/config.apply.sh --check
 ```
 
-**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, and patches installed OMP CLI and SDK sources for native compaction. It rejects other OMP versions, but may have created links before a later step fails. Dry-run does not prove patch compatibility. Restart OMP after installation.
+**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, and patches installed OMP CLI and SDK sources for account routing, recoverable shake, and legacy compaction migration. It rejects unsupported OMP versions, but may have created links before a later step fails. Dry-run does not prove patch compatibility. Restart OMP after installation.
 
 The settings check does not apply changes; exit `1` reports differences. To opt into the repository's personal OMP defaults after inspecting them:
 
@@ -56,13 +56,13 @@ Inside OMP:
 /account list
 /profile code
 /effort high
-/native-compact
-/native-compact portable
+/compact
+/native-compact portable  # legacy native state only
 ```
 
 - `/account` uses OMP's existing OAuth session pinning and requires the installed runtime compatibility patch. Restart OMP after installation. Provider fallback can still select another account; this is not a strict billing lock.
 - `/effort high` changes the current session and model. Adding `--profile` explicitly changes shared profile state.
-- Native compaction can call paid provider APIs. A portable handoff is for crossing providers; it is not interchangeable with provider-native state.
+- Ordinary sessions use OMP's built-in compaction. `/native-compact portable` migrates existing Harness-native state; migration and built-in summarization can call paid provider APIs. See the [compaction workflow](docs/guides/usage.md#자동-압축과-기존-native-상태-이전).
 
 From a terminal, with `~/.local/bin` on `PATH`:
 

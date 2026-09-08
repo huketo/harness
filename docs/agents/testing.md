@@ -60,7 +60,7 @@ bash omp/config.apply.sh --check
 bun omp/native-runtime.ts --check
 ```
 
-`install.sh --dry-run` reports planned links, backups, conflicts, and the runtime patch without applying them. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. `native-runtime.ts --check` requires OMP 18.1.13 and verifies its compatibility patch. None replaces a focused unit or integration test of changed source.
+`install.sh --dry-run` reports planned links, backups, conflicts, and the runtime patch without applying them. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. `native-runtime.ts --check` requires OMP 18.1.13 or 18.1.14 and verifies its compatibility patch. None replaces a focused unit or integration test of changed source.
 
 The mutating forms of installation and configuration commands are governed by [`authority.md`](authority.md) and are not routine verification.
 

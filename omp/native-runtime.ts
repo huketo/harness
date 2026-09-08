@@ -10,9 +10,15 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 
-export const NATIVE_TIMEOUT_MARKER = "/*harness-native-compaction-timeout*/";
+// The hook must outlive the native API deadline so the request remains its timeout owner.
+export const NATIVE_COMPACTION_TIMEOUT_MS = 600000;
+const NATIVE_HOOK_TIMEOUT_MS = NATIVE_COMPACTION_TIMEOUT_MS + 10000;
+export const NATIVE_TIMEOUT_MARKER = "/*harness-native-compaction-timeout-v2*/";
 const PREPARATION_MARKER = "/*harness-native-compaction-preparation*/";
 export const ACCOUNT_SESSION_MARKER = "/*harness-account-session*/";
+const SHAKE_PERSISTENCE_MARKER = "/*harness-shake-persistence*/";
+const SHAKE_PERSISTENCE_ERROR =
+	"Shake refused to discard history without a saved recovery artifact.";
 
 /** Expose the live provider-routing identity to extension contexts. */
 export function patchAccountSessionIdentity(bundle: string): string {
@@ -62,7 +68,7 @@ export function patchAccountSessionIdentity(bundle: string): string {
 export function patchCompactionTimeout(bundle: string): string {
 	if (bundle.includes(NATIVE_TIMEOUT_MARKER)) return bundle;
 	const selector =
-		/function ([\w$]+)\(([\w$]+)\)\{return \2==="session_shutdown"\?([\w$]+):([\w$]+)\}/g;
+		/function ([\w$]+)\(([\w$]+)\)\{(?:\/\*harness-native-compaction-timeout\*\/)?return (?:\2==="session_before_compact"\?180000:)?\2==="session_shutdown"\?([\w$]+):([\w$]+)\}/g;
 	const matches = [...bundle.matchAll(selector)];
 	if (matches.length !== 1)
 		throw new Error(
@@ -71,7 +77,59 @@ export function patchCompactionTimeout(bundle: string): string {
 	return bundle.replace(
 		selector,
 		(_match, fn, arg, shutdown, normal) =>
-			`function ${fn}(${arg}){${NATIVE_TIMEOUT_MARKER}return ${arg}==="session_before_compact"?180000:${arg}==="session_shutdown"?${shutdown}:${normal}}`,
+			`function ${fn}(${arg}){${NATIVE_TIMEOUT_MARKER}return ${arg}==="session_before_compact"?${NATIVE_HOOK_TIMEOUT_MS}:${arg}==="session_shutdown"?${shutdown}:${normal}}`,
+	);
+}
+
+/** A failed archive write must leave the original transcript untouched. */
+export function patchShakePersistence(bundle: string): string {
+	if (bundle.includes(SHAKE_PERSISTENCE_MARKER)) return bundle;
+	const selector =
+		/if\(([\w$]+)\.length===0\)return\{mode:([\w$]+),toolResultsDropped:0,blocksDropped:0,tokensFreed:0\};let ([\w$]+)=await this\.(#[\w$]+)\(\1\),/g;
+	if ([...bundle.matchAll(selector)].length !== 1)
+		throw new Error(
+			"OMP shake 저장 경계가 변경되었습니다. 호환 패치를 검토해야 합니다.",
+		);
+	return bundle.replace(
+		selector,
+		(_match, regions, mode, artifact, save) =>
+			`if(${regions}.length===0)return{mode:${mode},toolResultsDropped:0,blocksDropped:0,tokensFreed:0};let ${artifact}=await this.${save}(${regions});${SHAKE_PERSISTENCE_MARKER}if(!${artifact})throw Error(${JSON.stringify(SHAKE_PERSISTENCE_ERROR)});let `,
+	);
+}
+
+export function patchShakePersistenceSource(source: string): string {
+	const statement =
+		"const artifactId = await this.#saveShakeArtifact(regions);";
+	return replaceOnce(
+		source,
+		statement,
+		`${statement}\n\t\t${SHAKE_PERSISTENCE_MARKER}if (!artifactId) throw new Error(${JSON.stringify(SHAKE_PERSISTENCE_ERROR)});`,
+	).replace(
+		"the session is not persisted or the write fails — callers degrade to a\n\t * bare placeholder.",
+		"the session is not persisted or the write fails. The caller preserves\n\t * the original transcript when no recovery artifact is available.",
+	);
+}
+
+/** Storage failure leaves the old window intact, so automatic maintenance can fall back. */
+export function patchShakeFallback(bundle: string): string {
+	const marker = "/*harness-shake-fallback*/";
+	if (bundle.includes(marker)) return bundle;
+	const selector =
+		/(type:"auto_compaction_end",action:"shake",result:void 0,aborted:!1,willRetry:!1,errorMessage:([\w$]+),skipped:!1\},[\w$]+\),)([\w$]+)==="overflow"\?"fallback":/g;
+	if ([...bundle.matchAll(selector)].length !== 1)
+		throw new Error("OMP shake 오류 처리 구조가 변경되었습니다.");
+	return bundle.replace(
+		selector,
+		(_match, prefix, message, reason) =>
+			`${prefix}${marker}(${reason}==="overflow"||${message}===${JSON.stringify(SHAKE_PERSISTENCE_ERROR)})?"fallback":`,
+	);
+}
+
+export function patchShakeFallbackSource(source: string): string {
+	return replaceOnce(
+		source,
+		'return reason === "overflow" ? "fallback" : COMPACTION_CHECK_NONE;',
+		`return /*harness-shake-fallback*/(reason === "overflow" || message === ${JSON.stringify(SHAKE_PERSISTENCE_ERROR)}) ? "fallback" : COMPACTION_CHECK_NONE;`,
 	);
 }
 
@@ -80,12 +138,21 @@ function nativePreparation(
 	settings: string,
 	host: string,
 ): string {
-	return `(${entries}.some(entry=>entry.type==="compaction"&&entry.preserveData?.harnessNativeCompaction)&&${host}.extensionRunner?.hasHandlers("session_before_compact")?{firstKeptEntryId:${entries}.at(-1).id,messagesToSummarize:[],turnPrefixMessages:[],recentMessages:[],isSplitTurn:false,tokensBefore:0,fileOps:{read:new Set(),written:new Set(),edited:new Set()},settings:${settings}}:undefined)`;
+	return `(${entries}.findLast(entry=>entry.type==="compaction"||entry.type==="reset_boundary")?.preserveData?.harnessNativeCompaction&&${host}.extensionRunner?.hasHandlers("session_before_compact")?{firstKeptEntryId:${entries}.at(-1).id,messagesToSummarize:[],turnPrefixMessages:[],recentMessages:[],isSplitTurn:false,tokensBefore:0,fileOps:{read:new Set(),written:new Set(),edited:new Set()},settings:${settings}}:undefined)`;
+}
+
+/** Upgrade the installed bundle and SDK patch without reviving a superseded native window. */
+function upgradePreparationBoundary(text: string): string {
+	return text.replace(
+		/([\w$]+)\.some\(entry=>entry\.type==="compaction"&&entry\.preserveData\?\.harnessNativeCompaction\)/g,
+		'$1.findLast(entry=>entry.type==="compaction"||entry.type==="reset_boundary")?.preserveData?.harnessNativeCompaction',
+	);
 }
 
 /** A native window can need a portable handoff even with no sizable new transcript. */
 export function patchNativePreparation(bundle: string): string {
-	if (bundle.includes(PREPARATION_MARKER)) return bundle;
+	if (bundle.includes(PREPARATION_MARKER))
+		return upgradePreparationBoundary(bundle);
 	const selector =
 		/let ([\w$]+)=this\.(#[\w$]+)\.sessionManager\.getBranch\(\),([\w$]+)=([\w$]+)\(\1,([\w$]+),([\w$]+),this\.(#[\w$]+)\);if\(!\3\)\{if\(\1\[\1.length-1\]\?\.type==="compaction"\)throw Error\("Already compacted"\);throw Error\("Nothing to compact \(session too small\)"\)\}/g;
 	if ([...bundle.matchAll(selector)].length !== 1)
@@ -112,10 +179,18 @@ function replaceOnce(text: string, old: string, replacement: string): string {
 }
 
 function patchRunnerSource(source: string): string {
+	const legacy =
+		'/*harness-native-compaction-timeout*/\n\treturn eventType === "session_before_compact" ? 180000 : eventType === "session_shutdown" ? sessionShutdownHandlerTimeoutMs : extensionHandlerTimeoutMs;';
+	if (source.includes(legacy))
+		source = replaceOnce(
+			source,
+			legacy,
+			'return eventType === "session_shutdown" ? sessionShutdownHandlerTimeoutMs : extensionHandlerTimeoutMs;',
+		);
 	let patched = replaceOnce(
 		source,
 		'return eventType === "session_shutdown" ? sessionShutdownHandlerTimeoutMs : extensionHandlerTimeoutMs;',
-		`${NATIVE_TIMEOUT_MARKER}\n\treturn eventType === "session_before_compact" ? 180000 : eventType === "session_shutdown" ? sessionShutdownHandlerTimeoutMs : extensionHandlerTimeoutMs;`,
+		`${NATIVE_TIMEOUT_MARKER}\n\treturn eventType === "session_before_compact" ? ${NATIVE_HOOK_TIMEOUT_MS} : eventType === "session_shutdown" ? sessionShutdownHandlerTimeoutMs : extensionHandlerTimeoutMs;`,
 	);
 	patched = replaceOnce(
 		patched,
@@ -137,7 +212,10 @@ if (import.meta.main) {
 	const pkg = JSON.parse(
 		readFileSync(join(packageDir, "package.json"), "utf8"),
 	);
-	if (pkg.name !== "@oh-my-pi/pi-coding-agent" || pkg.version !== "18.1.13")
+	if (
+		pkg.name !== "@oh-my-pi/pi-coding-agent" ||
+		!["18.1.13", "18.1.14"].includes(pkg.version)
+	)
 		throw new Error(`네이티브 호환 검증이 필요한 OMP 버전: ${pkg.version}`);
 	const files = [
 		cli,
@@ -149,16 +227,24 @@ if (import.meta.main) {
 		const before = readFileSync(file, "utf8");
 		let after: string;
 		if (file === cli)
-			after = patchAccountSessionIdentity(
-				patchNativePreparation(patchCompactionTimeout(before)),
+			after = patchShakeFallback(
+				patchShakePersistence(
+					patchAccountSessionIdentity(
+						patchNativePreparation(patchCompactionTimeout(before)),
+					),
+				),
 			);
 		else if (file.endsWith("extensibility/extensions/runner.ts"))
 			after = patchRunnerSource(before);
 		else if (file.endsWith("session-maintenance.ts"))
-			after = replaceOnce(
-				before,
-				"const preparation = prepareCompaction(pathEntries, effectiveSettings, activeModel, this.#tokenizer);",
-				`const preparation = prepareCompaction(pathEntries, effectiveSettings, activeModel, this.#tokenizer) ?? ${PREPARATION_MARKER}${nativePreparation("pathEntries", "effectiveSettings", "this.#host")};`,
+			after = patchShakeFallbackSource(
+				patchShakePersistenceSource(
+					replaceOnce(
+						upgradePreparationBoundary(before),
+						"const preparation = prepareCompaction(pathEntries, effectiveSettings, activeModel, this.#tokenizer);",
+						`const preparation = prepareCompaction(pathEntries, effectiveSettings, activeModel, this.#tokenizer) ?? ${PREPARATION_MARKER}${nativePreparation("pathEntries", "effectiveSettings", "this.#host")};`,
+					),
+				),
 			);
 		else
 			after = replaceOnce(

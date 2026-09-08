@@ -13,7 +13,7 @@ Before asking a person or handling an unattended run, read [`.omp/APPEND_SYSTEM.
 
 ## Repository map
 
-- `omp/` — OMP configuration application, profiles, prompts, extensions, and the OMP 18.1.13 native-runtime compatibility patch.
+- `omp/` — OMP configuration application, profiles, prompts, extensions, and the OMP 18.1.13/18.1.14 native-runtime compatibility patch.
 - `herdr/` — Herdr configuration, launch helpers, plugin pins, cost audit, and guarded host-sync sources. The distributed cron snapshot contains no jobs.
 - `skills/` — personal skill sources; preserve each adopted skill's license and provenance.
 - `bench/` — Python benchmark runner, synthetic fixtures, oracles, references, and runner tests.

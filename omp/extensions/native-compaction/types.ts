@@ -1,5 +1,3 @@
-import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai";
-
 export interface NativeWindow {
 	provider: string;
 	model: string;
@@ -9,15 +7,4 @@ export interface NativeWindow {
 	/** Readable native summary, when the provider exposes one. */
 	summary?: string;
 	usage?: Record<string, unknown>;
-}
-
-export interface NativeRequest {
-	model: Model;
-	context: Context;
-	apiKey: string;
-	sessionId: string;
-	signal?: AbortSignal;
-	instructions: string;
-	previous?: NativeWindow;
-	fetch?: FetchImpl;
 }

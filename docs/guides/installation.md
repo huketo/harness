@@ -9,7 +9,7 @@ Harness configures an existing coding-agent workstation. It does not install OMP
 | Component | Maintained showcase target |
 | --- | --- |
 | Operating environment | Linux or WSL2 with Bash 4+ and GNU-compatible utilities (`readlink -f`, `cmp`, `cp`, `ln`). Native Windows and macOS installation are not maintained targets. |
-| OMP | `@oh-my-pi/pi-coding-agent` **18.1.13**, available as `omp` on `PATH`. The runtime patch rejects other versions or unexpected source layouts. |
+| OMP | `@oh-my-pi/pi-coding-agent` **18.1.13 or 18.1.14**, available as `omp` on `PATH`. The runtime patch rejects other versions or unexpected source layouts. |
 | Bun | **1.3.14**. The installer, extensions, and helper CLIs use Bun; other releases are not maintained compatibility targets. |
 | Python 3 | Required for `omp/config.apply.sh`, benchmarks, and selected skill collectors. |
 | Existing personal instructions | `~/.claude/CLAUDE.md` must already be a file you maintain. The installer links it into AGY's global rules. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
@@ -51,6 +51,8 @@ bash omp/config.apply.sh --check
 
 `--with-config` changes managed OMP settings, including model roles, fallback policy, skill discovery, compaction policy, and `dev.autoqaConsent`. It is not required merely to link extensions. Provider credentials and model access remain with their owning tools. The model choices are personal defaults, not universally available or benchmark-proven optima.
 
+Managed compaction uses `shake → remote → handoff → soft` with the existing 75% threshold and 40,000 recent-token setting. Configuration application checks the installed runtime patch before writing any setting; `--check` only reports settings drift. Save active work and stop existing OMP processes before applying the new policy, then restart them. See [compaction behavior and legacy migration](usage.md#자동-압축과-기존-native-상태-이전).
+
 Ensure `~/.local/bin` is on `PATH`, then inspect the local commands without starting an agent:
 
 ```bash
@@ -67,7 +69,7 @@ harness-run --help
 | `omp/extensions/{accounts,profiles,herdr,native-compaction}` | Four `harness-*` links under `~/.omp/agent/extensions/`. |
 | `omp/profiles.ts`, `herdr/scripts/harness-run.ts` | `~/.local/bin/omp-profile` and `~/.local/bin/harness-run`. |
 | `agy/config/plugins/harness/` | Plugin link under `~/.gemini/config/plugins/`. Shared skills and existing personal instructions are linked into AGY's global slots. |
-| `omp/native-runtime.ts` | Patches the installed OMP CLI bundle and SDK source files for native compaction and account selection by the actual provider request session ID. Originals remain beside them as `.harness-native-original`. |
+| `omp/native-runtime.ts` | Patches the installed OMP CLI bundle and SDK source files for actual request-session account selection, recoverable shake, and legacy compaction migration. Originals remain beside them as `.harness-native-original`. |
 | `--with-config` only | Applies managed values through `omp config set`; it does not copy the example snapshot over live configuration. |
 
 Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, or real skill directory is a conflict, not permission to overwrite it. Correct links are left unchanged. See [ownership rules](../REPO.md).

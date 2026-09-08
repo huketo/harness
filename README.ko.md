@@ -15,14 +15,14 @@ Harness는 기존 [Oh My Pi](https://github.com/can1357/oh-my-pi)(OMP), [Herdr](
 | 공유 스킬 | 저장소 소유 지침을 OMP·Claude Code·AGY에 연결합니다. 편입 자료의 원저작자 고지는 유지합니다. |
 | 모델 프로필 | `/profile`과 `omp-profile`로 용도별 모델·effort를 선택합니다. `/effort` 변경은 한 세션에만 적용할 수 있습니다. |
 | OAuth 계정 선택 | `/account`로 OMP에 등록된 계정을 선택하고, 필요하면 선택을 공유합니다. 토큰은 이 저장소로 복사하지 않습니다. |
-| 네이티브 압축 | 지원 모델의 공급자별 컨텍스트 압축과 이식 가능한 인계문을 제공합니다. OMP 18.1.13 호환 패치가 포함됩니다. |
+| 컨텍스트 압축 | OMP 내장 압축을 기본으로 사용하고 기존 native 상태의 portable 이전과 OMP 18.1.13/18.1.14 호환 패치를 제공합니다. |
 | 보이는 실행 | `harness-run`으로 Herdr의 명령이나 독립 에이전트를 실행하고 다시 조회합니다. 기존 task 서브에이전트를 옮기는 기능은 아닙니다. |
 | 실제 과제 평가 | 재생 가능한 fixture, 보호된 채점 자료, 비용 계산, 라우팅 제안을 제공합니다. 보편적인 모델 순위표는 아닙니다. |
 | 개인 운영 | 비용 감사, 보호된 호스트 동기화, 사람이 검토하는 일일보고 초안 흐름을 제공합니다. 호스팅 서비스가 아닙니다. |
 
 ## 권장 환경
 
-유지하는 쇼케이스 대상은 **Bash와 GNU 호환 유틸리티를 갖춘 Linux 또는 WSL2, OMP 18.1.13, Bun 1.3.14**입니다. 설정 검사와 벤치마크에는 Python 3가 필요합니다. 현재 설치기는 기존 `~/.claude/CLAUDE.md`를 요구합니다. 기반 도구의 설치·인증은 별도로 준비합니다. 네이티브 Windows, macOS, 다른 OMP 버전, 다른 Bun 버전은 유지하는 호환 대상이 아닙니다.
+유지하는 쇼케이스 대상은 **Bash와 GNU 호환 유틸리티를 갖춘 Linux 또는 WSL2, OMP 18.1.13 또는 18.1.14, Bun 1.3.14**입니다. 설정 검사와 벤치마크에는 Python 3가 필요합니다. 현재 설치기는 기존 `~/.claude/CLAUDE.md`를 요구합니다. 기반 도구의 설치·인증은 별도로 준비합니다. 네이티브 Windows, macOS, 다른 OMP 버전, 다른 Bun 버전은 유지하는 호환 대상이 아닙니다.
 
 ```bash
 git clone https://github.com/huketo/harness.git
@@ -38,7 +38,7 @@ bun omp/native-runtime.ts --check
 bash omp/config.apply.sh --check
 ```
 
-**설치는 워크스테이션을 변경합니다.** 공유 자산을 연결하고, 교체 가능한 기존 설정 파일을 백업하며, 네이티브 압축을 위해 설치된 OMP CLI와 SDK 소스를 패치합니다. 다른 OMP 버전은 거부하지만 뒤 단계가 실패하기 전에 일부 링크가 만들어질 수 있습니다. Dry-run은 패치 호환성을 입증하지 않습니다. 설치 후 OMP를 재시작합니다.
+**설치는 워크스테이션을 변경합니다.** 공유 자산을 연결하고, 교체 가능한 기존 설정 파일을 백업하며, 계정 라우팅·복구 가능한 shake·기존 압축 상태 이전을 위해 설치된 OMP CLI와 SDK 소스를 패치합니다. 지원하지 않는 OMP 버전은 거부하지만 뒤 단계가 실패하기 전에 일부 링크가 만들어질 수 있습니다. Dry-run은 패치 호환성을 입증하지 않습니다. 설치 후 OMP를 재시작합니다.
 
 설정 검사는 값을 바꾸지 않으며 종료 코드 `1`은 차이가 있다는 뜻입니다. 내용을 확인한 뒤 저장소의 개인용 OMP 기본값을 적용하려면 명시적으로 실행합니다.
 
@@ -56,13 +56,13 @@ OMP 안에서:
 /account list
 /profile code
 /effort high
-/native-compact
-/native-compact portable
+/compact
+/native-compact portable  # 기존 native 상태만 이전
 ```
 
 - `/account`는 OMP의 기존 OAuth 세션 pin을 사용하며 런타임 호환 패치 설치가 필요합니다. 설치 후 OMP를 재시작하세요. 공급자 fallback이 다른 계정을 선택할 수 있으므로 엄격한 과금 잠금은 아닙니다.
 - `/effort high`는 현재 세션·모델만 변경합니다. `--profile`을 붙이면 공용 프로필 상태를 명시적으로 변경합니다.
-- 네이티브 압축은 유료 공급자 API를 호출할 수 있습니다. Portable 인계문은 공급자 이동용이며 공급자 고유 상태와 같은 형식이 아닙니다.
+- 일반 세션은 OMP 내장 압축을 사용합니다. `/native-compact portable`은 기존 Harness-native 상태를 이전합니다. 이전과 내장 요약은 유료 공급자 API를 호출할 수 있습니다. [압축 흐름](docs/guides/usage.md#자동-압축과-기존-native-상태-이전)을 참고하세요.
 
 터미널에서는 `~/.local/bin`을 `PATH`에 포함한 뒤 실행합니다.
 

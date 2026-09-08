@@ -9,7 +9,6 @@ import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
 } from "@oh-my-pi/pi-coding-agent";
-import { PORTABLE_INSTRUCTIONS } from "../native-compaction/state";
 import extension, { contextBudget } from "./index";
 import {
 	buildArgv,
@@ -156,11 +155,9 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 			},
 			async compact(options: string | CompactOptions) {
 				expect(selected).toBe(old);
-				if (
-					typeof options !== "string" ||
-					!options.startsWith(PORTABLE_INSTRUCTIONS)
-				)
-					throw new Error("Native state requires an explicit portable handoff");
+				// OMP's soft method removes its provider-specific remote state.
+				if (typeof options === "string" || options.mode !== "soft")
+					throw new Error("Remote state requires a portable soft handoff");
 				observed.push("compact");
 				if (fail) throw new Error("summarizer unavailable");
 				native = false;
@@ -174,6 +171,43 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 		await commands.profile.handler("frontend", ctx);
 		expect(selected).toBe(next);
 		expect(observed).toEqual(["compact", "switch"]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("ordinary high-context input is left to OMP automatic maintenance", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "harness-input-"));
+	try {
+		const handlers = new Map<string, Function>();
+		const model = {
+			id: "gpt-6-astra",
+			provider: "openai-codex",
+			contextWindow: 272000,
+			maxTokens: 128000,
+		};
+		extension({
+			pi: { getAgentDir: () => dir },
+			registerFlag() {},
+			getFlag() {},
+			registerCommand() {},
+			on: (name: string, handler: Function) => handlers.set(name, handler),
+		} as unknown as ExtensionAPI);
+		const ctx = {
+			model,
+			isIdle: () => true,
+			hasUI: false,
+			getContextUsage: () => ({ tokens: 250000 }),
+			sessionManager: { getBranch: () => [{ type: "message" }] },
+			ui: { notify() {} },
+			async compact() {
+				throw new Error("profile extension intercepted ordinary input");
+			},
+		};
+		await handlers.get("session_start")!({ type: "session_start" }, ctx);
+		expect(
+			await handlers.get("input")!({ text: "continue" }, ctx),
+		).toBeUndefined();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

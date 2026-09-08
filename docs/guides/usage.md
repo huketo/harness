@@ -6,7 +6,7 @@
 
 ## 계정·모델·보이는 실행
 
-`bash install.sh`는 OMP 확장 네 개(accounts, profiles, herdr, native-compaction)와 `omp-profile`, `harness-run` 명령을 연결하고, 계정 선택·네이티브 압축을 위한 OMP 18.1.13 전용 런타임 호환 패치를 설치합니다. 인증 저장소를 복제하지 않습니다. 설치 후 OMP를 재시작합니다.
+`bash install.sh`는 OMP 확장 네 개(accounts, profiles, herdr, native-compaction)와 `omp-profile`, `harness-run` 명령을 연결하고, 계정 선택·복구 가능한 shake·기존 native 상태 이전을 위한 OMP 18.1.13/18.1.14 런타임 호환 패치를 설치합니다. 인증 저장소를 복제하지 않습니다. 설치 후 OMP를 재시작합니다.
 
 ### 계정 선택
 
@@ -39,30 +39,31 @@ Fable 5.1·Astra는 high를 비교 시작값으로 둡니다. Opus 5·Sol은 코
 
 컨텍스트는 실행 중 모델의 실제 한도와 출력 여유를 기준으로 관리합니다. 네이티브 압축 지원과 다른 제공자로의 이동은 구분하며, 이동 전 읽을 수 있는 인계문을 사용합니다. 긴 대화에서 `/model`로 바로 바꾸기보다 `/profile`의 보호된 전환을 사용합니다. AGY의 내부 압축 설정은 OMP에서 조절할 수 없습니다. 모델별 공식 근거와 그 한계는 [FACTS 8절](../FACTS.md#8-모델-프로필컨텍스트-정책의-근거-2026-09-07)에 있습니다.
 
-### 네이티브 compaction
+### 자동 압축과 기존 native 상태 이전
 
-`omp/extensions/native-compaction`이 지원 모델의 자동·수동 압축을 처리합니다. 기존 공급자·모델 선택자와 OMP 인증을 유지합니다.
+관리 설정의 `compaction.methodOrder`는 **`shake → remote → handoff → soft`**입니다. 자동 압축 시점은 OMP의 실제 `contextWindow`와 전역 75% 정책에 맡기고 `keepRecentTokens: 40000`을 유지합니다. 먼저 `shake`로 복구 가능한 큰 도구 결과와 블록을 줄이고, 공간이 더 필요할 때 다음 내장 방법으로 넘어갑니다. 한 방법이 충분한 공간을 확보하면 종료하므로 네 방법이 모두 실행되는 것은 아닙니다.
 
-- **OpenAI Codex(Astra·Sol·Luna):** 실제 Codex가 지원하는 V2 Responses 압축을 사용합니다. 현재 경로의 standalone `/responses/compact`는 실측에서 404를 반환했습니다.
-- **일반 OpenAI Responses:** standalone `/responses/compact`의 반환 창 전체를 보존합니다. reasoning·도구 호출·결과를 필터링하지 않습니다.
-- **Claude:** `compact-2026-01-12` / `compact_20260112`로 서버 압축을 요청하고, `pause_after_compaction`으로 결과를 확정한 뒤 다음 요청에 같은 블록을 재전송합니다. 재전송에도 베타와 전략이 필요합니다. 별도 압축 없이 읽을 수 있는 handoff로 대체하지 않습니다.
+자동 `shake`는 최근 16,000토큰 등을 보호하는 OMP 기본값을 사용하며, 수동 `/shake`의 최근 4,000토큰 보호와 다릅니다. 제거한 원문은 `artifact://`로 다시 읽을 수 있어야 합니다. 호환 패치는 산출물 저장에 실패하면 기록을 변경하기 전에 오류를 반환합니다. 자동 압축에서는 이 저장 오류에 한해 원본을 유지한 채 다음 방법을 시도할 수 있습니다. `snapcompact`와 공격적인 수동 shake는 기본 자동 순서에 포함하지 않습니다. 이 순서는 복구용 산출물을 실제로 읽을 수 있는 코딩 세션을 전제로 합니다. 파일·산출물 조회가 금지된 실행은 복구 수단이 필요 없는 순서를 별도로 선택해야 합니다.
+
+일반 세션은 `native-compaction` 확장의 `session_before_compact` 훅을 등록하지 않으며 자동 압축과 `/compact`를 OMP 본체에 맡깁니다. 같은 모델의 일반 입력도 프로필 확장이 선제 압축하거나 차단하지 않습니다. 실제 모델 전환에만 프로필별 기준과 출력 여유 보호를 적용하며, OMP 내장 remote 상태로 공급자를 바꿀 때는 `soft`로 읽을 수 있는 요약을 만든 뒤 진행합니다.
+
+확장은 이미 저장된 `harnessNativeCompaction` 상태만 복구합니다. 그런 세션의 다음 자동 압축은 portable 인계문으로 한 번 이전하고, 후속 압축은 OMP에 맡깁니다. 공급자를 바꾸기 전에 명시적으로 이전할 수도 있습니다.
 
 ```text
-/native-compact           # 지금 네이티브 압축
-/native-compact portable  # 다른 공급자로 이동할 읽기 가능한 인계문
-/profile frontend        # 필요하면 portable 변환 후 모델 전환
+/compact                    # 일반·새 세션: OMP 내장 압축
+/native-compact portable    # 기존 Harness-native 상태 이전
+/profile frontend           # 필요하면 이전 후 모델 전환
 ```
 
-Claude의 네이티브 압축에는 최소 50,000 입력 토큰이 필요합니다. 짧은 대화·API 오류·취소를 압축 성공으로 표시하지 않으며, 원본 대화를 유지합니다. 압축 상태는 세션에 청크와 무결성 해시로 저장하여 OMP의 긴 문자열 잘림을 피하고 재개 시 복원합니다. 압축 사용량은 compaction 엔트리의 `details.usage`와 `details.totals`에 기록합니다. Claude는 `usage.iterations`를 합산하며, 이 별도 압축 비용을 기존 `omp stats`의 메시지 비용 총액에 자동 합산하지는 않습니다.
+기존 OpenAI Codex V2 Responses 상태, 일반 OpenAI Responses 반환 창, Claude `compact-2026-01-12` / `compact_20260112` 블록을 재생할 수 있습니다. Claude 기존 블록은 같은 베타와 전략으로 재전송합니다. 새 공급자별 native 상태는 생성하지 않습니다. 기존 청크·무결성 해시와 사용량 기록은 이전 성공 전까지 유지됩니다. 손상된 상태, API 오류·취소, 비어 있는 요약 또는 생성 도중 바뀐 세션 leaf는 성공으로 처리하지 않고 원본을 보존합니다. 이전은 원래 공급자 API를 사용할 수 있으며 별도 압축 비용을 `omp stats`의 메시지 비용에 자동 합산하지 않습니다.
 
-`bash install.sh`는 확장 링크와 **OMP 18.1.13 전용 호환 패치**를 설치합니다. 압축 관련 패치는 압축 이벤트만 180초까지 허용하고, 이미 압축된 짧은 대화도 portable 변환 훅에 도달하게 합니다. 같은 설치 경로가 위 계정 선택의 요청 세션 ID도 확장에 제공합니다. 확장의 인증·API 작업 제한은 합계 170초입니다. CLI 번들과 SDK 소스 원본은 각각 `.harness-native-original`로 보존합니다. 다른 버전·예상과 다른 코드에는 적용하지 않습니다.
+호환 패치는 기존 상태 이전의 압축 이벤트만 610초까지 허용하며 API 작업 제한은 600초입니다. 이미 압축된 짧은 대화도 이전 훅에 도달하게 하고, 새 compaction 또는 reset 경계가 덮은 옛 상태를 다시 살리지 않습니다. 일반·종료 훅 제한은 유지합니다. CLI와 SDK 원본은 `.harness-native-original`로 보존하며 지원 버전 외 또는 예상과 다른 코드에는 적용하지 않습니다.
 
 ```bash
 bun omp/native-runtime.ts --check
 ```
 
-**설치 후 실행 중인 OMP는 재시작해야 합니다.** OMP 업그레이드 후에는 호환 패치와 회귀 검사를 다시 확인해야 합니다. 전역 75%와 OpenAI 프로필 유휴 경계 70% 정책은 바꾸지 않았습니다. 실제 API·세션 검증 범위는 [FACTS](../FACTS.md#네이티브-compaction-구현검증)에 기록합니다.
-
+새 순서를 적용하기 전에 기존 OMP 작업을 보존하고 프로세스를 종료합니다. `bash install.sh --with-config`는 런타임 패치를 설치·확인한 뒤 설정을 적용합니다. `omp/config.apply.sh`도 변경 모드에서 패치 확인에 실패하면 어떤 설정도 쓰지 않습니다. `--check`는 설정 차이만 읽습니다. 설치 후 OMP를 재시작하고 업그레이드마다 호환 패치를 다시 확인합니다. [FACTS의 이전 native 연구](../FACTS.md#네이티브-compaction-구현검증)는 과거 구현의 관측이며 현재 기본 압축 경로가 아닙니다.
 
 ### Herdr에서 실행하고 재사용하기
 

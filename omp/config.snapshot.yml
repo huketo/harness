@@ -27,6 +27,7 @@ statusLine:
 compaction:
   keepRecentTokens: 40000
   methodOrder:
+    - shake
     - remote
     - handoff
     - soft

@@ -1,10 +1,10 @@
 # 하네스 통합 레포의 확인된 사실
 
-이 문서는 공개 가능한 기술 관측과 그 한계를 기록합니다. 현재 유지하는 환경은 Linux/WSL2, OMP 18.1.13, Bun 1.3.14입니다. 날짜가 있는 관측은 다른 버전이나 호스트의 성능 보장이 아닙니다.
+이 문서는 공개 가능한 기술 관측과 그 한계를 기록합니다. 현재 유지하는 환경은 Linux/WSL2, OMP 18.1.13/18.1.14, Bun 1.3.14입니다. 날짜가 있는 관측은 다른 버전이나 호스트의 성능 보장이 아닙니다.
 
 ## 1. 도구 가용성
 
-- 설치기와 런타임 패치는 `@oh-my-pi/pi-coding-agent` 18.1.13을 명시적으로 요구합니다. 다른 버전이나 예상과 다른 source layout은 거부합니다.
+- 설치기와 런타임 패치는 `@oh-my-pi/pi-coding-agent` 18.1.13 또는 18.1.14를 요구합니다. 다른 버전이나 예상과 다른 source layout은 거부합니다.
 - Bun 1.3.14가 설치기, TypeScript extension, `omp-profile`, `harness-run`, cost audit, host-sync의 기준 환경입니다.
 - Python 3 표준 라이브러리의 `sqlite3`와 `json`은 benchmark와 collector에 사용됩니다. `sqlite3`나 `jq` CLI가 모든 Herdr/cron 환경에 있다고 가정하지 않습니다.
 - 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL에서 Windows Chrome을 연결하는 기능은 전체 Windows 설치 지원과 별개입니다.
@@ -140,6 +140,8 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 
 ### 네이티브 compaction 구현·검증
 
+이 절은 이전 native 생성 구현의 관측입니다. 현재 일반 세션은 OMP 내장 압축을 사용하며, 확장은 이미 저장된 native 상태의 재생·portable 이전만 담당합니다. 현재 동작과 적용 조건은 [사용법](guides/usage.md#자동-압축과-기존-native-상태-이전)이 정본입니다. 아래 생성·과금 테스트 설명은 현재 테스트 목록이 아닙니다.
+
 `omp/extensions/native-compaction`은 OMP 18.1.13의 compaction hook과 final request transform을 사용합니다. Opaque state는 session의 `preserveData.harnessNativeCompaction`에 chunk와 integrity hash로 보존하여 serialization truncation을 피합니다. `/clear` 이후에는 이전 state를 재사용하지 않습니다.
 
 - General OpenAI Responses adapter는 standalone compaction 반환 window 전체를 보존합니다. Codex transport에서 standalone endpoint가 지원되지 않은 관측 때문에 installed OMP의 native Responses transport와 trigger를 사용합니다.
@@ -149,3 +151,22 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 - Regression tests cover full-window preservation, tool-call/result pairs, provider errors, cancellation, chunk integrity, session replay, usage accounting, and existing profile/account behavior.
 
 설치된 OMP process는 extension과 runtime patch를 읽도록 재시작해야 합니다. Upgrade 뒤에는 patch와 regression boundary를 다시 확인하며, 다른 OMP version에 자동 적용하지 않습니다.
+
+## 9. 내장 압축과 플러그인 핀 갱신 (2026-09-08)
+
+일반 세션은 OMP 내장 압축을 사용하고, 기존 Harness-native 상태만 portable 이전 경로로 처리하도록 변경했습니다. 현재 동작은 [사용법](guides/usage.md#자동-압축과-기존-native-상태-이전)에 설명합니다. `bun test omp/native-runtime.test.ts omp/extensions/native-compaction omp/extensions/accounts omp/extensions/profiles`는 38개 테스트와 134개 assertions를 통과했습니다. 설치된 OMP 18.1.14의 compiled CLI 계정 경로를 합성 OAuth·loopback 서버로 확인했으며, 유료 공급자 API의 가용성을 검증한 결과는 아닙니다.
+
+별도 합성 SDK 실행에서는 shake 산출물 저장 실패 시 원본 branch가 유지되었고, 정상 저장 후 원문 artifact 조회와 디스크 재개 후 복구 참조 보존을 확인했습니다. 합성 입력의 토큰 추정치는 실제 비용·속도 개선이나 장기 요약 품질을 입증하지 않습니다. 이번 통합에서는 설치·재시작·플러그인 업데이트를 실행하지 않았습니다.
+
+`herdr/plugins.manifest.json`은 다음 설치 핀을 기록합니다. 원격 확인 당시 각 핀은 해당 `huketo` 저장소의 `main`과 일치했습니다.
+
+| 플러그인 | 버전 | 커밋 |
+| --- | --- | --- |
+| herdr-cron | 0.2.2 | `3805d2c` |
+| Herdr HITL | 0.2.1 | `b478557` |
+| Herdr Sheep | 0.3.1 | `dc60164` |
+| Agent Usage | 0.5.12 | `7cdbc13` |
+
+HITL 기록을 0.2.0에서 [0.2.1](https://github.com/huketo/herdr-hitl/releases/tag/v0.2.1)로 갱신했습니다. 이 릴리스의 [IPC 수정](https://github.com/huketo/herdr-hitl/commit/d594c5eb023fc4bb87b15d87ff8a21124320d164)은 timeout 미지정과 명시적인 `0`을 구분하고 알림 유지 시간을 daemon 설정에 맡깁니다. 이는 설치된 핀의 변경이력이며 Telegram rate limit을 해결했다고 주장하지 않습니다.
+
+Agent Usage는 AGY 지원 등이 포함된 `huketo/herdr-agent-usage` fork를 유지합니다. [upstream과의 비교](https://github.com/huketo/herdr-agent-usage/compare/7cdbc13a3443d3868496d3d3f821bca2710b4b81...df95abc0ba2edb002697d49a218868f87f823a3e)에서는 fork 고유 커밋 6개와 upstream 고유 커밋 3개가 확인되었습니다. Upstream의 0.5.13·sidebar cache diagnostics는 별도 통합 검토 대상이며, 설치 핀을 upstream으로 교체하지 않았습니다.

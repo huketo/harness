@@ -14,8 +14,6 @@ import {
 } from "./state";
 import type { NativeWindow } from "./types";
 
-import { nativeUsage } from "./usage";
-
 const { SessionManager } = await loadOmp<typeof SessionModule>(
 	"@oh-my-pi/pi-coding-agent/session/session-manager",
 );
@@ -165,32 +163,4 @@ test("corrupted persisted native state fails integrity verification", () => {
 		"lose this decision",
 	);
 	expect(() => decodeWindow(stored)).toThrow("무결성");
-});
-
-test("compaction billing sums iterations rather than the non-compaction top-level usage", () => {
-	const totals = nativeUsage({
-		provider: "anthropic",
-		model: "claude-fable-5-1",
-		format: "anthropic-messages",
-		items: [],
-		usage: {
-			input_tokens: 23,
-			output_tokens: 10,
-			iterations: [
-				{
-					type: "compaction",
-					input_tokens: 118008,
-					output_tokens: 263,
-					cache_read_input_tokens: 1000,
-				},
-				{ type: "message", input_tokens: 23, output_tokens: 10 },
-			],
-		},
-	});
-	expect(totals).toEqual({
-		input: 118031,
-		output: 273,
-		cacheRead: 1000,
-		cacheWrite: 0,
-	});
 });

@@ -1,8 +1,16 @@
 import { expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	patchAccountSessionIdentity,
 	patchCompactionTimeout,
 	patchNativePreparation,
+	patchShakeFallback,
+	patchShakeFallbackSource,
+	patchShakePersistence,
+	patchShakePersistenceSource,
 } from "./native-runtime";
 
 test("only native compaction receives the API deadline; shutdown and ordinary hooks retain their caps", () => {
@@ -12,10 +20,140 @@ test("only native compaction receives the API deadline; shutdown and ordinary ho
 	const timeout = new Function(`${patched};return timeout`)() as (
 		event: string,
 	) => number;
-	expect(timeout("session_before_compact")).toBe(180000);
+	expect(timeout("session_before_compact")).toBeGreaterThan(600000);
+	expect(timeout("session_before_compact")).toBeLessThanOrEqual(610000);
 	expect(timeout("session_shutdown")).toBe(2000);
 	expect(timeout("before_provider_request")).toBe(30000);
 	expect(patchCompactionTimeout(patched)).toBe(patched);
+});
+
+test("upgrades the installed three-minute hook without changing other deadlines", () => {
+	const source =
+		'let shutdown=2000,normal=30000;function timeout(event){/*harness-native-compaction-timeout*/return event==="session_before_compact"?180000:event==="session_shutdown"?shutdown:normal}';
+	const patched = patchCompactionTimeout(source);
+	const timeout = new Function(`${patched};return timeout`)();
+	expect(timeout("session_before_compact")).toBeGreaterThan(600000);
+	expect(timeout("session_shutdown")).toBe(2000);
+	expect(timeout("before_provider_request")).toBe(30000);
+	expect(patchCompactionTimeout(patched)).toBe(patched);
+});
+
+test("shake refuses to rewrite history when no recovery artifact was saved", async () => {
+	const source =
+		'class Shake{#save;constructor(save){this.#save=save}async run(e,r){if(r.length===0)return{mode:e,toolResultsDropped:0,blocksDropped:0,tokensFreed:0};let i=await this.#save(r),a=r.map(item=>{item.text="artifact://"+i;return item});return a}}';
+	const patched = patchShakePersistence(source);
+	const Shake = new Function(`${patched};return Shake`)() as new (
+		save: () => Promise<string | undefined>,
+	) => { run(mode: string, regions: { text: string }[]): Promise<unknown> };
+	expect(
+		await new Shake(async () => {
+			throw new Error("empty regions must not reach storage");
+		}).run("elide", []),
+	).toEqual({
+		mode: "elide",
+		toolResultsDropped: 0,
+		blocksDropped: 0,
+		tokensFreed: 0,
+	});
+	const regions = [{ text: "unrecoverable command output" }];
+	await expect(
+		new Shake(async () => undefined).run("elide", regions),
+	).rejects.toBeInstanceOf(Error);
+	expect(regions).toEqual([{ text: "unrecoverable command output" }]);
+	const saved = new Shake(async () => "saved");
+	await saved.run("elide", regions);
+	expect(regions).toEqual([{ text: "artifact://saved" }]);
+	expect(patchShakePersistence(patched)).toBe(patched);
+});
+
+test("SDK shake uses the same artifact-before-rewrite boundary", async () => {
+	const source =
+		'class Shake { #saveShakeArtifact; constructor(save) { this.#saveShakeArtifact = save; } async run(regions) { const artifactId = await this.#saveShakeArtifact(regions); for (const region of regions) region.text = "artifact://" + artifactId; } }';
+	const patched = patchShakePersistenceSource(source);
+	const Shake = new Function(`${patched};return Shake`)() as new (
+		save: () => Promise<string | undefined>,
+	) => { run(regions: { text: string }[]): Promise<void> };
+	const regions = [{ text: "original" }];
+	await expect(
+		new Shake(async () => undefined).run(regions),
+	).rejects.toBeInstanceOf(Error);
+	expect(regions).toEqual([{ text: "original" }]);
+	expect(patchShakePersistenceSource(patched)).toBe(patched);
+	expect(() => patchShakePersistence("unrecognized layout")).toThrow();
+	expect(() => patchShakePersistenceSource("unrecognized layout")).toThrow();
+});
+
+test("automatic shake falls back after a refused archive write, without broadening other errors", async () => {
+	const guardSource =
+		"class Guard{#saveShakeArtifact=async()=>undefined;async run(regions){const artifactId = await this.#saveShakeArtifact(regions);return artifactId}}";
+	const Guard = new Function(
+		`${patchShakePersistenceSource(guardSource)};return Guard`,
+	)() as new () => { run(regions: unknown[]): Promise<unknown> };
+	let message = "";
+	await new Guard().run([{}]).catch((error: Error) => {
+		message = error.message;
+	});
+	const source =
+		'function notice(){}function recover(e,d,a){return notice({type:"auto_compaction_end",action:"shake",result:void 0,aborted:!1,willRetry:!1,errorMessage:d,skipped:!1},a),e==="overflow"?"fallback":"none"}';
+	const patched = patchShakeFallback(source);
+	const recover = new Function(`${patched};return recover`)() as (
+		reason: string,
+		message: string,
+		detach: boolean,
+	) => string;
+	expect(recover("threshold", message, false)).toBe("fallback");
+	expect(recover("threshold", "other failure", false)).toBe("none");
+	expect(recover("overflow", "other failure", false)).toBe("fallback");
+	expect(patchShakeFallback(patched)).toBe(patched);
+	const sdk =
+		'const COMPACTION_CHECK_NONE="none";function recover(reason,message){return reason === "overflow" ? "fallback" : COMPACTION_CHECK_NONE;}';
+	const sdkPatched = patchShakeFallbackSource(sdk);
+	const sdkRecover = new Function(`${sdkPatched};return recover`)() as (
+		reason: string,
+		message: string,
+	) => string;
+	expect(sdkRecover("threshold", message)).toBe("fallback");
+	expect(sdkRecover("threshold", "other failure")).toBe("none");
+	expect(patchShakeFallbackSource(sdkPatched)).toBe(sdkPatched);
+	expect(() => patchShakeFallback("unrecognized layout")).toThrow();
+	expect(() => patchShakeFallbackSource("unrecognized layout")).toThrow();
+});
+
+test("managed settings are not written while the required runtime guard is missing", () => {
+	const dir = mkdtempSync(join(tmpdir(), "harness-config-guard-"));
+	const marker = join(dir, "settings-written");
+	try {
+		writeFileSync(
+			join(dir, "bun"),
+			'#!/bin/sh\ncase "$1" in */native-runtime.ts) exit 1;; esac\ncase "$2" in roles) echo "{}";; *) echo "openai-codex/gpt-6-astra";; esac\n',
+			{ mode: 0o755 },
+		);
+		writeFileSync(
+			join(dir, "omp"),
+			'#!/bin/sh\ncase "$1 $2" in "config set") echo changed >> "$MARKER";; *) echo \'{"value":null}\';; esac\n',
+			{ mode: 0o755 },
+		);
+		const result = spawnSync(
+			"bash",
+			[join(import.meta.dir, "config.apply.sh")],
+			{
+				env: {
+					...process.env,
+					PATH: `${dir}:${process.env.PATH}`,
+					MARKER: marker,
+					HOME: dir,
+					PI_CODING_AGENT_DIR: dir,
+				},
+				stdio: "ignore",
+				timeout: 5000,
+			},
+		);
+		expect(result.error).toBeUndefined();
+		expect(result.status).toBe(1);
+		expect(existsSync(marker)).toBe(false);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 test("extension contexts expose the provider request identity used by ModelRegistry", () => {
@@ -62,6 +200,22 @@ test("a persisted native window reaches the compaction hook even with a small ne
 		extensionRunner: { hasHandlers: () => true },
 	};
 	expect(new Patched(host).run().firstKeptEntryId).toBe("native");
+	expect(() =>
+		new Patched({
+			...host,
+			sessionManager: {
+				getBranch: () => [native, { type: "compaction", id: "portable" }],
+			},
+		}).run(),
+	).toThrow("Already compacted");
+	expect(() =>
+		new Patched({
+			...host,
+			sessionManager: {
+				getBranch: () => [native, { type: "reset_boundary", id: "reset" }],
+			},
+		}).run(),
+	).toThrow("Nothing to compact");
 	const ordinary = {
 		...host,
 		sessionManager: { getBranch: () => [{ type: "message", id: "message" }] },

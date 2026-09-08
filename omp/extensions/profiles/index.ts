@@ -118,9 +118,12 @@ export default function profilesExtension(pi: ExtensionAPI) {
 			"info",
 		);
 		await ctx.compact(
-			portable
+			portable && latestCompaction(ctx)?.preserveData?.[STATE_KEY]
 				? `${PORTABLE_INSTRUCTIONS}${PRESERVE}`
-				: { internalGuidance: PRESERVE },
+				: {
+						internalGuidance: PRESERVE,
+						...(portable ? { mode: "soft" as const } : {}),
+					},
 		);
 		if (portable && hasNativeState(ctx))
 			throw new Error(
@@ -372,7 +375,13 @@ export default function profilesExtension(pi: ExtensionAPI) {
 	pi.on("session_switch", restoreSessionState);
 	pi.on("session_tree", restoreSessionState);
 	pi.on("input", async (event, ctx) => {
-		if (!ctx.isIdle() || !ctx.model || event.text.startsWith("/")) return;
+		if (
+			!ctx.isIdle() ||
+			!ctx.model ||
+			event.text.startsWith("/") ||
+			sameModel(lastModel, ctx.model)
+		)
+			return;
 		try {
 			await prepareContext(
 				ctx,
