@@ -21,8 +21,7 @@ WSL 안의 `playwright-cli`와 OMP `browser` 도구는 기본으로 Linux 헤드
 
    ```bash
    playwright-cli -s=win attach --cdp=http://127.0.0.1:9222
-   # 새 탭을 띄울 때
-   playwright-cli -s=win open https://example.com
+   playwright-cli -s=win goto https://example.com
    ```
 
    ```javascript
@@ -42,7 +41,7 @@ WSL 안의 `playwright-cli`와 OMP `browser` 도구는 기본으로 Linux 헤드
 3. **해제** — 작업이 끝나면 세션만 떼고 Chrome은 남긴다. 사용자가 브라우저를 닫아 달라고 할 때만 `stop`을 쓴다.
 
    ```bash
-   playwright-cli -s=win close-session     # 브라우저는 그대로 두고 CLI 세션만 정리
+   playwright-cli -s=win detach            # Chrome은 그대로 둔다
    node scripts/windows-chrome.js stop     # Chrome을 닫고 브릿지를 내린다
    ```
 
