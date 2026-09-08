@@ -9,9 +9,9 @@
   {
     "plugin_id": "huketo.hitl",
     "source_slug": "huketo/herdr-hitl",
-    "requested_ref": "27f3f14a615a70e6bf063e5c3e95a81d7b9ef92d",
-    "resolved_commit": "27f3f14a615a70e6bf063e5c3e95a81d7b9ef92d",
-    "version": "0.2.1"
+    "requested_ref": "v0.3.0",
+    "resolved_commit": "af3bc5e94a82e611b0828083540a593aa22265db",
+    "version": "0.3.0"
   },
   {
     "plugin_id": "huketo.sheep",
