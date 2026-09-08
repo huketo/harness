@@ -4,6 +4,16 @@
 
 이 문서는 명령의 세션·공용 상태 경계와 호스트에서 확인한 제약을 설명합니다. 명령은 저장소 루트에서 실행합니다. 설치 조건은 [설치 안내](installation.md)를 먼저 확인합니다. 모델 가용성과 공급자 동작은 설치 버전에 따라 달라집니다.
 
+## AFK와 자율 결정
+
+사람이 응답할 수 없을 때는 `herdr-hitl afk`를 실행합니다. `herdr-hitl afk --for 2h`처럼 기간을 정할 수 있고, `herdr-hitl here`로 해제하거나 `herdr-hitl away`로 메신저 수신 가능한 부재 상태를 선언할 수 있습니다. 상태 전환은 사람의 명령이며 에이전트가 대신 실행하지 않습니다.
+
+AFK 중 `herdr-hitl channel`은 `afk`를 출력합니다. 명시적인 `--channel messenger`보다 우선하며 `ask`와 `notify`는 전송 전에 종료 코드 `6`으로 거절됩니다. 답변이나 `--default` 승인을 만들지 않습니다. 만료 뒤에는 기존 채널 설정을 따릅니다.
+
+에이전트는 `herdr-hitl` 스킬의 자율 결정·쿼럼·유예 정책을 따릅니다. 범위 내 가역 결정은 근거로 처리하고, 중요한 기술적 갈림은 쿼럼으로 검토합니다. 사람만 결정할 수 있는 사항은 해당 작업만 유예하고 독립적인 승인 작업을 계속합니다. CLI 자체가 모델을 실행하거나 새 권한을 부여하지는 않습니다.
+
+CLI·판단 정책 정본은 [herdr-hitl](https://github.com/huketo/herdr-hitl)이고 이 저장소는 검증한 플러그인 커밋과 스킬 해시를 기록합니다.
+
 ## 계정·모델·보이는 실행
 
 `bash install.sh`는 OMP 확장 네 개(accounts, profiles, herdr, native-compaction)와 `omp-profile`, `harness-run` 명령을 연결하고, 계정 선택·복구 가능한 shake·기존 native 상태 이전을 위한 OMP 18.1.13/18.1.14 런타임 호환 패치를 설치합니다. 인증 저장소를 복제하지 않습니다. 설치 후 OMP를 재시작합니다.

@@ -1,10 +1,10 @@
 # Copy this example to ~/.config/herdr-hitl/config.toml and replace placeholders.
 # Never commit the real file: it contains bot credentials in plaintext.
 
-# Where a question goes (herdr-hitl 0.2.0 and later). "messenger" always sends
-# to Telegram or Discord, "terminal" never sends and makes `ask` and `notify`
-# exit 5, and "auto" sends only while the away marker set by `herdr-hitl away`
-# is present. This environment uses "auto".
+# Normal routing: "messenger" delivers, "terminal" refuses with exit 5,
+# and "auto" follows the away marker. Human-declared `herdr-hitl afk`
+# overrides every policy and refuses ask/notify with exit 6 and no answer.
+# `here` clears AFK; `away` replaces it. AFK is a command, not a config value.
 channel = "auto"
 
 [telegram]

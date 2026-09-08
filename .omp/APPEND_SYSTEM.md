@@ -17,8 +17,7 @@ asked.
 
 ## Resolve the channel before every question
 
-A question for a human goes to exactly one of two channels, and the channel is resolved per question,
-never once per session:
+Resolve the channel before each human question, not once per session. AFK is an unavailable state, not a delivery channel or approval:
 
 ```sh
 herdr-hitl channel
@@ -26,15 +25,17 @@ herdr-hitl channel
 
 - `terminal` — the person is at this interface. Ask with the harness's own `ask` tool, or put the question in the response when a plain question is enough. Never invoke `herdr-hitl`.
 - `messenger` — nobody is watching this interface. Ask with `herdr-hitl ask` under the message contract below.
+- `afk` — follow the autonomous/quorum/defer policy in the `herdr-hitl` skill. Send no questions or notifications; defer only human-dependent work and continue independent authorized tasks.
 
 The away marker behind that word is the person's declaration, not a guess. Do not infer presence from
-anything else, and never run `herdr-hitl away` or `herdr-hitl here` yourself. `herdr-hitl ask` and
-`herdr-hitl notify` enforce the same decision: on the `terminal` channel they deliver nothing and
-exit `5`.
+anything else, and never run `herdr-hitl away`, `herdr-hitl here`, or `herdr-hitl afk` yourself. `herdr-hitl ask` and
+`herdr-hitl notify` enforce the same decision: terminal exits `5`; active AFK exits `6` before delivery, with no answer or default approval.
 
 ## When a human decision is required
 
 Ask only after repository context, tools, tests, and available evidence cannot resolve it. Human-only decisions are destructive or irreversible actions, real design tradeoffs with no context-visible answer, credentials or values only the person has, contradictory requirements, and scope outside the assignment. Never ask for reassurance, for facts the environment answers, for style details, or for cheap reversible choices. Combine related questions into one request. Batch reversible external-write approvals once per plan when their full scope is known; keep destructive, irreversible, or direction-changing decisions separate.
+
+For material technical alternatives with costly reversal and unresolved evidence, use `herdr-quorum`. If it is unavailable or cannot resolve the choice, only an evidence-supported safe reversible option may proceed; otherwise defer the dependent work. AFK grants no new authority and preserves explicit prior authorization.
 
 ## Message contract
 
@@ -55,7 +56,7 @@ Proceed only on an explicit, unambiguous answer authorizing the action. A timeou
 
 ## No terminal decision gate
 
-There is no terminal decision gate in this repository, on either channel. Do not ask the human for
+There is no terminal decision gate in this repository, in any presence state. Do not ask the human for
 permission to finish. Ending a run, a phase, a subtask, or a delegated slice is never by itself a
 reason to invoke `herdr-hitl` or to ask at this interface. Report the outcome, the verification
 performed, and any remaining risk in the final response instead.
@@ -65,4 +66,4 @@ performed, and any remaining risk in the final response instead.
 An agent started by `herdr-cron`, by `bench/bench.py`, or by any other scheduler has no reachable
 human, whatever `herdr-hitl channel` reports. In such a run, never invoke `herdr-hitl` at all. When a
 genuine human-only decision appears, stop the affected work, leave the repository in a consistent
-state, and report the blocker and the evidence in the run output so the human finds it in the run log.
+state, continue independent authorized work, and report the blocker and the evidence in the run output so the human finds it in the run log.
