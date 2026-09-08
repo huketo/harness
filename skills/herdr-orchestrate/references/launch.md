@@ -57,7 +57,7 @@ bun --no-install <harness>/omp/review.ts \
 
 `--inspect-tools`는 모델을 호출하지 않는다. enabled/registered/bridge 목록은 모두 `glob`, `grep`, `read`이며 mounted tools·extensions는 비고 MCP는 꺼져 있어야 한다. bridge 목록이 존재해도 eval 도구는 등록하지 않는다. 다른 capability가 보이면 진입점이 모델 호출 전에 거부한다.
 
-`--model <provider/id>`와 `--thinking <effort>`는 이번 reviewer에만 적용하는 명시적 override다. 그 외에는 프로필의 저장된 선택을 따른다. native 압축 순서는 이 프로세스의 읽기 전용 설정에서 `remote/handoff/soft`로 제한하며, 전역 설정과 계정·압축 확장을 변경하지 않는다. 파일·artifact 읽기는 유지한다.
+`--model <provider/id>`와 `--thinking <effort>`는 이번 reviewer에만 적용하는 명시적 override다. 모델은 정확한 provider/id가 일치해야 하며 축약·오타를 다른 모델로 대체하지 않는다. 그 외에는 프로필의 저장된 선택을 따른다. effort 선택자가 없는 프로필을 OMP 모델로 전환할 때는 `--thinking`도 지정한다. native 압축 순서는 이 프로세스의 읽기 전용 설정에서 `remote/handoff/soft`로 제한하며, 전역 설정과 계정·압축 확장을 변경하지 않는다. 파일·artifact 읽기는 유지한다.
 
 stdout의 최종 판정은 오케스트레이터가 review 파일로 저장한다. 실패한 프로세스나 빈 출력을 완료로 세지 않는다. 이 경로는 모델 도구의 capability 경계이며 OS 파일 읽기 sandbox나 자격증명 격리를 뜻하지 않는다.
 

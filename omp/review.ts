@@ -66,7 +66,7 @@ function usage(): string {
 		"       bun omp/review.ts [options] -- TEXT",
 		"",
 		`  --profile NAME       Harness purpose profile (default: ${DEFAULT_PROFILE})`,
-		"  --model PROVIDER/ID  Override only the profile model; keep its resolved effort",
+		"  --model PROVIDER/ID  Exact model override; keep profile effort (if absent, require --thinking)",
 		"  --thinking LEVEL     Override profile effort using OMP's native thinking selector",
 		"  --cwd DIR            Repository root to review (default: current directory)",
 		"  --brief TEXT         Review assignment; positional text after -- is also accepted",
@@ -127,7 +127,7 @@ export function resolveReviewSelection(options: {
 	if (!options.model && resolved.runner !== "omp") {
 		fail(
 			`Profile "${options.profile}" uses the ${resolved.runner} runner; ` +
-				"the restricted reviewer requires an OMP provider/model (or an explicit --model PROVIDER/ID)",
+				"the restricted reviewer requires an OMP provider/model (override with --model PROVIDER/ID and --thinking LEVEL)",
 		);
 	}
 	const model = options.model ?? `${resolved.provider}/${resolved.model}`;
@@ -135,6 +135,11 @@ export function resolveReviewSelection(options: {
 		fail(`--model must be an exact PROVIDER/ID selector, got "${model}"`);
 	}
 	const thinkingText = options.thinking ?? resolved.effort;
+	if (thinkingText === null) {
+		fail(
+			`Profile "${options.profile}" has no effort selector; supply --thinking LEVEL for the OMP model`,
+		);
+	}
 	const thinking = parseCliThinkingLevel(thinkingText);
 	if (!thinking) {
 		fail(
@@ -287,6 +292,13 @@ export async function createRestrictedReviewSession(options: {
 		}),
 	);
 	try {
+		const model = result.session.model;
+		const actual = model ? `${model.provider}/${model.id}` : undefined;
+		if (actual !== options.selection.model) {
+			fail(
+				`Reviewer requires exact model "${options.selection.model}"; SDK selected "${actual ?? "none"}"`,
+			);
+		}
 		await initializeReviewExtensions(result.session);
 		const capabilities = assertRestrictedReviewCapabilities(result);
 		return { result, capabilities };
