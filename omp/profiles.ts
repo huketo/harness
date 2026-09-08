@@ -59,7 +59,7 @@ function cmdList(): void {
 				name,
 				runner: resolved.runner,
 				model: `${resolved.provider}/${resolved.model}`,
-				effort: resolved.effort,
+				effort: resolved.effort ?? "n/a",
 				purpose: resolved.purpose,
 			};
 		});
@@ -134,12 +134,14 @@ function cmdEffortGet(name: string): void {
 	const { profiles, state } = loadAll();
 	if (profiles.profiles[name]) {
 		const resolved = resolveProfile(profiles, state, name);
-		process.stdout.write(`${resolved.effort} (${resolved.effortSource})\n`);
+		process.stdout.write(
+			`${resolved.effort ?? "unsupported"} (${resolved.effortSource})\n`,
+		);
 		return;
 	}
 	if (profiles.models[name]) {
 		const { effort, source } = resolveModelEffort(profiles, state, name);
-		process.stdout.write(`${effort} (${source})\n`);
+		process.stdout.write(`${effort ?? "unsupported"} (${source})\n`);
 		return;
 	}
 	fail(`"${name}" is neither a known profile nor a known model key.`);
@@ -152,6 +154,8 @@ function cmdEffortSet(name: string, level: string): void {
 	const key = profiles.profiles[name]?.model ?? name;
 	const model = profiles.models[key];
 	if (!model) fail(`Unknown profile or model: ${name}`);
+	if (model.effort === null && level !== "reset")
+		fail(`Model "${key}" does not support effort selection.`);
 	const supported =
 		model.provider === "agy"
 			? ["low", "medium", "high"]

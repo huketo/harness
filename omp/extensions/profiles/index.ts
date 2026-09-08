@@ -146,7 +146,7 @@ export default function profilesExtension(pi: ExtensionAPI) {
 			const state = readState();
 			effort = (
 				activeProfile
-					? resolveProfile(profiles, state, activeProfile).effort
+					? (resolveProfile(profiles, state, activeProfile).effort ?? undefined)
 					: state.modelEffort[key]
 			) as ThinkingLevel | undefined;
 		}
@@ -199,6 +199,8 @@ export default function profilesExtension(pi: ExtensionAPI) {
 					throw new Error(
 						`사용 가능한 모델이 없습니다: ${resolved.provider}/${resolved.model}`,
 					);
+				if (resolved.effort === null)
+					throw new Error(`${target.id}에는 선택 가능한 effort가 없습니다.`);
 				if (!supported(target, resolved.effort))
 					throw new Error(
 						`${target.id}에서 지원하지 않는 effort: ${resolved.effort}`,

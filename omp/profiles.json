@@ -5,7 +5,7 @@
 		"fable-5-1": {
 			"provider": "anthropic",
 			"model": "claude-fable-5-1",
-			"effort": "high",
+			"effort": "medium",
 			"prompt": "prompts/claude-fable-5-1.txt",
 			"compaction": { "thresholdPercent": 75 }
 		},
@@ -19,7 +19,7 @@
 		"gpt-6-astra": {
 			"provider": "openai-codex",
 			"model": "gpt-6-astra",
-			"effort": "high",
+			"effort": "medium",
 			"prompt": "prompts/gpt-6-astra.txt",
 			"compaction": { "thresholdPercent": 70 }
 		},
@@ -39,15 +39,15 @@
 		},
 		"agy-flash": {
 			"provider": "agy",
-			"model": "gemini-3.8-flash-medium",
-			"effort": "medium",
+			"model": "gemini-3.8-flash-high",
+			"effort": "high",
 			"prompt": "",
 			"compaction": { "thresholdPercent": null }
 		},
 		"agy-opus-thinking": {
 			"provider": "agy",
 			"model": "claude-opus-4-6-thinking",
-			"effort": "medium",
+			"effort": null,
 			"prompt": "",
 			"compaction": { "thresholdPercent": null }
 		}
@@ -109,7 +109,7 @@
 		},
 		"fallback": {
 			"model": "agy-opus-thinking",
-			"purpose": "AGY Opus 4.6 Thinking as an explicit-budget fallback when other models/budgets are exhausted"
+			"purpose": "AGY Opus 4.6 Thinking as an explicit-budget fallback when other models/budgets are exhausted; the model exposes no effort selector"
 		}
 	}
 }

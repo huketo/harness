@@ -64,21 +64,52 @@ test("personal CLI effort overrides do not create compatibility-role drift", () 
 	}
 });
 
-test("requested quality and economical routes resolve to the selected models", () => {
+test("requested routes expose their selected effort capabilities", () => {
 	const profiles = loadProfiles();
 	const state = { version: 1 as const, modelEffort: {}, profileEffort: {} };
-	expect(resolveProfile(profiles, state, "best").model).toBe("gpt-6-astra");
-	expect(resolveProfile(profiles, state, "hard-code").model).toBe(
-		"claude-fable-5-1",
-	);
+	const best = resolveProfile(profiles, state, "best");
+	expect(best.model).toBe("gpt-6-astra");
+	expect(best.effort).toBe("medium");
+	const hardCode = resolveProfile(profiles, state, "hard-code");
+	expect(hardCode.model).toBe("claude-fable-5-1");
+	expect(hardCode.effort).toBe("medium");
 	expect(resolveProfile(profiles, state, "economical").effort).toBe("max");
-	const flash = resolveProfile(
-		profiles,
-		{ ...state, profileEffort: { media: "high" } },
-		"media",
-	);
+	const flash = resolveProfile(profiles, state, "media");
 	expect(flash.model).toBe("gemini-3.8-flash-high");
+	expect(flash.effort).toBe("high");
 	expect(buildArgv(flash)).toContain(process.cwd());
+	const fallback = resolveProfile(profiles, state, "fallback");
+	expect(fallback.effort).toBeNull();
+	expect(buildArgv(fallback)).not.toContain("--effort");
+});
+
+test("CLI rejects effort overrides for models without effort selection", () => {
+	const dir = mkdtempSync(join(tmpdir(), "harness-cli-unsupported-effort-"));
+	try {
+		const result = Bun.spawnSync(
+			[
+				"bun",
+				join(import.meta.dir, "../../profiles.ts"),
+				"effort",
+				"set",
+				"fallback",
+				"high",
+			],
+			{
+				env: {
+					...process.env,
+					PI_CODING_AGENT_DIR: dir,
+					PI_PROFILE: undefined,
+				},
+			},
+		);
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr.toString()).toContain(
+			'Model "agy-opus-thinking" does not support effort selection.',
+		);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 test("input budget reserves output without subtracting it twice", () => {
@@ -103,14 +134,14 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 			provider: "openai-codex",
 			contextWindow: 272000,
 			maxTokens: 128000,
-			thinking: { efforts: ["high"] },
+			thinking: { efforts: ["medium"] },
 		} as unknown as Model;
 		const next = {
 			id: "claude-fable-5-1",
 			provider: "anthropic",
 			contextWindow: 1000000,
 			maxTokens: 128000,
-			thinking: { efforts: ["high"] },
+			thinking: { efforts: ["medium"] },
 		} as unknown as Model;
 		let native = true;
 		let fail = true;
@@ -179,7 +210,7 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 test("ordinary high-context input is left to OMP automatic maintenance", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "harness-input-"));
 	try {
-		const handlers = new Map<string, Function>();
+		const handlers = new Map<string, CallableFunction>();
 		const model = {
 			id: "gpt-6-astra",
 			provider: "openai-codex",
@@ -191,7 +222,8 @@ test("ordinary high-context input is left to OMP automatic maintenance", async (
 			registerFlag() {},
 			getFlag() {},
 			registerCommand() {},
-			on: (name: string, handler: Function) => handlers.set(name, handler),
+			on: (name: string, handler: CallableFunction) =>
+				handlers.set(name, handler),
 		} as unknown as ExtensionAPI);
 		const ctx = {
 			model,
@@ -204,10 +236,11 @@ test("ordinary high-context input is left to OMP automatic maintenance", async (
 				throw new Error("profile extension intercepted ordinary input");
 			},
 		};
-		await handlers.get("session_start")!({ type: "session_start" }, ctx);
-		expect(
-			await handlers.get("input")!({ text: "continue" }, ctx),
-		).toBeUndefined();
+		const sessionStart = handlers.get("session_start");
+		const input = handlers.get("input");
+		if (!sessionStart || !input) throw new Error("extension handlers missing");
+		await sessionStart({ type: "session_start" }, ctx);
+		expect(await input({ text: "continue" }, ctx)).toBeUndefined();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

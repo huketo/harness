@@ -35,7 +35,7 @@ OMP 안에서는 `/profile` 선택기 또는 `/profile code`로 용도를 선택
 
 내장 `smol`·`mid`·`slow` 역할은 기존 서브에이전트와의 호환에만 사용합니다. 이 용도 프로필은 인증·세션 전체를 격리하는 OMP의 `--profile` 옵션과 다릅니다.
 
-Fable 5.1·Astra는 high를 비교 시작값으로 둡니다. Opus 5·Sol은 코딩 high와 일반 작업 medium을 구분하고 Luna는 max를 사용합니다. Flash에는 기계적 작업·검색·미디어·자동화 프로필을, AGY Opus 4.6에는 명시적인 fallback 프로필을 둡니다. 실제 이름과 최종 모델·effort는 `list`·`show` 출력이 정본입니다. 확정되지 않은 “최적 effort”나 서로 다른 실행기 사이의 강도 동등성을 주장하지 않습니다.
+Fable 5.1·Astra는 medium, Opus 5·Sol은 코딩 high와 일반 작업 medium, Luna는 max를 사용합니다. Flash의 기계적 작업·검색·미디어·자동화 프로필은 high입니다. AGY Opus 4.6 Thinking의 `fallback` 프로필은 별도 effort 선택을 지원하지 않습니다. 실제 이름과 최종 모델·effort는 `list`·`show` 출력이 정본입니다. 확정되지 않은 “최적 effort”나 서로 다른 실행기 사이의 강도 동등성을 주장하지 않습니다.
 
 컨텍스트는 실행 중 모델의 실제 한도와 출력 여유를 기준으로 관리합니다. 네이티브 압축 지원과 다른 제공자로의 이동은 구분하며, 이동 전 읽을 수 있는 인계문을 사용합니다. 긴 대화에서 `/model`로 바로 바꾸기보다 `/profile`의 보호된 전환을 사용합니다. AGY의 내부 압축 설정은 OMP에서 조절할 수 없습니다. 모델별 공식 근거와 그 한계는 [FACTS 8절](../FACTS.md#8-모델-프로필컨텍스트-정책의-근거-2026-09-07)에 있습니다.
 

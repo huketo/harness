@@ -112,7 +112,7 @@ Herdr의 화면 기반 완료 감지는 integration마다 신뢰도가 다릅니
 
 ## 8. 모델 프로필·컨텍스트 정책의 근거 (2026-09-07)
 
-현재 정책의 정본은 `omp/profiles.json`입니다. Model guide, OMP catalog, runtime behavior를 분리해 해석합니다.
+현재 정책의 정본은 `omp/profiles.json`입니다. Fable 5.1과 Astra는 medium, AGY Flash는 high를 사용하며 AGY Opus 4.6 Thinking은 별도 effort 선택을 노출하지 않습니다. Model guide, OMP catalog, runtime behavior를 분리해 해석합니다.
 
 - [OpenAI Compaction](https://developers.openai.com/api/docs/guides/compaction)의 `context_management`는 Responses request field입니다. 문서 예시 threshold는 보편적인 optimum이 아닙니다. Standalone compaction의 반환 window는 일부 item만 골라내지 않고 전체를 다음 request에 전달해야 합니다.
 - [Claude Compaction](https://platform.claude.com/docs/en/build-with-claude/compaction)은 beta와 strategy를 request와 replay 양쪽에 요구합니다. Minimum input token 조건에 못 미친 요청은 성공한 compaction으로 표시하지 않습니다.

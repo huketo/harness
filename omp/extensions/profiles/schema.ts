@@ -23,7 +23,7 @@ export interface CompactionPolicy {
 export interface ModelEntry {
 	provider: string;
 	model: string;
-	effort: string;
+	effort: string | null;
 	prompt: string;
 	compaction: CompactionPolicy;
 }
@@ -146,7 +146,8 @@ export type EffortSource =
 	| "profile-override"
 	| "profile-default"
 	| "model-override"
-	| "model-default";
+	| "model-default"
+	| "unsupported";
 
 export interface ResolvedProfile {
 	name: string;
@@ -154,7 +155,7 @@ export interface ResolvedProfile {
 	provider: string;
 	model: string;
 	modelKey: string;
-	effort: string;
+	effort: string | null;
 	effortSource: EffortSource;
 	purpose: string;
 }
@@ -185,9 +186,12 @@ export function resolveProfile(
 	}
 	const runner: Runner = modelEntry.provider === "agy" ? "agy" : "omp";
 
-	let effort: string;
+	let effort: string | null;
 	let effortSource: EffortSource;
-	if (state.profileEffort[name] !== undefined) {
+	if (modelEntry.effort === null) {
+		effort = null;
+		effortSource = "unsupported";
+	} else if (state.profileEffort[name] !== undefined) {
 		effort = state.profileEffort[name];
 		effortSource = "profile-override";
 	} else if (profile.effort !== undefined) {
@@ -207,6 +211,7 @@ export function resolveProfile(
 		provider: modelEntry.provider,
 		model:
 			modelEntry.provider === "agy" &&
+			effort !== null &&
 			/^gemini-3\.8-flash-(low|medium|high)$/.test(modelEntry.model)
 				? `gemini-3.8-flash-${effort}`
 				: modelEntry.model,
@@ -222,9 +227,15 @@ export function resolveModelEffort(
 	profiles: ProfilesFile,
 	state: ProfilesState,
 	modelKey: string,
-): { effort: string; source: "model-override" | "model-default" } {
+): {
+	effort: string | null;
+	source: "model-override" | "model-default" | "unsupported";
+} {
 	const modelEntry = profiles.models[modelKey];
 	if (!modelEntry) throw new Error(`Unknown model key "${modelKey}"`);
+	if (modelEntry.effort === null) {
+		return { effort: null, source: "unsupported" };
+	}
 	if (state.modelEffort[modelKey] !== undefined) {
 		return { effort: state.modelEffort[modelKey], source: "model-override" };
 	}
@@ -252,6 +263,11 @@ export function selectorString(resolved: ResolvedProfile): string {
 		throw new Error(
 			`Profile "${resolved.name}" targets the agy runner (${resolved.model}); it has no OMP provider/model:effort selector. ` +
 				`Use "argv ${resolved.name}" to launch it as a separate agy process instead.`,
+		);
+	}
+	if (resolved.effort === null) {
+		throw new Error(
+			`Profile "${resolved.name}" does not support effort selection.`,
 		);
 	}
 	return `${resolved.provider}/${resolved.model}:${resolved.effort}`;
@@ -294,6 +310,11 @@ export function buildArgv(
 
 export function validateProfilesFile(profiles: ProfilesFile): string[] {
 	const errors: string[] = [];
+	for (const [key, model] of Object.entries(profiles.models)) {
+		if (model.effort === null && model.provider !== "agy") {
+			errors.push(`OMP model "${key}" must declare an effort`);
+		}
+	}
 	for (const purpose of REQUIRED_PURPOSES) {
 		if (!profiles.profiles[purpose])
 			errors.push(`missing required purpose profile "${purpose}"`);
