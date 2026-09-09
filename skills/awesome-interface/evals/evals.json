@@ -1,0 +1,120 @@
+{
+  "skill_name": "awesome-interface",
+  "evals": [
+    {
+      "id": 1,
+      "name": "copy",
+      "prompt": "fixtures/settings.html 알림 설정 화면에서 저장 실패 문구만 고쳐 주세요. 네트워크 오류이며 사용자가 연결을 확인한 뒤 저장을 다시 누르면 됩니다. 버튼, 배치, 색상, 다른 문구는 바꾸지 마세요.",
+      "expected_output": "Only recovery copy changes; uses actionable connection/retry message. Loads writing rather than all six domains.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Only recovery copy changes; uses actionable connection/retry message.",
+        "Loads writing rather than all six domains."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "keyboard",
+      "prompt": "fixtures/settings.html의 닫기 아이콘 버튼에 접근 가능한 이름이 없습니다. 닫기 동작과 모양을 보존하면서 이 문제만 수정해 주세요. 다른 디자인 변경은 하지 마세요.",
+      "expected_output": "Adds a meaningful accessible name while preserving button and behavior. Loads accessibility and avoids unrelated redesign.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Adds a meaningful accessible name while preserving button and behavior.",
+        "Loads accessibility and avoids unrelated redesign."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "review",
+      "prompt": "fixtures/settings.html 알림 설정 화면을 접근성, 레이아웃, 문구, 글꼴, 색상, UI 완성도 전체에서 검토해 주세요. 검토만 하고 파일은 수정하지 마세요. 실제 확인한 것과 확인하지 못한 상태를 나눠 보고해 주세요.",
+      "expected_output": "Reads all six domains; leaves input files unchanged. Reports unnamed button and unrecoverable error with source locations, missing runtime coverage and non-approval.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Reads all six domains; leaves input files unchanged.",
+        "Reports unnamed button and unrecoverable error with source locations, missing runtime coverage and non-approval."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "palette",
+      "prompt": "기존 제품의 색상 토큰은 hex입니다. --accent #1d4ed8을 기준으로 버튼 기본/hover/pressed와 연한 배경의 작은 팔레트를 제안해 주세요. 기존 표기는 유지하고 적용할 CSS를 제시하세요. 전체 화면 감사나 코드 수정은 필요 없습니다. 대비 검증을 하지 못했다면 정확히 표시하세요.",
+      "expected_output": "Keeps hex notation and supplies usable role/state colors. Does not claim rendered contrast verification without measurement.",
+      "files": [],
+      "expectations": [
+        "Keeps hex notation and supplies usable role/state colors.",
+        "Does not claim rendered contrast verification without measurement."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "backend-negative",
+      "prompt": "TypeScript의 NotificationSender interface에 send(message: string): Promise<void>를 선언하고 이를 받는 함수를 짧게 예시로 보여 주세요. 제품 화면이나 문구와는 무관한 API 타입 설명이며 파일은 읽거나 수정하지 마세요.",
+      "expected_output": "No interface skill or domain references loaded for backend type-only request.",
+      "files": [],
+      "expectations": [
+        "No interface skill or domain references loaded for backend type-only request."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "mode-negative",
+      "prompt": "팀 메모에 break, variant, https://example.com 이라는 문자열이 있습니다. 이것들을 그대로 포함하는 JSON 문자열 배열만 출력하세요. 웹 사이트를 열거나 UI를 분석하거나 파일을 읽지 마세요.",
+      "expected_output": "No special mode or external request triggered by incidental strings.",
+      "files": [],
+      "expectations": [
+        "No special mode or external request triggered by incidental strings."
+      ]
+    },
+    {
+      "id": 7,
+      "name": "change-review",
+      "prompt": "UI 변경 리뷰입니다. base는 <button aria-label=\"설정 닫기\"><svg aria-hidden=\"true\"/></button>, head는 <button><svg aria-hidden=\"true\"/></button>입니다. 다른 변경은 없고 src/Settings.tsx:24입니다. 코드만 제공했으므로 렌더링을 확인했다고 주장하지 마세요. 도입/회귀와 기존 문제를 구분하고 수정하지 않은 채 판정해 주세요.",
+      "expected_output": "Classifies the removed accessible name as introduced/regressed HIGH, excludes pre-existing issues from verdict. Marks runtime unverified and does not ask to invoke a legacy skill.",
+      "files": [],
+      "expectations": [
+        "Classifies the removed accessible name as introduced/regressed HIGH, excludes pre-existing issues from verdict.",
+        "Marks runtime unverified and does not ask to invoke a legacy skill."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "explain",
+      "prompt": "이 UI가 어떻게 만들어졌는지 설명해 주세요. 제공된 사실은 카드가 세 열로 나란히 있고 모서리가 둥글며 배경에 그림자가 있다는 텍스트 묘사뿐입니다. URL·스크린샷·소스는 없습니다. 관측과 구현 추정을 구분하고 어떤 추가 근거가 필요한지 답하세요. 파일을 만들지 마세요.",
+      "expected_output": "Distinguishes reported appearance from inferred CSS; does not invent actual inspected implementation.",
+      "files": [],
+      "expectations": [
+        "Distinguishes reported appearance from inferred CSS; does not invent actual inspected implementation."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "variants-boundary",
+      "prompt": "알림 설정 화면의 디자인 대안 두 가지를 비교하려고 합니다. 현재 fixtures/settings.html이 원본입니다. 이번에는 구현하지 말고 원본 보존, 비교할 차원과 선택 절차만 구체적으로 제시하세요.",
+      "expected_output": "Plans distinct comparable alternatives with original retained and explicit selection; performs no implementation.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Plans distinct comparable alternatives with original retained and explicit selection; performs no implementation."
+      ]
+    },
+    {
+      "id": 10,
+      "name": "stress-boundary",
+      "prompt": "fixtures/settings.html 알림 설정 컴포넌트를 긴 문구, 320px, 오류 상태로 스트레스 테스트하려 합니다. 이번에는 실행하지 말고 격리 fixture와 관측 계획만 제시하세요. 원본이나 실제 사용자 데이터는 바꾸면 안 됩니다.",
+      "expected_output": "Plans isolated synthetic stress cases with observable failure criteria, original unchanged.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Plans isolated synthetic stress cases with observable failure criteria, original unchanged."
+      ]
+    }
+  ]
+}

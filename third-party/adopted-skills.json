@@ -9,6 +9,58 @@
   },
   "snapshot_hash_recipe": "SHA-256 over files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL; based on archived installed tree before adoption edits and license additions.",
   "skills": {
+    "awesome-interface": {
+      "adopted_on": "2026-09-09",
+      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/jakubkrehel/skills",
+          "commit": "267330e1adfc66a718fb65fa6918c1f06d0a689e",
+          "paths": [
+            "LICENSE",
+            "skills/better-accessibility",
+            "skills/better-layout",
+            "skills/better-writing",
+            "skills/better-typography",
+            "skills/better-colors",
+            "skills/better-ui",
+            "skills/better-interface",
+            "skills/interface-review",
+            "skills/break",
+            "skills/variant",
+            "skills/explain-interface"
+          ],
+          "snapshot_sha256": "382a7c3dd8bf806a11223fbaa33ea0494c9d9d2b766950ba4fe31622db29aaa3",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        },
+        {
+          "source": "https://github.com/jakubkrehel/make-interfaces-feel-better",
+          "commit": "35545ea1512ad59fa463e6b1f95ca9c052981fe6",
+          "paths": ["LICENSE", "skills/make-interfaces-feel-better"],
+          "snapshot_sha256": "f692cfbc668768a1cc8eeb3263f3dd6bf445abbc12c93b20aede563e28ace3bf",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Consolidate discovery into awesome-interface with conditional plain-file domain and workflow references.",
+        "Preserve review-only and explicit task intent boundaries; remove dependencies on independently installed upstream skills.",
+        "Use project conventions and existing color notation; separate accessibility requirements from aesthetic starting points.",
+        "Deduplicate shared UI rules and retain generation, improvement, review, stress, variant and explanation workflows."
+      ],
+      "excluded_sources": [
+        {
+          "source": "https://github.com/jakubkrehel/oklch-skill",
+          "commit": "daa2ec87cc80bc7e7e812f84c5b34d5990240fcb",
+          "reason": "No license identified in the cloned tree; no text or examples adopted. OKLCH guidance derives from the MIT better-colors source above."
+        }
+      ]
+    },
     "tdd": {
       "previous_registration": {
         "source": "mattpocock/skills",

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>알림 설정</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; color: var(--ink); background: #fff;
+  font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 34rem; margin: 24px auto; }
+header { display: flex; justify-content: space-between; align-items: center; }
+button { min-width: 44px; min-height: 44px; padding: 10px 16px;
+  border: 1px solid #9ca3af; background: #fff; border-radius: 8px; font: inherit; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.save { color: #fff; background: var(--accent); border-color: var(--accent); }
+label { display: block; margin-block: 12px; }
+.error { color: #991b1b; }
+</style>
+</head>
+<body>
+<main>
+<header><h1>알림 설정</h1><button id="close" type="button"><svg aria-hidden="true"
+ width="16" height="16" viewBox="0 0 16 16"><path d="M2 2L14 14M14 2L2 14"
+ stroke="currentColor" stroke-width="2"/></svg></button></header>
+<p>받고 싶은 알림을 선택하세요.</p>
+<label><input id="email" type="checkbox" checked> 이메일 알림</label>
+<p id="error" class="error" role="alert">오류가 발생했습니다.</p>
+<button id="save" class="save" type="button">저장</button>
+<p id="status" role="status"></p>
+</main>
+<script>
+document.querySelector('#close').addEventListener('click', () => {
+  document.querySelector('#status').textContent = '설정을 닫았습니다.';
+});
+document.querySelector('#save').addEventListener('click', () => {
+  document.querySelector('#status').textContent = '저장하지 못했습니다. 연결을 확인하고 다시 시도하세요.';
+});
+</script>
+</body>
+</html>
