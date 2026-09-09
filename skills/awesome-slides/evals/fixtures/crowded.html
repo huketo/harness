@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northstar 검색 개선 검토 — 합성 입력 덱</title>
+<style>
+:root{--bg:#f7f5ef;--text:#16243a;--accent:#087e8b;--warning:#9b4d13}
+*{box-sizing:border-box}body{margin:0;background:#16243a;color:var(--text);font-family:"Noto Sans CJK KR","Malgun Gothic",sans-serif}main{width:960px;height:540px;position:absolute;transform-origin:0 0;background:var(--bg)}.slide{width:960px;height:540px;padding:34px;overflow:hidden}.slide[hidden]{display:none}h1{font-size:30px;margin:0 0 14px}h2{font-size:20px;margin:10px 0}p,li,td,th{font-size:16px;line-height:1.6}table{width:100%;border-collapse:collapse}td,th{padding:12px;border:1px solid #bbc5c8;text-align:left;vertical-align:top}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{border:1px solid #ccd4d4;padding:20px;background:white}.label{color:var(--accent);font-weight:700}.fine{font-size:12px}nav{position:fixed;bottom:16px;width:100%;display:flex;gap:12px;justify-content:center;color:white}button{padding:10px 16px;cursor:pointer}button:focus-visible{outline:3px solid #ffc857;outline-offset:2px}.notes{display:none}
+</style>
+</head>
+<body>
+<main id="deck">
+<section class="slide" aria-labelledby="s1">
+<p class="label">Northstar · 승인 검토 · 교육용 합성 자료</p>
+<h1 id="s1">문서 검색 개선: 현황, 계산, 세 가지 대안을 한 번에 검토</h1>
+<div class="grid">
+<div class="card"><h2>현재와 목표</h2><p>대상 40명, 업무일 20일/월. 검색 시간 현재 6분/일에서 파일럿 목표 3분/일로 줄인다. 검토용 인건비는 30,000원/시간이다.</p><p>40명 × 20일 × 3분 = 월 40시간. 시간 환산 가치는 월 1,200,000원이다. 실제 현금 절감이나 인원 감축이 아니라 가용 시간의 추정 가치이다.</p></div>
+<div class="card"><h2>권장 방향과 한계</h2><p>내부 인덱스 파일럿을 4주간 진행하고 확대 여부는 실측 후 결정한다. 초기비용은 3,000,000원 한도, 월 운영비는 200,000원 상한이다.</p><p>이 숫자는 교육용 합성 가정이다. 실측 ROI나 고객 성공 사례가 아니며, 두 도입 대안 모두 검색 3분/일 달성을 가정한다. 유지보수 부담과 목표 달성률은 아직 확인되지 않았다.</p></div>
+</div>
+<aside class="notes">현황의 검색 시간은 가정이다. 월 40시간의 산식을 설명하고 현금 절감과 구분한다. 다음 장에서 초기비용과 운영 책임의 차이를 공정하게 비교한다.</aside>
+</section>
+<section class="slide" aria-labelledby="s2" hidden>
+<p class="label">Northstar · 대안 비교 · 모든 비용은 가상 예산</p>
+<h1 id="s2">현상 유지, SaaS, 내부 파일럿의 비용과 위험</h1>
+<table><thead><tr><th>대안</th><th>초기비용</th><th>월비용</th><th>이점</th><th>위험·한계</th></tr></thead><tbody>
+<tr><th>현상 유지</th><td>0원</td><td>0원</td><td>도입 위험이 없다.</td><td>검색 시간 문제를 그대로 둔다.</td></tr>
+<tr><th>검색 SaaS</th><td>1,000,000원</td><td>600,000원</td><td>낮은 초기비용으로 빠르게 탐색 기능을 도입한다.</td><td>데이터 외부 전송과 공급자 의존을 검토해야 한다.</td></tr>
+<tr><th>내부 인덱스 파일럿</th><td>3,000,000원</td><td>200,000원</td><td>데이터 경계를 통제하고 낮은 월비용을 기대한다.</td><td>자체 운영과 접근권한 동기화 책임이 있다. 결과가 아직 검증되지 않았다.</td></tr>
+</tbody></table>
+<p>두 도입 대안 모두 같은 검색 3분/일 목표를 가정한다. SaaS의 낮은 초기비용을 숨기지 않는다. 확대 결정에는 실제 목표 달성률과 유지보수 부담이 필요하다.</p>
+<aside class="notes">SaaS도 유효한 대안이다. 낮은 초기비용과 외부 데이터 전송 위험을 함께 말한다. 내부 파일럿의 월비용 이점은 운영 책임을 감수할 때의 가정이다.</aside>
+</section>
+<section class="slide" aria-labelledby="s3" hidden>
+<p class="label">Northstar · 요청과 통제</p>
+<h1 id="s3">4주 파일럿을 승인하되 접근권한 누출이면 즉시 중단한다</h1>
+<div class="grid"><div class="card"><h2>4주 일정</h2><ol>
+<li>공개 샘플 문서와 접근권한 테스트, 검색 시간 기준선을 기록한다.</li>
+<li>제한된 참여자로 인덱스를 연결하고 기존 검색을 유지한다.</li>
+<li>동일 과제의 검색 시간과 잘못된 접근 허용 여부를 관찰한다.</li>
+<li>결과를 검토하고 확대하거나 철회한다.</li>
+</ol></div><div class="card"><h2>성공과 중단 기준</h2><ul>
+<li>검색 과제 중앙값 시간이 3분 이하이다.</li>
+<li>승인되지 않은 문서 접근은 0건이다.</li>
+<li>월 운영비 추정은 200,000원 상한 이내이다.</li>
+<li>접근권한 누출이 1건이라도 있으면 즉시 중단한다. 기존 검색으로 복귀하고 인덱스 접근을 해제한다.</li>
+</ul><p>요청: 초기비용 3,000,000원 한도, 월 200,000원 상한으로 4주 파일럿을 승인한다. 전체 확대는 아직 승인하지 않는다.</p></div></div>
+<p class="fine">이 덱의 조직·비용·효과는 교육용 합성 가정이며 실제 운영 결과가 아니다.</p>
+<aside class="notes">승인은 제한된 파일럿에 대한 것이며 전체 확대 승인이 아니다. 접근권한 누출 중단 기준은 성능 개선보다 우선한다. 4주차에 측정 결과와 운영 부담을 가지고 다시 결정한다.</aside>
+</section>
+</main>
+<nav aria-label="슬라이드 이동"><button id="previous" type="button">이전</button><span id="count" aria-live="polite"></span><button id="next" type="button">다음</button></nav>
+<script>
+const slides=Array.from(document.querySelectorAll('.slide'));let current=0;
+function show(index){current=Math.max(0,Math.min(slides.length-1,index));slides.forEach((slide,i)=>{slide.hidden=i!==current});document.getElementById('count').textContent=`${current+1} / ${slides.length}`;document.getElementById('previous').disabled=current===0;document.getElementById('next').disabled=current===slides.length-1;history.replaceState(null,'',`#${current+1}`)}
+function fit(){const scale=Math.min(innerWidth/960,(innerHeight-64)/540);const deck=document.getElementById('deck');deck.style.transform=`translate(${(innerWidth-960*scale)/2}px,${(innerHeight-64-540*scale)/2}px) scale(${scale})`}
+document.getElementById('previous').addEventListener('click',()=>show(current-1));document.getElementById('next').addEventListener('click',()=>show(current+1));document.addEventListener('keydown',event=>{if(event.key==='ArrowRight')show(current+1);if(event.key==='ArrowLeft')show(current-1)});addEventListener('resize',fit);show(Number(location.hash.slice(1)||1)-1);fit();
+</script>
+</body>
+</html>

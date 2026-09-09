@@ -9,6 +9,47 @@
   },
   "snapshot_hash_recipe": "SHA-256 over files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL; based on archived installed tree before adoption edits and license additions.",
   "skills": {
+    "awesome-slides": {
+      "adopted_on": "2026-09-10",
+      "source": "Original synthesis informed by four pinned public repositories; no upstream prose, implementation, templates, or media copied",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT for original skill, references, and synthetic evaluation fixtures",
+      "license_path": "skills/awesome-slides/LICENSE",
+      "previous_registration": null,
+      "upstreams": [
+        {
+          "source": "https://github.com/zarazhangrui/frontend-slides",
+          "commit": "9906a34d640d2111f724544cbc50f7f130569ae1",
+          "license": "MIT",
+          "use": "Research only: visual previews, delivery modes, selective style references"
+        },
+        {
+          "source": "https://github.com/vstorm-co/content-skills",
+          "commit": "5138a11b1e3407ea3352d4010cbe33233bdeb01c",
+          "license": "MIT",
+          "use": "Research only: audience-led narrative, brand integration, speaker notes"
+        },
+        {
+          "source": "https://github.com/AlemTuzlak/skills",
+          "commit": "4b16f3e052635c873d4eede00e8dc5f471f5fc3a",
+          "license": "MIT declared in README and plugin metadata; root license text not found in the reviewed snapshot",
+          "use": "Research only: assertion/evidence, code grounding, rendered-state verification"
+        },
+        {
+          "source": "https://github.com/BaizeAI/talks",
+          "commit": "5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99",
+          "license": "Apache-2.0",
+          "use": "Research only: technical case structure, controlled-demo labels, static media substitutes; no third-party media or trademarks reused"
+        }
+      ],
+      "local_changes": [
+        "Author original presentation and reading workflows joining evidence, narrative, visual direction, notes, and actual output verification.",
+        "Preserve existing engines; default new decks to Slidev, use HTML for single-file delivery, and distinguish native-editable from image-based PPTX.",
+        "Add Korean/CJK, truthful data provenance, offline, static-media, privacy, and meaning-preserving revision guidance.",
+        "Add four original synthetic evaluation cases without upstream assets or real organizational data."
+      ],
+      "excluded_sources": []
+    },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
       "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better",
