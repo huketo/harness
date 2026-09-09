@@ -1,6 +1,6 @@
 ---
 name: awesome-interface
-description: Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, and visual polish or motion. Use for focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for API interface design, general document writing, or backend-only code review.
+description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, and visual polish or motion. Use for focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for API interface design, general document writing, or backend-only code review."
 license: MIT
 ---
 
