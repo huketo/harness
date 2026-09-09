@@ -104,3 +104,19 @@ node skills/windows-chrome/scripts/windows-chrome.js stop    # Chrome 닫고 브
 ```
 
 Windows 쪽 전제는 Chrome과 Node.js(`node.exe`) 두 가지뿐이며 방화벽 규칙, `netsh portproxy`, mirrored 네트워킹은 필요 없습니다. 헤디드 Chrome이 `127.0.0.1`에만 듣고 WSL→호스트 연결을 방화벽이 막기 때문에, 브릿지는 연결마다 Windows `node.exe` 릴레이를 interop으로 띄워 stdio로 잇습니다. Chrome은 `%LOCALAPPDATA%\windows-chrome\default` 전용 프로필을 씁니다. Chrome 136부터 기본 프로필에서는 원격 디버깅이 거부되기 때문입니다. 포트를 WSL 9222·Windows 19222로 나눈 이유와 실측값은 [FACTS](../FACTS.md) 7절에 있습니다.
+
+## 인터페이스 개선과 검토
+
+[`awesome-interface`](../../skills/awesome-interface/SKILL.md)는 제품 UI의 접근성·배치·문구·타이포그래피·색상·시각적 완성도를 다룹니다. 작은 요청은 필요한 전문 문서만 읽고, 전체 검토는 여섯 영역을 모두 검토합니다.
+
+- “awesome-interface로 이 오류 문구만 고쳐 주세요.”
+- “이 화면을 전체 검토하되 수정하지 마세요.”
+- “현재 브랜치의 UI 변경을 리뷰하고 회귀를 구분해 주세요.”
+- “이 컴포넌트의 긴 문구·좁은 화면 스트레스 테스트를 해주세요.”
+- “원본을 유지하면서 두 디자인 대안을 비교하게 해주세요.”
+
+리뷰만 요청하면 소스를 수정하지 않습니다. 변경 리뷰·스트레스·대안 생성·외부 UI 설명은 해당 작업을 명시적으로 요청했을 때만 수행합니다. 이 구분은 스킬 내부의 행동 조건이며 호스트가 기능별 호출을 강제 차단한다는 뜻은 아닙니다. 기존 색상 표기·토큰·컴포넌트를 유지하며 마이그레이션은 별도 요청이 필요합니다.
+
+설치는 기존 `install.sh`의 스킬 링크 경로를 사용합니다. 이미 설치된 `better-*`, `interface-review`, `break`, `variant`, `explain-interface`를 교체할 때에는 먼저 수정본과 참조를 탐색 경로 밖에 백업하고 설치 관리자의 등록 여부를 확인합니다. 등록된 항목은 관리자의 제거 명령을 사용하고, 미등록 사본은 백업 후 탐색 경로에서 옮깁니다. 새 스킬과 이전 사본을 함께 활성화하지 않습니다. 설치 직후 기존 대화의 목록은 그대로일 수 있으므로 새 세션에서 확인합니다.
+
+검증용 합성 입력과 기대 동작은 [`evals/evals.json`](../../skills/awesome-interface/evals/evals.json)에 있습니다. 각 사례는 `files`의 fixture를 같은 상대 경로로 배치한 격리 작업공간에서 실행합니다. 실제 모델 응답과 캡처는 버전 관리하지 않습니다.

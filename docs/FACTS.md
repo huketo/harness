@@ -170,3 +170,15 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 HITL 기록을 0.2.0에서 [0.2.1](https://github.com/huketo/herdr-hitl/releases/tag/v0.2.1)로 갱신했습니다. 이 릴리스의 [IPC 수정](https://github.com/huketo/herdr-hitl/commit/d594c5eb023fc4bb87b15d87ff8a21124320d164)은 timeout 미지정과 명시적인 `0`을 구분하고 알림 유지 시간을 daemon 설정에 맡깁니다. 이는 설치된 핀의 변경이력이며 Telegram rate limit을 해결했다고 주장하지 않습니다.
 
 Agent Usage는 AGY 지원 등이 포함된 `huketo/herdr-agent-usage` fork를 유지합니다. [upstream과의 비교](https://github.com/huketo/herdr-agent-usage/compare/7cdbc13a3443d3868496d3d3f821bca2710b4b81...df95abc0ba2edb002697d49a218868f87f823a3e)에서는 fork 고유 커밋 6개와 upstream 고유 커밋 3개가 확인되었습니다. Upstream의 0.5.13·sidebar cache diagnostics는 별도 통합 검토 대상이며, 설치 핀을 upstream으로 교체하지 않았습니다.
+
+## 10. awesome-interface 편입과 검증 (2026-09-09)
+
+`awesome-interface`는 한 개의 `SKILL.md`, 여섯 전문 영역, 다섯 작업 절차, 공통 리뷰 양식으로 구성됩니다. [Jakub Krehel의 skills](https://github.com/jakubkrehel/skills/tree/267330e1adfc66a718fb65fa6918c1f06d0a689e)와 [make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better/tree/35545ea1512ad59fa463e6b1f95ca9c052981fe6)의 MIT 자료를 선별·재구성했습니다. 라이선스를 확인하지 못한 `oklch-skill`의 고유 콘텐츠는 복사하지 않았습니다. 입력 revision·해시·고지와 변경 경계는 `third-party/adopted-skills.json`의 개별 항목에 있습니다.
+
+OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 설치본 비교 3개를 실행했습니다. 후보의 문구 수정은 writing만, 버튼 이름 수정은 accessibility와 writing을 읽었고, 전체 검토는 여섯 영역을 모두 읽었습니다. 수정 도구가 제공된 리뷰 사례도 fixture를 변경하지 않았습니다. backend 타입 설명과 문자열 배열 요청은 UI 스킬이나 특수 모드를 호출하지 않았습니다. 변경 리뷰는 이름 제거를 HIGH 회귀로 분류했습니다. 스트레스·대안·설명 사례는 요청된 계획·근거 경계를 확인했으며, 실제 대안 앱 생성이나 외부 사이트 분석까지 검증한 것은 아닙니다.
+
+초기 이름·설명 문자열은 나머지 설치 스킬을 동일하게 유지한 조건에서 8,790자에서 8,241자로 줄었습니다. 표시 항목은 36개에서 30개로 줄었으며 이 중 UI 영역은 7개에서 1개로 바뀌었습니다. 각 사례 1회뿐이고 작은 요청의 라우터 읽기 비용도 있어, 전체 토큰·비용·호출 정확도가 개선됐다고 주장하지 않습니다. 최초 평가 실행은 discovery 함수에 스킬의 부모 디렉터리 대신 스킬 디렉터리를 넘겨 후보를 찾지 못했습니다. 해당 결과를 제외하고, 실제 후보 노출을 검사하도록 고친 평가기로 위 13개 실행을 다시 수행했습니다.
+
+합성 fixture의 후보 출력은 Chromium에서 별도로 확인했습니다. 320px에서 이름이 있는 닫기 버튼과 가시적 포커스, Tab·Enter 활성화, 넘침 없음을 확인했고, 데스크톱에서 수정된 복구 문구와 키보드 저장 활성화를 확인했습니다. 자동화 click helper는 보이는 버튼에서도 timeout이 발생해 키보드 경로로 검증했습니다. 스크린리더 발화·200% 확대·포인터 자동화 성공을 주장하지 않습니다.
+
+독립적인 Claude 계열 제한 리뷰어가 세 구현 슬라이스를 검토했고 blocking은 없었습니다. 확인된 보완 사항인 색상 외 상태 단서, 규칙 중복, 대안 preview의 수명, 스트레스 증거 보존은 통합 시 반영했습니다. 구조 검사에서는 단일 스킬 진입점, 105개 로컬 Markdown 링크, 두 MIT 출처와 10개 평가 입력이 확인됐습니다. 평가 입력은 `skills/awesome-interface/evals/`에 있으며 실제 응답·비교 화면·캡처는 배포하지 않습니다.
