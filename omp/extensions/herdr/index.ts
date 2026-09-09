@@ -56,12 +56,62 @@ async function run(args: string[], signal?: AbortSignal) {
 	}
 }
 
+async function askChannel() {
+	let child;
+	try {
+		child = Bun.spawn(["herdr-hitl", "channel", "-o", "json"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+	} catch (error) {
+		const code = (error as { code?: string }).code;
+		// Only missing installations (ENOENT) are outside this gate.
+		if (code === "ENOENT") return undefined;
+		return {
+			block: true,
+			reason: `herdr-hitl channel could not start (${code ?? String(error)}). The ask tool is unavailable until the channel resolves; run herdr-hitl doctor. Do not ask the human another way: take the safe reversible path or defer only the dependent work.`,
+		};
+	}
+	const [stdout, stderr, code] = await Promise.all([
+		new Response(child.stdout).text(),
+		new Response(child.stderr).text(),
+		child.exited,
+	]);
+	let channel: unknown;
+	try {
+		channel = JSON.parse(stdout)?.channel;
+	} catch {}
+	if (code !== 0 || typeof channel !== "string")
+		return {
+			block: true,
+			reason: `herdr-hitl channel failed (exit ${code}): ${(stderr.trim() || stdout.trim()).split(/\r?\n/, 1)[0]}. The ask tool is unavailable until the channel resolves; run herdr-hitl doctor. Do not ask the human another way: take the safe reversible path or defer only the dependent work.`,
+		};
+	if (channel === "terminal") return undefined;
+	if (channel === "messenger")
+		return {
+			block: true,
+			reason: "herdr-hitl channel is messenger: nobody is watching this interface. Do not use the ask tool. Ask with the herdr-hitl CLI (bash: herdr-hitl ask …) under the message contract in the herdr-hitl skill and APPEND_SYSTEM.md, then act only on an explicit answer.",
+		};
+	if (channel === "afk")
+		return {
+			block: true,
+			reason: "herdr-hitl channel is afk: the person declared themselves unavailable. Do not ask or notify on any channel and do not retry. Apply the autonomous/quorum/defer policy from the herdr-hitl skill: decide in-scope reversible matters from evidence, defer only work that depends on a human-only decision, continue independent authorized work, and record the blocker in your final report.",
+		};
+	return {
+		block: true,
+		reason: `herdr-hitl channel returned an unknown channel "${channel}". The ask tool is blocked; run herdr-hitl doctor and take the safe reversible path.`,
+	};
+}
+
 export default function herdrExtension(pi: ExtensionAPI) {
 	const z = pi.zod;
 	pi.on("before_agent_start", (event) =>
 		process.env.HERDR_ENV === "1" && !event.systemPrompt.includes(POLICY)
 			? { systemPrompt: [...event.systemPrompt, POLICY] }
 			: undefined,
+	);
+	pi.on("tool_call", (event) =>
+		event.toolName === "ask" ? askChannel() : undefined,
 	);
 	pi.registerTool({
 		name: "herdr_run",
