@@ -6,9 +6,9 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/herdrdev/herdr.git",
       "skillPath": "skills/herdr/SKILL.md",
-      "skillFolderHash": "f8bb649bb92ddc99e6af463ab9a635da98c7b129",
+      "skillFolderHash": "b9dcfddcfa7ce43e2e4cf60e724c519be553f149",
       "installedAt": "2026-08-30T09:07:26.785Z",
-      "updatedAt": "2026-08-30T09:07:26.785Z"
+      "updatedAt": "2026-09-09T01:28:28.970Z"
     },
     "herdr-hitl": {
       "source": "huketo/herdr-hitl",
