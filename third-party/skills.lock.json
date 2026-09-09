@@ -15,9 +15,9 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/huketo/herdr-hitl.git",
       "skillPath": "skills/herdr-hitl/SKILL.md",
-      "skillFolderHash": "9505e3d267e448baec9bca199da6dd3462cbdf5f",
-      "installedAt": "2026-09-01T06:55:01.457Z",
-      "updatedAt": "2026-09-08T05:52:18.572Z"
+      "skillFolderHash": "51bf044a8b9b8b1c5b7fbeb4f6ddd1c9cf2c6516",
+      "installedAt": "2026-09-09T11:46:12.554Z",
+      "updatedAt": "2026-09-09T11:46:12.554Z"
     },
     "skill-doctor": {
       "source": "warpdotdev/common-skills",

@@ -190,3 +190,5 @@ OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 
 `daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description을 트리거 조건만 남기도록 줄였고 본문은 바꾸지 않았습니다. `diagnosing-bugs`와 `tdd`는 "원인 미상"과 "원인이 테스트 환경으로 확인됨"으로 간헐 실패 트리거를 나눴고, `writing-for-agents`는 `skill-creator`와 겹치던 "creating or editing skills"를 제거했습니다. `git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)(MIT)에서 편입하고 `third-party/adopted-skills.json`에 이전 등록·입력 해시·로컬 변경을 기록했습니다.
 
 같은 로더로 같은 설치 목록을 읽은 조건에서 가시 이름·설명 문자 수는 8,241자에서 6,554자로 줄었습니다(항목 30개 동일). 라우팅 프로브는 OMP SDK `openai-codex/gpt-6-astra:low`, 도구 read/glob/grep, 빈 합성 작업 디렉터리에서 긍정 13·부정 7 프롬프트를 각 1회 실행했고 기준선과 후보 모두 20/20 통과했습니다. 각 사례 1회이므로 호출 정확도의 통계적 개선이나 전체 토큰·비용 절감을 주장하지 않습니다. 제한 SDK 리뷰어(다른 모델 계열) 1회차에서 blocking은 없었고 nit 4건을 반영했습니다.
+
+`herdr-hitl`의 description은 upstream v0.3.1에서 줄였고, 따옴표 없는 값의 `: `를 엄격한 YAML 파서가 거부하여 v0.3.2에서 값을 인용했습니다. OMP 로더가 경고 없이 읽는 것과 `skills` CLI가 설치할 수 있는 것은 다른 조건입니다.
