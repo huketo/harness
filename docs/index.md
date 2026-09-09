@@ -9,7 +9,7 @@ Choose the document for the task rather than reading the entire directory. The R
 | Document | Read it for |
 | --- | --- |
 | [Installation](guides/installation.md) | Linux/WSL2 prerequisites, OMP and Bun pins, installer side effects, configuration opt-in, updates, and manual rollback. |
-| [상세 사용법](guides/usage.md) | Accounts, profiles, session/shared effort, native compaction, Herdr execution, and Windows Chrome. |
+| [상세 사용법](guides/usage.md) | Accounts, profiles, session/shared effort, native compaction, Herdr execution, Windows Chrome, and interface improvement/review. |
 | [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
 | [공개 배포 정책](public-release.md) | License, fresh-history, privacy, dependency, support, and publication invariants. |
 

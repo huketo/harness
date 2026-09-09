@@ -43,12 +43,12 @@ Examine deleted lines as carefully as additions. Check for equivalent replacemen
 | Signal removed or weakened | Consult owner for confirmation |
 | --- | --- |
 | Accessible names, descriptions, live regions, labels, alt text, table associations, native semantics, keyboard handling or focus styles | [Accessibility](accessibility.md) |
-| Reduced-motion or contrast-preference support | [Accessibility](accessibility.md) |
+| Reduced-motion or contrast-preference support, non-color state cues, feedback that disappears with motion disabled | [Accessibility](accessibility.md) |
 | Logical positioning, responsive containment, disclosure/scroll cues | [Layout](layout.md) |
 | Language/direction metadata, wrapping, full-value access, numeric alignment | [Typography](typography.md), or the semantic owner where applicable |
-| Semantic tokens, foreground/background pairing, non-color state cues | [Colors](colors.md) |
+| Semantic tokens or foreground/background pairing | [Colors](colors.md) |
 | Labels, recovery instructions, empty-state guidance or translation entries | [Writing](writing.md) |
-| Persistent state cues, interrupted transitions, shared visual state treatment | [UI polish](ui.md) |
+| Interrupted transitions or shared visual state treatment | [UI polish](ui.md) |
 
 An `aria-label` replaced by a valid visible-label association, custom role replaced by a native element, focus outline replaced by a visible equivalent, or string moved to a translation catalog is not by itself a regression.
 

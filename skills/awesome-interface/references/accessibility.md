@@ -72,14 +72,14 @@ For field errors:
 3. On failed submission, focus the first invalid field or a navigable error summary appropriate to a long form.
 4. Remove stale invalid state and error references when corrected.
 
-Convey state with text, an icon, a shape or another visible cue in addition to color. A red border alone cannot identify an error, and an accent color alone cannot identify selection. This is separate from contrast measurement in [colors.md](colors.md); inspect both color-independent meaning and the applicable contrast requirement.
-
 ```html
 <label for="email">Email</label>
 <input id="email" name="email" type="email" autocomplete="email"
        aria-invalid="true" aria-describedby="email-error">
 <p id="email-error">Enter a valid email address.</p>
 ```
+
+Convey state with text, an icon, a shape or another visible cue in addition to color. A red border alone cannot identify an error, and an accent color alone cannot identify selection. This is separate from contrast measurement in [colors.md](colors.md); inspect both color-independent meaning and the applicable contrast requirement.
 
 During submission, prevent duplicate requests and keep a meaningful action label beside any progress indicator. Re-enable the action after a recoverable failure. Preserve input and focus across re-renders and hydration; protect unsaved work at navigation boundaries where the product requires it. Error text must agree with actual validation and available recovery, as covered in [writing.md](writing.md).
 
