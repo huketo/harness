@@ -56,15 +56,6 @@
       "installedAt": "2026-09-03T09:26:47.634Z",
       "updatedAt": "2026-09-03T09:26:47.634Z"
     },
-    "git-commit": {
-      "source": "github/awesome-copilot",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/github/awesome-copilot.git",
-      "skillPath": "skills/git-commit/SKILL.md",
-      "skillFolderHash": "883a6a7466f55a9cd9f22cf1cce2d9333fc9b998",
-      "installedAt": "2026-09-03T09:27:28.410Z",
-      "updatedAt": "2026-09-03T09:27:28.410Z"
-    },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
       "sourceType": "github",

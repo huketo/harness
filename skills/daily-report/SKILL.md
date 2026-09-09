@@ -1,6 +1,6 @@
 ---
 name: daily-report
-description: Use this skill whenever the user asks to draft, write, generate, or prepare a daily work report, including Korean requests such as "일일보고", "일일 업무보고", "데일리 리포트", "오늘 보고 써줘", "일보 정리해줘", or "퇴근 전 보고서". Collects the authenticated user's public or self-hosted GitLab activity through glab and the existing Google Calendar collector, grounds a Korean draft in that evidence, and guides the user through reviewing and entering it in their Daou Office tenant UI. Submission remains a human-reviewed browser action.
+description: 일일보고 — draft/write/prepare a daily work report. Use for "일일보고", "일일 업무보고", "데일리 리포트", "오늘 보고 써줘", "일보 정리해줘", "퇴근 전 보고서", or any request meaning "오늘 한 일과 내일 할 일 정리", including vague end-of-day "보고 좀"·"정리해서 올려줘". Not for weekly or monthly reports.
 ---
 
 # 일일 업무보고 작성

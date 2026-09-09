@@ -88,6 +88,8 @@ bun test herdr/cron/host-sync.test.mjs
 
 `awesome-interface`는 Jakub Krehel의 MIT 스킬을 재구성한 단일 진입점입니다. 여섯 전문 영역과 리뷰·변경 리뷰·스트레스·대안·설명 절차는 내부 참조 문서로 유지합니다. `third-party/adopted-skills.json`의 최상위 출처·날짜는 최초 편입 묶음의 기록이며, 이 스킬은 개별 항목의 출처·revision·입력 해시·로컬 변경 기록을 사용합니다. 라이선스가 확인되지 않은 `oklch-skill`의 고유 콘텐츠는 포함하지 않았습니다.
 
+`git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)의 MIT 스킬을 2026-09-09에 편입했습니다. 본문은 그대로 두고 description만 트리거 조건으로 줄였습니다. 같은 날 `daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description도 줄였습니다. description은 시스템 프롬프트에 항상 실리는 유일한 부분이므로 절차 설명은 본문에 두고, 이웃 스킬과 겹치는 트리거는 한쪽에만 둡니다. 근거는 `docs/FACTS.md` 11절에 있습니다.
+
 ## 서드파티 스킬과 Herdr 플러그인
 
 설치 관리자가 내려받은 스킬과 플러그인 checkout은 이 레포가 소유하지 않습니다. 관리형 디렉터리를 복사하면 상류 업데이트와 로컬 사본이 갈라지므로, 공개 핀과 필요한 패치만 보존합니다.

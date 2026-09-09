@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow, and equally when you hit the failure yourself mid-task, whether an integration stalls, a run reports success while doing nothing, or output is wrong only sometimes.
+description: Diagnose bugs, performance regressions, and intermittent failures of unknown cause, whether reported by the user ("diagnose"/"debug this", broken/throwing/failing/slow behavior) or encountered mid-task, including stalls, false success, and sporadically wrong output.
 ---
 
 # Diagnosing Bugs

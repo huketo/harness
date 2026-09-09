@@ -41,7 +41,10 @@
         {
           "source": "https://github.com/jakubkrehel/make-interfaces-feel-better",
           "commit": "35545ea1512ad59fa463e6b1f95ca9c052981fe6",
-          "paths": ["LICENSE", "skills/make-interfaces-feel-better"],
+          "paths": [
+            "LICENSE",
+            "skills/make-interfaces-feel-better"
+          ],
           "snapshot_sha256": "f692cfbc668768a1cc8eeb3263f3dd6bf445abbc12c93b20aede563e28ace3bf",
           "license": "MIT",
           "license_path": "LICENSE"
@@ -242,6 +245,38 @@
         "updatedAt": "2026-08-06T12:13:15.256Z"
       },
       "installed_snapshot_sha256": "c97a305f5ca0b6fa21ca82a009ac5a553acd02aab63cf59de939f75ac7797393"
+    },
+    "git-commit": {
+      "adopted_on": "2026-09-09",
+      "source": "github/awesome-copilot",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "previous_registration": {
+        "source": "github/awesome-copilot",
+        "sourceType": "github",
+        "sourceUrl": "https://github.com/github/awesome-copilot.git",
+        "skillPath": "skills/git-commit/SKILL.md",
+        "skillFolderHash": "883a6a7466f55a9cd9f22cf1cce2d9333fc9b998",
+        "installedAt": "2026-09-03T09:27:28.410Z",
+        "updatedAt": "2026-09-03T09:27:28.410Z"
+      },
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/github/awesome-copilot",
+          "commit": "7568a482ce2df38f8965ab5336a3220db796a4ba",
+          "paths": [
+            "skills/git-commit/SKILL.md"
+          ],
+          "snapshot_sha256": "6703a02ae1348ca6f99284259a734a8f2e9d51fb5f86083800e827795d62da9a",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Shorten description to commit, /commit, conventional commit message generation, and staging triggers; preserve the upstream body."
+      ],
+      "excluded_sources": []
     }
   },
   "removed": [

@@ -182,3 +182,11 @@ OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 
 합성 fixture의 후보 출력은 Chromium에서 별도로 확인했습니다. 320px에서 이름이 있는 닫기 버튼과 가시적 포커스, Tab·Enter 활성화, 넘침 없음을 확인했고, 데스크톱에서 수정된 복구 문구와 키보드 저장 활성화를 확인했습니다. 자동화 click helper는 보이는 버튼에서도 timeout이 발생해 키보드 경로로 검증했습니다. 스크린리더 발화·200% 확대·포인터 자동화 성공을 주장하지 않습니다.
 
 독립적인 Claude 계열 제한 리뷰어가 세 구현 슬라이스를 검토했고 blocking은 없었습니다. 확인된 보완 사항인 색상 외 상태 단서, 규칙 중복, 대안 preview의 수명, 스트레스 증거 보존은 통합 시 반영했습니다. 구조 검사에서는 단일 스킬 진입점, 105개 로컬 Markdown 링크, 두 MIT 출처와 10개 평가 입력이 확인됐습니다. 평가 입력은 `skills/awesome-interface/evals/`에 있으며 실제 응답·비교 화면·캡처는 배포하지 않습니다.
+
+## 11. 스킬 description 축소와 git-commit 편입 (2026-09-09)
+
+10절 이후 설치 스킬 전체를 단일 진입점·내부 라우팅 후보로 다시 조사했습니다. OMP 18.1.15는 시스템 프롬프트에 `name`과 `description`만 렌더링하고(`src/prompts/system/system-prompt.md:32-36`), `disable-model-invocation`은 `hide`로 정규화되어 목록에서 빠지며(`src/extensibility/skills.ts:113`), 본문과 참조는 `read skill://…`에서만 로드됩니다(`src/internal-urls/skill-protocol.ts:51-95`). `allowed-tools`는 `discovery/agent-plugin-format.ts:94,155-158`에서 문자열 타입만 검증하며 도구 실행 경로에서 참조되지 않습니다. 추가 통합 후보는 소유권(관리형·CLI 제공)이나 작업 단위 차이로 채택하지 않았고, 라우팅보다 description 길이가 더 큰 상시 비용이었습니다.
+
+`daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description을 트리거 조건만 남기도록 줄였고 본문은 바꾸지 않았습니다. `diagnosing-bugs`와 `tdd`는 "원인 미상"과 "원인이 테스트 환경으로 확인됨"으로 간헐 실패 트리거를 나눴고, `writing-for-agents`는 `skill-creator`와 겹치던 "creating or editing skills"를 제거했습니다. `git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)(MIT)에서 편입하고 `third-party/adopted-skills.json`에 이전 등록·입력 해시·로컬 변경을 기록했습니다.
+
+같은 로더로 같은 설치 목록을 읽은 조건에서 가시 이름·설명 문자 수는 8,241자에서 6,554자로 줄었습니다(항목 30개 동일). 라우팅 프로브는 OMP SDK `openai-codex/gpt-6-astra:low`, 도구 read/glob/grep, 빈 합성 작업 디렉터리에서 긍정 13·부정 7 프롬프트를 각 1회 실행했고 기준선과 후보 모두 20/20 통과했습니다. 각 사례 1회이므로 호출 정확도의 통계적 개선이나 전체 토큰·비용 절감을 주장하지 않습니다. 제한 SDK 리뷰어(다른 모델 계열) 1회차에서 blocking은 없었고 nit 4건을 반영했습니다.

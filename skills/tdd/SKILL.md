@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Reliable testing and red-green-refactor. Use for behavior changes requiring TDD, adding or changing tests, flaky or order-dependent failures (including failures encountered during work), and changes to test fixtures, isolation, waits, or runner configuration.
+description: TDD for behavior changes; adding or changing tests, fixtures, isolation, waits, or runner configuration; fixing flaky or order-dependent tests with a known test-environment cause.
 ---
 
 # Reliable TDD
