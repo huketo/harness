@@ -428,7 +428,7 @@ HTML_TEMPLATE = r'''<!doctype html>
     .masthead, main { inline-size: min(1380px, calc(100% - 2rem)); margin-inline: auto; }
     .masthead { padding-block: clamp(2.5rem, 7vw, 5.5rem) 2rem; }
     .eyebrow { margin: 0 0 0.65rem; color: var(--accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
-    h1 { max-inline-size: 17ch; margin: 0; font-family: ui-serif, Georgia, serif; font-size: clamp(2.35rem, 7vw, 5.1rem); line-height: 1; letter-spacing: -0.035em; }
+    h1 { max-inline-size: 17ch; margin: 0; font-family: ui-serif, Georgia, serif; font-size: clamp(2.35rem, 7vw, 5.1rem); line-height: 1; letter-spacing: -0.035em; word-break: keep-all; text-wrap: balance; }
     .lede { max-inline-size: 68ch; margin: 1.25rem 0 0; font-size: clamp(1rem, 2vw, 1.2rem); }
     .notice { max-inline-size: 78ch; margin-block-start: 1.2rem; padding-inline-start: 1rem; border-inline-start: 4px solid var(--accent); color: var(--muted); }
     main { padding-block-end: 5rem; }
