@@ -79,7 +79,7 @@ harness-run command --name dev --detach -- bun run dev
 harness-run read dev
 ```
 
-Detached 핸들은 준비 완료의 증거가 아닙니다. 출력과 서비스를 확인한 뒤 사용합니다. 독립 에이전트에는 명시적인 브리프가 필요하며, 내장 task 에이전트는 OMP Agent Hub에 남습니다. [상세 사용법과 상태 경계](docs/guides/usage.md)를 참고하세요.
+Detached 핸들은 준비 완료의 증거가 아닙니다. 출력과 서비스를 확인한 뒤 사용합니다. 독립 에이전트에는 명시적인 브리프가 필요하며, 내장 task 에이전트는 OMP Agent Hub에 남습니다. `harness-herdr` 확장은 OMP 내장 `ask` 도구를 게이트합니다. 호출마다 `herdr-hitl channel`을 먼저 실행하고 채널이 `terminal`일 때만 통과시킵니다. [상세 사용법과 상태 경계](docs/guides/usage.md)를 참고하세요.
 
 ## 기본값 변경 전에 평가하기
 

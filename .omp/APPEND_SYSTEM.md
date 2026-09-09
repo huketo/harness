@@ -17,15 +17,17 @@ asked.
 
 ## Resolve the channel before every question
 
-Resolve the channel before each human question, not once per session. AFK is an unavailable state, not a delivery channel or approval:
+A question for a human MUST resolve the channel before asking, per question and never once per session. AFK is an unavailable state, not a delivery channel or approval:
 
 ```sh
 herdr-hitl channel
 ```
 
 - `terminal` — the person is at this interface. Ask with the harness's own `ask` tool, or put the question in the response when a plain question is enough. Never invoke `herdr-hitl`.
-- `messenger` — nobody is watching this interface. Ask with `herdr-hitl ask` under the message contract below.
-- `afk` — follow the autonomous/quorum/defer policy in the `herdr-hitl` skill. Send no questions or notifications; defer only human-dependent work and continue independent authorized tasks.
+- `messenger` — nobody is watching this interface. NEVER call the `ask` tool. Ask with `herdr-hitl ask` under the message contract below.
+- `afk` — NEVER call the `ask` tool. Follow the autonomous/quorum/defer policy in the `herdr-hitl` skill. Send no questions or notifications; defer only human-dependent work and continue independent authorized tasks.
+
+The `harness-herdr` OMP extension enforces this mechanically: every `ask` tool call runs `herdr-hitl channel` first and is blocked with an explanatory error unless the channel is `terminal`. A blocked `ask` is not a failure to retry; follow the error's instruction (use `herdr-hitl ask` on `messenger`, apply the AFK policy on `afk`). Running `herdr-hitl channel` yourself before deciding how to ask remains REQUIRED, because the gate only covers the `ask` tool.
 
 The away marker behind that word is the person's declaration, not a guess. Do not infer presence from
 anything else, and never run `herdr-hitl away`, `herdr-hitl here`, or `herdr-hitl afk` yourself. `herdr-hitl ask` and

@@ -11,6 +11,7 @@ Bun tests import `bun:test` and live beside the mechanism they exercise. Pass th
 ```bash
 bun test omp/native-runtime.test.ts
 bun test omp/extensions/profiles/profiles.test.ts
+bun test omp/extensions/herdr/herdr.test.ts
 bun test herdr/scripts/harness-run.test.ts
 bun test herdr/cron/host-sync.test.mjs
 ```

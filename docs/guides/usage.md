@@ -12,6 +12,8 @@ AFK 중 `herdr-hitl channel`은 `afk`를 출력합니다. 명시적인 `--channe
 
 에이전트는 `herdr-hitl` 스킬의 자율 결정·쿼럼·유예 정책을 따릅니다. 범위 내 가역 결정은 근거로 처리하고, 중요한 기술적 갈림은 쿼럼으로 검토합니다. 사람만 결정할 수 있는 사항은 해당 작업만 유예하고 독립적인 승인 작업을 계속합니다. CLI 자체가 모델을 실행하거나 새 권한을 부여하지는 않습니다.
 
+OMP 세션에서는 `harness-herdr` 확장이 내장 `ask` 도구를 기계적으로 막습니다. 모델이 `ask`를 호출하면 확장의 `tool_call` 훅이 `herdr-hitl channel -o json`을 먼저 실행하고, 채널이 `terminal`일 때만 통과시킵니다. `messenger`이면 `herdr-hitl ask`를 쓰라는 오류를, `afk`이면 질문·알림 없이 자율 결정·쿼럼·유예 정책을 적용하라는 오류를 도구 결과로 돌려주며, `herdr-hitl channel` 자체가 실패하거나 알 수 없는 채널을 내면 안전 방향으로 차단합니다. `herdr-hitl`이 설치되지 않은 환경(`ENOENT`)만 게이트 밖입니다. 시스템 프롬프트의 산문 지시가 지켜지지 않아도 `ask`가 사람 없는 화면으로 흘러가지 않게 하는 장치이며, `herdr-hitl ask`나 응답 본문의 질문에는 개입하지 않습니다. 검증은 `bun test omp/extensions/herdr/herdr.test.ts`입니다.
+
 CLI·판단 정책 정본은 [herdr-hitl](https://github.com/huketo/herdr-hitl)이고 이 저장소는 검증한 플러그인 커밋과 스킬 해시를 기록합니다.
 
 ## 계정·모델·보이는 실행

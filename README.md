@@ -79,7 +79,7 @@ harness-run command --name dev --detach -- bun run dev
 harness-run read dev
 ```
 
-A detached handle is not readiness evidence. Check the output and service before using it. Independent agents need an explicit brief; built-in task agents remain in OMP's Agent Hub. See [detailed usage and state boundaries](docs/guides/usage.md) (Korean).
+A detached handle is not readiness evidence. Check the output and service before using it. Independent agents need an explicit brief; built-in task agents remain in OMP's Agent Hub. The `harness-herdr` extension gates OMP's built-in `ask` tool: each call runs `herdr-hitl channel` first and is blocked unless the channel is `terminal`. See [detailed usage and state boundaries](docs/guides/usage.md) (Korean).
 
 ## Evaluate before changing defaults
 
