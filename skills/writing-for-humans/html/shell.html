@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="$if(lang)$$lang$$else$ko$endif$">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>$title$</title>
+    <style>
+      /* ---- 토큰: 테마가 값을 정하고, 규칙은 역할 이름만 참조한다 ---- */
+      :root {
+        color-scheme: only light;
+        --font: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        --serif: "Noto Serif KR", "Apple Myungjo", "Batang", Georgia, serif;
+        --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace;
+        --heading-font: var(--font);
+        --measure: 820px;
+        --body-size: 16px;
+        --body-leading: 1.7;
+      }
+      /* slate: 조사·검증 보고서, 설계 문서, 회의록. 중립 청회색 */
+      .theme-slate {
+        --bg: #ffffff; --panel: #f6f8fa; --ink: #16191d; --muted: #5b6470; --line: #d7dce3;
+        --accent: #1f4d7a; --warn: #8a5a00; --note-bg: #fffaf0; --evidence-rule: #5b6470;
+      }
+      /* ember: 장애 보고. 사건 문서임을 첫눈에 구분하는 갈색 계열, 위험색(적색)은 쓰지 않는다 */
+      .theme-ember {
+        --bg: #ffffff; --panel: #faf6f2; --ink: #1c1917; --muted: #6b5f57; --line: #e3d9d0;
+        --accent: #9a3412; --warn: #8a5a00; --note-bg: #fff4ec; --evidence-rule: #6b5f57;
+      }
+      /* moss: 안내서·runbook. 절차 문서의 녹색 */
+      .theme-moss {
+        --bg: #ffffff; --panel: #f4f8f4; --ink: #161d17; --muted: #586657; --line: #d3ddd3;
+        --accent: #1e6b3a; --warn: #8a5a00; --note-bg: #f6fbf4; --evidence-rule: #586657;
+      }
+      /* ink: 결재·공지·1페이지 요약. 무채색, 명조 제목 */
+      .theme-ink {
+        --bg: #ffffff; --panel: #f5f5f5; --ink: #111111; --muted: #555c66; --line: #d4d4d4;
+        --accent: #1f2937; --warn: #7a4b00; --note-bg: #fafafa; --evidence-rule: #555c66;
+        --heading-font: var(--serif);
+      }
+      /* editorial: 기술 블로그 포스트. 따뜻한 종이색, 명조 제목, 긴 글 읽기 폭 */
+      .theme-editorial {
+        --bg: #fdfbf7; --panel: #f5f0e8; --ink: #1f1b16; --muted: #6a6157; --line: #e2d9cc;
+        --accent: #a2461f; --warn: #7a4b00; --note-bg: #fbf3e6; --evidence-rule: #6a6157;
+        --heading-font: var(--serif); --measure: 680px; --body-size: 17px; --body-leading: 1.8;
+      }
+
+      /* ---- 스타일: 읽기 환경 ---- */
+      .style-compact { --measure: 960px; --body-size: 15px; --body-leading: 1.6; }
+      .style-print { --measure: 720px; --font: var(--serif); --heading-font: var(--serif); --body-size: 16px; }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: var(--body-size);
+        line-height: var(--body-leading);
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+        -webkit-text-size-adjust: 100%;
+      }
+      main {
+        max-width: var(--measure);
+        margin: 0 auto;
+        padding: clamp(20px, 4vw, 40px) clamp(14px, 4vw, 20px) 72px;
+      }
+      h1, h2, h3 { font-family: var(--heading-font); }
+      h1 {
+        font-size: clamp(22px, 5vw, 28px);
+        line-height: 1.35;
+        margin: 0 0 12px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: clamp(18px, 3.4vw, 20px);
+        margin: clamp(28px, 5vw, 44px) 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line);
+      }
+      h3 { font-size: 16px; margin: 24px 0 8px; }
+      h2, h3 { scroll-margin-top: 16px; }
+      p, ul, ol { margin: 0 0 14px; }
+      ul, ol { padding-left: 22px; }
+      li { margin: 4px 0; }
+      a { color: var(--accent); }
+      .lead { font-size: 1.1em; color: var(--muted); }
+      dl.meta {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 4px 16px;
+        margin: 0 0 8px;
+        padding: 14px 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font-size: 15px;
+      }
+      dl.meta dt { color: var(--muted); }
+      dl.meta dd { margin: 0; }
+      nav.toc { margin: 16px 0 0; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font-size: 15px; }
+      nav.toc ul { margin: 0; padding-left: 20px; }
+      .table-wrap { margin: 0 0 16px; overflow-x: auto; overscroll-behavior-x: contain; }
+      table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: 15px; }
+      th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+      th { background: var(--panel); font-weight: 600; }
+      td[style*="text-align: right"], th[style*="text-align: right"], td.num, th.num {
+        font-variant-numeric: tabular-nums; white-space: nowrap;
+      }
+      code { font-family: var(--mono); font-size: 0.86em; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+      pre {
+        margin: 0 0 16px; padding: 12px 14px;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+        overflow-x: auto; overscroll-behavior-x: contain; font-size: 13px;
+      }
+      pre code { background: none; border: 0; padding: 0; font-size: inherit; white-space: pre; }
+      blockquote { margin: 0 0 16px; padding: 10px 14px; border-left: 3px solid var(--evidence-rule); background: var(--panel); }
+      blockquote p:last-child { margin-bottom: 0; }
+      blockquote cite { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; font-style: normal; }
+      .note { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 3px; background: var(--note-bg); }
+      .note p:last-child { margin-bottom: 0; }
+      .note > p:first-child > strong:first-child { color: var(--warn); }
+      figure.diagram { margin: 0 0 20px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; }
+      figure.diagram figcaption { margin-top: 10px; color: var(--muted); font-size: 14px; }
+      figure:not(.diagram) { margin: 0 0 20px; }
+      figure:not(.diagram) img { max-width: 100%; height: auto; outline: 1px solid rgb(0 0 0 / 0.1); }
+      figure:not(.diagram) figcaption { margin-top: 8px; color: var(--muted); font-size: 14px; }
+      ol.sources, .sources ol { font-size: 15px; }
+      .sources li { margin-bottom: 8px; }
+      .sources li > span, .sources li > em { display: block; color: var(--muted); font-style: normal; }
+      hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+
+      /* ---- 반응형 ---- */
+      @media (max-width: 560px) {
+        dl.meta { grid-template-columns: 1fr; gap: 0; padding: 12px 14px; }
+        dl.meta dt { margin-top: 8px; font-size: 14px; }
+        dl.meta dt:first-of-type { margin-top: 0; }
+        figure.diagram { padding: 10px; }
+      }
+
+      /* ---- 인쇄: 모든 스타일 공통. print 스타일은 화면에서도 이 값을 미리 보여준다 ---- */
+      @page { size: A4; margin: 18mm 16mm 20mm; }
+      @media print {
+        body { font-size: 11pt; line-height: 1.6; }
+        main { max-width: none; padding: 0; }
+        h2 { break-after: avoid; }
+        figure, .table-wrap, table, pre, blockquote, .note { break-inside: avoid; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+        pre code { white-space: inherit; }
+        .table-wrap { overflow: visible; }
+        table { min-width: 0; }
+        a { color: var(--ink); }
+        a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 9pt; overflow-wrap: anywhere; }
+        nav.toc { display: none; }
+      }
+      .style-print pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .style-print pre code { white-space: inherit; }
+      .style-print a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body class="theme-$if(theme)$$theme$$else$slate$endif$ style-$if(style)$$style$$else$reading$endif$">
+    <main>
+      <h1>$title$</h1>
+$if(subtitle)$
+      <p class="lead">$subtitle$</p>
+$endif$
+$if(date)$
+      <dl class="meta">
+        <dt>작성일</dt><dd>$date$</dd>
+$if(author)$
+        <dt>작성자</dt><dd>$for(author)$$author$$sep$, $endfor$</dd>
+$endif$
+$if(subject)$
+        <dt>대상</dt><dd>$subject$</dd>
+$endif$
+$if(scope)$
+        <dt>범위</dt><dd>$scope$</dd>
+$endif$
+      </dl>
+$endif$
+$if(toc)$
+      <nav class="toc" aria-label="목차">
+$table-of-contents$
+      </nav>
+$endif$
+$body$
+    </main>
+  </body>
+</html>

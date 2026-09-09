@@ -1,0 +1,3 @@
+interface:
+  display_name: "SVG Diagram"
+  short_description: "Draw self-contained SVG diagrams readable on mobile"

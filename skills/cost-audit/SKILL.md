@@ -21,7 +21,7 @@ description: OMP 세션에서 버려지는 토큰과 명목 지출 원인을 진
 4. 조치에는 적용 대상을 모호하게 쓰지 말고 실제 설정 키를 명시합니다. 캐시 보존은 `providers.cacheRetention`, 역할 라우팅은 `task.agentModelOverrides`와 `modelRoles.smol`·`modelRoles.mid`, 압축은 `compaction.thresholdTokens`, 재시도 경로는 `retry.fallbackChains`를 사용합니다. 관측된 순이익이 음수인 설정 변경은 권장하지 않습니다.
 5. 설정을 바꾸면 같은 기간과 필터로 기준선을 다시 계산하여 변경 전 결과와 비교합니다. 기간이나 대상 세션이 다르면 개선으로 단정하지 않습니다.
 
-사용자가 HTML 보고서를 요청하면 분석기의 Markdown 또는 JSON을 근거 데이터로 만들고 기존 `html-report` 스킬의 작성·렌더 검수 절차를 따릅니다.
+사용자가 보고서 문서를 요청하면 분석기의 Markdown 또는 JSON을 근거 데이터로 만들고 `writing-for-humans` 스킬의 작성·검수 절차를 따릅니다. HTML 보고서는 그 스킬의 FORMATS.md HTML 절이 맡습니다.
 
 ## 해석 원칙
 
