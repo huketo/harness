@@ -234,7 +234,7 @@ def build_view_model(
     catalog_dir = catalog_path.parent.resolve()
     results_dir = results_path.parent.resolve()
     assets_root = output / "assets"
-    candidate_sources: list[Path] = []
+    candidate_sources: list[Path] = [catalog_path, results_path]
 
     for case in results["cases"]:
         for reference_id in case["reference_ids"]:
@@ -504,7 +504,7 @@ HTML_TEMPLATE = r'''<!doctype html>
     <p id="result-title" class="eyebrow"></p>
     <h1>원본 참고 → 새 요청 적용</h1>
     <p id="result-description" class="lede"></p>
-    <p class="notice">선택된 99개 원본은 취향 참고 자료입니다. 이 화면은 동일 조건의 1:1 재현이나 유사도 평가가 아니며, 모든 원본 스타일의 지원을 주장하지 않습니다. 에이전트 모델과 실제 이미지 모델은 서로 다른 항목입니다. 도구 응답으로 확인되지 않은 이미지 모델 버전은 명확히 미확인으로 표시합니다.</p>
+    <p class="notice">원본은 표현 기법의 참고 자료입니다. 이 화면은 동일 조건의 1:1 재현이나 유사도 평가가 아니며, 모든 원본 스타일의 지원을 주장하지 않습니다. 에이전트 모델과 실제 이미지 모델은 서로 다른 항목입니다. 출처 증거로 확인되지 않은 이미지 모델 버전은 미확인으로 표시합니다.</p>
   </header>
 
   <main id="comparison" tabindex="-1">
@@ -632,7 +632,7 @@ HTML_TEMPLATE = r'''<!doctype html>
         appendDefinition(facts, "런타임", run.runtime);
         appendDefinition(facts, "에이전트 모델", run.agent_model);
         appendDefinition(facts, "이미지 모델", run.image_model);
-        appendDefinition(facts, "이미지 모델 확인", run.image_model_verified ? "도구 응답으로 확인됨" : "미확인");
+        appendDefinition(facts, "이미지 모델 확인", run.image_model_verified ? "출처 증거 확인됨" : "미확인");
         appendDefinition(
           facts,
           "경과 시간",
@@ -728,6 +728,8 @@ def build(catalog_path: Path, results_path: Path, output: Path) -> dict[str, Any
     catalog_path = catalog_path.resolve()
     results_path = results_path.resolve()
     output = output.resolve()
+    if output in (catalog_path.parent, results_path.parent):
+        raise ValueError("입력 디렉터리를 덮어쓸 수 없습니다. 별도의 --output을 사용하세요.")
     catalog = load_json(catalog_path, "catalog")
     results = load_json(results_path, "results")
     catalog_index = validate_catalog(catalog)

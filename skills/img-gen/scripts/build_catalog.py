@@ -15,9 +15,8 @@ from urllib.parse import quote
 SCHEMA_VERSION = 1
 README_SHOWCASE_HEADING = "## 🎨 Prompt Showcase"
 README_SHOWCASE_END = "## 🙏 Acknowledgments"
-MISSING_PROMPT = "원본에서 대응 프롬프트를 찾지 못했습니다."
-MISSING_METADATA = "원본 메타데이터가 없습니다."
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+MISSING_PROMPT = ""
+MISSING_METADATA = ""
 
 CATEGORY_LABELS = {
     "Anime & Manga": "애니메이션·만화",
@@ -249,7 +248,7 @@ def infer_readme_details(readme: str, record: dict[str, object]) -> tuple[str, s
     sub_match = re.search(r"<sub>(.*?)</sub>", region, re.IGNORECASE | re.DOTALL)
     metadata = sub_match.group(1).strip() if sub_match else MISSING_METADATA
     prompt_match = PROMPT_RE.search(region)
-    if prompt_match:
+    if prompt_match and PROMPT_RE.search(region, prompt_match.end()) is None:
         prompt = prompt_match.group(1)
         prompt_line = readme.count("\n", 0, offset + prompt_match.start(1)) + 1
     else:
@@ -397,8 +396,10 @@ def validate_entries(entries: list[dict[str, object]]) -> None:
 
 def load_pillow():
     try:
-        from PIL import Image, ImageOps
+        from PIL import Image, ImageOps, features
     except ImportError:
+        return None
+    if not hasattr(Image, "Resampling") or not features.check("webp"):
         return None
     return Image, ImageOps
 
@@ -816,7 +817,7 @@ HTML_TEMPLATE = r'''<!doctype html>
         const summary = document.createElement("summary");
         summary.textContent = entry.prompt_status === "missing" ? "원문 확인 · 프롬프트 누락" : "원문과 출처 보기";
         details.append(summary);
-        details.append(element("pre", "", entry.prompt));
+        details.append(element("pre", "", entry.prompt || "원본에서 대응 프롬프트를 확정하지 못했습니다."));
         const sources = element("ul", "source-list");
         entry.source_urls.forEach((url, index) => {
           const item = document.createElement("li");
