@@ -42,7 +42,7 @@ Present the local preview location, picker controls, judged widths and a concise
 | --- | --- | --- | --- |
 | Stable semantic name | Distinct design choice | Product/user situation | Space, density, emphasis or interaction cost |
 
-Leave the decision to the user; do not silently promote a favorite. If asked for a recommendation, tie it to task frequency, content and product constraints rather than personal taste. Retain the unselected preview as the requested decision deliverable, state its lifecycle and preserve the original. Stop an owned preview process when it no longer needs to run; retained files still allow reopening.
+Leave the decision to the user; do not silently promote a favorite. If asked for a recommendation, tie it to task frequency, content and product constraints rather than personal taste. Retain the unselected preview as the requested decision deliverable and preserve the original. Keep an owned preview available until the user selects a direction or requests its shutdown, unless an agreed resource lifetime requires stopping it. Report its lifecycle and, for an app-backed preview, the exact restart command, working directory and route so the comparison remains usable after shutdown.
 
 ## After explicit selection
 

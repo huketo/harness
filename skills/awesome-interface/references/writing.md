@@ -94,7 +94,7 @@ A first-use empty state explains what belongs here, why it is useful when not ob
 
 A search/filter empty state distinguishes absence from failure: identify the relevant query or active constraint and offer a supported way to revise it. “No results for ‘quarterly’” with “Clear filters” is appropriate only if filters are involved; otherwise point to changing the search. Do not imply the entire collection is empty when only the current filter matches nothing.
 
-Keep persistent instructions in a stable location. An empty state disappears once content arrives and cannot be the only home for essential product guidance.
+Use [layout.md](layout.md) to place guidance that must remain available after the empty state ends.
 
 ### Pending and success
 
@@ -104,7 +104,7 @@ Success copy confirms the actual result with enough context to resolve uncertain
 
 ### Destructive, unavailable and permission states
 
-Explain why an action is unavailable when that reason is useful and known. Identify the required condition or permission and a real route to resolve it, without exposing unnecessary sensitive detail. Copy beside a disabled control must remain reachable; a hover-only explanation is not a sufficient home.
+Explain why an action is unavailable when that reason is useful and known. Identify the required condition or permission and a real route to resolve it, without exposing unnecessary sensitive detail. Use [accessibility.md](accessibility.md) for the explanation's reachability.
 
 Keep warnings proportional to consequence. State the affected object, scope and reversibility rather than relying on alarming adjectives. Distinguish removing access, archiving and deleting: similar-looking controls must not conceal different outcomes.
 

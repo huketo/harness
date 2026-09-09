@@ -42,4 +42,4 @@ Report broken scenarios first, then covered scenarios, exclusions and unverified
 
 ## Cleanup is part of completion
 
-Remove disposable routes, fixture data and temporary artifacts; stop only the preview processes and browser resources created for this run. Preserve unrelated user work. Keep a fixture only when the user explicitly requested a persistent deliverable, state its location/lifecycle and keep it outside production entry points. Report cleanup performed and any resource that could not be removed. A temporary stress page must not silently become shipped UI.
+Remove disposable routes and fixture data; stop only preview processes and browser resources created for this run. Preserve unrelated user work and captures cited as evidence, placing those captures with the report outside production paths before cleanup. Keep an executable fixture only when the user explicitly requested a persistent deliverable, state its location/lifecycle and keep it outside production entry points. Report cleanup performed and any resource that could not be removed. A temporary stress page must not silently become shipped UI.
