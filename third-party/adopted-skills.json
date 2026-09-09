@@ -9,28 +9,6 @@
   },
   "snapshot_hash_recipe": "SHA-256 over files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL; based on archived installed tree before adoption edits and license additions.",
   "skills": {
-    "img-gen": {
-      "adopted_on": "2026-09-09",
-      "source": "https://github.com/wuyoscar/GPT-Image2-Skill",
-      "ownership": "harness-owned; excluded from skills CLI updates",
-      "license": "MIT",
-      "previous_registration": null,
-      "upstream_commit": "7268a1d977c3084527ef349e94bd7e032f06ea2f",
-      "license_path": "skills/img-gen/LICENSE",
-      "snapshot_hash_recipe": "SHA-256 over LICENSE, skills/gpt-image/SKILL.md, references/gallery.md and references/gallery-*.md sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL.",
-      "input_snapshot_sha256": "7500b529aa74ebce1faff9051da57121bf47e496356757a558eb0670733bfd8d",
-      "local_changes": [
-        "Use selected gallery examples as inspiration for transferable techniques, not a closed image catalog or similarity targets.",
-        "Write original Korean examples and a compact native OMP/Codex/AGY generation-and-inspection workflow informed by the OpenAI GPT Image 2.5 prompting guide.",
-        "Add local catalog and comparison builders; do not vendor upstream images, generated outputs, API clients, credentials, or execution logs.",
-        "Preserve upstream source IDs and URLs and distinguish C2PA-recorded provenance from conversation model names."
-      ],
-      "reference_sources": [
-        "https://developers.openai.com/api/docs/guides/image-prompting?model=gpt-image-2.5",
-        "https://github.com/contentauth/c2pa-rs/blob/main/cli/docs/usage.md"
-      ],
-      "rights_note": "The upstream MIT notice is retained. External authors, artwork and referenced brands may have separate rights; local catalog inspection does not grant blanket redistribution permission."
-    },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
       "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better",
