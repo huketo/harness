@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "source": {
+    "url": "https://github.com/wuyoscar/GPT-Image2-Skill",
+    "commit": "7268a1d977c3084527ef349e94bd7e032f06ea2f",
+    "license": "MIT"
+  },
+  "patterns": [
+    {
+      "id": "character-series",
+      "title": "일관된 캐릭터와 연작",
+      "when": "한 인물의 설정표, 표정·포즈 변형, 장면 연작처럼 정체성을 유지하면서 여러 모습을 보여줄 때 쓴다.",
+      "techniques": [
+        "머리 형태, 얼굴 비율, 의상 구조, 대표 색처럼 변하지 않을 식별 특징을 먼저 고정한다.",
+        "패널마다 달라질 표정, 동작, 시점과 계속 보존할 특징을 분리해서 적는다.",
+        "전신·측면·후면이 필요하면 프레이밍과 발끝 포함 여부를 명시하고 소품과 손의 접촉을 설명한다.",
+        "사진, 셀 채색, 픽셀, 잉크, 판화 같은 매체는 요청된 분위기에 맞춰 하나를 고르고 선, 입자, 번짐, 표면 질감처럼 보이는 속성으로 표현한다.",
+        "참조 이미지가 있으면 번호별 역할을 인물, 의상, 포즈, 배경으로 나누고 서로 충돌할 때 무엇을 우선할지 밝힌다.",
+        "후속 편집은 한 번에 한 가지를 바꾸고 얼굴, 체형, 의상, 팔레트 중 유지할 항목을 다시 적는다."
+      ],
+      "avoid": [
+        "모든 요청을 같은 미형, 같은 장르, 같은 연령대로 바꾸기",
+        "패널마다 얼굴·의상·장비의 핵심 형태가 달라지는 연작",
+        "특정 작가나 지식재산 이름만으로 외형을 대신 설명하기",
+        "손, 시선, 소품 접촉처럼 장면 의미를 좌우하는 관계를 생략하기"
+      ],
+      "source_ids": [
+        "character-sheet",
+        "anime-expression-grid",
+        "natural-sns-portrait"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-character-design.md#L7-L23",
+        "https://x.com/MANISH1027512",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-anime-and-manga.md#L89-L99",
+        "https://mp.weixin.qq.com/s/ASxig6mFVYxrIE8-8Fthew",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-photography.md#L57-L108",
+        "https://github.com/LunarXuan/natural-sns-portrait"
+      ],
+      "example": {
+        "short_prompt": "고장 난 달 기지를 돌보는 정비사 캐릭터 설정표를 만들어줘.",
+        "expanded_prompt": "용도: 창작용 캐릭터 설정표. 주인공은 낡은 달 기지의 성인 정비사이며 짧은 곱슬머리, 왼쪽 눈썹의 작은 흉터, 황토색 작업복, 청록색 공구 벨트를 모든 패널에서 동일하게 유지한다. 구성: 흰 배경의 가로 보드에 전면·측면·후면 전신 3개, 침착함·당황·집중·안도의 얼굴 4개, 장갑·통신기·접이식 렌치 세부 확대를 정돈된 그리드로 배치한다. 전신은 머리부터 작업화까지 보이고 손은 공구를 자연스럽게 잡는다. 매체: 선이 또렷한 컬러 콘셉트 아트, 절제된 회색과 황토색에 청록 포인트. 작은 설명은 최소화하고 읽을 수 없는 장식 문자는 넣지 않는다.",
+        "checks": [
+          "모든 뷰에서 얼굴, 흉터, 머리, 작업복, 공구 벨트가 같은가",
+          "전신 3개와 표정 4개, 장비 세부가 서로 겹치지 않는가",
+          "손가락 수와 공구를 잡는 방식이 자연스러운가",
+          "요청하지 않은 로고나 추가 문구가 없는가"
+        ],
+        "aspect_ratio": "3:2"
+      }
+    },
+    {
+      "id": "cinematic-space",
+      "title": "장면과 공간의 영화적 설계",
+      "when": "풍경, 건축, 인테리어, 아이소메트릭 공간처럼 인물과 환경의 관계, 깊이, 빛이 결과를 좌우할 때 쓴다.",
+      "techniques": [
+        "주 피사체, 카메라 높이, 화면 안 크기, 전경·중경·배경의 역할을 먼저 정한다.",
+        "광원 방향과 시간대, 안개·비·먼지 같은 대기, 명암 대비와 제한 팔레트를 함께 적는다.",
+        "거대함은 작은 비교 대상과 긴 원근으로, 친밀함은 가까운 프레이밍과 생활 흔적으로 보여준다.",
+        "건축과 제품 표면은 목재, 콘크리트, 금속, 종이처럼 재료를 이름 붙이고 반사·거칠기·마모를 설명한다.",
+        "아이소메트릭, 수묵, 픽셀, 저다각형 같은 변형은 같은 공간 위계를 유지한 채 투영법과 표면 표현만 바꾼다.",
+        "기존 장면을 편집할 때는 바꿀 대상 하나와 보존할 구도, 구조, 조명, 인물 위치를 분리해 적는다."
+      ],
+      "avoid": [
+        "분위기 형용사만 나열하고 피사체 위치와 화면 깊이를 비워 두기",
+        "서로 다른 카메라 시점이나 광원 방향을 한 장면에 섞기",
+        "질감과 소품을 늘려 주제가 묻히게 하기",
+        "참조 장면의 고유 인물·장소·상표를 새 요청에 자동으로 옮기기"
+      ],
+      "source_ids": [
+        "villeneuve-monolithic-desert",
+        "japanese-minimalist-living-room-render",
+        "isometric-cafe"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-cinematic-film-references.md#L18-L28",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-architecture-and-interior.md#L7-L17",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-isometric.md#L7-L17",
+        "https://github.com/EvoLinkAI/awesome-gpt-image-2-prompts"
+      ],
+      "example": {
+        "short_prompt": "비 오는 산속의 작은 기차역을 영화처럼 보여줘.",
+        "expanded_prompt": "장면: 늦은 저녁, 비에 젖은 산속 단선 기차역에 마지막 완행열차가 들어오는 순간. 구성: 사람 눈높이의 넓은 가로 화면, 젖은 승강장 표지판을 왼쪽 전경에 두고 작은 대합실과 기다리는 승객 두 명을 중경, 안개 속 열차 불빛과 겹친 산 능선을 배경에 둔다. 승객은 화면의 작은 비율로 보여 공간의 고요함이 우세해야 한다. 조명: 대합실의 따뜻한 텅스텐 빛과 차가운 청회색 빗빛이 젖은 레일에 길게 반사된다. 질감: 오래된 목재, 벗겨진 페인트, 굵고 가는 빗줄기, 약한 필름 입자. 읽을 수 없는 표지 문자나 로고는 넣지 않는다.",
+        "checks": [
+          "역, 승객, 열차 불빛의 전경·중경·배경 관계가 명확한가",
+          "따뜻한 실내광과 차가운 빗빛의 방향이 일관되는가",
+          "젖은 목재와 금속 레일의 재질 차이가 보이는가",
+          "장식보다 마지막 열차가 도착하는 순간이 먼저 읽히는가"
+        ],
+        "aspect_ratio": "16:9"
+      }
+    },
+    {
+      "id": "poster-type",
+      "title": "포스터와 타이포그래피 위계",
+      "when": "행사 포스터, 표지, 캠페인 키비주얼처럼 그림과 정확한 문구가 하나의 정보 위계를 이뤄야 할 때 쓴다.",
+      "techniques": [
+        "제목, 날짜, 장소, 보조 문구를 중요도 순서로 정하고 각각의 정확한 문자열을 따옴표로 지정한다.",
+        "상단·중앙·하단의 시선 흐름과 그림이 차지할 면적, 여백, 문구 위치를 구체화한다.",
+        "서체 이름 대신 획의 굵기, 폭, 대비, 정렬, 손글씨 여부처럼 보이는 특성을 설명한다.",
+        "종이결, 잉크 번짐, 판화 어긋남, 사진 콜라주 같은 매체 효과는 메시지를 방해하지 않는 범위에서 고른다.",
+        "필수 문구는 등장 횟수를 정하고 그 밖의 문자, 워터마크, 관련 없는 로고를 제외한다.",
+        "생성 뒤 철자, 숫자, 줄바꿈, 대비와 작은 크기 가독성을 실제로 확인한다."
+      ],
+      "avoid": [
+        "필수 문구를 이미지 분위기 설명 속에 묻기",
+        "서로 경쟁하는 제목 크기와 과도한 장식 서체를 함께 쓰기",
+        "사용자가 요청하지 않은 브랜드, 서명, 잡지 제호를 추가하기",
+        "특정 디자이너 이름을 쓰는 것으로 구도와 조형 설명을 대신하기"
+      ],
+      "source_ids": [
+        "boston-poster",
+        "pulp-scifi-cover",
+        "epic-silhouette-poster"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-typography-and-posters.md#L112-L122",
+        "https://x.com/BubbleBrain",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-typography-and-posters.md#L92-L111",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-typography-and-posters.md#L123-L133",
+        "https://www.xiaohongshu.com/explore/69e324cd0000000021039ca9"
+      ],
+      "example": {
+        "short_prompt": "밤샘 독립서점 축제 포스터를 만들어줘.",
+        "expanded_prompt": "용도: 독립서점의 심야 낭독 축제 세로 포스터. 필수 문구는 상단 제목에 \"책이 잠들지 않는 밤\", 중단에 \"낭독 · 교환 · 새벽 음악\", 하단에 \"10월 17일 토요일 / 오후 8시–오전 2시 / 느린책방\"을 정확히 한 번씩 넣는다. 구성: 큰 제목 아래 열린 책에서 작은 창문 불빛과 별자리 모양의 종이 조각이 솟아오르고, 하단 25%는 일정 정보와 넉넉한 여백에 쓴다. 표현: 짙은 남색 바탕, 크림색 종이, 주황 잉크의 3색 리소그래프 질감, 약한 잉크 어긋남. 제목은 굵고 좁은 글자, 세부 정보는 단순한 산세리프체로 대비한다. 추가 문구, 로고, 워터마크는 넣지 않는다.",
+        "checks": [
+          "세 필수 문구가 철자와 숫자까지 정확히 한 번씩 보이는가",
+          "제목, 그림, 일정 정보의 우선순위가 즉시 구분되는가",
+          "작은 일정 문구가 배경과 충분히 대비되는가",
+          "추가 문자, 로고, 워터마크가 없는가"
+        ],
+        "aspect_ratio": "4:5"
+      }
+    },
+    {
+      "id": "product-brand",
+      "title": "제품과 브랜드 시스템",
+      "when": "제품 사진, 패키지, 로고, 브랜드 보드처럼 재질과 상업적 정보, 여러 적용물의 일관성을 함께 보여줄 때 쓴다.",
+      "techniques": [
+        "제품의 형태, 단면, 표면 재료, 크기 비교 대상을 정하고 카메라 각도와 접지 그림자를 지정한다.",
+        "브랜드 성격을 고정 스타일명이 아니라 색, 형태 언어, 활자 성격, 여백과 촉감으로 번역한다.",
+        "브랜드 보드는 로고, 팔레트, 패키지, 카드, 스티커, 화면 조각처럼 역할이 다른 타일을 동일한 그리드와 규칙으로 묶는다.",
+        "식품은 내용물의 구조와 광택·부스러기·증기 같은 먹을 수 있는 질감을, 공산품은 모서리·결합부·투명도 같은 제조 특성을 우선한다.",
+        "투명 배경이 필요한 자산은 프롬프트와 별개로 지원되는 출력 설정을 사용하고 알파 가장자리, 유리, 털, 그림자를 확인한다.",
+        "기존 제품 참조가 있으면 형상과 라벨 중 무엇을 보존할지 밝히고 허구의 새 브랜드에는 독자적인 마크를 요청한다."
+      ],
+      "avoid": [
+        "읽히는 상표나 라벨을 요청 없이 만들어 내기",
+        "제품 형태보다 파티클, 광선, 액체 효과가 더 크게 보이게 하기",
+        "로고 한 장과 실제 인쇄·패키지·UI 구현 파일을 같은 산출물로 취급하기",
+        "외부 브랜드나 창작물과의 비침해를 결과만 보고 보장하기"
+      ],
+      "source_ids": [
+        "product-chocolate-wafer",
+        "brand-identity-moss-radio",
+        "logo-bakery"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-product-and-food.md#L18-L53",
+        "https://x.com/mehvishs25",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-brand-systems-and-identity.md#L7-L17",
+        "https://x.com/LexnLin/status/2046952493213429886",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-official-openai-cookbook-examples.md#L35-L48",
+        "https://github.com/openai/openai-cookbook/blob/main/examples/multimodal/image-gen-models-prompting-guide.ipynb"
+      ],
+      "example": {
+        "short_prompt": "김과 현미로 만든 바삭한 스낵 신제품 광고를 만들어줘.",
+        "expanded_prompt": "용도: 가상의 스낵 브랜드 \"파도한입\" 신제품 세로 광고. 중앙에 무광 청록색 파우치 한 개를 세워 두고, 앞쪽에는 얇은 사각 스낵 두 장과 김 가루, 볶은 현미 알갱이를 소량 배치한다. 한 장은 깨진 단면이 보여 공기층과 바삭한 결이 드러나야 한다. 조명: 왼쪽 위의 부드러운 스튜디오 광, 포장 모서리에는 얇은 하이라이트, 바닥에는 자연스러운 접지 그림자. 배경은 따뜻한 모래색에서 옅은 크림색으로 이어지는 단순한 그라데이션. 포장 전면에는 브랜드명 \"파도한입\"과 제품명 \"김현미 크리스프\"만 정확히 표시한다. 신선하고 담백한 인상, 과도한 폭발 효과나 관련 없는 인증 마크는 제외한다.",
+        "checks": [
+          "파우치 형태와 두 필수 문구가 왜곡 없이 읽히는가",
+          "김, 현미, 스낵 단면의 재질 차이가 보이는가",
+          "제품이 바닥에 자연스럽게 놓이고 광원 방향이 일관되는가",
+          "관련 없는 로고, 인증 마크, 추가 문구가 없는가"
+        ],
+        "aspect_ratio": "3:4"
+      }
+    },
+    {
+      "id": "diagram-process",
+      "title": "과정과 관계 도식",
+      "when": "업무 흐름, 시스템 구조, 교육 과정, 연구 절차처럼 단계와 관계를 한눈에 설명하는 이미지가 필요할 때 쓴다.",
+      "techniques": [
+        "대상 독자와 이미지가 답해야 할 질문을 먼저 정하고 노드·단계·경계·예외를 실제 입력으로 받는다.",
+        "주 흐름 방향을 하나로 정하고 병렬, 되먹임, 오프라인·온라인 경계를 선 종류와 그룹 상자로 구분한다.",
+        "노드 제목은 짧게, 보조 설명은 한 줄로 제한하고 같은 의미에는 같은 도형과 색을 쓴다.",
+        "화살표는 출발점과 도착점, 라벨이 겹치지 않게 하며 번호가 있으면 읽는 순서와 일치시킨다.",
+        "참조 자료는 내용 근거, 시각 체계, 아이콘 역할을 나눠 지정하고 근거에 없는 단계를 추가하지 않는다.",
+        "생성된 래스터 도식은 개념 시안으로 검수하고 편집 가능한 SVG, 슬라이드, 문서 산출물이 필요하면 별도로 구현한다."
+      ],
+      "avoid": [
+        "실제 단계와 레이블 없이 모델이 그럴듯한 흐름을 발명하게 하기",
+        "양방향 관계, 시간 순서, 포함 관계를 같은 화살표 모양으로 표시하기",
+        "장식 아이콘과 색을 늘려 연결 관계를 가리기",
+        "이미지가 과학적·교육적 정확성을 보장한다고 간주하기"
+      ],
+      "source_ids": [
+        "rag-pipeline",
+        "clinical-cohort-flow",
+        "multimodal-agent-experiment-workflow"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L107-L128",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L7-L27",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L377-L387",
+        "https://www.xiaohongshu.com/explore/69e997a90000000022027c30"
+      ],
+      "example": {
+        "short_prompt": "도시 빗물이 공원에 다시 쓰이는 과정을 쉽게 설명해줘.",
+        "expanded_prompt": "용도: 중학생을 위한 가로형 과정 도식. 제목은 \"빗물이 공원으로 돌아오는 길\". 왼쪽에서 오른쪽으로 6단계: \"지붕·도로 집수\" → \"낙엽 거름망\" → \"침전 탱크\" → \"모래·자갈 여과\" → \"저장 수조\" → \"공원 관수\". 폭우 때만 \"하천으로 안전 방류\"되는 예외 가지를 침전 탱크 아래에 점선으로 둔다. 각 단계는 짧은 한글 레이블, 단순한 단면 아이콘, 한 방향 화살표로 연결한다. 빗물은 파랑, 처리 설비는 회색, 재사용 구역은 초록으로 일관되게 표시하고 오른쪽 아래에 3색 범례를 둔다. 흰 배경, 넓은 간격, 장식용 건물과 근거 없는 수치는 넣지 않는다.",
+        "checks": [
+          "입력된 6단계와 폭우 예외 가지가 빠짐없이 연결되는가",
+          "화살표가 한 방향이고 교차하거나 잘못된 단계로 향하지 않는가",
+          "레이블 철자와 범례의 색 의미가 일치하는가",
+          "도시 물관리 의미를 아는 사람이 단계 관계를 검수했는가"
+        ],
+        "aspect_ratio": "16:9"
+      }
+    },
+    {
+      "id": "chart-evidence",
+      "title": "수치와 근거 중심 차트",
+      "when": "비교, 추세, 분포, 불확실성처럼 입력된 수치에서 근거를 읽어야 하는 차트나 논문 도판 시안에 쓴다.",
+      "techniques": [
+        "원자료, 단위, 집계 기준, 정렬 순서, 결측 처리와 강조할 결론을 먼저 확정한다.",
+        "비교에는 막대·점·행렬, 시간 추세에는 선, 구간에는 오차막대나 신뢰구간처럼 질문에 맞는 부호를 고른다.",
+        "축 제목, 단위, 눈금 범위, 범례, 표본 수와 불확실성 표기를 정확한 문자열로 지정한다.",
+        "색은 범주 구분, 순서형 크기, 양·음 발산 중 한 의미만 맡기고 색 외의 직접 레이블이나 형태 단서를 함께 쓴다.",
+        "여러 패널은 공통 척도와 정렬을 유지하고 각 패널이 답하는 질문을 A, B, C처럼 구분한다.",
+        "래스터 생성 결과의 숫자와 위치는 입력 데이터와 대조하며 출판용 차트는 코드, SVG, 차트 도구에서 실제 데이터로 다시 만든다."
+      ],
+      "avoid": [
+        "모델이 예시 수치나 출처를 만들어 내게 하기",
+        "3D 효과, 면적 왜곡, 잘린 축으로 차이를 과장하기",
+        "색상만으로 범주나 상태를 구별하기",
+        "시각적으로 그럴듯한 이미지를 통계 검증이나 재현 가능한 차트로 간주하기"
+      ],
+      "source_ids": [
+        "scaling-curves",
+        "benchmark-heatmap",
+        "therapeutic-response-bar-forest"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L171-L190",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L191-L210",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-research-paper-figures.md#L69-L89"
+      ],
+      "example": {
+        "short_prompt": "네 지역의 재활용률 변화를 비교하는 차트를 보여줘.",
+        "expanded_prompt": "용도: 실제 입력 데이터를 검토하기 위한 가로 차트 시안. 제목은 \"지역별 재활용률 변화, 2022–2025\". 제공된 표의 네 지역을 행으로 두고 각 행에 2022년부터 2025년까지의 재활용률을 연결한 작은 배수 선 차트로 배치한다. 모든 패널은 y축 0–100%, x축 2022·2023·2024·2025의 같은 척도를 사용한다. 실제 데이터 값을 각 점 옆에 한 자리 소수와 % 단위로 표시하고, 목표치 65%는 얇은 점선 \"2025 목표 65%\"로 넣는다. 지역 색은 서로 구분되는 절제된 팔레트로 쓰되 각 패널에 지역명을 직접 적는다. 출처와 집계 기준은 입력받은 문구만 하단 주석으로 사용하며 임의 수치는 만들지 않는다.",
+        "checks": [
+          "모든 점, 직접 레이블, 목표선이 입력 표와 일치하는가",
+          "네 패널의 축 범위와 연도 순서가 동일한가",
+          "색을 보지 않아도 지역명과 값이 구분되는가",
+          "출처, 단위, 집계 기준을 데이터 담당자가 검수했는가"
+        ],
+        "aspect_ratio": "16:9"
+      }
+    },
+    {
+      "id": "technical-cutaway",
+      "title": "분해도와 단면 기술 설명",
+      "when": "기계 분해도, 제품 내부, 지질·생물 단면처럼 보이지 않는 층과 부품의 위치 관계를 설명할 때 쓴다.",
+      "techniques": [
+        "대상의 외형과 절개 방향 또는 폭발 축을 정하고 부품·층의 실제 순서를 입력으로 받는다.",
+        "분해도는 부품 간격과 정렬축을 일정하게, 단면은 경계와 두께 차이를 명확하게 유지한다.",
+        "재료별 색과 표면을 제한된 팔레트로 구분하고 외피, 구조체, 유체, 전기 부품처럼 기능 범주에 일관되게 쓴다.",
+        "리더선은 대상과 직접 닿게 하고 선끼리 교차하지 않도록 레이블을 바깥 여백에 정렬한다.",
+        "치수, 용량, 부품명, 축척은 검증된 입력만 정확한 문자열로 넣고 단위 체계를 통일한다.",
+        "래스터 결과는 설명용 콘셉트로 검수하고 제작 도면, 의료 판단, 안전 절차를 대신하지 않게 한다."
+      ],
+      "avoid": [
+        "실제 내부 구조를 모른 채 그럴듯한 부품이나 치수를 발명하기",
+        "외형 원근과 분해 축을 섞어 조립 순서를 모호하게 하기",
+        "리더선이 엉뚱한 부품에 닿거나 텍스트 위를 가로지르게 하기",
+        "교육용 이미지가 공학·의학적 정확성을 스스로 보장한다고 보기"
+      ],
+      "source_ids": [
+        "rocket-cutaway-launch-vehicle",
+        "mechanical-keyboard-exploded-assembly",
+        "geological-strata-cross-section"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-technical-illustration.md#L18-L28",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-technical-illustration.md#L29-L39",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-scientific-and-educational.md#L73-L82"
+      ],
+      "example": {
+        "short_prompt": "휴대용 정수기의 내부 구조를 분해도로 보여줘.",
+        "expanded_prompt": "용도: 캠핑용 휴대 정수기의 구조 설명 시안. 가상의 원통형 제품 \"CLEARPATH P1\"을 오른쪽 위에서 본 3/4 시점의 가로 폭발도로 그린다. 왼쪽에서 오른쪽으로 흡입 캡, 1차 메시, 활성탄 카트리지, 중공사막 필터, 실리콘 패킹, 펌프 챔버, 출수 노즐 순서이며 모든 부품은 하나의 중심축에 일정한 간격으로 정렬한다. 외장은 무광 회색, 물길은 파랑, 교체 부품은 청록, 패킹은 주황으로 구분한다. 흰 배경과 옅은 접지 그림자, 바깥 여백에 교차하지 않는 리더선. 필수 레이블은 \"흡입 캡\", \"1차 메시\", \"활성탄\", \"중공사막\", \"패킹\", \"펌프\", \"출수 노즐\"이며, 검증되지 않은 성능 수치나 인증 표시는 넣지 않는다.",
+        "checks": [
+          "입력된 7개 부품의 순서와 중심축 정렬이 맞는가",
+          "각 리더선이 해당 부품에 직접 닿고 교차하지 않는가",
+          "물길, 교체 부품, 패킹의 색 의미가 일관되는가",
+          "구조 전문가가 조립 관계와 레이블을 검수했는가"
+        ],
+        "aspect_ratio": "16:9"
+      }
+    },
+    {
+      "id": "ui-preview",
+      "title": "UI 콘셉트와 화면 미리보기",
+      "when": "모바일 화면, 대시보드, 디자인 시스템 보드처럼 제품 인터페이스의 레이아웃과 시각 방향을 빠르게 보여줄 때 쓴다.",
+      "techniques": [
+        "사용자 목표와 핵심 상태를 정한 뒤 헤더, 탐색, 주요 작업, 보조 정보의 위계를 배치한다.",
+        "실제 표시할 레이블과 샘플 데이터를 입력으로 받고 카드, 표, 차트, 알림의 정렬 규칙을 지정한다.",
+        "간격, 모서리, 그림자, 아이콘 굵기, 색 토큰을 반복해 한 화면 안의 시스템성을 만든다.",
+        "모바일은 손가락이 닿는 주요 행동과 세로 흐름을, 데스크톱은 열 너비와 밀도, 필터와 표의 관계를 우선한다.",
+        "정상, 빈 상태, 오류, 선택, 비활성처럼 의미가 다른 상태를 색뿐 아니라 레이블과 형태로 구분한다.",
+        "생성 이미지는 시각 콘셉트로 취급하고 접근성, 반응형 동작, 상호작용, 실제 컴포넌트는 코드나 디자인 도구에서 구현하고 검증한다."
+      ],
+      "avoid": [
+        "예쁜 카드 수를 늘리는 대신 핵심 작업과 상태를 숨기기",
+        "요청하지 않은 지표, 사용자 정보, 거래 내역을 사실처럼 만들기",
+        "작은 글자와 낮은 대비를 고밀도 디자인으로 정당화하기",
+        "래스터 목업을 작동하는 UI나 구현 명세로 오인하기"
+      ],
+      "source_ids": [
+        "mobile-budgeting-app-neobank",
+        "desktop-analytics-dashboard-operations",
+        "design-system-component-card-set"
+      ],
+      "source_urls": [
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-ui-ux-mockups.md#L7-L17",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-ui-ux-mockups.md#L18-L28",
+        "https://github.com/wuyoscar/GPT-Image2-Skill/blob/7268a1d977c3084527ef349e94bd7e032f06ea2f/skills/gpt-image/references/gallery-ui-ux-mockups.md#L29-L39"
+      ],
+      "example": {
+        "short_prompt": "반려식물 관리 앱의 홈 화면을 보여줘.",
+        "expanded_prompt": "용도: 반려식물 관리 앱 \"잎새\"의 모바일 홈 화면 콘셉트. 사용자는 오늘 할 일을 5초 안에 알아야 한다. 상단에는 \"좋은 아침이에요, 민서님\"과 오늘 날짜, 그 아래 가장 중요한 카드에 몬스테라 사진 자리와 \"오늘 물 주기\" 버튼을 둔다. 중단에는 \"오늘의 관리\" 목록으로 \"몬스테라 · 물 주기\", \"바질 · 햇빛 3시간\", \"고무나무 · 잎 닦기\"를 체크 가능한 행으로 표시한다. 하단에는 일주일 습도 추세의 단순 선 차트와 홈·식물·기록·설정 4개 탭을 둔다. 따뜻한 아이보리 배경, 짙은 초록 본문, 밝은 연두 행동색, 8포인트 간격 규칙, 둥근 카드와 또렷한 한글. 관련 없는 통계나 광고 배너는 넣지 않는다.",
+        "checks": [
+          "오늘 물 주기 행동이 첫 화면에서 가장 먼저 보이는가",
+          "세 관리 항목의 식물명과 작업이 정확히 짝지어졌는가",
+          "텍스트 대비와 터치 대상 크기를 실제 구현 단계에서 검증할 수 있는가",
+          "래스터 콘셉트와 작동하는 앱 구현이 구분되어 있는가"
+        ],
+        "aspect_ratio": "9:16"
+      }
+    }
+  ]
+}
