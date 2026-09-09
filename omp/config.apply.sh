@@ -48,6 +48,7 @@ compaction.methodOrder|["shake","remote","handoff","soft"]
 compaction.handoffSaveToDisk|true
 compaction.thresholdTokens|-1
 compaction.thresholdPercent|75
+generate_image.enabled|true
 tools.xdevDocs|"catalog"
 tools.intentTracing|false
 startup.checkUpdate|true
@@ -70,6 +71,7 @@ retry.usageAwareFallback|true
 retry.usageReservePct|10
 retry.usageReservePolicy|"auto"
 cycleOrder|["smol","mid","default","slow"]
+providers.imageOrder|["openai-codex"]
 providers.cacheRetention|"auto"
 EOF
 

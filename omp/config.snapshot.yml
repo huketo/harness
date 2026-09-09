@@ -34,6 +34,8 @@ compaction:
   handoffSaveToDisk: true
   thresholdTokens: -1
   thresholdPercent: 75
+generate_image:
+  enabled: true
 tools:
   xdevDocs: catalog
   intentTracing: false
@@ -87,4 +89,6 @@ cycleOrder:
   - default
   - slow
 providers:
+  imageOrder:
+    - openai-codex
   cacheRetention: auto
