@@ -1,0 +1,26 @@
+This starter contains adapted material from:
+
+BaizeAI/talks — https://github.com/BaizeAI/talks
+Revision: 5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99
+License: Apache-2.0; full license in licenses/Apache-2.0.txt.
+Original paths under packages/2026-09-09-kubecon-cn/components/:
+- TtftBreakdown.vue -> components/AsBreakdown.vue
+- StageFlow.vue -> components/AsStageFlow.vue
+- CaseStory.vue -> components/AsCaseStory.vue
+Modified for this starter: Korean synthetic content, semantic markup, plain-text
+case props instead of HTML injection, common-scale comparison bars, theme-token
+styling, local SVG arrows instead of external icon classes, readable typography.
+No upstream NOTICE file was present in the pinned snapshot.
+
+Vstorm content-skills — https://github.com/vstorm-co/content-skills
+Revision: 5138a11b1e3407ea3352d4010cbe33233bdeb01c
+Copyright (c) 2026 Vstorm
+License: MIT; full license in licenses/content-skills-MIT.txt.
+Source: skills/content-presentation/templates/pitch-deck.slidev.template
+slides.md adapts the concrete template's title/problem/cost/how-it-works/ask
+sequence, layout choices, and per-slide speaker-note practice. Its fundraising
+content is replaced with a six-slide engineering decision and labelled synthetic
+examples. No upstream statistics, branding, or claims of measured results remain.
+
+Keep this notice and both license files when redistributing the starter or its
+adapted source components. Dependency licenses remain with their packages.

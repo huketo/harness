@@ -1,0 +1,17 @@
+{
+  "source": "https://github.com/zarazhangrui/beautiful-html-templates",
+  "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+  "license": "MIT",
+  "copyright": "2026 Zara Zhang",
+  "copied": [
+    "templates/",
+    "runtime/",
+    "index.json",
+    "LICENSE"
+  ],
+  "modifications": "Unmodified upstream template sources; generator supplies shared deck-stage.js when a folder omits it. Preview screenshots remain at pinned upstream URLs, not vendored. Demo content must be replaced before delivery.",
+  "limitations": [
+    "Original templates may request online fonts. Generation is not offline packaging or complete-deck visual certification.",
+    "No automatic HTML-to-Slidev conversion. Preserve chosen design when a native engine port is required."
+  ]
+}

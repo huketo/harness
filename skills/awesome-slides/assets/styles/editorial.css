@@ -1,0 +1,66 @@
+/*
+Awesome Slides editorial — adapted from zarazhangrui/frontend-slides
+Commit 9906a34d640d2111f724544cbc50f7f130569ae1.
+See ATTRIBUTION.md for source mapping and local changes.
+
+MIT License
+
+Copyright (c) 2025 Zara Zhang
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+/* Tokens only: the native engine owns stage geometry and selectors.
+   em values resolve at the consumer; use type tokens on text elements,
+   spacing tokens on a body-sized container. No network font dependency. */
+:root {
+  --as-bg: #f2eedf;
+  --as-fg: #2a241b;
+  --as-muted: #5c5345;
+  --as-accent: #485b3b;
+  --as-line: #827869;
+  --as-surface: #ece6d2;
+  --as-accent-soft: #b7c7a8;
+  --as-on-accent: #ffffff;
+  --as-code-bg: #ece6d2;
+  --as-code-fg: #2a241b;
+  --as-font-display: "Noto Serif KR", "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", "Noto Serif CJK JP", "Noto Serif CJK SC", Georgia, serif;
+  --as-display-size: 3.5em;
+  --as-title-size: 2.125em;
+  --as-heading-weight: 600;
+  --as-radius: 0.75em;
+  --as-sage: #b7c7a8;
+  --as-blush: #e8c9b6;
+  --as-lemon: #d6dd63;
+  --as-font: "Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK JP", "Noto Sans CJK SC", system-ui, sans-serif;
+  --as-mono: "D2Coding", "Noto Sans Mono CJK KR", "SFMono-Regular", Consolas, "Liberation Mono", "Noto Sans KR", "Malgun Gothic", monospace;
+  --as-body-size: 1em;
+  --as-label-size: 0.8em;
+  --as-code-size: 0.85em;
+  --as-body-leading: 1.6;
+  --as-heading-leading: 1.25;
+  --as-code-leading: 1.5;
+  --as-space-1: 0.25em;
+  --as-space-2: 0.5em;
+  --as-space-3: 0.75em;
+  --as-space-4: 1em;
+  --as-space-6: 1.5em;
+  --as-space-8: 2em;
+  --as-space-12: 3em;
+}

@@ -1,0 +1,66 @@
+/* Native Reveal theme mapping adapted from content-skills; see THIRD-PARTY-NOTICES.txt. */
+:root {
+  --r-background-color: var(--as-bg);
+  --r-main-font: var(--as-font);
+  --r-main-color: var(--as-fg);
+  --r-main-font-size: 27px;
+  --r-heading-font: var(--as-font-display, var(--as-font));
+  --r-heading-color: var(--as-fg);
+  --r-link-color: var(--as-accent);
+  --r-link-color-hover: var(--as-fg);
+  --r-selection-background-color: var(--as-accent);
+}
+body.reveal-viewport { background: var(--as-bg); }
+.reveal { font-family: var(--as-font); font-size: 27px; color: var(--as-fg); }
+.reveal .slides { text-align: left; }
+.reveal .slides section.page { box-sizing: border-box; padding: 60px 72px; height: 720px; word-break: keep-all; overflow-wrap: anywhere; }
+.reveal h1, .reveal h2, .reveal h3, .reveal p, .reveal figure { margin: 0; }
+.reveal h1, .reveal h2 { font-family: var(--as-font-display, var(--as-font)); font-weight: var(--as-heading-weight, 700); line-height: 1.25; letter-spacing: normal; text-transform: none; text-wrap: balance; }
+.reveal h1 { font-size: 86px; max-width: 960px; }
+.reveal h2 { font-size: 58px; max-width: 1060px; }
+.reveal h3 { font-size: 32px; line-height: 1.3; font-weight: 650; }
+.reveal p, .reveal li { font-size: 27px; line-height: 1.55; text-wrap: pretty; }
+.reveal .kicker, .reveal .caption { font-size: 20px; color: var(--as-muted); }
+.reveal .kicker { margin-bottom: 24px; }
+.reveal .lead { font-size: 32px; margin-top: 34px; max-width: 880px; }
+.reveal .accent { color: var(--as-accent); }
+.reveal .page > header { margin-bottom: 48px; }
+.reveal .page.title-slide, .reveal .page.closing { display: flex !important; flex-direction: column; justify-content: center; }
+.reveal .title-slide .caption { margin-top: 68px; }
+.reveal .principles { padding: 0; margin: 0; list-style: none; display: grid; gap: 28px; }
+.reveal .principles li { display: grid; grid-template-columns: 66px 1fr; gap: 24px; align-items: baseline; }
+.reveal .number { font-family: var(--as-mono); font-size: 25px; color: var(--as-accent); }
+.reveal .principles p { margin-top: 6px; color: var(--as-muted); }
+.reveal .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 76px; }
+.reveal .comparison > div + div { border-left: 2px solid var(--as-line); padding-left: 60px; }
+.reveal .comparison h3 { margin-bottom: 28px; }
+.reveal .comparison ul { margin: 0; padding-left: 26px; }
+.reveal .comparison li + li { margin-top: 20px; }
+.reveal .takeaway { border-top: 2px solid var(--as-accent); margin-top: 44px; padding-top: 22px; }
+.reveal .flow { padding: 0; margin: 64px 0 36px; list-style: none; display: flex; align-items: stretch; gap: 26px; }
+.reveal .flow li { flex: 1; padding: 30px 18px; border-block: 2px solid var(--as-line); position: relative; }
+.reveal .flow li:not(:last-child)::after { content: '→'; position: absolute; right: -24px; top: 30px; color: var(--as-accent); }
+.reveal .flow strong, .reveal .flow span { display: block; }
+.reveal .flow span { font-size: 22px; margin-top: 16px; color: var(--as-muted); }
+.reveal .sequence { padding: 0; margin: 0; list-style: none; display: grid; gap: 24px; }
+.reveal .sequence li { display: grid; grid-template-columns: 100px 1fr; gap: 30px; align-items: baseline; }
+.reveal .sequence strong { font-family: var(--as-mono); color: var(--as-accent); }
+.reveal .sequence p { margin-top: 6px; color: var(--as-muted); }
+.reveal .closing .lead { border-left: 4px solid var(--as-accent); padding-left: 28px; }
+.reveal .controls, .reveal .progress { color: var(--as-accent); }
+.reveal .progress span { background: var(--as-accent); }
+.reveal .slide-number { background: var(--as-bg); color: var(--as-muted); font: 16px var(--as-mono); }
+.reveal a { color: var(--as-accent); text-decoration: underline; }
+.reveal :focus-visible { outline: 3px solid var(--as-accent); outline-offset: 4px; }
+.reveal pre { font: 23px/1.5 var(--as-mono); margin: 32px 0; padding: 20px; border: 1px solid var(--as-line); white-space: pre-wrap; }
+.reveal code { font-family: var(--as-mono); }
+.reveal .hljs { color: var(--as-fg); background: var(--as-bg); }
+.reveal .hljs-keyword, .reveal .hljs-title, .reveal .hljs-string, .reveal .hljs-number { color: var(--as-accent); }
+.reveal .hljs-comment { color: var(--as-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .reveal *, .reveal *::before, .reveal *::after { transition: none !important; animation: none !important; }
+}
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .reveal .slides section.page { height: 720px; }
+}

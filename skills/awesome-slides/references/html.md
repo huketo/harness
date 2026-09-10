@@ -1,64 +1,86 @@
-# Portable HTML slides
+# HTML: clone a real theme and deliver it
 
-Use plain HTML when the delivery contract calls for one file, no build, or a deliberately small browser deck. Preserve an existing HTML deck's architecture when revising it. This reference defines the necessary behavior rather than prescribing a new reusable slide engine.
+Read [Style selection](style-selection.md), inspect the [catalog](../assets/template-library/index.json), and choose an actual theme. The library is a pinned source dependency: 34 theme-specific HTML/CSS/layout systems, not one runtime recolored 34 ways.
 
-## Choose the presentation surface
+## Generate the editable starting point
 
-Separate the authored slide canvas from the surrounding controls. Use the requested aspect ratio, normally 16:9, with uniform scaling when presentation layout must stay fixed. Letterboxing is acceptable; shrinking the entire canvas does not make dense text readable on a phone.
+```bash
+node <skill-directory>/scripts/new-deck.mjs html ./my-deck --template soft-editorial
+```
 
-For reading mode, use a self-contained page/slide layout with enough explanatory text. If narrow-screen reading is required, provide an intentional reading view with normal document flow or an equivalent handout. Derive it from the same content rather than duplicating facts in two separately maintained DOM trees. Do not force portrait readers to consume tiny text merely because the deck technically fits.
+Open `my-deck/template.html` in a real browser. The command copies the selected folder, including its `design.md`, `template.json`, and sibling assets. Where the HTML imports `deck-stage.js` but the folder omits it, the command adds the bundled shared runtime. It preserves the upstream filename and content, refuses an existing destination, and copies the source license and origin record. It does not install tools, fetch fonts, replace demo claims, or certify offline operation.
 
-Recheck intrinsic sizing when a fixed canvas becomes an auto-height reading page. Percentage grid gaps and centered track alignment can create vertical collisions even when the page has no horizontal overflow. Inspect adjacent headings, lists, diagrams, and controls in the actual narrow view; use flow-relative spacing where the container height is indefinite.
+Read the generated design guide and actual layouts before editing. Replace the demo content; retain the template's hierarchy, grids, motifs, and useful runtime. A single common title/list/comparison scaffold is not an acceptable replacement for the chosen theme. See [Style selection](style-selection.md) for duplication, extension, language, and native-engine ports.
 
-Choose a design size and role-based typography consistently. Test its actual scaled size. Keep controls outside the canvas and usable independently of slide scaling. An overflow boundary may protect the stage; it must not hide required content that failed to fit.
+## Inspect the owning runtime
 
-## Single-file and offline mean different things
+Templates differ: some use the `<deck-stage>` custom element and others use inline navigation or viewport layouts. Inspect the selected template's script, current-slide state, visibility, fragment format, controls, and print CSS. Retain that mechanism rather than layering a second generic controller on top.
 
-For a promised single-file offline deck, the delivered HTML must contain or avoid every dependency:
+Before expanding, exercise:
 
-- Inline CSS and JavaScript. Do not load a CDN presentation library or a remote chart renderer.
-- Use inline SVG, embedded data, or appropriately sized data-URI media. Preserve SVG text and semantics where feasible.
-- Use a font stack available on the target platform, or embed licensed fonts covering the required glyphs. Do not silently depend on Google Fonts, Fontshare, or a network-loaded CJK subset.
-- Inspect CSS `url()`, `@import`, image/video/source URLs, module imports, workers, and runtime fetches—not just `<script src>` and `<img src>`.
-- Distinguish ordinary reference hyperlinks from assets that must load to display the deck. Offline external links can remain visibly identified references, but the content must not require opening them.
+- next/previous buttons and left/right arrows, including clicking a button and then using arrows without blurring it;
+- first/last boundaries, reload with the current fragment, and browser back/forward where supported;
+- focus when a slide becomes hidden, visible focus indicators, and native Enter/Space behavior on controls;
+- reduced motion without hiding the final content;
+- notes and whether they belong in the shared artifact.
 
-A large video may make one-file delivery impractical. If the requested constraints cannot coexist, explain the size/format tradeoff before replacing one with a folder bundle. Do not label `index.html` plus a sidecar asset folder as a self-contained file.
+Correct unsupported or broken behavior in the selected runtime when the deliverable needs it. Do not claim every upstream template already meets every accessibility, URL, reading, and export contract. Keep text-input editing keys intact. Remove inactive presentation content from keyboard access; restore it in reading/print modes. Preserve visible graph/chart labels and a static final state for reveals.
 
-## Navigation and focus
+## Local fonts without losing the design
 
-Use semantic sections with meaningful headings and a labelled control region. Implement only the navigation the deck needs, but make the advertised controls real:
+Many upstream templates load Google Fonts. Keep the named Latin families and add a matching licensed CJK family for Korean; do not silently replace the theme's display face with a system sans because its font request failed.
 
-- Previous/next buttons and keyboard movement work at the first and last slide without wrapping unexpectedly.
-- A reloadable location identifies the current slide when deep links are promised; update the URL on movement and handle back/forward navigation consistently.
-- Ignore deck shortcuts while an input, textarea, select, or editable region owns focus, and do not hijack modified browser shortcuts. Keep normal Tab traversal.
-- Inactive slides must not expose interactive controls to the tab order or assistive technology. Use native visibility/inert mechanisms compatible with the chosen layout; a transparent slide is not necessarily inactive.
-- Ensure focus is not stranded inside a slide that becomes hidden. Keep control focus stable or move it to an appropriate visible target. Announce changes without reading the entire deck on every keypress.
-- Support touch if promised, without making it the only way to move or suppressing browser zoom. Avoid wheel interception unless the presentation explicitly requires it and reading/scrollable regions remain usable.
+For an offline artifact:
 
-Use animation to explain sequence, with a meaningful reduced-motion state. Decorative motion must not delay reading. If a slide has reveal steps, define how next/previous and export map to those steps rather than scattering unrelated timers.
+1. Identify the exact families, styles, and weights used in the selected template.
+2. Obtain the font files from their official distribution and retain the font-specific license. Font rights are separate from the template MIT license.
+3. Store the required files under the generated deck's own `fonts/` and replace the remote stylesheet with local `@font-face` declarations. No global font installation is implied.
+4. Keep original family names where possible. Add the chosen Korean face to the matching serif/sans/mono role; inspect actual mixed-script rendering.
+5. Load the deck in a new offline browser context. A warm browser cache is not proof that local fonts work.
 
-Do not add an inline editor by default. If editing is requested, define persistence and export behavior explicitly. A localStorage copy is not the user's saved HTML file, and a download must preserve the edited content while excluding transient editor UI.
+A local-face declaration is ordinary CSS, not a second theme system:
 
-## Notes and private material
+```css
+@font-face {
+  font-family: "Chosen Display";
+  src: url("./fonts/chosen-display.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+```
 
-Keep presentation notes associated with each slide in the editable source. Use the existing project's presenter mechanism, or provide a clearly named companion notes artifact when one is requested and compatible with the output contract. Do not promise a presenter console that was not implemented.
+Use the real file, family, weight, and license; this declaration is syntax guidance, not a supplied font.
 
-HTML comments and hidden elements are delivered to anyone who receives the file. Remove private speaker notes from the shared variant when they are not authorized for publication. Hiding them with CSS is not privacy protection.
+## Single-file packaging
 
-## Printing and PDF
+Keep the editable folder as the source. When the user requires one HTML file, derive it after authoring: inline the selected runtime script, stylesheet rules, licensed font data, and required local image/SVG resources into that HTML. Resolve nested CSS `url()` dependencies too. Preserve copyright and font notices in the distributed file; do not assume a sibling notice travels with a single-file attachment.
 
-Use an intentional print stylesheet and the browser's PDF path where available:
+No online font stylesheet, script import, external image, CDN icon, or fetched data may remain required for the offline path. Do not replace missing real media with a fake player. Use the user's actual media or an honest static explanation/poster as agreed. Open the final single file in a fresh browser context with networking disabled before navigation and record requests/errors.
 
-- Print every intended slide in order, normally one slide per page for a presentation export.
-- Remove viewport transforms, navigation chrome, and interactive-only overlays in print. Restore all intended slides and the selected reveal state.
-- Set a consistent page size/margin and avoid an extra blank final page.
-- Replace video or interaction with its meaningful static image and explanation.
-- Preserve text as text where the browser supports it. A screenshot assembled into a PDF is raster output; disclose its search/selectability limitations.
+This packaging is a delivery step, not a reason to rewrite the selected theme's layouts or maintain a second copy of its claims.
 
-Do not infer PDF correctness from a print CSS declaration. Open the generated PDF, inspect rendered pages, count them, and check essential text and glyphs. Browser defaults such as headers, margins, paper size, and background printing can change the result.
+## Reading view
 
-## Conversion and completion
+A miniature 16:9 stage is not a readable phone handout. When reading is required, derive normal-flow content from the same slide DOM: release absolute placement at the reading breakpoint, stack related regions in source order, preserve tables/labels/caveats and notes as appropriate, and expose all reveal content. Keep the theme's typography roles, palette, motifs, and grouping while changing geometry.
 
-For an existing deck, preserve its meaningful text, figures, notes, ordering, and brand. Split an overloaded slide before reducing text below a readable size; keep caveats beside their claims. Reconstruct unsupported source objects honestly rather than silently dropping them.
+For complex template-specific positioning, inspect and adapt the affected selectors rather than applying a universal reset that destroys the design. A local horizontal code/table scroller can be appropriate; the entire document must not overflow at the required 390px width. Do not duplicate and separately edit the presentation and reading claims. Reading mode keeps normal scrolling and keyboard semantics.
 
-Apply [Verification](verification.md). For single-file offline delivery, open the actual final file in a fresh browser context with network access disabled, exercise movement and any reading view, and verify required resources. A warm cache or an already loaded page does not prove offline operation. Report the verified browser/platform; system-font availability on another machine remains a separate assumption.
+## PDF from the actual theme
+
+Inspect the template's own print mechanism first. Some runtimes use custom-element/shadow-DOM layout; body-level generic print overrides may not reach it. In print mode, make every intended slide and final reveal visible, disable stage transforms where needed, use the authored page dimensions, and hide navigation and private notes. Preserve the theme's visual composition and vector/text content rather than screenshotting every page.
+
+For a browser page already opened and ready in the environment's browser tool, Puppeteer supports:
+
+```js
+await page.evaluate(() => document.fonts.ready)
+await page.pdf({ path: outputPath, preferCSSPageSize: true, printBackground: true })
+```
+
+The selected template must provide correct page-size/break styles; these options alone do not repair print layout. Use an available browser rather than downloading or globally installing one by default.
+
+Open the resulting PDF. Check page count/order, selectable Korean text, final reveal state, source caveats, font identity, diagrams, cropping, and blank pages. Verify both the authored cover and densest slide, then every remaining page. [Verification](verification.md) owns the full contract.
+
+## Source and adoption boundary
+
+The complete sources are copied from [beautiful-html-templates at e5e204f](https://github.com/zarazhangrui/beautiful-html-templates/tree/e5e204fb1f3b06290846e7dcd7aceddabeceec8c), MIT, copyright 2026 Zara Zhang. [ORIGIN.json](../assets/template-library/ORIGIN.json) records the copied paths and limitations; [LICENSE](../assets/template-library/LICENSE) retains the exact terms. Selection and adaptation guidance here is local integration. The upstream operational guide's unconditional questions and preview gates do not override this environment's authority policy or a user's already settled brief.

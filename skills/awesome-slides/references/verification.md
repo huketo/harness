@@ -2,7 +2,15 @@
 
 Use this reference after a deck runs and before delivery. Verification means exercising the actual presentation and each requested output, not inferring quality from source, a successful build, or one representative screenshot.
 
-Use available built-in tools and browser capabilities. Adapt to the project's existing preview and export mechanisms. Do not require a fixed port, a particular browser product, a permanently running server, or new test infrastructure solely to perform this pass.
+Use available built-in tools and the project's existing preview/export mechanisms. Choose the browser by the requested verification purpose: Windows Chrome for visible Windows/user-assisted review, built-in or headless browsers for automation. In WSL, read `windows-chrome` for this distinction; WSLg GUI operation is not a valid substitute for the intended development/compatibility environment. Follow an explicit user browser choice rather than silently substituting another mode.
+
+### WSL: one Windows browser owner
+
+Read `windows-chrome`, run its `scripts/windows-chrome.js start` command, and attach to the returned `endpoint:` through CDP. Prepare a dedicated review tab, select it with a unique URL/title target, and verify the actual URL before navigation. An OMP handle name does not create a separate Chrome tab. Serve WSL files over a Windows-reachable local HTTP route or use an actual Windows-readable file URL; Linux `/home/...` file URLs do not identify Windows files.
+
+For parallel authoring, workers can build independent sources while one integration owner performs Windows Chrome rendering, PDF export, and visual checks sequentially. Do not let several agents navigate the same real tab or compete for visibility. Use the official screenshot helper; a visibility warning requires correcting the target/visible tab, not bypassing the guard through raw Puppeteer screenshots. Detach tool handles afterward and leave Chrome running unless the user asks to close it.
+
+For automated checks, OMP's built-in browser or a headless browser can run inside WSL without being a WSLg GUI browser. Record the actual host, product, and headed/headless mode. Such evidence does not replace Windows-visible verification when the user specifically requested it.
 
 ## Define the observable contract
 
@@ -57,6 +65,8 @@ Do not misclassify intentional fixed-stage clipping. It is acceptable for a back
 ## Walk keyboard, focus, links, and notes
 
 Run the complete presentation path with the keyboard used by the engine. Confirm forward and backward navigation, meaningful click progression, and any direct slide or overview controls the presentation relies on. Interaction must not trap focus or steal editing keys from an active control.
+
+Mix input methods: click Next, then press Left/Right without blurring the button. Navigation controls should retain arrow navigation while Enter/Space activates the focused control only once; text inputs retain their editing keys. Test this transition rather than testing mouse and keyboard only in isolation.
 
 For every interactive element in scope:
 

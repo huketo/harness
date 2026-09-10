@@ -41,7 +41,7 @@ Treat empty space as pacing, grouping, and emphasis. A quiet region is valid whe
 
 Compose the title, evidence, and explanation as a deliberate visual group with room around and within it. Inspect that group's optical position on the canvas. A repeated top-aligned header-and-card scaffold can leave every slide cramped above an empty lower half; distributing equal gaps to fill the screen is not the remedy. Set proximity by meaning, then place the group according to the slide's purpose. A comparison, a code explanation, and a quiet conclusion need not share the same vertical skeleton.
 
-Remove a badge, rule, icon, ring, or background motif when its informational or compositional role cannot be explained. Prefer space and shared alignment before adding containers. Keep real navigational and data symbols; do not use arbitrary marks as substitutes for visual interest.
+Preserve the chosen template's badges, rules, illustrations, textures, and background motifs: establishing its visual identity is a legitimate compositional role. Do not strip them merely because they are decorative. For new additions, prefer the template's own vocabulary over arbitrary marks or extra containers. Adjust a motif only when it obscures required content or the user asks to change it; retain the overall design rather than flattening it into generic minimalism.
 
 Split or reshape content when the hierarchy no longer reads. Preserve all required information. Never make an overflow defect appear solved by shrinking the entire slide or hiding required content with `overflow: hidden`, a mask, a crop, or a line clamp.
 

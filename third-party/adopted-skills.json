@@ -11,9 +11,9 @@
   "skills": {
     "awesome-slides": {
       "adopted_on": "2026-09-10",
-      "source": "Original synthesis informed by four pinned public repositories; no upstream prose, implementation, templates, or media copied",
+      "source": "Original workflow with attributed implementation, template, and design-recipe adaptations from pinned upstream sources",
       "ownership": "harness-owned; excluded from skills CLI updates",
-      "license": "MIT for original skill, references, and synthetic evaluation fixtures",
+      "license": "MIT for original skill and fixtures; source-specific MIT and Apache-2.0 terms retained with adapted assets",
       "license_path": "skills/awesome-slides/LICENSE",
       "previous_registration": null,
       "upstreams": [
@@ -21,32 +21,41 @@
           "source": "https://github.com/zarazhangrui/frontend-slides",
           "commit": "9906a34d640d2111f724544cbc50f7f130569ae1",
           "license": "MIT",
-          "use": "Research only: visual previews, delivery modes, selective style references"
+          "use": "Adapted native-engine palette tokens and composition recipes; exact map and MIT notice in assets/styles/ATTRIBUTION.md. Generic HTML starter superseded by complete theme-specific source templates."
         },
         {
           "source": "https://github.com/vstorm-co/content-skills",
           "commit": "5138a11b1e3407ea3352d4010cbe33233bdeb01c",
           "license": "MIT",
-          "use": "Research only: audience-led narrative, brand integration, speaker notes"
+          "use": "Adapted Slidev pitch-deck sequence and timed notes, Reveal native sections/plugins/configuration and brand mapping; MIT notices in both engine asset directories"
         },
         {
           "source": "https://github.com/AlemTuzlak/skills",
           "commit": "4b16f3e052635c873d4eede00e8dc5f471f5fc3a",
           "license": "MIT declared in README and plugin metadata; root license text not found in the reviewed snapshot",
-          "use": "Research only: assertion/evidence, code grounding, rendered-state verification"
+          "use": "Research only: official Slidev skill dependency and concrete syntax recipes, assertion/evidence and rendered-state verification; no source copied"
+        },
+        {
+          "source": "https://github.com/zarazhangrui/beautiful-html-templates",
+          "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+          "license": "MIT, Copyright 2026 Zara Zhang",
+          "license_path": "skills/awesome-slides/assets/template-library/LICENSE",
+          "paths": ["templates", "runtime", "index.json", "LICENSE"],
+          "use": "Direct unmodified copy of all 34 complete HTML themes, design guides, metadata and runtime. Generator clones the chosen theme and supplies missing shared deck-stage.js. ORIGIN.json records scope; screenshot gallery remains pinned upstream. Demo content and online fonts require task-specific adaptation."
         },
         {
           "source": "https://github.com/BaizeAI/talks",
           "commit": "5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99",
           "license": "Apache-2.0",
-          "use": "Research only: technical case structure, controlled-demo labels, static media substitutes; no third-party media or trademarks reused"
+          "use": "Adapted TtftBreakdown, StageFlow and CaseStory into typed AsBreakdown, AsStageFlow and AsCaseStory Vue components; modification notices, source map and Apache-2.0 license in assets/slidev; no domain measurements, media or trademarks reused"
         }
       ],
       "local_changes": [
         "Author original presentation and reading workflows joining evidence, narrative, visual direction, notes, and actual output verification.",
-        "Preserve existing engines; default new decks to Slidev, use HTML for single-file delivery, and distinguish native-editable from image-based PPTX.",
+        "Preserve existing engines; default unconstrained new decks to a complete HTML theme, port its visual system when native Slidev/Reveal source is required, and distinguish native-editable from image-based PPTX.",
         "Add Korean/CJK, truthful data provenance, offline, static-media, privacy, and meaning-preserving revision guidance.",
-        "Add four original synthetic evaluation cases without upstream assets or real organizational data."
+        "Add four original synthetic evaluation cases without real organizational data.",
+        "Bundle a theme-specific HTML library, native Slidev/Reveal engine mechanisms and technical components, an exclusive-destination template copier, and a verified officecli native-editable recipe."
       ],
       "excluded_sources": []
     },
