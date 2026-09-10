@@ -48,14 +48,23 @@
           "commit": "5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99",
           "license": "Apache-2.0",
           "use": "Adapted TtftBreakdown, StageFlow and CaseStory into typed AsBreakdown, AsStageFlow and AsCaseStory Vue components; modification notices, source map and Apache-2.0 license in assets/slidev; no domain measurements, media or trademarks reused"
+        },
+        {
+          "source": "https://github.com/slidevjs/slidev",
+          "commit": "a8d8ff717c5a72c1b3a9d98f1c849481f2ddcd00",
+          "license": "MIT",
+          "license_path": "skills/awesome-slides/references/slidev-official/LICENSE.txt",
+          "paths": ["skills/slidev/SKILL.md", "skills/slidev/references/", "LICENSE"],
+          "use": "Official Slidev agent reference set bundled unmodified under references/slidev-official/ so the skill routes to pinned syntax documentation without installing a second top-level skill. SKILL.md renamed to INDEX.md with its frontmatter removed; README.md excluded. Provenance in references/slidev-official/ORIGIN.json."
         }
       ],
       "local_changes": [
         "Author original presentation and reading workflows joining evidence, narrative, visual direction, notes, and actual output verification.",
         "Preserve existing engines; default unconstrained new decks to a complete HTML theme, port its visual system when native Slidev/Reveal source is required, and distinguish native-editable from image-based PPTX.",
         "Add Korean/CJK, truthful data provenance, offline, static-media, privacy, and meaning-preserving revision guidance.",
-        "Add four original synthetic evaluation cases without real organizational data.",
-        "Bundle a theme-specific HTML library, native Slidev/Reveal engine mechanisms and technical components, an exclusive-destination template copier, and a verified officecli native-editable recipe."
+        "Add five original synthetic evaluation cases without real organizational data.",
+        "Bundle a theme-specific HTML library, native Slidev/Reveal engine mechanisms and technical components, an exclusive-destination template copier, and a verified officecli native-editable recipe.",
+        "Bundle the pinned official Slidev agent reference set inside the skill and route to it, instead of depending on a separately installed slidev skill."
       ],
       "excluded_sources": []
     },

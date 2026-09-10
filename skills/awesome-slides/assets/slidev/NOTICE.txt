@@ -19,8 +19,17 @@ License: MIT; full license in licenses/content-skills-MIT.txt.
 Source: skills/content-presentation/templates/pitch-deck.slidev.template
 slides.md adapts the concrete template's title/problem/cost/how-it-works/ask
 sequence, layout choices, and per-slide speaker-note practice. Its fundraising
-content is replaced with a six-slide engineering decision and labelled synthetic
+content is replaced with a nine-slide engineering decision and labelled synthetic
 examples. No upstream statistics, branding, or claims of measured results remain.
+
+Harness original components and synthetic media:
+- components/AsDemoMedia.vue is an original work of this harness, licensed under
+  the skill's MIT license. It wraps Slidev's built-in <SlidevVideo> and enforces
+  static accessibility and fallback text.
+- public/demo-admission.mp4 and public/demo-admission.poster.jpg are synthetic
+  simulation media generated directly for this starter. They are not recordings
+  of any real product or production service. Users adopting this starter should
+  replace these media files with their own recordings.
 
 Keep this notice and both license files when redistributing the starter or its
 adapted source components. Dependency licenses remain with their packages.

@@ -30,14 +30,14 @@ Record the brief compactly in the project's existing working format. Avoid a new
 | --- | --- |
 | Existing deck | Keep its engine and design system. Inspect its own documentation and commands; migrate only when requested or necessary for an agreed deliverable. |
 | New deck without an engine requirement | **HTML theme library**: read [HTML](references/html.md), select a complete theme, and clone it. |
-| Technical deck requiring native code reveals, presenter tooling, or an explicitly requested Slidev source | Read [Slidev](references/slidev.md). Preserve the selected theme's compositions when implementing native layouts. |
+| Technical deck requiring native code reveals, motion, embedded demo media, presenter tooling, or an explicitly requested Slidev source | Read [Slidev](references/slidev.md). Preserve the selected theme's compositions when implementing native layouts. |
 | One file or offline delivery | Use the selected HTML template, then localize/embed its fonts, runtime, and assets as described in [HTML](references/html.md). A copied upstream template is not yet an offline deliverable. |
 | Reveal.js requested or already used | Read [Reveal.js](references/reveal.md); preserve the existing project or port the selected theme into native sections. |
 | PowerPoint with editable text, shapes, or charts | Read [Native PPTX](references/officecli.md) and use `officecli`'s actual schema. Slidev's image-based PPTX export does not meet this requirement. |
 
 For a theme-based deck, run `node <skill-directory>/scripts/new-deck.mjs html <new-directory> --template <catalog-slug>`. This clones the complete theme folder and any missing shared runtime; it refuses an existing destination and carries the source license. Native engine scaffolds remain available as `new-deck.mjs <slidev|reveal> <new-directory> --style <editorial|signal|technical>`, but those palette presets are not the HTML themes and do not constitute a finished visual design. Neither route installs dependencies or starts services.
 
-For Slidev, load the installed official `slidev` skill when available; otherwise use the official feature references identified in the local Slidev recipe. Presentation judgment and engine syntax are separate responsibilities. Do not guess syntax or rely on a theme name alone to supply the design. Existing Spectacle and other engines remain valid revision targets; do not migrate merely to use a bundled starter.
+For Slidev, the official feature documentation is bundled at `references/slidev-official/` (pinned to Slidev 52.19.1); the Slidev recipe routes to it. Read the exact feature reference instead of guessing syntax, and do not install a separate Slidev skill or global package. Presentation judgment and engine syntax are separate responsibilities. Do not rely on a theme name alone to supply the design. Existing Spectacle and other engines remain valid revision targets; do not migrate merely to use a bundled starter.
 
 ## 3. Ground and storyboard the content
 

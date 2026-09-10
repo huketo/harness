@@ -1,0 +1,18 @@
+{
+  "source": "https://github.com/slidevjs/slidev",
+  "commit": "a8d8ff717c5a72c1b3a9d98f1c849481f2ddcd00",
+  "committed_on": "2026-08-25",
+  "retrieved_on": "2026-09-10",
+  "slidev_version": "52.19.1",
+  "license": "MIT",
+  "license_path": "LICENSE.txt",
+  "copied_paths": ["skills/slidev/SKILL.md", "skills/slidev/references/", "LICENSE"],
+  "modifications": [
+    "skills/slidev/SKILL.md renamed to INDEX.md and its YAML frontmatter removed so the bundled router is not discovered as a second installed skill.",
+    "Reference documents under references/ are byte-identical to the pinned upstream snapshot."
+  ],
+  "excluded": [
+    "skills/slidev/README.md — installation instructions for adding slidev as a separate Claude Code skill; contradicts this harness's single-domain-skill routing."
+  ],
+  "verify": "diff -r references/ <clone>/skills/slidev/references/ produces no output at the pinned commit."
+}
