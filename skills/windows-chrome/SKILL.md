@@ -7,6 +7,8 @@ description: WSL에서 Windows 호스트의 Chrome을 CDP로 붙여 쓴다. 사�
 
 WSL 안의 `playwright-cli`와 OMP `browser` 도구는 기본으로 Linux 헤드리스 Chromium을 띄운다. 이 스킬은 대신 Windows 호스트의 Chrome을 `http://127.0.0.1:9222`(CDP)로 노출한다. 창이 Windows 화면에 뜨고, 프로필이 디스크에 남아 로그인 상태가 유지되며, 사용자가 직접 개입할 수 있다.
 
+브라우저 선택은 실행 방식으로 구분한다. 실제 창·사용자 개입·Windows 환경 확인에는 이 스킬의 Windows Chrome을 쓴다. 자동화·렌더링·CI 검사는 OMP 내장 브라우저나 실제 headless 브라우저를 사용할 수 있다. WSLg의 headed Chrome/Chromium은 개발·호환성 검증용 브라우저로 선택하지 않는다. 창이 뜬다는 사실은 검증 근거가 아니며, WSL에서 실행하는 headless 프로세스와 WSLg GUI를 혼동하지 않는다. 사용자가 지정한 브라우저·검증 환경을 우선하고 실제 실행 모드를 증거에 기록한다.
+
 ## 순서
 
 1. **연결** — 브릿지와 Chrome을 올리고 엔드포인트를 얻는다. 이미 떠 있으면 그대로 재사용한다.
@@ -72,4 +74,3 @@ Chrome은 `%LOCALAPPDATA%\windows-chrome\<profile>`을 전용 프로필로 쓴�
 - **`Chrome did not expose ... within 30s`** — 같은 프로필의 Chrome 창이 원격 디버깅 없이 이미 열려 있으면 새 실행이 그 창으로 흡수된다. 사용자에게 그 창을 닫아 달라고 한 뒤 다시 `start`한다. 다른 원인은 `~/.local/state/windows-chrome/bridge-9222.log`에서 확인한다.
 - **`node.exe not found`** — Windows에 Node.js가 없다. 설치하거나 `WINDOWS_NODE_EXE`로 경로를 준다. Linux `node`는 Windows 소켓에 닿지 못하므로 대체가 안 된다.
 - **`cannot listen on 127.0.0.1:9222`** — 다른 프로세스가 포트를 쓴다. `WINDOWS_CHROME_PORT`를 바꾸고 attach 주소도 같이 바꾼다.
-- **Linux Chromium이 필요한 경우** — 헤드리스 스크린샷, 병렬 세션, CI 재현처럼 창이 필요 없는 작업은 이 스킬을 쓰지 않고 `playwright-cli open`이나 OMP `browser.open`의 기본 경로를 쓴다.
