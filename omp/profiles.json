@@ -53,6 +53,14 @@
 		}
 	},
 	"profiles": {
+		"agy-work": {
+			"model": "agy-flash",
+			"purpose": "Opt-in Herdr delegation trial: research, implementation and general worker roles"
+		},
+		"agy-review": {
+			"model": "agy-opus-thinking",
+			"purpose": "Opt-in Herdr delegation trial: independent analysis and review"
+		},
 		"frontend": {
 			"model": "fable-5-1",
 			"purpose": "Fable 5.1 for frontend/UI-facing work and general daily driving"

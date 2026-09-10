@@ -77,6 +77,8 @@ harness-run command --name dev --detach -- bun run dev
 harness-run read dev
 ```
 
+Use `/delegation` to inspect session-local routing, `agy` for interactive AGY-first workers, `native` to restore native delegation, `off` to stop new delegation, and `model` to select the default AGY model. Existing workers survive mode changes. Ordinary startup remains native; `bun omp/herdr-trial.ts` is an optional AGY-start launcher. No OMP core rebuild or shared-setting change is required. See [routing behavior and limitations](docs/guides/usage.md#세션별-위임-모드).
+
 A detached handle is not readiness evidence. Check the output and service before using it. Independent agents need an explicit brief; built-in task agents remain in OMP's Agent Hub. The `harness-herdr` extension gates OMP's built-in `ask` tool: each call runs `herdr-hitl channel` first and is blocked unless the channel is `terminal`. See [detailed usage and state boundaries](docs/guides/usage.md) (Korean).
 
 ## Evaluate before changing defaults

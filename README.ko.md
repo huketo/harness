@@ -77,6 +77,8 @@ harness-run command --name dev --detach -- bun run dev
 harness-run read dev
 ```
 
+`/delegation`으로 현재 세션의 위임 상태를 확인하고, `agy`로 대화형 AGY 우선 위임, `native`로 내장 위임 복귀, `off`로 새 위임 중지, `model`로 AGY 기본 모델 선택을 관리합니다. 모드를 바꿔도 기존 작업자는 유지합니다. 일반 시작값은 native이며 `bun omp/herdr-trial.ts`는 AGY 모드로 시작하는 선택적 launcher입니다. OMP 코어 재빌드나 공용 설정 변경은 필요하지 않습니다. [동작과 제약](docs/guides/usage.md#세션별-위임-모드)을 확인합니다.
+
 Detached 핸들은 준비 완료의 증거가 아닙니다. 출력과 서비스를 확인한 뒤 사용합니다. 독립 에이전트에는 명시적인 브리프가 필요하며, 내장 task 에이전트는 OMP Agent Hub에 남습니다. `harness-herdr` 확장은 OMP 내장 `ask` 도구를 게이트합니다. 호출마다 `herdr-hitl channel`을 먼저 실행하고 채널이 `terminal`일 때만 통과시킵니다. [상세 사용법과 상태 경계](docs/guides/usage.md)를 참고하세요.
 
 ## 기본값 변경 전에 평가하기

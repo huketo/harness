@@ -89,6 +89,31 @@ harness-run agent --profile code --name implementation --resume  # 종료한 프
 
 이 도구로 띄운 독립 에이전트는 기존 `task`를 다른 창에 옮겨 놓은 것이 아닙니다. 별도의 대화이므로 브리프나 인계문을 명시적으로 전달합니다. 유한 실행 명령(finite command)은 exit artifact와 로그를 확보하고 자신이 만든 탭이나 페인의 소유권을 확인한 뒤 자동으로 닫습니다. `--detach`로 실행한 백그라운드 명령(명시적인 `--name` 필수)이나 독립 에이전트, 사용자가 분할하거나 공유한 탭은 닫지 않고 보존합니다. 누적된 완료 단일-pane 명령 탭은 `harness-run prune --workspace current --dry-run` 또는 `--apply`로 안전하게 정리할 수 있습니다. `--detach`는 실행 핸들만 반환하며 준비 완료를 보장하지 않습니다. 실행 중에도 `read`·`send`·`wait`를 사용할 수 있고, PTY를 통해 사람도 같은 터미널에 입력할 수 있습니다. 실행별 종료 상태·전체 로그는 `~/.local/state/harness-run/`에 보존하며 도구 응답은 로그의 마지막 64KiB로 제한합니다(`XDG_STATE_HOME`이 있으면 그 경로 사용). AGY 무인 실행은 print 프로세스의 종료 코드와 JSON `SUCCESS`를 모두 확인합니다. 상세 인자는 `harness-run --help`에서 확인합니다.
 
+### 세션별 위임 모드
+
+Herdr 안에서 `herdr` 확장을 로드한 OMP는 공개 확장 API로 위임 모드를 바꿉니다. 별도 OMP 빌드나 공용 설정 변경은 필요하지 않습니다. 명령이 없는 기존 세션은 확장을 다시 로드하거나 새로 시작합니다.
+
+```text
+/delegation                 현재 모드·기본 모델·대기 중 작업자
+/delegation agy             대화형 AGY 우선 위임
+/delegation native          기존 OMP 내장 위임으로 복귀
+/delegation off             새 작업자 위임 중지
+/delegation model           등록된 AGY 기본 모델 선택
+/delegation model agy-flash  모델 키를 직접 지정
+```
+
+일반 시작값은 `native`입니다. `agy` 모드에서는 OMP가 목표·분해·통합·검증을 맡고 독립적인 조사·구현·검토를 작업자에게 배분합니다. 짧은 작업까지 무조건 위임하는 분류기는 없습니다. `agy-work`가 기본 프로필이고 독립 검토는 `agy-review`를 선택할 수 있습니다.
+
+`agy`와 `off`는 내장 `task` 및 `eval`을 제외합니다. 공개 API에서 Eval의 `agent()`·`workpool()`만 따로 끌 수 없어 일반 계산 기능도 함께 빠집니다. `native`로 돌아가면 모드가 제거했던 도구를 복원합니다. `off`는 새 Herdr 작업자의 `start`·`dispatch`도 거절하지만 기존 작업자의 조회·대기·후속 지시·정리는 허용합니다. 직접 CLI 호출을 막는 보안 기능은 아닙니다.
+
+모드와 모델은 현재 세션에만 적용하고 세션 전환 시 시작값으로 돌아갑니다. 모드 전환은 기존 작업자나 결과 감시를 종료하지 않습니다. 모델 변경은 이후 새 기본 작업자에만 적용하며 명시한 다른 프로필은 유지합니다. 모델 키와 실제 모델 ID는 `omp/profiles.json`이 소유합니다. `bun omp/herdr-trial.ts --`는 AGY 모드로 시작하는 선택적 launcher이며 일반 OMP에서도 `/delegation agy`를 사용할 수 있습니다.
+
+작업자는 조정자와 같은 workspace·cwd의 no-focus 탭에서 실행합니다. 이름 있는 작업자를 후속 지시에 재사용하며 새 workspace 생성·이동은 위임의 부수 효과가 아닙니다. socket·조정자 소유권을 검사하고 자신이 생성한 idle/done 단일-pane 작업자 탭만 정리합니다. 공유 탭과 작업 중인 대상은 보존합니다. AGY 전용 권한·sandbox·worktree 제한은 추가하지 않습니다.
+
+작업자가 settled 상태가 되어도 산출물 검증이 끝난 것은 아닙니다. OMP가 결과를 읽고 검증해야 합니다. `blocked`·`unknown`·timeout은 기존 작업자를 확인할 이유이지 같은 지시를 재제출할 근거가 아닙니다. OMP 종료 시 감시만 해제하고 남은 작업자는 종료하지 않습니다. 자연어 완료 문구와 실제 goal 상태 전이는 별개입니다. 작은 fixture의 성공은 장기 운용·분해 품질·비용 우위를 보장하지 않습니다.
+
+관리 목록과 모델 선택은 OMP 프로세스 메모리에 있습니다. 프로세스 전체를 재시작하면 이전 관리 목록을 복원하지 않습니다. 남은 작업자는 종료하지 않으므로 retained 기록을 별도로 확인합니다.
+
 ## WSL에서 Windows Chrome 쓰기
 
 `playwright-cli`와 OMP의 `browser` 도구는 기본으로 WSL 안의 헤드리스 Chromium을 띄웁니다. 창이 보이고 로그인 상태가 남는 브라우저가 필요하면 `windows-chrome` 스킬이 Windows 호스트의 Chrome을 `http://127.0.0.1:9222`로 노출합니다.

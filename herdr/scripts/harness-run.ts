@@ -42,6 +42,8 @@ type RecordState = {
 	launchError?: string;
 	detached?: boolean;
 	ownTab?: boolean;
+	socketPath?: string;
+	ownerPaneId?: string;
 };
 function object(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value))
@@ -52,6 +54,45 @@ function text(value: unknown): string {
 	if (typeof value !== "string" || !value)
 		throw new Error("Expected a nonempty string in CLI response");
 	return value;
+}
+function agyDelegationEnabled() {
+	return process.env.HARNESS_DELEGATION === "agy";
+}
+function currentSocketPath() {
+	return text(process.env.HERDR_SOCKET_PATH);
+}
+function recordSocketMatches(record: RecordState) {
+	return (
+		!agyDelegationEnabled() ||
+		(typeof record.socketPath === "string" &&
+			record.socketPath === currentSocketPath())
+	);
+}
+function assertRecordSocket(record: RecordState) {
+	if (recordSocketMatches(record)) return;
+	throw new Error(
+		record.socketPath
+			? `${record.name} belongs to another Herdr session; refusing control`
+			: `${record.name} predates Herdr session ownership; use a new name while HARNESS_DELEGATION=agy`,
+	);
+}
+function recordOwnerMatches(record: RecordState) {
+	return (
+		recordSocketMatches(record) &&
+		(!agyDelegationEnabled() ||
+			(typeof record.ownerPaneId === "string" &&
+				record.ownerPaneId === process.env.HERDR_PANE_ID))
+	);
+}
+function assertRecordOwner(record: RecordState) {
+	if (!agyDelegationEnabled()) return;
+	assertRecordSocket(record);
+	if (record.ownerPaneId === process.env.HERDR_PANE_ID) return;
+	throw new Error(
+		record.ownerPaneId
+			? `${record.name} belongs to another harness-run coordinator; refusing control`
+			: `${record.name} predates harness-run coordinator ownership; use a new name while HARNESS_DELEGATION=agy`,
+	);
 }
 async function logTail(path: string, limit = 65536) {
 	const file = await open(path, "r");
@@ -167,7 +208,7 @@ async function required(name?: string) {
 	if (!record) throw new Error(`No retained session: ${name}`);
 	return record;
 }
-// The lock is per name and covers launch only, never a command/agent's execution or log reads.
+// The lock is per name and covers launch plus opt-in prompt admission, never command execution or log reads.
 async function locked<T>(name: string, action: () => Promise<T>): Promise<T> {
 	if (!AGENT_NAME_RE.test(name)) throw new Error("Invalid session name");
 	await mkdir(stateRoot, { recursive: true, mode: 0o700 });
@@ -226,6 +267,89 @@ async function agentSnapshot(record: RecordState) {
 		await save(record);
 	}
 	return agent;
+}
+function agentStatus(agent: Record<string, unknown>) {
+	const status = text(agent.agent_status);
+	if (!["idle", "done", "working", "blocked", "unknown"].includes(status))
+		throw new Error(`Unsupported agent lifecycle status: ${status}`);
+	return status;
+}
+function assertAgentReady(record: RecordState, agent: Record<string, unknown>) {
+	const status = agentStatus(agent);
+	if (status !== "idle" && status !== "done")
+		throw new Error(
+			`${record.name} is ${status}; refusing to send another prompt. No input was resent.`,
+		);
+}
+async function promptInteractive(
+	record: RecordState,
+	input: string,
+	wait: boolean,
+	timeout: number,
+) {
+	if (!agyDelegationEnabled()) {
+		await herdr([
+			"agent",
+			"prompt",
+			record.name,
+			input,
+			...(wait ? ["--wait", "--timeout", String(timeout)] : []),
+		]);
+		return false;
+	}
+	assertRecordOwner(record);
+	assertAgentReady(record, await agentSnapshot(record));
+	try {
+		await herdr([
+			"agent",
+			"prompt",
+			record.name,
+			input,
+			"--wait",
+			...(wait
+				? ["--timeout", String(timeout)]
+				: [
+						"--until",
+						"working",
+						"--until",
+						"blocked",
+						"--timeout",
+						String(Math.min(timeout, 5000)),
+					]),
+		]);
+		return true;
+	} catch (error) {
+		throw new Error(
+			`Prompt outcome is uncertain; it may have been submitted and was not resent: ${error}`,
+		);
+	}
+}
+async function interactiveResult(
+	record: RecordState,
+	agent: Record<string, unknown>,
+	activityObserved = false,
+) {
+	const status = agentStatus(agent);
+	const output = await execute([
+		"herdr",
+		"agent",
+		"read",
+		record.name,
+		"--source",
+		"recent-unwrapped",
+	]);
+	return {
+		ok: status !== "blocked" && status !== "unknown",
+		...record,
+		agent,
+		agentStatus: status,
+		lifecycleSource:
+			agent.screen_detection_skipped === true ? "integration" : "screen",
+		settled: ["idle", "done", "blocked"].includes(status),
+		activityObserved,
+		completionValidated: false,
+		output,
+	};
 }
 async function pane(
 	name: string,
@@ -368,9 +492,7 @@ async function finishCommand(record: RecordState, timeout: number) {
 			`${record.name}'s pane ownership changed; preserving the completed pane`,
 		);
 	if (record.ownTab) {
-		const currentTab = object(
-			(await herdr(["tab", "get", record.tabId])).tab,
-		);
+		const currentTab = object((await herdr(["tab", "get", record.tabId])).tab);
 		if (currentTab.tab_id !== record.tabId || currentTab.pane_count !== 1)
 			throw new Error(
 				`${record.name}'s tab is shared; preserving the completed pane`,
@@ -425,6 +547,7 @@ async function pruneCommands(options: {
 	for (const name of names) {
 		const record = await load(name);
 		if (!record || record.kind !== "command") continue;
+		if (!recordOwnerMatches(record)) continue;
 		const code = await exitState(record);
 		if (code === undefined) continue;
 		if (currentTabId && record.tabId === currentTabId) continue;
@@ -447,10 +570,7 @@ async function pruneCommands(options: {
 			continue;
 		}
 
-		if (
-			paneObj.pane_id !== record.paneId ||
-			paneObj.tab_id !== record.tabId
-		)
+		if (paneObj.pane_id !== record.paneId || paneObj.tab_id !== record.tabId)
 			continue;
 
 		seenTabs.add(record.tabId);
@@ -486,12 +606,14 @@ harness-run prune [--workspace current|ID] [--dry-run] [--apply]
 harness-run read NAME [--lines N]
 harness-run wait NAME [--timeout MS]
 harness-run send NAME TEXT [--wait] [--timeout MS]
+harness-run close NAME
 
 Default placement: a no-focus tab in the same cwd; finite command tabs close after their result is captured.
 Use command --detach --name NAME for retained servers/REPLs; it returns a running handle, NOT readiness.
 Prune finished single-pane command tabs: --dry-run (default) previews candidates; --apply closes them.
 read/send/wait remain available during retained execution. --timeout bounds waiting, not the visible process.
-AGY unattended requires a prompt and verifies process exit + JSON SUCCESS. Interactive AGY has no reliable --wait.
+AGY unattended requires a prompt and verifies process exit + JSON SUCCESS.
+HARNESS_DELEGATION=agy enables interactive AGY lifecycle waits and guarded close; lifecycle settlement is not task-result validation.
 Only use visible command execution for long runs, human observation/collaboration, or an explicit visibility request.
 Short commands (including short builds/tests) stay on native tools. HERDR_ENV=1 is required except for --help.
 `;
@@ -567,14 +689,20 @@ export async function main(args: string[]) {
 			runner = native[0] as "omp" | "agy";
 			if (values.unattended && (runner !== "agy" || !values.prompt))
 				throw new Error("--unattended requires an AGY profile and --prompt");
-			if (runner === "agy" && values.wait && !values.unattended)
+			if (
+				runner === "agy" &&
+				values.wait &&
+				!values.unattended &&
+				!agyDelegationEnabled()
+			)
 				throw new Error(
-					"Interactive AGY completion is unreliable; use --unattended or inspect the retained pane",
+					"Interactive AGY completion is unreliable unless HARNESS_DELEGATION=agy",
 				);
 		} else if (!native.length)
 			throw new Error("command requires PROGRAM ARG... after --");
 		const record = await locked(name, async () => {
 			let rec = await load(name);
+			if (rec) assertRecordOwner(rec);
 			if (
 				rec &&
 				(rec.cwd !== cwd ||
@@ -595,14 +723,19 @@ export async function main(args: string[]) {
 				}
 			}
 			if (rec && action === "agent" && !values.unattended && alive) {
+				let agent: Record<string, unknown> | undefined;
 				try {
-					await agentSnapshot(rec);
-					return rec;
+					agent = await agentSnapshot(rec);
 				} catch (error) {
 					if (!values.resume)
 						throw new Error(
 							`Retained agent unavailable: ${error}. Use --resume or a new name.`,
 						);
+				}
+				if (agent) {
+					if (agyDelegationEnabled() && values.prompt)
+						assertAgentReady(rec, agent);
+					return rec;
 				}
 			}
 			if (rec?.runDir && alive && (await exitState(rec)) === undefined)
@@ -646,6 +779,12 @@ export async function main(args: string[]) {
 				unattended: values.unattended,
 				detached: action === "command" ? Boolean(values.detach) : undefined,
 				launchError: undefined,
+				socketPath: agyDelegationEnabled()
+					? currentSocketPath()
+					: rec?.socketPath,
+				ownerPaneId: agyDelegationEnabled()
+					? text(process.env.HERDR_PANE_ID)
+					: rec?.ownerPaneId,
 			};
 			if (action === "command") await launchCommand(rec, native);
 			else if (values.unattended)
@@ -685,21 +824,32 @@ export async function main(args: string[]) {
 						timeout + (values.unattended ? 15000 : 0),
 					);
 		else {
+			let activityObserved = false;
 			if (values.prompt)
-				await herdr([
-					"agent",
-					"prompt",
-					name,
-					values.prompt,
-					...(values.wait ? ["--wait", "--timeout", String(timeout)] : []),
-				]);
+				activityObserved = agyDelegationEnabled()
+					? await locked(name, () =>
+							promptInteractive(
+								record,
+								values.prompt as string,
+								Boolean(values.wait),
+								timeout,
+							),
+						)
+					: await promptInteractive(
+							record,
+							values.prompt,
+							Boolean(values.wait),
+							timeout,
+						);
 			const agent = await agentSnapshot(record);
-			result = {
-				ok: agent.agent_status !== "blocked",
-				...record,
-				agent,
-				lifecycleReliable: runner === "omp",
-			};
+			result = agyDelegationEnabled()
+				? await interactiveResult(record, agent, activityObserved)
+				: {
+						ok: agent.agent_status !== "blocked",
+						...record,
+						agent,
+						lifecycleReliable: runner === "omp",
+					};
 		}
 	} else if (action === "list") {
 		await mkdir(stateRoot, { recursive: true, mode: 0o700 });
@@ -711,6 +861,12 @@ export async function main(args: string[]) {
 			sessions: await Promise.all(
 				names.map(async (name) => {
 					const record = await required(name.slice(0, -5));
+					if (!recordSocketMatches(record))
+						return {
+							...record,
+							alive: false,
+							controlDenied: "foreign-or-legacy-session",
+						};
 					try {
 						await herdr(["pane", "get", record.paneId]);
 						return {
@@ -732,6 +888,11 @@ export async function main(args: string[]) {
 		});
 	} else {
 		const record = await required(positionals[0]);
+		if (agyDelegationEnabled()) {
+			if (action === "read") {
+				if (record.kind === "agent") assertRecordSocket(record);
+			} else assertRecordOwner(record);
+		}
 		if (action === "read") {
 			const lines = values.lines === undefined ? 100 : Number(values.lines);
 			if (!Number.isSafeInteger(lines) || lines <= 0)
@@ -759,8 +920,10 @@ export async function main(args: string[]) {
 			if (record.kind === "command" || record.unattended)
 				result = await finishCommand(record, timeout);
 			else {
-				if (record.runner !== "omp")
-					throw new Error("Interactive AGY wait is unreliable");
+				if (record.runner !== "omp" && !agyDelegationEnabled())
+					throw new Error(
+						"Interactive AGY wait is unreliable unless HARNESS_DELEGATION=agy",
+					);
 				await agentSnapshot(record);
 				await herdr([
 					"agent",
@@ -770,7 +933,9 @@ export async function main(args: string[]) {
 					String(timeout),
 				]);
 				const agent = await agentSnapshot(record);
-				result = { ok: agent.agent_status !== "blocked", ...record, agent };
+				result = agyDelegationEnabled()
+					? await interactiveResult(record, agent)
+					: { ok: agent.agent_status !== "blocked", ...record, agent };
 			}
 		} else if (action === "send") {
 			const input = positionals[1];
@@ -787,19 +952,60 @@ export async function main(args: string[]) {
 					throw new Error(
 						"Unattended AGY is one-shot; start another turn explicitly",
 					);
-				if (values.wait && record.runner !== "omp")
-					throw new Error("Interactive AGY wait is unreliable");
-				await agentSnapshot(record);
-				await herdr([
-					"agent",
-					"prompt",
-					record.name,
-					input,
-					...(values.wait ? ["--wait", "--timeout", String(timeout)] : []),
-				]);
+				if (values.wait && record.runner !== "omp" && !agyDelegationEnabled())
+					throw new Error(
+						"Interactive AGY wait is unreliable unless HARNESS_DELEGATION=agy",
+					);
+				const activityObserved = agyDelegationEnabled()
+					? await locked(record.name, () =>
+							promptInteractive(record, input, Boolean(values.wait), timeout),
+						)
+					: await promptInteractive(
+							record,
+							input,
+							Boolean(values.wait),
+							timeout,
+						);
 				const agent = await agentSnapshot(record);
-				result = { ok: agent.agent_status !== "blocked", ...record, agent };
+				result = agyDelegationEnabled()
+					? await interactiveResult(record, agent, activityObserved)
+					: { ok: agent.agent_status !== "blocked", ...record, agent };
 			}
+		} else if (action === "close") {
+			if (!agyDelegationEnabled())
+				throw new Error("close requires HARNESS_DELEGATION=agy");
+			if (record.kind !== "agent" || record.unattended)
+				throw new Error("close only supports retained interactive agents");
+			if (!record.ownTab)
+				throw new Error(
+					`${record.name} does not own its tab; refusing to close a user or shared pane`,
+				);
+			if (record.paneId === process.env.HERDR_PANE_ID)
+				throw new Error("Refusing to close the current caller pane");
+			const agent = await agentSnapshot(record);
+			if (record.runner && agent.agent !== record.runner)
+				throw new Error(
+					`${record.name}'s agent kind changed; preserving the tab`,
+				);
+			const status = agentStatus(agent);
+			if (status !== "idle" && status !== "done")
+				throw new Error(`${record.name} is ${status}; refusing to close it`);
+			const pane = object((await herdr(["pane", "get", record.paneId])).pane);
+			if (pane.pane_id !== record.paneId || pane.tab_id !== record.tabId)
+				throw new Error(
+					`${record.name}'s pane identity changed; preserving the tab`,
+				);
+			const tab = object((await herdr(["tab", "get", record.tabId])).tab);
+			if (tab.tab_id !== record.tabId || tab.pane_count !== 1)
+				throw new Error(`${record.name}'s tab is shared; preserving it`);
+			await herdr(["tab", "close", record.tabId]);
+			result = {
+				ok: true,
+				status: "closed",
+				...record,
+				agentStatus: status,
+				closed: true,
+			};
 		} else throw new Error(`Unknown action: ${action}`);
 	}
 	console.log(JSON.stringify(result));
