@@ -70,7 +70,7 @@ omp-profile show code
 harness-run --help
 ```
 
-Use Herdr when a command is long-running or benefits from human observation or interaction. Run short reads, builds, and tests with normal tools. For example, in a project that provides a development-server command:
+Use Herdr when a command is long-running or benefits from human observation or interaction. Run short reads, builds, and tests with normal tools. Finite command runs automatically capture exit artifacts and logs, verify ownership, and close their created tab, preventing pager stalls with `PAGER=cat`. Detached commands require an explicit `--name` and remain retained. Completed command tabs can be cleaned with `harness-run prune --workspace current --dry-run` or `--apply`. For example, in a project that provides a development-server command:
 
 ```bash
 harness-run command --name dev --detach -- bun run dev

@@ -87,7 +87,7 @@ harness-run wait dev --timeout 60000  # 대기 만료는 서버를 종료하지 
 harness-run agent --profile code --name implementation --resume  # 종료한 프로세스의 대화 재개
 ```
 
-이 도구로 띄운 독립 에이전트는 기존 `task`를 다른 창에 옮겨 놓은 것이 아닙니다. 별도의 대화이므로 브리프나 인계문을 명시적으로 전달합니다. 완료된 페인은 자동으로 닫지 않습니다. `--detach`는 실행 핸들만 반환하며 준비 완료를 보장하지 않습니다. 실행 중에도 `read`·`send`·`wait`를 사용할 수 있고, PTY를 통해 사람도 같은 터미널에 입력할 수 있습니다. 실행별 종료 상태·전체 로그는 `~/.local/state/harness-run/`에 보존하며 도구 응답은 로그의 마지막 64KiB로 제한합니다(`XDG_STATE_HOME`이 있으면 그 경로 사용). AGY 무인 실행은 print 프로세스의 종료 코드와 JSON `SUCCESS`를 모두 확인합니다. 상세 인자는 `harness-run --help`에서 확인합니다.
+이 도구로 띄운 독립 에이전트는 기존 `task`를 다른 창에 옮겨 놓은 것이 아닙니다. 별도의 대화이므로 브리프나 인계문을 명시적으로 전달합니다. 유한 실행 명령(finite command)은 exit artifact와 로그를 확보하고 자신이 만든 탭이나 페인의 소유권을 확인한 뒤 자동으로 닫습니다. `--detach`로 실행한 백그라운드 명령(명시적인 `--name` 필수)이나 독립 에이전트, 사용자가 분할하거나 공유한 탭은 닫지 않고 보존합니다. 누적된 완료 단일-pane 명령 탭은 `harness-run prune --workspace current --dry-run` 또는 `--apply`로 안전하게 정리할 수 있습니다. `--detach`는 실행 핸들만 반환하며 준비 완료를 보장하지 않습니다. 실행 중에도 `read`·`send`·`wait`를 사용할 수 있고, PTY를 통해 사람도 같은 터미널에 입력할 수 있습니다. 실행별 종료 상태·전체 로그는 `~/.local/state/harness-run/`에 보존하며 도구 응답은 로그의 마지막 64KiB로 제한합니다(`XDG_STATE_HOME`이 있으면 그 경로 사용). AGY 무인 실행은 print 프로세스의 종료 코드와 JSON `SUCCESS`를 모두 확인합니다. 상세 인자는 `harness-run --help`에서 확인합니다.
 
 ## WSL에서 Windows Chrome 쓰기
 

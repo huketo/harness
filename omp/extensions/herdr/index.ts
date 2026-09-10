@@ -7,7 +7,7 @@ const RUNNER = join(
 	"herdr/scripts/harness-run.ts",
 );
 const POLICY =
-	"Use Herdr for command execution only when it is long-running, needs live human observation, or supports human collaboration (server/debugger/REPL). Short reads, transforms, builds and tests stay on native tools. herdr_run detach:true starts a retained interactive terminal; inspect readiness explicitly and use herdr_agent read/send/wait to control it. Use herdr_agent for independently visible, reusable OMP/AGY agents with explicit briefs. Built-in task agents remain accessible through Alt+A Agent Hub; they cannot be moved into Herdr.";
+	"Use Herdr for command execution only when it is long-running, needs live human observation, or supports human collaboration (server/debugger/REPL). Short reads, transforms, builds and tests stay on native tools. herdr_run detach:true starts a retained interactive terminal (name required); inspect readiness explicitly and use herdr_agent read/send/wait to control it. Finite runs close their tab automatically after results are captured. Use herdr_agent for independently visible, reusable OMP/AGY agents with explicit briefs. Built-in task agents remain accessible through Alt+A Agent Hub; they cannot be moved into Herdr.";
 
 async function run(args: string[], signal?: AbortSignal) {
 	if (process.env.HERDR_ENV !== "1")
@@ -118,7 +118,7 @@ export default function herdrExtension(pi: ExtensionAPI) {
 		label: "Herdr 실행",
 		approval: "exec",
 		description:
-			"Run argv in a retained, no-focus Herdr tab with the current cwd. Use only for long runs, human observation/collaboration, or an explicit visibility request. Short commands stay on native tools. detach:true returns a running handle for a server/REPL, not readiness; false waits for the real exit artifact. Logs remain on disk.",
+			"Run argv in a no-focus Herdr tab with the current cwd. Use only for long runs, human observation/collaboration, or an explicit visibility request. Short commands stay on native tools. detach:true requires name and returns a running handle for a server/REPL, not readiness; false waits for the real exit artifact and closes the owned tab. Logs remain on disk.",
 		parameters: z.object({
 			command: z.array(z.string()).min(1),
 			name: z.string().optional(),

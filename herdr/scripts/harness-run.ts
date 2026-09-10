@@ -40,6 +40,8 @@ type RecordState = {
 	marker?: string;
 	unattended?: boolean;
 	launchError?: string;
+	detached?: boolean;
+	ownTab?: boolean;
 };
 function object(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value))
@@ -269,7 +271,11 @@ async function pane(
 				).root_pane,
 			);
 	await herdr(["pane", "rename", text(created.pane_id), name]);
-	return { paneId: text(created.pane_id), tabId: text(created.tab_id) };
+	return {
+		paneId: text(created.pane_id),
+		tabId: text(created.tab_id),
+		ownTab: !direction,
+	};
 }
 async function launchCommand(record: RecordState, argv: string[]) {
 	record.runDir = join(stateRoot, record.name, randomUUID());
@@ -279,9 +285,12 @@ async function launchCommand(record: RecordState, argv: string[]) {
 	const done = join(record.runDir, "exit.json");
 	const script = join(record.runDir, "launch.sh");
 	// script(1) supplies a real PTY, so humans can operate debuggers/REPLs while output is logged.
+	const pagerEnvironment = record.detached
+		? ""
+		: "export PAGER=cat GIT_PAGER=cat\n";
 	await writeFile(
 		script,
-		`#!/usr/bin/env bash\numask 077\ncd -- ${shellQuote(record.cwd)} || exit 125\nscript -q -e -f -c ${shellQuote(`exec ${argv.map(shellQuote).join(" ")}`)} ${shellQuote(log)}\nstatus=$?\nprintf '{"exitCode":%d}\\n' "$status" > ${shellQuote(`${done}.tmp`)}\nmv -- ${shellQuote(`${done}.tmp`)} ${shellQuote(done)}\nprintf '\\n${record.marker}:%s\\n' "$status"\n`,
+		`#!/usr/bin/env bash\numask 077\ncd -- ${shellQuote(record.cwd)} || exit 125\n${pagerEnvironment}script -q -e -f -c ${shellQuote(`exec ${argv.map(shellQuote).join(" ")}`)} ${shellQuote(log)}\nstatus=$?\nprintf '{"exitCode":%d}\\n' "$status" > ${shellQuote(`${done}.tmp`)}\nmv -- ${shellQuote(`${done}.tmp`)} ${shellQuote(done)}\nprintf '\\n${record.marker}:%s\\n' "$status"\n`,
 		{ mode: 0o700 },
 	);
 	await save(record);
@@ -344,16 +353,144 @@ async function waitCommand(record: RecordState, timeout: number) {
 			: {}),
 	};
 }
+
+async function finishCommand(record: RecordState, timeout: number) {
+	const result = await waitCommand(record, timeout);
+	if (record.kind !== "command" || record.detached !== false) return result;
+	const currentPane = object(
+		(await herdr(["pane", "get", record.paneId])).pane,
+	);
+	if (
+		currentPane.pane_id !== record.paneId ||
+		currentPane.tab_id !== record.tabId
+	)
+		throw new Error(
+			`${record.name}'s pane ownership changed; preserving the completed pane`,
+		);
+	if (record.ownTab) {
+		const currentTab = object(
+			(await herdr(["tab", "get", record.tabId])).tab,
+		);
+		if (currentTab.tab_id !== record.tabId || currentTab.pane_count !== 1)
+			throw new Error(
+				`${record.name}'s tab is shared; preserving the completed pane`,
+			);
+		await herdr(["tab", "close", record.tabId]);
+	} else await herdr(["pane", "close", record.paneId]);
+	return { ...result, closed: true };
+}
+
+async function pruneCommands(options: {
+	workspace?: string;
+	"dry-run"?: boolean;
+	apply?: boolean;
+}) {
+	if (options["dry-run"] && options.apply)
+		throw new Error("Cannot specify both --dry-run and --apply");
+	let currentWs = process.env.HERDR_WORKSPACE_ID;
+	let currentTabId = process.env.HERDR_TAB_ID;
+	const anchor = process.env.HERDR_PANE_ID;
+	if (anchor) {
+		try {
+			const p = object((await herdr(["pane", "get", anchor])).pane);
+			currentWs = p.workspace_id ? text(p.workspace_id) : currentWs;
+			currentTabId = p.tab_id ? text(p.tab_id) : currentTabId;
+		} catch {
+			// ignore probe errors
+		}
+	}
+	const targetWs =
+		!options.workspace || options.workspace === "current"
+			? currentWs
+			: options.workspace;
+
+	if (!targetWs)
+		throw new Error("Unable to determine target workspace for prune");
+
+	await mkdir(stateRoot, { recursive: true, mode: 0o700 });
+	const files = await readdir(stateRoot);
+	const names = files
+		.filter((f) => f.endsWith(".json") && f !== "sessions.json")
+		.map((f) => f.slice(0, -5))
+		.filter((name) => AGENT_NAME_RE.test(name));
+
+	const candidates: Array<{
+		name: string;
+		tabId: string;
+		paneId: string;
+		exitCode: number;
+	}> = [];
+	const seenTabs = new Set<string>();
+
+	for (const name of names) {
+		const record = await load(name);
+		if (!record || record.kind !== "command") continue;
+		const code = await exitState(record);
+		if (code === undefined) continue;
+		if (currentTabId && record.tabId === currentTabId) continue;
+		if (seenTabs.has(record.tabId)) continue;
+
+		let tabObj: Record<string, unknown>;
+		try {
+			tabObj = object((await herdr(["tab", "get", record.tabId])).tab);
+		} catch {
+			continue;
+		}
+
+		if (tabObj.workspace_id !== targetWs) continue;
+		if (tabObj.pane_count !== 1) continue;
+
+		let paneObj: Record<string, unknown>;
+		try {
+			paneObj = object((await herdr(["pane", "get", record.paneId])).pane);
+		} catch {
+			continue;
+		}
+
+		if (
+			paneObj.pane_id !== record.paneId ||
+			paneObj.tab_id !== record.tabId
+		)
+			continue;
+
+		seenTabs.add(record.tabId);
+		candidates.push({
+			name: record.name,
+			tabId: record.tabId,
+			paneId: record.paneId,
+			exitCode: code,
+		});
+	}
+
+	const apply = Boolean(options.apply);
+	if (apply) {
+		for (const cand of candidates) {
+			await herdr(["tab", "close", cand.tabId]);
+		}
+	}
+
+	return {
+		ok: true,
+		action: "prune",
+		workspace: targetWs,
+		dryRun: !apply,
+		count: candidates.length,
+		pruned: candidates,
+	};
+}
+
 const HELP = `harness-run command [--name NAME] [--cwd PATH] [--pane ANCHOR] [--direction right|down] [--detach] [--timeout MS] -- PROGRAM ARG...
 harness-run agent --profile PURPOSE --name NAME [--prompt TEXT] [--unattended] [--resume] [--wait] [--timeout MS] [--cwd PATH]
 harness-run list
+harness-run prune [--workspace current|ID] [--dry-run] [--apply]
 harness-run read NAME [--lines N]
 harness-run wait NAME [--timeout MS]
 harness-run send NAME TEXT [--wait] [--timeout MS]
 
-Default placement: a retained tab, --no-focus, same cwd. --direction explicitly requests a split.
-Use command --detach for servers/REPLs: returns a running handle, NOT proof of readiness.
-read/send/wait remain available during execution. --timeout bounds waiting, not the visible process.
+Default placement: a no-focus tab in the same cwd; finite command tabs close after their result is captured.
+Use command --detach --name NAME for retained servers/REPLs; it returns a running handle, NOT readiness.
+Prune finished single-pane command tabs: --dry-run (default) previews candidates; --apply closes them.
+read/send/wait remain available during retained execution. --timeout bounds waiting, not the visible process.
 AGY unattended requires a prompt and verifies process exit + JSON SUCCESS. Interactive AGY has no reliable --wait.
 Only use visible command execution for long runs, human observation/collaboration, or an explicit visibility request.
 Short commands (including short builds/tests) stay on native tools. HERDR_ENV=1 is required except for --help.
@@ -385,6 +522,9 @@ export async function main(args: string[]) {
 			wait: { type: "boolean" },
 			unattended: { type: "boolean" },
 			resume: { type: "boolean" },
+			workspace: { type: "string" },
+			"dry-run": { type: "boolean" },
+			apply: { type: "boolean" },
 		},
 	});
 	const timeout =
@@ -394,6 +534,8 @@ export async function main(args: string[]) {
 	if (values.direction && !["right", "down"].includes(values.direction))
 		throw new Error("--direction must be right or down");
 	let result: Record<string, unknown>;
+	if (action === "command" && values.detach && !values.name)
+		throw new Error("Detached commands require an explicit --name");
 	if (action === "command" || action === "agent") {
 		const name =
 			values.name ??
@@ -502,6 +644,7 @@ export async function main(args: string[]) {
 				profile: values.profile,
 				runner,
 				unattended: values.unattended,
+				detached: action === "command" ? Boolean(values.detach) : undefined,
 				launchError: undefined,
 			};
 			if (action === "command") await launchCommand(rec, native);
@@ -537,7 +680,10 @@ export async function main(args: string[]) {
 		if (action === "command" || values.unattended)
 			result = values.detach
 				? { ok: true, status: "running", ...record, exitCode: null }
-				: await waitCommand(record, timeout + (values.unattended ? 15000 : 0));
+				: await finishCommand(
+						record,
+						timeout + (values.unattended ? 15000 : 0),
+					);
 		else {
 			if (values.prompt)
 				await herdr([
@@ -578,6 +724,12 @@ export async function main(args: string[]) {
 				}),
 			),
 		};
+	} else if (action === "prune") {
+		result = await pruneCommands({
+			workspace: values.workspace,
+			"dry-run": values["dry-run"],
+			apply: values.apply,
+		});
 	} else {
 		const record = await required(positionals[0]);
 		if (action === "read") {
@@ -605,7 +757,7 @@ export async function main(args: string[]) {
 			};
 		} else if (action === "wait") {
 			if (record.kind === "command" || record.unattended)
-				result = await waitCommand(record, timeout);
+				result = await finishCommand(record, timeout);
 			else {
 				if (record.runner !== "omp")
 					throw new Error("Interactive AGY wait is unreliable");

@@ -70,7 +70,7 @@ omp-profile show code
 harness-run --help
 ```
 
-오래 걸리거나 사람이 관찰·조작할 필요가 있는 실행에 Herdr를 사용합니다. 짧은 조회·빌드·테스트는 평소 도구로 실행합니다. 개발 서버 명령이 있는 프로젝트에서는 다음처럼 사용할 수 있습니다.
+오래 걸리거나 사람이 관찰·조작할 필요가 있는 실행에 Herdr를 사용합니다. 짧은 조회·빌드·테스트는 평소 도구로 실행합니다. 유한 명령(finite command)은 exit artifact와 로그를 확보한 뒤 자신이 생성한 탭이나 페인의 소유권을 확인하고 자동으로 닫으며, `PAGER=cat` 환경변수를 설정하여 페이저 정지를 방지합니다. 백그라운드 명령(`--detach`)은 명시적인 `--name`이 필수이며 탭이 닫히지 않고 유지됩니다. 완료된 단일-pane 명령 탭은 `harness-run prune --workspace current --dry-run` 또는 `--apply` 명령으로 안전하게 정리할 수 있습니다. 개발 서버 명령이 있는 프로젝트에서는 다음처럼 사용할 수 있습니다.
 
 ```bash
 harness-run command --name dev --detach -- bun run dev
