@@ -1,10 +1,10 @@
 # 하네스 통합 레포의 확인된 사실
 
-이 문서는 공개 가능한 기술 관측과 그 한계를 기록합니다. 현재 유지하는 환경은 Linux/WSL2, OMP 18.1.13/18.1.14, Bun 1.3.14입니다. 날짜가 있는 관측은 다른 버전이나 호스트의 성능 보장이 아닙니다.
+이 문서는 공개 가능한 기술 관측과 그 한계를 기록합니다. 날짜가 있는 관측은 다른 버전이나 호스트의 성능 보장이 아닙니다. 2026-09-10부터 accounts·native-compaction 확장과 전용 런타임 패치를 제거하고 OMP 내장 기능을 사용합니다. 이전 버전의 코드·패치·테스트 경로는 이력이며 현재 설치 지침이 아닙니다.
 
 ## 1. 도구 가용성
 
-- 설치기와 런타임 패치는 `@oh-my-pi/pi-coding-agent` 18.1.13 또는 18.1.14를 요구합니다. 다른 버전이나 예상과 다른 source layout은 거부합니다.
+- 현재 설치기는 OMP CLI와 SDK를 패치하지 않습니다. 계정 선택은 내장 `/session pin`, 압축은 관리 설정과 내장 `/compact`를 사용합니다. 현재 설치·설정의 정본은 [설치 안내](guides/installation.md)입니다.
 - Bun 1.3.14가 설치기, TypeScript extension, `omp-profile`, `harness-run`, cost audit, host-sync의 기준 환경입니다.
 - Python 3 표준 라이브러리의 `sqlite3`와 `json`은 benchmark와 collector에 사용됩니다. `sqlite3`나 `jq` CLI가 모든 Herdr/cron 환경에 있다고 가정하지 않습니다.
 - 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL에서 Windows Chrome을 연결하는 기능은 전체 Windows 설치 지원과 별개입니다.
@@ -64,7 +64,7 @@ Benchmark는 session usage를 사후 집계하므로 후보 실행에 session을
 - 역할 selector의 effort suffix는 agent frontmatter의 `thinking-level`보다 우선합니다.
 - `task.agentModelOverrides`의 role alias는 OMP의 model role로 해석됩니다.
 - `modelRoles.default`는 session이 현재 model을 바꿀 때 갱신할 수 있으므로 declarative drift 비교에서 예외로 둡니다.
-- 같은 provider의 OAuth account pinning이 먼저 작동하고, provider/model fallback은 그 다음 경계입니다. `/account`는 엄격한 billing lock이 아닙니다.
+- 계정 선택은 OMP 내장 `/session pin`으로 수행합니다. 제거한 `/account`의 공용 선택 동기화는 제공하지 않으며, 내장 pin을 엄격한 과금 잠금으로 간주하지 않습니다.
 - `/effort high`는 현재 session과 현재 model의 override입니다. `--profile`을 명시한 effort 명령과 `omp-profile effort set`만 공유 profile state를 수정합니다.
 - Candidate profile을 config에 적는 일은 benchmark 실행이나 최적성의 증거가 아닙니다. 실제 task, repetitions, failures, cost semantics를 함께 봅니다.
 
@@ -140,7 +140,7 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 
 ### 네이티브 compaction 구현·검증
 
-이 절은 이전 native 생성 구현의 관측입니다. 현재 일반 세션은 OMP 내장 압축을 사용하며, 확장은 이미 저장된 native 상태의 재생·portable 이전만 담당합니다. 현재 동작과 적용 조건은 [사용법](guides/usage.md#자동-압축과-기존-native-상태-이전)이 정본입니다. 아래 생성·과금 테스트 설명은 현재 테스트 목록이 아닙니다.
+이 절은 제거된 native 구현의 과거 관측입니다. 현재는 OMP 내장 압축만 사용하며, 기존 `harnessNativeCompaction` 상태의 replay·portable 이전도 제공하지 않습니다. 데이터 이전 없이 해당 legacy 상태에 의존하는 세션의 재개를 보장하지 않습니다. 현재 동작은 [사용법](guides/usage.md#내장-자동-압축)이 정본이며, 아래 생성·과금 테스트 설명은 현재 테스트 목록이 아닙니다.
 
 `omp/extensions/native-compaction`은 OMP 18.1.13의 compaction hook과 final request transform을 사용합니다. Opaque state는 session의 `preserveData.harnessNativeCompaction`에 chunk와 integrity hash로 보존하여 serialization truncation을 피합니다. `/clear` 이후에는 이전 state를 재사용하지 않습니다.
 
@@ -150,11 +150,11 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 - Usage for compaction iteration is stored separately in compaction details. Existing `omp stats` message total에 자동으로 합산된다고 주장하지 않습니다.
 - Regression tests cover full-window preservation, tool-call/result pairs, provider errors, cancellation, chunk integrity, session replay, usage accounting, and existing profile/account behavior.
 
-설치된 OMP process는 extension과 runtime patch를 읽도록 재시작해야 합니다. Upgrade 뒤에는 patch와 regression boundary를 다시 확인하며, 다른 OMP version에 자동 적용하지 않습니다.
+당시 설치된 OMP process는 extension과 runtime patch를 읽도록 재시작해야 했으며, 다른 OMP version에는 패치를 자동 적용하지 않았습니다. 이 패치는 현재 배포에서 제거되었습니다.
 
 ## 9. 내장 압축과 플러그인 핀 갱신 (2026-09-08)
 
-일반 세션은 OMP 내장 압축을 사용하고, 기존 Harness-native 상태만 portable 이전 경로로 처리하도록 변경했습니다. 현재 동작은 [사용법](guides/usage.md#자동-압축과-기존-native-상태-이전)에 설명합니다. `bun test omp/native-runtime.test.ts omp/extensions/native-compaction omp/extensions/accounts omp/extensions/profiles`는 38개 테스트와 134개 assertions를 통과했습니다. 설치된 OMP 18.1.14의 compiled CLI 계정 경로를 합성 OAuth·loopback 서버로 확인했으며, 유료 공급자 API의 가용성을 검증한 결과는 아닙니다.
+2026-09-08에는 일반 세션을 OMP 내장 압축으로 처리하고, 기존 Harness-native 상태만 portable 이전 경로로 처리하도록 변경했습니다. 이후 두 확장이 제거되었으며 현재 동작은 [사용법](guides/usage.md#내장-자동-압축)을 따릅니다. 당시 `bun test omp/native-runtime.test.ts omp/extensions/native-compaction omp/extensions/accounts omp/extensions/profiles`는 38개 테스트와 134개 assertions를 통과했습니다. OMP 18.1.14의 compiled CLI 계정 경로를 합성 OAuth·loopback 서버로 확인했으며, 유료 공급자 API의 가용성을 검증한 결과는 아닙니다.
 
 별도 합성 SDK 실행에서는 shake 산출물 저장 실패 시 원본 branch가 유지되었고, 정상 저장 후 원문 artifact 조회와 디스크 재개 후 복구 참조 보존을 확인했습니다. 합성 입력의 토큰 추정치는 실제 비용·속도 개선이나 장기 요약 품질을 입증하지 않습니다. 이번 통합에서는 설치·재시작·플러그인 업데이트를 실행하지 않았습니다.
 

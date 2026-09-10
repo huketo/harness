@@ -1,7 +1,6 @@
 import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { Model } from "@oh-my-pi/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { PORTABLE_INSTRUCTIONS, STATE_KEY } from "../native-compaction/state";
 import {
 	loadProfiles,
 	loadState,
@@ -85,11 +84,6 @@ export default function profilesExtension(pi: ExtensionAPI) {
 			);
 		return boundary?.type === "compaction" ? boundary : undefined;
 	};
-	const hasNativeState = (ctx: ExtensionContext) =>
-		Boolean(
-			latestCompaction(ctx)?.preserveData?.openaiRemoteCompaction ||
-				latestCompaction(ctx)?.preserveData?.[STATE_KEY],
-		);
 	const notifyError = (ctx: ExtensionContext, error: unknown) =>
 		ctx.ui.notify(
 			error instanceof Error ? error.message : String(error),
@@ -97,7 +91,7 @@ export default function profilesExtension(pi: ExtensionAPI) {
 		);
 
 	// Only called at idle input/command boundaries: compact() aborts a running turn.
-	// Native state is converted explicitly before crossing a provider boundary.
+	// Built-in remote state is converted explicitly before crossing a provider boundary.
 	async function prepareContext(
 		ctx: ExtensionContext,
 		target: Model,
@@ -105,7 +99,9 @@ export default function profilesExtension(pi: ExtensionAPI) {
 	) {
 		const usage = ctx.getContextUsage();
 		if (!usage) return;
-		const needsPortable = portable && hasNativeState(ctx);
+		const needsPortable =
+			portable &&
+			Boolean(latestCompaction(ctx)?.preserveData?.openaiRemoteCompaction);
 		if (!needsPortable && usage.tokens <= budget(target)) return;
 		const branch = ctx.sessionManager.getBranch();
 		if (!branch.some((entry) => entry.type === "message")) return;
@@ -117,15 +113,11 @@ export default function profilesExtension(pi: ExtensionAPI) {
 			`컨텍스트 정리: ${usage.tokens} 토큰 → ${target.id}의 안전 기준 ${budget(target)} 토큰`,
 			"info",
 		);
-		await ctx.compact(
-			portable && latestCompaction(ctx)?.preserveData?.[STATE_KEY]
-				? `${PORTABLE_INSTRUCTIONS}${PRESERVE}`
-				: {
-						internalGuidance: PRESERVE,
-						...(portable ? { mode: "soft" as const } : {}),
-					},
-		);
-		if (portable && hasNativeState(ctx))
+		await ctx.compact({
+			internalGuidance: PRESERVE,
+			...(portable ? { mode: "soft" as const } : {}),
+		});
+		if (portable && latestCompaction(ctx)?.preserveData?.openaiRemoteCompaction)
 			throw new Error(
 				"읽을 수 있는 인계문 생성에 실패하여 모델 전환을 중단했습니다. 현재 세션은 유지됩니다.",
 			);

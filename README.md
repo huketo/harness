@@ -4,7 +4,7 @@
 
 **A version-controlled personal workstation setup for coding agents: shared skills, model profiles, visible execution, and task-based evaluation.**
 
-Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), [Herdr](https://github.com/herdrdev/herdr), and Antigravity CLI (`agy`) environment. It is a personal configuration and extension showcase—not a standalone agent, a hosted service, or a replacement for those tools.
+Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), [Herdr](https://github.com/herdrdev/herdr), and Antigravity CLI (`agy`) environment. Its OMP layer installs only the `profiles` and `herdr` extensions. Harness is a personal configuration and extension showcase, not a standalone agent, a hosted service, or a replacement for those tools.
 
 [Installation](docs/guides/installation.md) · [Documentation](docs/index.md) · [Usage](docs/guides/usage.md) · [Benchmarks](bench/README.md) · [Reuse policy](CONTRIBUTING.md) · [MIT License](LICENSE)
 
@@ -14,15 +14,15 @@ Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OM
 | --- | --- |
 | Shared skills | Repository-owned instructions linked into OMP, Claude Code, and AGY, with retained notices for adopted material. |
 | Model profiles | Purpose-based model and effort selection through `/profile` and `omp-profile`; `/effort` can remain local to one session. |
-| OAuth account selection | `/account` chooses among OMP's existing accounts, with optional shared selection. Tokens are not copied into this repository. |
-| Context compaction | OMP built-in compaction by default, portable migration of legacy native state, and an OMP 18.1.13/18.1.14 compatibility patch. |
+| Session account pinning | OMP's built-in `/session pin` provides manual, per-session account selection. Harness does not synchronize an account choice across sessions. |
+| Context compaction | OMP's built-in compaction, managed through six policy keys, without a custom OMP build or runtime patch. |
 | Visible execution | `harness-run` launches and revisits commands or independent agents in Herdr without moving existing task subagents. |
 | Task-based evaluation | Replayable fixtures, protected grading material, cost accounting, and routing proposals—not a universal model leaderboard. |
 | Personal operations | Cost audits, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
 
 ## Recommended environment
 
-The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, OMP 18.1.13 or 18.1.14, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows, macOS, other OMP releases, and other Bun releases are not maintained compatibility targets.
+The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, a stock OMP installation available as `omp`, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows and macOS are not maintained installation targets. Future OMP or Bun releases must be reviewed rather than assumed compatible.
 
 ```bash
 git clone https://github.com/huketo/harness.git
@@ -34,11 +34,10 @@ Review the [installation guide](docs/guides/installation.md), the source, and th
 
 ```bash
 bash install.sh
-bun omp/native-runtime.ts --check
 bash omp/config.apply.sh --check
 ```
 
-**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, and patches installed OMP CLI and SDK sources for account routing, recoverable shake, and legacy compaction migration. It rejects unsupported OMP versions, but may have created links before a later step fails. Dry-run does not prove patch compatibility. Restart OMP after installation.
+**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, and retires old `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout. A foreign or unexpected entry remains a conflict and is not removed; dry-run reports the plan without mutating it. The installer leaves authentication, saved preferences, session transcripts, and backups unchanged. Legacy Harness native-compaction replay and portable migration are no longer available, so a preserved legacy session is not guaranteed to resume. Restart every OMP process that was already loaded after installation.
 
 The settings check does not apply changes; exit `1` reports differences. To opt into the repository's personal OMP defaults after inspecting them:
 
@@ -46,23 +45,22 @@ The settings check does not apply changes; exit `1` reports differences. To opt 
 bash install.sh --with-config
 ```
 
-This includes model routing, fallback behavior, skill discovery, and Auto QA consent. It is not required merely to link extensions. AGY settings and cron jobs are not restored by the installer.
+This includes model routing, fallback behavior, skill discovery, the built-in compaction policy, and Auto QA consent. It is not required merely to link extensions. AGY settings and cron jobs are not restored by the installer.
 
 ## Everyday use
 
 Inside OMP:
 
 ```text
-/account list
+/session pin
 /profile code
 /effort high
 /compact
-/native-compact portable  # legacy native state only
 ```
 
-- `/account` uses OMP's existing OAuth session pinning and requires the installed runtime compatibility patch. Restart OMP after installation. Provider fallback can still select another account; this is not a strict billing lock.
-- `/effort high` changes the current session and model. Adding `--profile` explicitly changes shared profile state.
-- Ordinary sessions use OMP's built-in compaction. `/native-compact portable` migrates existing Harness-native state; migration and built-in summarization can call paid provider APIs. See the [compaction workflow](docs/guides/usage.md#자동-압축과-기존-native-상태-이전).
+- `/session pin` is OMP's built-in manual account selector. Its choice applies only to the current session; Harness provides no shared account synchronization.
+- `/effort high` changes the current session and model. Adding `--profile` explicitly changes shared model-profile state.
+- `/compact` uses stock OMP compaction. The managed policy sets `enabled: true`, `methodOrder: remote → handoff → soft`, `keepRecentTokens: 40000`, `thresholdPercent: 75`, `thresholdTokens: -1`, and `handoffSaveToDisk: true`. See the [built-in compaction workflow](docs/guides/usage.md#내장-자동-압축).
 
 From a terminal, with `~/.local/bin` on `PATH`:
 
@@ -103,7 +101,7 @@ Actual runs require authenticated model access and can incur charges. Results an
 
 | Path | Purpose |
 | --- | --- |
-| [`omp/`](omp/) | Extensions, model profiles, runtime compatibility, and declarative settings. |
+| [`omp/`](omp/) | The `profiles` and `herdr` extensions, model profiles, prompts, and declarative settings. |
 | [`herdr/`](herdr/) | Terminal integration, helper commands, plugin pins, cost audit, and guarded host sync. |
 | [`skills/`](skills/) | Personal skills and adopted skills with retained notices. |
 | [`agy/`](agy/) | AGY plugin and an example settings snapshot. |

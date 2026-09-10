@@ -9,7 +9,6 @@ For behavior changes, test edits, flaky failures, or fixture/runner changes, use
 Bun tests import `bun:test` and live beside the mechanism they exercise. Pass the changed test file or owning directory explicitly, for example:
 
 ```bash
-bun test omp/native-runtime.test.ts
 bun test omp/extensions/profiles/profiles.test.ts
 bun test omp/extensions/herdr/herdr.test.ts
 bun test herdr/scripts/harness-run.test.ts
@@ -21,7 +20,7 @@ The host-sync test uses temporary local Git repositories and is the focused boun
 Use the aggregate Bun boundary only when a change crosses those components:
 
 ```bash
-bun test omp/extensions omp/native-runtime.test.ts herdr/scripts/harness-run.test.ts
+bun test omp/extensions/profiles omp/extensions/herdr herdr/scripts/harness-run.test.ts
 ```
 
 ## Python
@@ -58,10 +57,9 @@ These source-defined checks inspect the current machine and are appropriate only
 ```bash
 bash install.sh --dry-run
 bash omp/config.apply.sh --check
-bun omp/native-runtime.ts --check
 ```
 
-`install.sh --dry-run` reports planned links, backups, conflicts, and the runtime patch without applying them. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. `native-runtime.ts --check` requires OMP 18.1.13 or 18.1.14 and verifies its compatibility patch. None replaces a focused unit or integration test of changed source.
+`install.sh --dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without applying them. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. Neither replaces a focused unit or integration test of changed source.
 
 The mutating forms of installation and configuration commands are governed by [`authority.md`](authority.md) and are not routine verification.
 

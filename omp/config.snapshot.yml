@@ -25,9 +25,9 @@ statusLine:
   compactThinkingLevel: false
   preset: full
 compaction:
+  enabled: true
   keepRecentTokens: 40000
   methodOrder:
-    - shake
     - remote
     - handoff
     - soft

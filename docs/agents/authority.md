@@ -38,7 +38,7 @@ The root MIT license and no-contributions policy are settled repository policy, 
 
 ## Host and external boundaries
 
-`bash install.sh` changes links and applies an OMP 18.1.13/18.1.14 runtime patch; `--with-config` additionally applies managed OMP settings. `omp/config.apply.sh` without `--check` changes live configuration. Run mutating forms only under explicit host-change authority. The documented `--dry-run` and `--check` forms inspect machine state and therefore still require the task to permit host inspection.
+`bash install.sh` changes links and removes retired `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout; `--with-config` additionally applies managed OMP settings. Foreign or unexpected entries remain conflicts and are preserved. `omp/config.apply.sh` without `--check` changes live configuration. Run mutating forms only under explicit host-change authority. The documented `--dry-run` and `--check` forms inspect machine state without changing it and therefore still require the task to permit host inspection.
 
 Benchmark runs can invoke paid providers. Daily-report collectors can authenticate to GitLab and read private calendar feeds; the final Daou Office entry and submission are human UI actions. Cron commands can alter unattended behavior. Treat each boundary according to its effects rather than inferring safety from a command name or dry run.
 

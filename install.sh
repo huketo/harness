@@ -146,6 +146,26 @@ link_dir() {
   fi
 }
 
+retire_link() {
+  local src="$1"
+  local target="$2"
+
+  if same_link "$target" "$src"; then
+    if $DRY_RUN; then
+      echo "would remove retired asset link: $target"
+    else
+      rm -- "$target"
+      echo "removed retired asset link: $target"
+    fi
+    return
+  fi
+
+  if [[ -e "$target" || -L "$target" ]]; then
+    echo "skipped retired asset: $target is not this repo's managed link" >&2
+    conflicts+=("$target")
+  fi
+}
+
 # Two Antigravity customization slots point at assets this repo does not own:
 # the shared skill tree and the user's Claude Code instructions. Linking the
 # canonical file keeps one source of truth instead of a second copy that drifts.
@@ -288,17 +308,14 @@ migrate_file "$REPO/herdr/scripts/usagebar-toggle.sh" "$HOME/.config/herdr/scrip
 migrate_file "$REPO/herdr/scripts/usagebar-sync-fork.sh" "$HOME/.config/herdr/scripts/usagebar-sync-fork.sh"
 migrate_file "$REPO/herdr/plugins/usagebar.config.toml" "$HOME/.config/herdr/plugins/config/usagebar/config.toml"
 
-# OMP caps ordinary extension observers at 30s; native compaction needs its API deadline.
-if $DRY_RUN; then
-  echo "would apply OMP account routing and native compaction runtime compatibility patches"
-else
-  bun "$REPO/omp/native-runtime.ts"
-fi
-
 # Repository-owned OMP extensions coexist with Herdr's managed integration.
-for extension in accounts profiles herdr native-compaction; do
+for extension in profiles herdr; do
   link_dir "$REPO/omp/extensions/$extension" "$HOME/.omp/agent/extensions/harness-$extension"
 done
+for extension in accounts native-compaction; do
+  retire_link "$REPO/omp/extensions/$extension" "$HOME/.omp/agent/extensions/harness-$extension"
+done
+echo "warning: account routing and native-compaction extensions are retired. Existing authentication, preferences, sessions, and backups are unchanged; legacy native-compaction replay and portable migration are no longer available. Restart running OMP processes." >&2
 migrate_file "$REPO/omp/profiles.ts" "$HOME/.local/bin/omp-profile"
 migrate_file "$REPO/herdr/scripts/harness-run.ts" "$HOME/.local/bin/harness-run"
 # `~/.config/herdr-cron/jobs.yaml` is deliberately absent. `herdr-cron job add`

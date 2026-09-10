@@ -115,7 +115,9 @@
 
 ## 4. OMP 비용 손잡이
 
-| 키 | 현재 값 | 하는 일 | 비용에 닿는 경로 | 근거 |
+이 절의 설정과 비용 설명은 2026-09-05 조사 시점의 기록입니다. 현재 권장값은 [사용법](guides/usage.md#내장-자동-압축)과 `omp/config.apply.sh`가 정하며, 이 표를 설정 복원 템플릿으로 사용하지 않습니다.
+
+| 키 | 2026-09-05 관측값 | 하는 일 | 비용에 닿는 경로 | 근거 |
 | --- | --- | --- | --- | --- |
 | `providers.cacheRetention` | `auto` | 프롬프트 캐시 보존을 공급자에 전달. `auto`=공급자 기본(Anthropic 5분 + 유휴 keep-alive 갱신)이며 `PI_CACHE_RETENTION` 존중, `short`=5분 고정, `long`=지원 모델에 1시간 TTL·keep-alive 갱신 해제, `none`=캐싱과 캐시 친화 라우팅 해제 | `long`은 쓰기 배수를 1.25배→2배로 올리고 유휴 5~60분 복귀의 재구축만 구제. `none`은 모든 입력을 정가로 되돌림 | `omp://settings.md` L754, `omp://provider-quirks.md` L159 (`applyPromptCaching`이 마지막 두 턴에 `cache_control` 부착, `ttl:"1h"`는 long에서만) |
 | `provider.appendOnlyContext` | `auto` | 컨텍스트를 추가 전용으로 유지하는 모드 스위치(`auto`/`on`/`off`) | 프리픽스를 덮어쓰지 않으면 KV/프롬프트 캐시 적중이 유지되어 캐시 쓰기가 줄어듦 [추정] | `omp://settings.md` L755(값만 열거), `omp://provider-quirks.md` L1035 (`config/append-only-context-mode.ts`, 로컬 추론 공급자에서 `<think>` 보존으로 KV 캐시 적중) |

@@ -9,7 +9,7 @@ Harness configures an existing coding-agent workstation. It does not install OMP
 | Component | Maintained showcase target |
 | --- | --- |
 | Operating environment | Linux or WSL2 with Bash 4+ and GNU-compatible utilities (`readlink -f`, `cmp`, `cp`, `ln`). Native Windows and macOS installation are not maintained targets. |
-| OMP | `@oh-my-pi/pi-coding-agent` **18.1.13 or 18.1.14**, available as `omp` on `PATH`. The runtime patch rejects other versions or unexpected source layouts. |
+| OMP | A stock `@oh-my-pi/pi-coding-agent` installation available as `omp` on `PATH`. Harness does not require a custom OMP build or runtime patch. Review future OMP releases before adopting them; this guide does not promise blanket compatibility. |
 | Bun | **1.3.14**. The installer, extensions, and helper CLIs use Bun; other releases are not maintained compatibility targets. |
 | Python 3 | Required for `omp/config.apply.sh`, benchmarks, and selected skill collectors. |
 | Existing personal instructions | `~/.claude/CLAUDE.md` must already be a file you maintain. The installer links it into AGY's global rules. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
@@ -26,9 +26,9 @@ bash install.sh --help
 bash install.sh --dry-run
 ```
 
-Read [install.sh](../../install.sh), [native-runtime.ts](../../omp/native-runtime.ts), and [config.apply.sh](../../omp/config.apply.sh) before running mutating commands. Inspect the Herdr configuration and AGY plugin rules as part of the proposed links. `--dry-run` shows the plan but does **not** prove that the installed OMP source is patch-compatible. A missing personal instruction file or ownership conflict can make the plan exit nonzero.
+Read [install.sh](../../install.sh) and [config.apply.sh](../../omp/config.apply.sh) before running mutating commands. Inspect the Herdr configuration and AGY plugin rules as part of the proposed links. `--dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without changing them. A missing personal instruction file or ownership conflict can make the plan exit nonzero.
 
-The installer is not transactional. It can create links before discovering a later conflict or incompatible OMP installation. Resolve each reported path or version issue deliberately; a failed run does not imply that nothing changed.
+The installer is not transactional. It can create links before discovering a later conflict. Resolve each reported path issue deliberately; a failed run does not imply that nothing changed.
 
 ## Install and verify
 
@@ -36,11 +36,10 @@ After reviewing and accepting the workstation changes:
 
 ```bash
 bash install.sh
-bun omp/native-runtime.ts --check
 bash omp/config.apply.sh --check
 ```
 
-Restart running OMP processes after installation. Reloading extensions alone does not reload the patched CLI runtime.
+Restart every OMP process that was already loaded after installation. A running process can retain extensions or settings loaded before the update.
 
 The settings check is read-only: exit `1` means managed values differ, not necessarily an installation failure. Keep your settings, or inspect the differences and explicitly apply the repository's personal policy:
 
@@ -51,7 +50,7 @@ bash omp/config.apply.sh --check
 
 `--with-config` changes managed OMP settings, including model roles, fallback policy, skill discovery, compaction policy, and `dev.autoqaConsent`. It is not required merely to link extensions. Provider credentials and model access remain with their owning tools. The model choices are personal defaults, not universally available or benchmark-proven optima.
 
-Managed compaction uses `shake → remote → handoff → soft` with the existing 75% threshold and 40,000 recent-token setting. Configuration application checks the installed runtime patch before writing any setting; `--check` only reports settings drift. Save active work and stop existing OMP processes before applying the new policy, then restart them. See [compaction behavior and legacy migration](usage.md#자동-압축과-기존-native-상태-이전).
+Managed compaction sets all six policy keys: `compaction.enabled` to `true`, `compaction.methodOrder` to `remote → handoff → soft`, `compaction.keepRecentTokens` to `40000`, `compaction.thresholdPercent` to `75`, `compaction.thresholdTokens` to `-1`, and `compaction.handoffSaveToDisk` to `true`. Configuration application writes these stock OMP settings directly; `--check` only reports settings drift. Save active work before applying the policy, then restart existing OMP processes. See [built-in compaction behavior](usage.md#내장-자동-압축).
 
 Ensure `~/.local/bin` is on `PATH`, then inspect the local commands without starting an agent:
 
@@ -66,13 +65,15 @@ harness-run --help
 | --- | --- |
 | `skills/*` | Per-skill links in `~/.agents/skills/` and `~/.claude/skills/`. |
 | `herdr/config.toml`, selected scripts, and usagebar config | Links under `~/.config/herdr/`; inspect keybindings and helper behavior first. |
-| `omp/extensions/{accounts,profiles,herdr,native-compaction}` | Four `harness-*` links under `~/.omp/agent/extensions/`. |
+| `omp/extensions/{profiles,herdr}` | Two links, `harness-profiles` and `harness-herdr`, under `~/.omp/agent/extensions/`. |
+| Retired extension links | Existing `harness-accounts` and `harness-native-compaction` links are removed only when they are owned by this checkout. Foreign or unexpected entries remain conflicts. |
 | `omp/profiles.ts`, `herdr/scripts/harness-run.ts` | `~/.local/bin/omp-profile` and `~/.local/bin/harness-run`. |
 | `agy/config/plugins/harness/` | Plugin link under `~/.gemini/config/plugins/`. Shared skills and existing personal instructions are linked into AGY's global slots. |
-| `omp/native-runtime.ts` | Patches the installed OMP CLI bundle and SDK source files for actual request-session account selection, recoverable shake, and legacy compaction migration. Originals remain beside them as `.harness-native-original`. |
 | `--with-config` only | Applies managed values through `omp config set`; it does not copy the example snapshot over live configuration. |
 
-Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, or real skill directory is a conflict, not permission to overwrite it. Correct links are left unchanged. See [ownership rules](../REPO.md).
+Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, real skill directory, or foreign retired-extension entry is a conflict, not permission to overwrite or remove it. Correct links are left unchanged. Dry-run performs no cleanup. See [ownership rules](../REPO.md).
+
+The retirement cleanup does not delete or rewrite OMP authentication, saved preferences, session transcripts, or backups. The accounts extension's shared preference is no longer applied, and account choice is now manual and session-local through OMP's built-in `/session pin`. Legacy Harness native-compaction replay and portable migration are removed. A transcript can remain on disk without being resumable when it depends on that legacy state.
 
 The installer does **not** restore cron jobs, copy AGY settings, install plugin repositories, provision credentials, publish Git changes, or submit reports. The distributed cron snapshot is intentionally empty (`version: 1`, `jobs: []`). Example snapshots are review aids, not host restore inputs.
 
@@ -92,6 +93,6 @@ The `latest` example is not a reproducible version pin. Review the selected rele
 
 ## Updating and undoing
 
-The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun dry-run, installation, the runtime check, and the OMP restart. Revalidate before changing OMP or Bun versions.
+The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun dry-run and installation, then restart OMP. Review compatibility deliberately before changing OMP or Bun versions.
 
-There is no automated uninstaller. Inspect each installed link and remove only links still pointing into this checkout; restore matching `.bak` files where appropriate. Restore `.harness-native-original` files only to the same OMP installation, or reinstall OMP through its original package manager. Do not restore old backups over a newer OMP version. Settings applied with `--with-config` require deliberate rollback; removing links does not undo them. Keep credentials, manager-owned skills, and unrelated configuration intact.
+There is no automated uninstaller. Inspect each installed link and remove only links still pointing into this checkout; restore matching `.bak` files where appropriate. Settings applied with `--with-config` require deliberate rollback; removing links does not undo them. Keep credentials, manager-owned skills, transcripts, backups, and unrelated configuration intact. If an older Harness release patched OMP, reinstall stock OMP through its original package manager rather than restoring an old backup over a different version; the current installer does not alter those backups.
