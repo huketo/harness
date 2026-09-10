@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>인증 및 토큰 발급 시퀀스 (예시) · Diagram Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: only light;
+      --hs-bg: #ffffff;
+      --hs-panel: #f6f8fa;
+      --hs-ink: #16191d;
+      --hs-muted: #5b6470;
+      --hs-line: #d7dce3;
+      --hs-accent: #1f4d7a;
+      --hs-warn: #8a5a00;
+      --hs-note-bg: #fffaf0;
+      --hs-font: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      --hs-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace;
+    }
+    body {
+      font-family: var(--hs-font);
+      background: var(--hs-bg);
+      color: var(--hs-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 3vw, 32px) clamp(12px, 3vw, 24px);
+    }
+    .hs-frame {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .hs-eyebrow {
+      font-family: var(--hs-mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--hs-muted);
+      margin-bottom: 6px;
+    }
+    .hs-title-text {
+      font-size: clamp(18px, 4vw, 22px);
+      font-weight: 700;
+      color: var(--hs-ink);
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hs-frame">
+    <p class="hs-eyebrow">시각 유형 · 시퀀스 다이어그램 (Sequence, 예시)</p>
+    <h1 class="hs-title-text">클라이언트-인증-리소스 시퀀스 흐름 (예시)</h1>
+
+    <svg id="harness-sequence-svg" viewBox="0 0 320 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="hs-title hs-desc" data-diagram-type="sequence" data-viewport="360,1280" data-mobile-status="verified" width="100%" height="auto" style="max-width: 520px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <title id="hs-title">클라이언트-인증-리소스 시퀀스 흐름 (예시)</title>
+      <desc id="hs-desc">사용자 클라이언트, 인증 게이트웨이, 리소스 서비스 3개 액터 간의 인증 요청, JWT 토큰 발급, 토큰 검증 및 데이터 반환을 시간 하향 순서로 시각화한 모바일 시퀀스 다이어그램 예시.</desc>
+      <style>
+        #harness-sequence-svg {
+          max-width: 520px;
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+          font-family: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+      </style>
+      <defs>
+        <marker id="hs-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#1f4d7a"/>
+        </marker>
+        <marker id="hs-arrow-return" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#5b6470"/>
+        </marker>
+        <marker id="hs-arrow-muted" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#5b6470"/>
+        </marker>
+      </defs>
+
+      <!-- 캔버스 배경 -->
+      <rect width="100%" height="100%" fill="#ffffff"/>
+
+      <!-- 시간 하향 축: 좌측 여백 14px에서 시작하여 텍스트 클리핑 방지 -->
+      <line x1="16" y1="72" x2="16" y2="455" stroke="#5b6470" stroke-width="1.2" marker-end="url(#hs-arrow-muted)"/>
+      <text x="14" y="62" fill="#5b6470" font-size="12" font-weight="700" text-anchor="start">시간 ▼</text>
+
+      <!-- 액터 3개 상단 박스 -->
+      <!-- 액터 1: 클라이언트 (중심 x=70) -->
+      <rect x="32" y="16" width="76" height="38" rx="5" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1.2"/>
+      <text x="70" y="40" fill="#16191d" font-size="13" font-weight="600" text-anchor="middle">클라이언트</text>
+
+      <!-- 액터 2: 인증 게이트웨이 (중심 x=166) -->
+      <rect x="118" y="16" width="96" height="38" rx="5" fill="#f6f8fa" stroke="#1f4d7a" stroke-width="1.6"/>
+      <text x="166" y="40" fill="#1f4d7a" font-size="13" font-weight="700" text-anchor="middle">인증 게이트웨이</text>
+
+      <!-- 액터 3: 리소스 서비스 (중심 x=264) -->
+      <rect x="224" y="16" width="80" height="38" rx="5" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1.2"/>
+      <text x="264" y="40" fill="#16191d" font-size="13" font-weight="600" text-anchor="middle">리소스 서비스</text>
+
+      <!-- 수직 생명선 (Lifelines) -->
+      <line x1="70" y1="54" x2="70" y2="465" stroke="#d7dce3" stroke-width="1.2" stroke-dasharray="4,3"/>
+      <line x1="166" y1="54" x2="166" y2="465" stroke="#d7dce3" stroke-width="1.2" stroke-dasharray="4,3"/>
+      <line x1="264" y1="54" x2="264" y2="465" stroke="#d7dce3" stroke-width="1.2" stroke-dasharray="4,3"/>
+
+      <!-- 활성화 바 (Activation Boxes) -->
+      <rect x="65" y="76" width="10" height="110" rx="2" fill="#ffffff" stroke="#1f4d7a" stroke-width="1"/>
+      <rect x="65" y="226" width="10" height="186" rx="2" fill="#ffffff" stroke="#1f4d7a" stroke-width="1"/>
+
+      <rect x="161" y="76" width="10" height="110" rx="2" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.2"/>
+      <rect x="161" y="278" width="10" height="64" rx="2" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.2"/>
+
+      <rect x="259" y="234" width="10" height="178" rx="2" fill="#ffffff" stroke="#1f4d7a" stroke-width="1"/>
+
+      <!-- 1. 로그인 요청 (Client -> Auth) -->
+      <line x1="75" y1="88" x2="159" y2="88" stroke="#1f4d7a" stroke-width="1.8" marker-end="url(#hs-arrow-accent)"/>
+      <rect x="78" y="72" width="80" height="15" rx="2" fill="#ffffff"/>
+      <text x="118" y="84" fill="#1f4d7a" font-size="12" font-weight="600" text-anchor="middle">1. 로그인 요청</text>
+
+      <!-- 2. 자격 증명 자체 검증 (Auth Internal) -->
+      <path d="M 171,116 H 206 V 140 H 173" fill="none" stroke="#5b6470" stroke-width="1.4" marker-end="url(#hs-arrow-muted)"/>
+      <text x="210" y="132" fill="#5b6470" font-size="12" font-weight="600">2. 계정 검증</text>
+
+      <!-- 3. 토큰 발급 응답 (Auth -> Client, Dashed) -->
+      <line x1="161" y1="172" x2="77" y2="172" stroke="#5b6470" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#hs-arrow-return)"/>
+      <rect x="78" y="156" width="82" height="15" rx="2" fill="#ffffff"/>
+      <text x="119" y="168" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">3. 토큰 발급 (JWT)</text>
+
+      <!-- 4. 자원 조회 요청 (Client -> Resource) -->
+      <line x1="75" y1="242" x2="257" y2="242" stroke="#1f4d7a" stroke-width="1.8" marker-end="url(#hs-arrow-accent)"/>
+      <rect x="106" y="226" width="120" height="15" rx="2" fill="#ffffff"/>
+      <text x="166" y="238" fill="#1f4d7a" font-size="12" font-weight="600" text-anchor="middle">4. 자원 조회 (Bearer)</text>
+
+      <!-- 5. 토큰 서명 검증 요청 (Resource -> Auth) -->
+      <line x1="259" y1="290" x2="173" y2="290" stroke="#1f4d7a" stroke-width="1.6" marker-end="url(#hs-arrow-accent)"/>
+      <rect x="178" y="274" width="76" height="15" rx="2" fill="#ffffff"/>
+      <text x="216" y="286" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">5. 서명 검증</text>
+
+      <!-- 6. 검증 성공 반환 (Auth -> Resource, Dashed) -->
+      <line x1="171" y1="334" x2="257" y2="334" stroke="#8a5a00" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#hs-arrow-return)"/>
+      <rect x="178" y="318" width="76" height="15" rx="2" fill="#ffffff"/>
+      <text x="216" y="330" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">6. 검증 성공</text>
+
+      <!-- 7. 보호된 데이터 반환 (Resource -> Client, Dashed) -->
+      <line x1="259" y1="398" x2="77" y2="398" stroke="#1f4d7a" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#hs-arrow-accent)"/>
+      <rect x="106" y="382" width="120" height="15" rx="2" fill="#ffffff"/>
+      <text x="166" y="394" fill="#1f4d7a" font-size="12" font-weight="600" text-anchor="middle">7. 보호된 자원 반환</text>
+
+      <!-- 하단 범례 및 요약 스트립: 텍스트 줄바꿈으로 SVG 경계 벗어남 방지 -->
+      <rect x="16" y="474" width="288" height="54" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="0.8"/>
+      <text x="160" y="495" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">시간 축은 상단에서 하단으로 순차 진행 (예시)</text>
+      <text x="160" y="513" fill="#5b6470" font-size="12" text-anchor="middle">3인 액터 분할 배치로 360px 가독성 확보</text>
+    </svg>
+  </div>
+</body>
+</html>

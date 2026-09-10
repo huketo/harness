@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>보안 진입로 아키텍처 (예시) · Diagram Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: only light;
+      --ha-bg: #ffffff;
+      --ha-panel: #f6f8fa;
+      --ha-ink: #16191d;
+      --ha-muted: #5b6470;
+      --ha-line: #d7dce3;
+      --ha-accent: #1f4d7a;
+      --ha-warn: #8a5a00;
+      --ha-note-bg: #fffaf0;
+      --ha-danger: #991b1b;
+      --ha-font: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      --ha-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace;
+    }
+    body {
+      font-family: var(--ha-font);
+      background: var(--ha-bg);
+      color: var(--ha-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 3vw, 32px) clamp(12px, 3vw, 24px);
+    }
+    .ha-frame {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .ha-eyebrow {
+      font-family: var(--ha-mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ha-muted);
+      margin-bottom: 6px;
+    }
+    .ha-title-text {
+      font-size: clamp(18px, 4vw, 22px);
+      font-weight: 700;
+      color: var(--ha-ink);
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ha-frame">
+    <p class="ha-eyebrow">아키텍처 패턴 · 보안 진입로 (Secure Paved Road, 예시)</p>
+    <h1 class="ha-title-text">다계층 신뢰 경계 및 인가 경로 아키텍처 (예시)</h1>
+
+    <svg id="harness-architecture-svg" viewBox="0 0 320 586" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ha-title ha-desc" data-diagram-type="architecture" data-viewport="360,1280" data-mobile-status="verified" width="100%" height="auto" style="max-width: 520px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <title id="ha-title">다계층 신뢰 경계 및 인가 경로 아키텍처 (예시)</title>
+      <desc id="ha-desc">외부 클라이언트에서 보안 API 게이트웨이를 거쳐 내부 코어 서비스로 이어지는 정규 승인 경로와 신뢰 경계에서 차단되는 비인가 직접 접근 시도를 시각화한 모바일 아키텍처 다이어그램 예시.</desc>
+      <style>
+        #harness-architecture-svg {
+          max-width: 520px;
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+          font-family: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+      </style>
+      <defs>
+        <marker id="ha-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#1f4d7a"/>
+        </marker>
+        <marker id="ha-stop-mark" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+          <circle cx="5" cy="5" r="4.5" fill="#991b1b" stroke="#ffffff" stroke-width="1.2"/>
+          <line x1="2.5" y1="2.5" x2="7.5" y2="7.5" stroke="#ffffff" stroke-width="1.4"/>
+        </marker>
+      </defs>
+
+      <!-- 배경 캔버스 -->
+      <rect width="100%" height="100%" fill="#ffffff"/>
+
+      <!-- 신뢰 영역 1: 외부 비신뢰 영역 -->
+      <rect id="ha-rect-zone1" x="16" y="16" width="288" height="104" rx="8" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <rect id="ha-rect-zone1-badge" x="26" y="24" width="196" height="20" fill="#f6f8fa" stroke="none"/>
+      <text id="ha-text-zone1-badge" data-box="ha-rect-zone1-badge" x="34" y="38" fill="#5b6470" font-size="12" font-weight="600">신뢰 영역 1 · 외부 비신뢰 영역</text>
+
+      <!-- 클라이언트 노드 -->
+      <rect id="ha-rect-client" x="28" y="52" width="264" height="58" rx="6" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="ha-text-client-title" data-box="ha-rect-client" x="160" y="74" fill="#16191d" font-size="14" font-weight="600" text-anchor="middle">외부 사용자 및 클라이언트</text>
+      <text id="ha-text-client-desc" data-box="ha-rect-client" x="160" y="96" fill="#5b6470" font-size="12" text-anchor="middle">공용 인터넷 발신 · 신뢰도 미인증 상태</text>
+
+      <!-- 신뢰 경계선 1 (DMZ) 기본선 -->
+      <line id="ha-line-boundary1" x1="16" y1="160" x2="304" y2="160" stroke="#5b6470" stroke-width="1.4" stroke-dasharray="4,3"/>
+
+      <!-- 연결선 1 (정규 경로): 클라이언트(x=52, y=110) -> 게이트웨이 영역(y=190) -->
+      <line id="ha-conn-https" data-connector="true" x1="52" y1="110" x2="52" y2="190" stroke="#1f4d7a" stroke-width="2" marker-end="url(#ha-arrow-accent)"/>
+
+      <!-- 연결선 2 (차단 경로): 클라이언트(x=268, y=110) -> 신뢰 경계선 1(y=158) -->
+      <line id="ha-conn-blocked" data-connector="true" x1="268" y1="110" x2="268" y2="158" stroke="#991b1b" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ha-stop-mark)"/>
+
+      <!-- HTTPS 라벨 (연결선 x=52 우측에 7px 간격 배치: x=60..114, y=122..144) -->
+      <rect id="ha-mask-https" data-label-for="ha-conn-https" x="60" y="122" width="54" height="22" fill="#ffffff" stroke="none"/>
+      <text id="ha-text-https" data-box="ha-mask-https" x="87" y="137" fill="#1f4d7a" font-size="12" font-weight="600" text-anchor="middle">HTTPS</text>
+
+      <!-- 직접 접근 차단 라벨 (연결선 x=268 좌측에 7px 간격 배치: x=164..260, y=122..144) -->
+      <rect id="ha-mask-blocked" data-label-for="ha-conn-blocked" x="164" y="122" width="96" height="22" fill="#ffffff" stroke="none"/>
+      <text id="ha-text-blocked" data-box="ha-mask-blocked" x="212" y="137" fill="#991b1b" font-size="12" font-weight="600" text-anchor="middle">직접 접근 차단</text>
+
+      <!-- 신뢰 경계 1 라벨 (중앙 x=86..234, y=150..170): 화살표(x=52, x=268)와 완전히 비교차 -->
+      <rect id="ha-rect-boundary1-label" x="86" y="150" width="148" height="20" fill="#ffffff" stroke="none"/>
+      <text id="ha-text-boundary1-label" data-box="ha-rect-boundary1-label" x="160" y="164" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">신뢰 경계 1 (외부 DMZ)</text>
+
+      <!-- 신뢰 영역 2: 보안 진입 게이트웨이 (DMZ) -->
+      <rect id="ha-rect-zone2" x="16" y="190" width="288" height="114" rx="8" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <rect id="ha-rect-zone2-badge" x="26" y="198" width="196" height="20" fill="#f6f8fa" stroke="none"/>
+      <text id="ha-text-zone2-badge" data-box="ha-rect-zone2-badge" x="34" y="212" fill="#1f4d7a" font-size="12" font-weight="600">신뢰 영역 2 · DMZ 게이트웨이</text>
+
+      <!-- 게이트웨이 노드 -->
+      <rect id="ha-rect-gateway" x="28" y="226" width="264" height="68" rx="6" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.5"/>
+      <text id="ha-text-gateway-title" data-box="ha-rect-gateway" x="160" y="246" fill="#1f4d7a" font-size="14" font-weight="700" text-anchor="middle">API 게이트웨이 &amp; 웹 방화벽 (WAF)</text>
+      <text id="ha-text-gateway-desc1" data-box="ha-rect-gateway" x="160" y="266" fill="#16191d" font-size="12" text-anchor="middle">단일 보안 진입로 · mTLS · JWT 토큰 검증</text>
+      <text id="ha-text-gateway-desc2" data-box="ha-rect-gateway" x="160" y="282" fill="#5b6470" font-size="12" text-anchor="middle">비인가 요청 즉시 차단 및 감사 로깅</text>
+
+      <!-- 신뢰 경계선 2 (내부 격리) 기본선 -->
+      <line id="ha-line-boundary2" x1="16" y1="334" x2="304" y2="334" stroke="#5b6470" stroke-width="1.4" stroke-dasharray="4,3"/>
+
+      <!-- 신뢰 경계 2 라벨 (좌측 x=24..112): x=140 연결선과 28px 간격 유지 -->
+      <rect id="ha-rect-boundary2-label" x="24" y="324" width="88" height="20" fill="#ffffff" stroke="none"/>
+      <text id="ha-text-boundary2-label" data-box="ha-rect-boundary2-label" x="68" y="338" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">신뢰 경계 2</text>
+
+      <!-- 게이트웨이 -> 코어 서비스 연결선 (x=140, y=294..370) -->
+      <line id="ha-conn-grpc" data-connector="true" x1="140" y1="294" x2="140" y2="370" stroke="#1f4d7a" stroke-width="2" marker-end="url(#ha-arrow-accent)"/>
+
+      <!-- 인가된 gRPC 라벨 (연결선 x=140 우측에 7px 간격 배치: x=148..236, y=324..344) -->
+      <rect id="ha-mask-grpc" data-label-for="ha-conn-grpc" x="148" y="324" width="88" height="20" fill="#ffffff" stroke="none"/>
+      <text id="ha-text-grpc" data-box="ha-mask-grpc" x="192" y="338" fill="#1f4d7a" font-size="12" font-weight="600" text-anchor="middle">인가된 gRPC</text>
+
+      <!-- 신뢰 영역 3: 내부 격리 신뢰 영역 -->
+      <rect id="ha-rect-zone3" x="16" y="370" width="288" height="140" rx="8" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <rect id="ha-rect-zone3-badge" x="26" y="378" width="196" height="20" fill="#f6f8fa" stroke="none"/>
+      <text id="ha-text-zone3-badge" data-box="ha-rect-zone3-badge" x="34" y="392" fill="#16191d" font-size="12" font-weight="600">신뢰 영역 3 · 내부 격리 영역</text>
+
+      <!-- 코어 서비스 노드 -->
+      <rect id="ha-rect-core" x="28" y="404" width="264" height="46" rx="6" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="ha-text-core-title" data-box="ha-rect-core" x="160" y="422" fill="#16191d" font-size="13" font-weight="700" text-anchor="middle">비즈니스 코어 서비스</text>
+      <text id="ha-text-core-desc" data-box="ha-rect-core" x="160" y="442" fill="#5b6470" font-size="12" text-anchor="middle">업무 로직 실행 · 내부 메시 통신</text>
+
+      <!-- 코어 -> DB 내부 연결선 -->
+      <line id="ha-conn-core-db" data-connector="true" x1="160" y1="450" x2="160" y2="458" stroke="#1f4d7a" stroke-width="1.6" marker-end="url(#ha-arrow-accent)"/>
+
+      <!-- DB 노드 -->
+      <rect id="ha-rect-db" x="28" y="458" width="264" height="44" rx="6" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="ha-text-db-title" data-box="ha-rect-db" x="160" y="476" fill="#16191d" font-size="13" font-weight="700" text-anchor="middle">보안 데이터베이스</text>
+      <text id="ha-text-db-desc" data-box="ha-rect-db" x="160" y="494" fill="#5b6470" font-size="12" text-anchor="middle">내부 전용 접근 · 외부 직접 연결 차단</text>
+
+      <!-- 하단 범례 스트립 -->
+      <rect id="ha-rect-legend" x="16" y="520" width="288" height="56" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="0.8"/>
+      <line x1="28" y1="537" x2="62" y2="537" stroke="#1f4d7a" stroke-width="2" marker-end="url(#ha-arrow-accent)"/>
+      <text id="ha-text-legend-allow" data-box="ha-rect-legend" x="70" y="541" fill="#16191d" font-size="12" font-weight="500">정규 승인 경로 (HTTPS / 인증된 gRPC)</text>
+
+      <line x1="28" y1="559" x2="62" y2="559" stroke="#991b1b" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ha-stop-mark)"/>
+      <text id="ha-text-legend-block" data-box="ha-rect-legend" x="70" y="563" fill="#991b1b" font-size="12" font-weight="500">차단 경로 (신뢰 경계 침입 즉각 거부)</text>
+    </svg>
+  </div>
+</body>
+</html>

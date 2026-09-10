@@ -52,7 +52,7 @@ function Figure(fig)
       fig.content[1] = plain
       return fig
     end
-    io.stderr:write("filters.lua: " .. png .. " 없음. Word에는 PNG를 넣는다 (svg-diagram 스킬 Word 절).\n")
+    io.stderr:write("filters.lua: " .. png .. " 없음. Word에는 PNG를 넣는다 (diagram-design 문서 적용 규칙).\n")
   end
   return nil
 end

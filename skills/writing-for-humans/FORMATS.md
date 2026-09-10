@@ -1,6 +1,6 @@
 # 장르, 테마, 형식
 
-[SKILL.md](SKILL.md) 3단계(골격)와 5단계(패키징)에서 읽는다. 정본은 Markdown 하나이고 HTML·Word는 그 원본에서 만든다. 문장·근거·참조·용어 규칙은 SKILL.md가, 그림은 `svg-diagram` 스킬이 소유한다.
+[SKILL.md](SKILL.md) 3단계(골격)와 5단계(패키징)에서 읽는다. 본문 원본은 Markdown이고 그림 원본은 HTML이다. HTML·Word 문서와 그림용 SVG·PNG는 두 원본에서 만든다. 문장·근거·참조·용어 규칙은 SKILL.md가, 그림 설계는 `diagram-design`이 소유한다. 내보내기와 문서 테마 적용은 [문서 적용 규칙](../diagram-design/references/harness-documents.md)을 따른다.
 
 ## 장르
 
@@ -43,7 +43,7 @@ front matter의 `genre:`가 기본 테마·스타일을 정한다. `title`, `dat
 원본 그대로가 산출물이다. GitHub·GitLab에서 그대로 읽히는 문법만 쓴다: YAML front matter, `#` 제목, GFM 표, 코드 펜스(언어 표기), `> [!NOTE]`/`> [!WARNING]` 알림, 인용은 일반 `>`, 그림은 `![캡션](이름.svg)`.
 
 - 경로를 지정받지 않았으면 `docs/<주제-kebab>.md`. README는 저장소 루트.
-- 그림 `.svg`는 같은 디렉터리에 두고 `svg-diagram`의 self-contained 규칙을 지킨다. 캡션이 alt가 되고, HTML에서는 `<figcaption>`이 된다.
+- 그림 HTML과 내보낸 `.svg`는 문서와 같은 디렉터리에 둔다. SVG는 [문서 적용 규칙](../diagram-design/references/harness-documents.md)의 외부 요청 없는 내보내기 계약을 지킨다. 캡션이 alt가 되고, HTML에서는 `<figcaption>`이 된다.
 - `공개` 독자면 링크는 절대 URL. `내부` 독자면 저장소 상대 링크를 쓸 수 있다.
 - **강조 닫는 기호 앞에 문장부호가 오면 그 뒤에 한글을 붙이지 않는다.** CommonMark는 닫는 `**` 바로 앞이 문장부호(백틱, 괄호, 따옴표, 콜론, 느낌표)이고 바로 뒤가 한글이면 닫는 기호로 보지 않아 `` **`config.json`**을 ``, `**(중요)**입니다`, `**항목:**설명`이 기호 그대로 출력된다. `**볼드**입니다`처럼 앞이 글자면 정상이다. 고치는 방법: 문장부호를 강조 밖으로 낸다(`**항목**: 설명`), 조사까지 강조 범위에 넣는다(`` **`config.json`을** ``), 그대로 둬야 하면 `<strong>`을 쓴다. `_`·`__`는 한글과 붙으면 항상 실패하므로 강조에는 `*`·`**`만 쓴다.
 - 제목 `#`, 목록 `-`, 인용 `>` 뒤에는 공백 하나. 목록과 코드 블록 앞뒤에는 빈 줄.
@@ -66,7 +66,7 @@ python3 <이 스킬>/scripts/build.py 문서.md --to html [--theme …] [--style
 1. **외부 요청 0건** — `performance.getEntriesByType('resource').map(r => r.name)`이 빈 배열이다.
 2. **스크립트 0건** — `document.scripts.length`가 0이다.
 3. **링크** — `[...document.querySelectorAll('a[href]')].filter(a => !a.getAttribute('href').startsWith('#')).map(a => a.href)`로 모아 각 URL을 실제로 연다. `공개` 문서에 `file:`·상대 경로·사내 호스트·로그인 필요 URL이 있으면 본문 인용으로 바꾼다.
-4. **그림** — `svg-diagram`의 검수(check.py, 브라우저 audit, 360px)를 통과한 `.svg`만 넣는다.
+4. **그림** — `diagram-design`의 self-check와 [모바일 검수](../diagram-design/references/mobile.md)를 통과한 그림을 넣고, 삽입된 페이지에서 다시 확인한다. 독립 HTML의 통과는 figure 여백이 추가된 문서의 통과를 뜻하지 않는다.
 5. **반응형** — 1280px에서 표·코드·그림이 잘리지 않는다. 360px에서 가로 스크롤이 생기는 요소가 `.table-wrap`, `<pre>`뿐이다: `[...document.querySelectorAll('body *:not(svg *)')].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.getAttribute('class') || el.tagName)`. 두 폭 모두 전체 스크린샷으로 확인한다.
 6. **print 스타일이나 인쇄 목적이면** 인쇄 미디어로 한 번 더 렌더해 코드가 줄바꿈되고 페이지 밖으로 나가지 않는지 본다.
 
@@ -76,13 +76,10 @@ python3 <이 스킬>/scripts/build.py 문서.md --to html [--theme …] [--style
 python3 <이 스킬>/scripts/build.py 문서.md --to docx [--out 경로]
 ```
 
-- 그림은 `이름.svg` 옆에 같은 이름의 `이름.png`를 두면 필터가 Word에는 PNG를 넣는다. PNG는 `svg-diagram`으로 검수한 SVG를 브라우저 도구에서 2배 배율로 스크린샷해 만든다. PNG가 없으면 pandoc이 `rsvg-convert`를 찾다 실패하므로 반드시 만든다.
+- 그림은 `이름.svg` 옆에 같은 이름의 `이름.png`를 둔다. `diagram-design`의 [문서 적용 규칙](../diagram-design/references/harness-documents.md)에 따라 검증한 그림 HTML에서 SVG 요소만 2배 배율로 캡처한다. 필터가 Word에는 이 PNG를 넣는다. PNG가 없으면 pandoc이 `rsvg-convert`를 찾다 실패하므로 반드시 만든다.
 - 제목은 pandoc이 `Heading N` 스타일로 넣어 탐색창이 동작한다. 표는 열 6개까지, 코드 줄은 80자 이내.
 - 링크는 본문에 URL이 보이게 둔다. 인쇄본에서는 하이퍼링크가 사라진다.
 - 사후 편집(표 서식, 그림 위치, 결재 양식 삽입)은 `officecli` 스킬로 한다.
 
 검수: `officecli view <file> <mode>`로 본문 순서·제목 계층·그림·표를 확인한다. `officecli validate`는 pandoc 산출물의 요소 순서(`pStyle`·`b`·`jc` 등)를 스키마 위반으로 33건 안팎 보고하는데, 이는 pandoc 3.1 writer의 알려진 출력이며 Word가 여는 데 지장이 없다는 것은 이 환경에서 실측하지 못했다. 결재·외부 전달 전에는 Word에서 한 번 연다.
 
-## LSOffice 게시글
-
-`lsoffice-post-writing` 스킬이 DEXT5 본문 패키징을 맡는다. 장르 골격과 문장 규칙은 이 스킬의 것을 그대로 쓴다.

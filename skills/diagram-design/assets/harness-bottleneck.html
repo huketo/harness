@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유입 큐 및 처리 병목 다이어그램 (예시) · Diagram Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: only light;
+      --hb-bg: #ffffff;
+      --hb-panel: #f6f8fa;
+      --hb-ink: #16191d;
+      --hb-muted: #5b6470;
+      --hb-line: #d7dce3;
+      --hb-accent: #1f4d7a;
+      --hb-warn: #8a5a00;
+      --hb-note-bg: #fffaf0;
+      --hb-font: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      --hb-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace;
+    }
+    body {
+      font-family: var(--hb-font);
+      background: var(--hb-bg);
+      color: var(--hb-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 3vw, 32px) clamp(12px, 3vw, 24px);
+    }
+    .hb-frame {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .hb-eyebrow {
+      font-family: var(--hb-mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--hb-muted);
+      margin-bottom: 6px;
+    }
+    .hb-title-text {
+      font-size: clamp(18px, 4vw, 22px);
+      font-weight: 700;
+      color: var(--hb-ink);
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hb-frame">
+    <p class="hb-eyebrow">시맨틱 패턴 · 유입 큐 및 병목 (Fan-in Queue &amp; Bottleneck, 예시)</p>
+    <h1 class="hb-title-text">처리 용량 한계와 대기열 배압 제어 (예시)</h1>
+
+    <svg id="harness-bottleneck-svg" viewBox="0 0 320 576" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="hb-title hb-desc" data-diagram-type="data-flow" data-viewport="360,1280" data-mobile-status="verified" width="100%" height="auto" style="max-width: 520px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <title id="hb-title">처리 용량 한계와 대기열 배압 제어 (예시)</title>
+      <desc id="hb-desc">초당 30건의 요청 유입과 4슬롯 대기열 스냅샷, 최대 처리 한도 15건/s 병목에서 정상 수용과 배압 제어로 분기되는 과정을 정량적으로 시각화한 모바일 다이어그램 예시.</desc>
+      <style>
+        #harness-bottleneck-svg {
+          max-width: 520px;
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+          font-family: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+      </style>
+      <defs>
+        <marker id="hb-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#1f4d7a"/>
+        </marker>
+        <marker id="hb-arrow-warn" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#8a5a00"/>
+        </marker>
+        <marker id="hb-arrow-muted" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#5b6470"/>
+        </marker>
+      </defs>
+
+      <!-- 캔버스 배경 -->
+      <rect width="100%" height="100%" fill="#ffffff"/>
+
+      <!-- 1. 유입 소스 그룹 (Ingress Sources) -->
+      <rect id="hb-rect-ingress-group" x="16" y="16" width="288" height="126" rx="8" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <rect id="hb-rect-ingress-badge" x="26" y="24" width="196" height="20" fill="#f6f8fa" stroke="none"/>
+      <text id="hb-text-ingress-badge" data-box="hb-rect-ingress-badge" x="34" y="38" fill="#5b6470" font-size="12" font-weight="600">유입 소스 · 정상상태 유입률</text>
+
+      <!-- 총 유입률 요약 (배경 일치 마스크): 유입선 집결 경로와 교차하지 않도록 소스 노드 상단에 격리 배치 -->
+      <rect id="hb-rect-ingress-total" x="26" y="50" width="268" height="24" fill="#f6f8fa" stroke="none"/>
+      <text id="hb-text-ingress-total" data-box="hb-rect-ingress-total" x="160" y="66" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">정상상태 총 유입률: 30건/s (한도 초과)</text>
+
+      <!-- 소스 1: 웹 프론트 -->
+      <rect id="hb-rect-source1" x="24" y="80" width="84" height="46" rx="5" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="hb-text-source1-name" data-box="hb-rect-source1" x="66" y="98" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">웹 프론트</text>
+      <text id="hb-text-source1-rate" data-box="hb-rect-source1" x="66" y="116" fill="#1f4d7a" font-size="12" font-weight="700" text-anchor="middle">12건/s</text>
+
+      <!-- 소스 2: 모바일 앱 -->
+      <rect id="hb-rect-source2" x="118" y="80" width="84" height="46" rx="5" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="hb-text-source2-name" data-box="hb-rect-source2" x="160" y="98" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">모바일 앱</text>
+      <text id="hb-text-source2-rate" data-box="hb-rect-source2" x="160" y="116" fill="#1f4d7a" font-size="12" font-weight="700" text-anchor="middle">8건/s</text>
+
+      <!-- 소스 3: 배치 워커 -->
+      <rect id="hb-rect-source3" x="212" y="80" width="84" height="46" rx="5" fill="#ffffff" stroke="#d7dce3" stroke-width="1.2"/>
+      <text id="hb-text-source3-name" data-box="hb-rect-source3" x="254" y="98" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">배치 워커</text>
+      <text id="hb-text-source3-rate" data-box="hb-rect-source3" x="254" y="116" fill="#1f4d7a" font-size="12" font-weight="700" text-anchor="middle">10건/s</text>
+
+      <!-- 유입 연결선 3개: 텍스트를 관통하지 않고 각 소스 하단에서 대기열로 직교 하향 인입 -->
+      <line id="hb-conn-inflow1" data-connector="true" x1="66" y1="126" x2="66" y2="176" stroke="#5b6470" stroke-width="1.4" marker-end="url(#hb-arrow-muted)"/>
+      <line id="hb-conn-inflow2" data-connector="true" x1="160" y1="126" x2="160" y2="176" stroke="#5b6470" stroke-width="1.4" marker-end="url(#hb-arrow-muted)"/>
+      <line id="hb-conn-inflow3" data-connector="true" x1="254" y1="126" x2="254" y2="176" stroke="#5b6470" stroke-width="1.4" marker-end="url(#hb-arrow-muted)"/>
+
+      <!-- 2. 수신 대기열 버퍼 (Ordered Queue Snapshot) -->
+      <rect id="hb-rect-queue" x="16" y="176" width="288" height="110" rx="8" fill="#fffaf0" stroke="#8a5a00" stroke-width="1.2"/>
+      <rect id="hb-rect-queue-badge" x="26" y="184" width="196" height="20" fill="#fffaf0" stroke="none"/>
+      <text id="hb-text-queue-badge" data-box="hb-rect-queue-badge" x="34" y="198" fill="#8a5a00" font-size="12" font-weight="600">수신 대기열 스냅샷 (4슬롯 용량)</text>
+
+      <!-- 슬롯 4개 (저장 상태 스냅샷) -->
+      <rect id="hb-rect-slot1" x="24" y="210" width="62" height="44" rx="4" fill="#ffffff" stroke="#8a5a00" stroke-width="1.2"/>
+      <text id="hb-text-slot1-label" data-box="hb-rect-slot1" x="55" y="227" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">슬롯 1</text>
+      <text id="hb-text-slot1-item" data-box="hb-rect-slot1" x="55" y="243" fill="#16191d" font-size="12" text-anchor="middle">웹 #101</text>
+
+      <rect id="hb-rect-slot2" x="94" y="210" width="62" height="44" rx="4" fill="#ffffff" stroke="#8a5a00" stroke-width="1.2"/>
+      <text id="hb-text-slot2-label" data-box="hb-rect-slot2" x="125" y="227" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">슬롯 2</text>
+      <text id="hb-text-slot2-item" data-box="hb-rect-slot2" x="125" y="243" fill="#16191d" font-size="12" text-anchor="middle">앱 #204</text>
+
+      <rect id="hb-rect-slot3" x="164" y="210" width="62" height="44" rx="4" fill="#ffffff" stroke="#8a5a00" stroke-width="1.2"/>
+      <text id="hb-text-slot3-label" data-box="hb-rect-slot3" x="195" y="227" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">슬롯 3</text>
+      <text id="hb-text-slot3-item" data-box="hb-rect-slot3" x="195" y="243" fill="#16191d" font-size="12" text-anchor="middle">배치 #55</text>
+
+      <rect id="hb-rect-slot4" x="234" y="210" width="62" height="44" rx="4" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1" stroke-dasharray="3,2"/>
+      <text id="hb-text-slot4-label" data-box="hb-rect-slot4" x="265" y="227" fill="#5b6470" font-size="12" font-weight="600" text-anchor="middle">슬롯 4</text>
+      <text id="hb-text-slot4-item" data-box="hb-rect-slot4" x="265" y="243" fill="#5b6470" font-size="12" text-anchor="middle">(빈 슬롯)</text>
+
+      <rect id="hb-rect-queue-note" x="26" y="260" width="268" height="20" fill="#fffaf0" stroke="none"/>
+      <text id="hb-text-queue-note" data-box="hb-rect-queue-note" x="160" y="274" fill="#5b6470" font-size="12" text-anchor="middle">FIFO 순차 인입 · 대기열 점유 스냅샷 상태</text>
+
+      <!-- 큐 -> 병목 처리기 연결선 -->
+      <line id="hb-conn-queue-engine" data-connector="true" x1="160" y1="286" x2="160" y2="306" stroke="#1f4d7a" stroke-width="2" marker-end="url(#hb-arrow-accent)"/>
+
+      <!-- 3. 단일 병목 처리 지점 (Bottleneck Service Point) -->
+      <rect id="hb-rect-engine" x="16" y="306" width="288" height="74" rx="8" fill="#ffffff" stroke="#8a5a00" stroke-width="1.8"/>
+      <rect id="hb-rect-engine-badge" x="26" y="314" width="206" height="20" fill="#ffffff" stroke="none"/>
+      <text id="hb-text-engine-badge" data-box="hb-rect-engine-badge" x="34" y="328" fill="#8a5a00" font-size="12" font-weight="700">제약 지점 · 단일 보안 검증 엔진</text>
+
+      <text id="hb-text-engine-title" data-box="hb-rect-engine" x="160" y="350" fill="#16191d" font-size="14" font-weight="700" text-anchor="middle">토큰 서명 및 정책 검증기</text>
+      <text id="hb-text-engine-limit" data-box="hb-rect-engine" x="160" y="368" fill="#8a5a00" font-size="12" font-weight="600" text-anchor="middle">최대 처리 한도: 15건/s (단일 병목)</text>
+
+      <!-- 4. 결과 분기 연결선 및 배경 일치 마스크 라벨 (선 옆 7px 간격 배치로 화살표 가림 방지) -->
+      <!-- 수용 연결선 (좌측 x=50, y=380..430) -->
+      <line id="hb-conn-accept" data-connector="true" x1="50" y1="380" x2="50" y2="430" stroke="#1f4d7a" stroke-width="2" marker-end="url(#hb-arrow-accent)"/>
+      <rect id="hb-mask-accept" data-label-for="hb-conn-accept" x="58" y="394" width="84" height="20" fill="#ffffff" stroke="none"/>
+      <text id="hb-text-accept-label" data-box="hb-mask-accept" x="100" y="408" fill="#1f4d7a" font-size="12" font-weight="700" text-anchor="middle">수용: 15건/s</text>
+
+      <!-- 배압 제어 연결선 (우측 x=268, y=380..430) -->
+      <line id="hb-conn-backpressure" data-connector="true" x1="268" y1="380" x2="268" y2="430" stroke="#8a5a00" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#hb-arrow-warn)"/>
+      <rect id="hb-mask-backpressure" data-label-for="hb-conn-backpressure" x="176" y="394" width="84" height="20" fill="#ffffff" stroke="none"/>
+      <text id="hb-text-backpressure-label" data-box="hb-mask-backpressure" x="218" y="408" fill="#8a5a00" font-size="12" font-weight="700" text-anchor="middle">배압: 15건/s</text>
+
+      <!-- 5. 두 갈래 결과 노드 (Two Outcomes) -->
+      <!-- 결과 1: 정상 처리 파이프라인 -->
+      <rect id="hb-rect-outcome1" x="16" y="430" width="138" height="68" rx="6" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.4"/>
+      <text id="hb-text-outcome1-title" data-box="hb-rect-outcome1" x="85" y="450" fill="#1f4d7a" font-size="13" font-weight="700" text-anchor="middle">코어 파이프라인</text>
+      <text id="hb-text-outcome1-desc1" data-box="hb-rect-outcome1" x="85" y="468" fill="#16191d" font-size="12" text-anchor="middle">정상 인가 · 완수</text>
+      <text id="hb-text-outcome1-desc2" data-box="hb-rect-outcome1" x="85" y="484" fill="#5b6470" font-size="12" text-anchor="middle">15건/s 정상 처리</text>
+
+      <!-- 결과 2: 지연 및 429 응답 -->
+      <rect id="hb-rect-outcome2" x="166" y="430" width="138" height="68" rx="6" fill="#fffaf0" stroke="#8a5a00" stroke-width="1.4"/>
+      <text id="hb-text-outcome2-title" data-box="hb-rect-outcome2" x="235" y="450" fill="#8a5a00" font-size="13" font-weight="700" text-anchor="middle">지연 큐 제어</text>
+      <text id="hb-text-outcome2-desc1" data-box="hb-rect-outcome2" x="235" y="468" fill="#16191d" font-size="12" text-anchor="middle">429 응답 반환</text>
+      <text id="hb-text-outcome2-desc2" data-box="hb-rect-outcome2" x="235" y="484" fill="#5b6470" font-size="12" text-anchor="middle">15건/s 백오프</text>
+
+      <!-- 6. 하단 요약 및 범례 스트립 -->
+      <rect id="hb-rect-summary" x="16" y="508" width="288" height="58" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="0.8"/>
+      <text id="hb-text-summary-rates" data-box="hb-rect-summary" x="160" y="530" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">유입 30건/s = 수용 15건/s + 배압 15건/s</text>
+      <text id="hb-text-summary-queue" data-box="hb-rect-summary" x="160" y="550" fill="#5b6470" font-size="12" text-anchor="middle">대기열 3/4 점유 스냅샷 (흐름과 구분)</text>
+    </svg>
+  </div>
+</body>
+</html>

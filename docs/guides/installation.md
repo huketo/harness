@@ -91,6 +91,14 @@ npx skills add microsoft/playwright-cli --skill playwright-cli --global --agent 
 
 The `latest` example is not a reproducible version pin. Review the selected release and let the skill manager own its local lock state.
 
+### Diagram skill migration
+
+`diagram-design` replaces the repository-owned `svg-diagram` skill. It retains the upstream type references, semantic patterns, examples, and import/export workflows, while adding local document and mobile guidance. The existing installer discovers the new skill through `skills/*`; no separate plugin installation is required.
+
+The installer does not automatically prune retired skill links. Before an approved installation, inspect `~/.agents/skills/svg-diagram` and `~/.claude/skills/svg-diagram` with `readlink -f`, or plain `readlink` for a dangling chain. Remove only symlinks that still point to this checkout's retired `skills/svg-diagram`, including a Claude link routed through `~/.agents/skills`. Remove the Claude link first so that the chain remains inspectable. Preserve regular directories, external links, and user-modified copies, and resolve them separately. Do not leave both skills discoverable. Then run the normal installation steps and start a new agent session so it loads the current skill list.
+
+Repository adoption does not apply these host changes automatically. See the [diagram usage guide](usage.md#다이어그램과-문서-양식) for the local gallery, document artifacts, and mobile verification boundary.
+
 ## Updating and undoing
 
 The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun dry-run and installation, then restart OMP. Review compatibility deliberately before changing OMP or Bun versions.

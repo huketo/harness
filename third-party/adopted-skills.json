@@ -114,6 +114,37 @@
         }
       ]
     },
+    "diagram-design": {
+      "adopted_on": "2026-09-10",
+      "source": "cathrynlavery/diagram-design",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/diagram-design/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/cathrynlavery/diagram-design",
+          "commit": "562dbdf93ff3c3da630be4f90f4f6c2548175058",
+          "paths": [
+            "LICENSE",
+            "skills/diagram-design"
+          ],
+          "snapshot_sha256": "03ccd82e461c5185f451177799a88b196bd276a1d7edb6a535a451eb6cfb662c",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Add early routing to local mobile and Harness document output contracts; those contracts override conflicting upstream HTML, font, palette, and export defaults.",
+        "Scope repository-only verifier and linter mentions as optional upstream-checkout tooling; installed skills use the bundled self-check only for its stated general scope and explicit manual checks for uncovered type and registry invariants.",
+        "Add artifact-specific mobile classification and adaptation guidance for all forty types, with pinned baseline measurements and meaning-preserving reflow or splitting.",
+        "Add offline Slate document theme and export contracts for Markdown, HTML, and Word using existing writing-for-humans mechanisms, including background-matched borderless annotation masks.",
+        "Add four synthetic Korean Slate examples generated with AGY gemini-3.8-flash-high and a local gallery; mark artifacts verified only after standalone and document-embedded browser checks.",
+        "Retain the complete upstream skill, references, scripts, templates, examples, semantic patterns, import/export workflows, brand onboarding, and forty visual types."
+      ],
+      "excluded_sources": []
+    },
     "tdd": {
       "previous_registration": {
         "source": "mattpocock/skills",

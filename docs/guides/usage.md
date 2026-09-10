@@ -141,3 +141,17 @@ Windows 쪽 전제는 Chrome과 Node.js(`node.exe`) 두 가지뿐이며 방화�
 설치는 기존 `install.sh`의 스킬 링크 경로를 사용합니다. 이미 설치된 `better-*`, `interface-review`, `break`, `variant`, `explain-interface`를 교체할 때에는 먼저 수정본과 참조를 탐색 경로 밖에 백업하고 설치 관리자의 등록 여부를 확인합니다. 등록된 항목은 관리자의 제거 명령을 사용하고, 미등록 사본은 백업 후 탐색 경로에서 옮깁니다. 새 스킬과 이전 사본을 함께 활성화하지 않습니다. 설치 직후 기존 대화의 목록은 그대로일 수 있으므로 새 세션에서 확인합니다.
 
 검증용 합성 입력과 기대 동작은 [`evals/evals.json`](../../skills/awesome-interface/evals/evals.json)에 있습니다. 각 사례는 `files`의 fixture를 같은 상대 경로로 배치한 격리 작업공간에서 실행합니다. 실제 모델 응답과 캡처는 버전 관리하지 않습니다.
+
+## 다이어그램과 문서 양식
+
+[`diagram-design`](../../skills/diagram-design/SKILL.md)은 상류의 의미 패턴, 유형별 배치, 브랜드 디자인, import/export를 유지하는 다이어그램 스킬입니다. 40개 유형의 지침을 모두 포함하며, [로컬 갤러리](../../skills/diagram-design/assets/harness-gallery.html)에는 한국어와 Slate 문서 테마를 적용한 합성 예제 네 개가 있습니다.
+
+- “diagram-design으로 검토 대기열의 병목을 설명해 주세요. 360px 모바일 문서에 들어갑니다.”
+- “이 Mermaid를 다시 설계해 주세요. 원본 관계를 보존하고 모바일용 개요와 상세를 나누세요.”
+- “writing-for-humans의 설계 문서에 맞춰 그림을 만들고 HTML과 Word로 패키징해 주세요.”
+
+[모바일 분류](../../skills/diagram-design/references/mobile.md)는 유형이 아니라 측정한 개별 산출물에 적용됩니다. 상류 예제나 유형 이름만으로 모바일 지원을 주장하지 않습니다. 모바일이 필요한 그림은 실제 문서에 삽입한 상태로 360px과 1280px에서 검수합니다. 재배치하거나 나눌 때에는 관계, 축, 시간, 포함 의미를 보존하며, 폭만 줄이거나 글자를 숨겨 통과시키지 않습니다.
+
+[문서 적용 규칙](../../skills/diagram-design/references/harness-documents.md)은 `writing-for-humans`의 장르, 색, 서체를 그림에 적용합니다. 본문 Markdown과 그림 HTML이 원본이며, 문서용 SVG와 Word용 PNG는 그림 HTML에서 내보내는 파생 산출물입니다. Markdown과 HTML에는 SVG를 사용하고 Word에는 PNG를 사용합니다. 완성한 HTML은 외부 폰트 요청과 스크립트가 없어야 하며, 그림은 독립 출력뿐 아니라 실제 HTML 또는 Word 문서에서도 확인합니다.
+
+생성 도구에 그림을 맡길 때에도 유형, 모바일 조건, 문서 테마를 입력으로 전달하고 결과를 직접 렌더링해 검수합니다. 특정 생성기의 성공 사례를 다른 그림의 품질 보증으로 일반화하지 않습니다. 설치 전환은 [설치 안내](installation.md#diagram-skill-migration)를 따릅니다.

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>릴리즈 단계별 배포 타임라인 (예시) · Diagram Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: only light;
+      --ht-bg: #ffffff;
+      --ht-panel: #f6f8fa;
+      --ht-ink: #16191d;
+      --ht-muted: #5b6470;
+      --ht-line: #d7dce3;
+      --ht-accent: #1f4d7a;
+      --ht-warn: #8a5a00;
+      --ht-note-bg: #fffaf0;
+      --ht-font: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      --ht-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace;
+    }
+    body {
+      font-family: var(--ht-font);
+      background: var(--ht-bg);
+      color: var(--ht-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 3vw, 32px) clamp(12px, 3vw, 24px);
+    }
+    .ht-frame {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .ht-eyebrow {
+      font-family: var(--ht-mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ht-muted);
+      margin-bottom: 6px;
+    }
+    .ht-title-text {
+      font-size: clamp(18px, 4vw, 22px);
+      font-weight: 700;
+      color: var(--ht-ink);
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ht-frame">
+    <p class="ht-eyebrow">시각 유형 · 타임라인 다이어그램 (Timeline, 예시)</p>
+    <h1 class="ht-title-text">프로덕션 무중단 릴리즈 타임라인 (예시)</h1>
+
+    <svg id="harness-timeline-svg" viewBox="0 0 320 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ht-title ht-desc" data-diagram-type="timeline" data-viewport="360,1280" data-mobile-status="verified" width="100%" height="auto" style="max-width: 520px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <title id="ht-title">프로덕션 무중단 릴리즈 타임라인 (예시)</title>
+      <desc id="ht-desc">09시 사전 준비부터 11시 30분 최종 안정화까지 단계별 배포 절차를 비례 시간 축(y=64+2.4×분)과 수직 카드로 시각화한 모바일 타임라인 다이어그램 예시.</desc>
+      <style>
+        #harness-timeline-svg {
+          max-width: 520px;
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+          font-family: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+      </style>
+      <defs>
+        <marker id="ht-arrow-muted" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#5b6470"/>
+        </marker>
+      </defs>
+
+      <!-- 캔버스 배경 -->
+      <rect width="100%" height="100%" fill="#ffffff"/>
+
+      <!-- 수직 시간 중심축 (선형 비례 척도) -->
+      <line x1="50" y1="36" x2="50" y2="450" stroke="#1f4d7a" stroke-width="2"/>
+      <line x1="50" y1="450" x2="50" y2="462" stroke="#5b6470" stroke-width="1.4" marker-end="url(#ht-arrow-muted)"/>
+
+      <!-- 마일스톤 1: 09:00 (경과 0분 -> cy=64) -->
+      <text x="42" y="68" fill="#5b6470" font-size="12" font-family="'ui-monospace', monospace" font-weight="600" text-anchor="end">09:00</text>
+      <circle cx="50" cy="64" r="5" fill="#1f4d7a" data-minute="0"/>
+      <circle cx="50" cy="64" r="2" fill="#ffffff"/>
+
+      <rect x="62" y="40" width="242" height="48" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <text x="74" y="60" fill="#16191d" font-size="13" font-weight="700">배포 준비 및 사전 점검 (예시)</text>
+      <text x="74" y="78" fill="#5b6470" font-size="12">체크리스트 확인 · DB 호환성 검증</text>
+
+      <!-- 마일스톤 2: 09:30 (경과 30분 -> cy=136) -->
+      <text x="42" y="140" fill="#5b6470" font-size="12" font-family="'ui-monospace', monospace" font-weight="600" text-anchor="end">09:30</text>
+      <circle cx="50" cy="136" r="5" fill="#1f4d7a" data-minute="30"/>
+      <circle cx="50" cy="136" r="2" fill="#ffffff"/>
+
+      <rect x="62" y="112" width="242" height="48" rx="6" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.4"/>
+      <text x="74" y="132" fill="#1f4d7a" font-size="13" font-weight="700">카나리 배포 (트래픽 5%, 예시)</text>
+      <text x="74" y="150" fill="#5b6470" font-size="12">신규 버전 Pod 기동 및 라우팅</text>
+
+      <!-- 마일스톤 3: 10:15 (경과 75분 -> cy=244) -->
+      <text x="42" y="248" fill="#5b6470" font-size="12" font-family="'ui-monospace', monospace" font-weight="600" text-anchor="end">10:15</text>
+      <circle cx="50" cy="244" r="5" fill="#8a5a00" data-minute="75"/>
+      <circle cx="50" cy="244" r="2" fill="#ffffff"/>
+
+      <rect x="62" y="220" width="242" height="48" rx="6" fill="#fffaf0" stroke="#8a5a00" stroke-width="1.2"/>
+      <text x="74" y="240" fill="#8a5a00" font-size="13" font-weight="700">지표 모니터링 및 검증 (예시)</text>
+      <text x="74" y="258" fill="#16191d" font-size="12">오류율 0.01% 이하 · 지연 시간 정상</text>
+
+      <!-- 마일스톤 4: 11:00 (경과 120분 -> cy=352) -->
+      <text x="42" y="356" fill="#5b6470" font-size="12" font-family="'ui-monospace', monospace" font-weight="600" text-anchor="end">11:00</text>
+      <circle cx="50" cy="352" r="5" fill="#1f4d7a" data-minute="120"/>
+      <circle cx="50" cy="352" r="2" fill="#ffffff"/>
+
+      <rect x="62" y="328" width="242" height="48" rx="6" fill="#ffffff" stroke="#1f4d7a" stroke-width="1.4"/>
+      <text x="74" y="348" fill="#1f4d7a" font-size="13" font-weight="700">전면 롤아웃 (100% 전환, 예시)</text>
+      <text x="74" y="366" fill="#5b6470" font-size="12">전체 파드 교체 · 구버전 트래픽 차단</text>
+
+      <!-- 마일스톤 5: 11:30 (경과 150분 -> cy=424) -->
+      <text x="42" y="428" fill="#5b6470" font-size="12" font-family="'ui-monospace', monospace" font-weight="600" text-anchor="end">11:30</text>
+      <circle cx="50" cy="424" r="5" fill="#1f4d7a" data-minute="150"/>
+      <circle cx="50" cy="424" r="2" fill="#ffffff"/>
+
+      <rect x="62" y="400" width="242" height="48" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="1"/>
+      <text x="74" y="420" fill="#16191d" font-size="13" font-weight="700">배포 완료 및 최종 안정화 (예시)</text>
+      <text x="74" y="438" fill="#5b6470" font-size="12">사후 지표 점검 완료 · 배포 보고</text>
+
+      <!-- 하단 범례 및 비례 시간 안내 스트립 (품질 과장 제거) -->
+      <rect x="16" y="472" width="288" height="56" rx="6" fill="#f6f8fa" stroke="#d7dce3" stroke-width="0.8"/>
+      <text x="160" y="494" fill="#16191d" font-size="12" font-weight="600" text-anchor="middle">시간 간격 비례 수직 타임라인 (선형 매핑 예시)</text>
+      <text x="160" y="514" fill="#5b6470" font-size="12" text-anchor="middle">수식 y=64+2.4×분 기준으로 시간 경과 시각화</text>
+    </svg>
+  </div>
+</body>
+</html>

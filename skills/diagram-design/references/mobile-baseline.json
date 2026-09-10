@@ -1,0 +1,332 @@
+{
+  "source": "https://github.com/cathrynlavery/diagram-design",
+  "commit": "562dbdf93ff3c3da630be4f90f4f6c2548175058",
+  "viewport": {
+    "width": 360,
+    "height": 900
+  },
+  "browser": "Chrome/150.0.7871.24 (Linux headless)",
+  "scope": "Upstream minimal HTML examples only. Type eligibility is not an artifact pass. Overlap candidates are not assessed here. SVG parent text with zero font size is excluded from minimum metric; tspan-only glyphs are not independently measured.",
+  "examples": [
+    {
+      "type": "architecture",
+      "file": "../assets/example-architecture.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.3,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "it-state",
+      "file": "../assets/example-it-state.html",
+      "page_width_px": 360,
+      "minimum_svg_text_px": 7.67,
+      "status": "needs-adaptation",
+      "reason": "text-below-11px"
+    },
+    {
+      "type": "flowchart",
+      "file": "../assets/example-flowchart.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "sequence",
+      "file": "../assets/example-sequence.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.3,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "state",
+      "file": "../assets/example-state.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.3,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "er",
+      "file": "../assets/example-er.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "timeline",
+      "file": "../assets/example-timeline.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "swimlane",
+      "file": "../assets/example-swimlane.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "quadrant",
+      "file": "../assets/example-quadrant.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "radar",
+      "file": "../assets/example-radar.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "polar",
+      "file": "../assets/example-polar.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "loop",
+      "file": "../assets/example-loop.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.92,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "nested",
+      "file": "../assets/example-nested.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "tree",
+      "file": "../assets/example-tree.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.3,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "org-chart",
+      "file": "../assets/example-org-chart.html",
+      "page_width_px": 360,
+      "minimum_svg_text_px": 8.48,
+      "status": "needs-adaptation",
+      "reason": "text-below-11px"
+    },
+    {
+      "type": "layers",
+      "file": "../assets/example-layers.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "venn",
+      "file": "../assets/example-venn.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 8.1,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "pyramid",
+      "file": "../assets/example-pyramid.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "bar",
+      "file": "../assets/example-bar.html",
+      "page_width_px": 792,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "waterfall",
+      "file": "../assets/example-waterfall.html",
+      "page_width_px": 360,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "text-below-11px"
+    },
+    {
+      "type": "treemap",
+      "file": "../assets/example-treemap.html",
+      "page_width_px": 792,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "line",
+      "file": "../assets/example-line.html",
+      "page_width_px": 792,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "gantt",
+      "file": "../assets/example-gantt.html",
+      "page_width_px": 792,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "scatter",
+      "file": "../assets/example-scatter.html",
+      "page_width_px": 792,
+      "minimum_svg_text_px": 5.32,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "high-level",
+      "file": "../assets/example-high-level.html",
+      "page_width_px": 992,
+      "minimum_svg_text_px": null,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "process",
+      "file": "../assets/example-process.html",
+      "page_width_px": 1032,
+      "minimum_svg_text_px": 4.7,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "medallion",
+      "file": "../assets/example-medallion.html",
+      "page_width_px": 1072,
+      "minimum_svg_text_px": 7,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "data-flow",
+      "file": "../assets/example-data-flow.html",
+      "page_width_px": 760,
+      "minimum_svg_text_px": 5,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "dp-integration",
+      "file": "../assets/example-dp-integration.html",
+      "page_width_px": 1132,
+      "minimum_svg_text_px": 6.42,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "dp-security-matrix",
+      "file": "../assets/example-dp-security-matrix.html",
+      "page_width_px": 360,
+      "minimum_svg_text_px": 7.67,
+      "status": "needs-adaptation",
+      "reason": "text-below-11px"
+    },
+    {
+      "type": "sankey",
+      "file": "../assets/example-sankey.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "fishbone",
+      "file": "../assets/example-fishbone.html",
+      "page_width_px": 1112,
+      "minimum_svg_text_px": 5.11,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "wardley",
+      "file": "../assets/example-wardley.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.2,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "kanban",
+      "file": "../assets/example-kanban.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.43,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "journey",
+      "file": "../assets/example-journey.html",
+      "page_width_px": 992,
+      "minimum_svg_text_px": 6.4,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "deployment",
+      "file": "../assets/example-deployment.html",
+      "page_width_px": 912,
+      "minimum_svg_text_px": 5.92,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "dependency",
+      "file": "../assets/example-dependency.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.3,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "uml-class",
+      "file": "../assets/example-uml-class.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 7.35,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "story-map",
+      "file": "../assets/example-story-map.html",
+      "page_width_px": 932,
+      "minimum_svg_text_px": 6.98,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    },
+    {
+      "type": "db-schema",
+      "file": "../assets/example-db-schema.html",
+      "page_width_px": 992,
+      "minimum_svg_text_px": 7.11,
+      "status": "needs-adaptation",
+      "reason": "page-overflow"
+    }
+  ]
+}
