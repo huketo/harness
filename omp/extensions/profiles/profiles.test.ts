@@ -186,9 +186,9 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 			},
 			async compact(options: string | CompactOptions) {
 				expect(selected).toBe(old);
-				// OMP's soft method removes its provider-specific remote state.
+				// Simulate OMP's method boundary: only soft removes its own remote state.
 				if (typeof options === "string" || options.mode !== "soft")
-					throw new Error("Remote state requires a portable soft handoff");
+					throw new Error("OMP remote state requires portable soft compaction");
 				observed.push("compact");
 				if (fail) throw new Error("summarizer unavailable");
 				native = false;
@@ -258,13 +258,32 @@ async function effortSession(
 	const handlers = new Map<string, unknown>();
 	let entries = structuredClone(initialEntries);
 	let level = "medium" as ThinkingLevel;
-	let model = {
-		id: "gpt-5.6-sol",
-		provider: "openai-codex",
-		contextWindow: 272000,
-		maxTokens: 128000,
-		thinking: { efforts: ["low", "medium", "high", "max"] },
-	} as unknown as Model;
+	let idle = true;
+	const notifications: { message: string; severity: string }[] = [];
+	const catalog: Record<string, Model> = {
+		"openai-codex/gpt-5.6-sol": {
+			id: "gpt-5.6-sol",
+			provider: "openai-codex",
+			contextWindow: 272000,
+			maxTokens: 128000,
+			thinking: { efforts: ["low", "medium", "high", "max"] },
+		} as Model,
+		"openai-codex/gpt-6-astra": {
+			id: "gpt-6-astra",
+			provider: "openai-codex",
+			contextWindow: 272000,
+			maxTokens: 128000,
+			thinking: { efforts: ["low", "medium", "high", "max"] },
+		} as Model,
+		"anthropic/claude-fable-5-1": {
+			id: "claude-fable-5-1",
+			provider: "anthropic",
+			contextWindow: 1000000,
+			maxTokens: 128000,
+			thinking: { efforts: ["low", "medium", "high"] },
+		} as Model,
+	};
+	let model = catalog["openai-codex/gpt-5.6-sol"];
 	const pi = {
 		pi: { getAgentDir: () => dir },
 		registerFlag() {},
@@ -285,7 +304,8 @@ async function effortSession(
 		setThinkingLevel(value: ThinkingLevel) {
 			level = value;
 		},
-		async setModel() {
+		async setModel(target: Model) {
+			model = target;
 			return true;
 		},
 	};
@@ -293,30 +313,43 @@ async function effortSession(
 		get model() {
 			return model;
 		},
-		models: { resolve: () => model },
-		isIdle: () => true,
+		models: {
+			resolve: (key: string) => catalog[key] ?? model,
+		},
+		isIdle: () => idle,
 		getContextUsage: () => ({ tokens: 0 }),
 		ui: {
-			notify(_message: string, severity: string) {
-				if (severity === "error") throw new Error(_message);
+			notify(message: string, severity: string) {
+				notifications.push({ message, severity });
+				if (severity === "error") throw new Error(message);
 			},
 		},
 		sessionManager: { getBranch: () => entries },
 	} as unknown as ExtensionCommandContext;
 	extension(pi as unknown as ExtensionAPI);
-	const emit = (name: string) => {
+	const emit = (name: string, payload?: Record<string, unknown>) => {
 		const handler = handlers.get(name);
 		if (typeof handler !== "function")
 			throw new Error(`Missing session event handler: ${name}`);
-		return handler({ type: name, systemPrompt: [] }, ctx);
+		return handler({ type: name, systemPrompt: [], ...payload }, ctx);
 	};
 	await emit("session_start");
 	return {
 		command: (args: string) => commands.effort.handler(args, ctx),
 		profile: (name: string) => commands.profile.handler(name, ctx),
 		request: () => emit("before_agent_start"),
+		agentEnd: (options?: { willContinue?: boolean }) =>
+			emit("agent_end", { willContinue: options?.willContinue }),
 		level: () => level,
+		model: () => model,
 		entries: () => structuredClone(entries),
+		setIdle(val: boolean) {
+			idle = val;
+		},
+		notifications: () => [...notifications],
+		clearNotifications() {
+			notifications.length = 0;
+		},
 		selectModel(id: string) {
 			model = { ...model, id };
 		},
@@ -409,3 +442,105 @@ test("native model switch cannot leave an unrelated profile selected after a ses
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("effort changes immediately during streaming with notification", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "harness-effort-streaming-"));
+	try {
+		const session = await effortSession(dir);
+		session.setIdle(false);
+		session.clearNotifications();
+		await session.command("high");
+		expect(session.level()).toBe("high");
+		const notes = session.notifications();
+		expect(
+			notes.some((n) =>
+				n.message.includes("현재 진행 중인 응답 이후 단계부터 반영됩니다."),
+			),
+		).toBe(true);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("profile switch within same provider is deferred during streaming until agent_end", async () => {
+	const dir = mkdtempSync(
+		join(tmpdir(), "harness-profile-streaming-same-provider-"),
+	);
+	try {
+		const session = await effortSession(dir);
+		session.setIdle(false);
+		session.clearNotifications();
+		// "best" uses openai-codex/gpt-6-astra (same provider as gpt-5.6-sol)
+		await session.profile("best");
+		// Model must NOT change immediately while streaming
+		expect(session.model().id).toBe("gpt-5.6-sol");
+		const notes = session.notifications();
+		expect(
+			notes.some((n) =>
+				n.message.includes(
+					"현재 응답이 끝난 뒤 best(gpt-6-astra) 프로필로 전환됩니다.",
+				),
+			),
+		).toBe(true);
+
+		// When turn completes (agent_end with willContinue=false), profile switches
+		session.setIdle(true);
+		await session.agentEnd({ willContinue: false });
+		expect(session.model().id).toBe("gpt-6-astra");
+		expect(session.level()).toBe("medium");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("profile switch across providers is blocked during streaming", async () => {
+	const dir = mkdtempSync(
+		join(tmpdir(), "harness-profile-streaming-cross-provider-"),
+	);
+	try {
+		const session = await effortSession(dir);
+		session.setIdle(false);
+		session.clearNotifications();
+		// "hard-code" uses anthropic/claude-fable-5-1 (cross-provider from openai-codex)
+		await session.profile("hard-code");
+		expect(session.model().id).toBe("gpt-5.6-sol");
+		const notes = session.notifications();
+		expect(
+			notes.some(
+				(n) =>
+					n.severity === "warning" &&
+					n.message.includes(
+						"스트리밍 중에는 다른 제공자(anthropic)로 전환할 수 없습니다.",
+					),
+			),
+		).toBe(true);
+
+		// agent_end should NOT trigger any switch since it was blocked
+		session.setIdle(true);
+		await session.agentEnd({ willContinue: false });
+		expect(session.model().id).toBe("gpt-5.6-sol");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("deferred profile switch is cancelled on session switch", async () => {
+	const dir = mkdtempSync(
+		join(tmpdir(), "harness-profile-streaming-session-switch-"),
+	);
+	try {
+		const session = await effortSession(dir);
+		session.setIdle(false);
+		await session.profile("best");
+		expect(session.model().id).toBe("gpt-5.6-sol");
+
+		// User switches sessions before turn completes
+		await session.switchTo([]);
+		session.setIdle(true);
+		await session.agentEnd({ willContinue: false });
+		expect(session.model().id).toBe("gpt-5.6-sol");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+

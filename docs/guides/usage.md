@@ -39,6 +39,8 @@ OMP 안에서는 `/profile` 선택기 또는 `/profile code`로 용도를 선택
 
 `/effort low --profile`은 선택한 용도의 **공용 저장값**을 바꾸고 현재 세션의 임시 변경을 해제합니다. 같은 용도를 사용하는 다른 세션에도 적용될 수 있지만, 그 세션에 별도 임시 effort가 있으면 그것을 우선합니다. `/effort reset --profile`은 공용 용도 저장값을 해제합니다. 공용값은 `~/.omp/agent/harness-profiles-state.json`, 용도 정본은 `omp/profiles.json`입니다. 기존 공용 모델 기본값과 `omp-profile effort set` CLI의 명시적 저장 동작은 유지합니다.
 
+스트리밍 중에도 `/effort`로 사고 강도를 변경할 수 있으며, 현재 진행 중인 단일 응답 이후 단계(다음 도구 실행 후 응답 또는 다음 턴)부터 반영됩니다. 스트리밍 중 `/profile <용도>`를 입력하면 동일 제공자(provider) 내 모델인 경우 현재 응답 완료 후 자동으로 전환되는 예약 전환 방식으로 동작하며, 다른 제공자로의 전환은 실행 중 턴 중단과 컨텍스트 불일치를 방지하기 위해 응답 완료 후 시도하도록 안내합니다.
+
 내장 `smol`·`mid`·`slow` 역할은 기존 서브에이전트와의 호환에만 사용합니다. 이 용도 프로필은 인증·세션 전체를 격리하는 OMP의 `--profile` 옵션과 다릅니다.
 
 Fable 5.1·Astra는 medium, Opus 5·Sol은 코딩 high와 일반 작업 medium, Luna는 max를 사용합니다. Flash의 기계적 작업·검색·미디어·자동화 프로필은 high입니다. AGY Opus 4.6 Thinking의 `fallback` 프로필은 별도 effort 선택을 지원하지 않습니다. 실제 이름과 최종 모델·effort는 `list`·`show` 출력이 정본입니다. 확정되지 않은 “최적 effort”나 서로 다른 실행기 사이의 강도 동등성을 주장하지 않습니다.
