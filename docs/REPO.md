@@ -90,6 +90,8 @@ bun test herdr/cron/host-sync.test.mjs
 
 2026-09-15에는 [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)의 MIT 자료를 선별 편입했습니다. `awesome-interface`에는 시각 방향·보존형 리디자인 참조만 추가하고, `image-to-code`·`imagegen`·`design-md`를 별도 진입점으로 둡니다. 이미지 생성의 웹·모바일·브랜드 분기는 일반 참조 문서이며 추가 등록하지 않습니다. theme/output/stitch 이름의 스킬이나 필수 생성 파이프라인은 도입하지 않습니다. 각 항목의 고정 revision과 입력 해시는 `third-party/adopted-skills.json`이 소유하고, 기존 UI 라이선스와 새 `LICENSE.taste-skill` 고지를 함께 유지합니다. 새 스킬은 각 디렉터리의 `LICENSE`를 사용합니다.
 
+2026-09-16에는 [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/85e8e2363b713506e1d5b6e07a0eb2da66be1bc3)의 MIT 자료 중 웹 모션·애니메이션·제스처 지침만 `awesome-interface`에 선별 편입했습니다. 일반 모션은 `references/ui.md`, 드래그·스와이프·관성·스냅은 필요할 때만 읽는 `references/gestures.md`가 다룹니다. React·Motion·Base UI를 필수로 삼지 않으며 기존 의존성과 컴포넌트 API를 우선합니다. 별도 스킬, 모바일 웹 초기 설정, 네이티브 API, 감사·프로토타입 절차는 추가하지 않았습니다. 입력 revision·해시는 `third-party/adopted-skills.json`, 원저작자의 MIT 고지는 `LICENSE.emilkowalski`에 보존합니다.
+
 `imagegen`의 독립 로고 분기는 워드마크·심벌·마스코트·조합형·엠블럼을 다룹니다. [s1dashu/ip-as-logo-skill](https://github.com/s1dashu/ip-as-logo-skill)의 조형 지침은 선택형 `references/logo/rounded-ip.md`에만 수용했고 `LICENSE.ip-as-logo`에 원저작자의 MIT 고지를 보존합니다. 고정 revision·입력 해시·로컬 변경은 같은 provenance 기록에 추가합니다. 별도 로고 스킬이나 상류의 고정 배치·무검수 생성 절차는 설치하지 않습니다.
 
 `git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)의 MIT 스킬을 2026-09-09에 편입했습니다. 본문은 그대로 두고 description만 트리거 조건으로 줄였습니다. 같은 날 `daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description도 줄였습니다. description은 시스템 프롬프트에 항상 실리는 유일한 부분이므로 절차 설명은 본문에 두고, 이웃 스킬과 겹치는 트리거는 한쪽에만 둡니다. 근거는 `docs/FACTS.md` 11절에 있습니다.

@@ -1,6 +1,6 @@
 ---
 name: awesome-interface
-description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, and visual polish or motion. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, API interface design, or backend-only code review."
+description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, native-platform animation APIs, API interface design, or backend-only code review."
 license: MIT
 ---
 
@@ -44,7 +44,7 @@ The links below are the authoritative rules. Read the relevant document before a
 | [Writing](references/writing.md) | Creating or correcting labels, actions, instructions, empty states, confirmations, or recovery messages. |
 | [Typography](references/typography.md) | Font loading, scale, spacing, wrapping, truncation, numeric alignment, language, or bidirectional rendering is involved. |
 | [Colors](references/colors.md) | Generating or converting palettes, semantic tokens, themes, gamut, gradients, or measuring rendered contrast. Preserve established notation unless migration is requested. |
-| [UI polish and motion](references/ui.md) | Surfaces, borders, shadows, optical alignment, icons, imagery, transitions, or interaction feedback are involved. |
+| [UI polish and motion](references/ui.md) | Surfaces, borders, shadows, optical alignment, icons, imagery, transitions, or interaction feedback are involved. For web drag, swipe, momentum or snap behavior, also read the conditional [gesture reference](references/gestures.md). |
 
 A full review covers accessibility → layout → writing → typography → colors → UI. A focused review reports its narrower coverage and cannot approve the uninspected interface. A rule has one owner; report one root cause with secondary effects rather than duplicate findings.
 

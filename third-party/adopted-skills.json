@@ -70,12 +70,13 @@
     },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
-      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill",
+      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill + emilkowalski/skills",
       "ownership": "harness-owned; excluded from skills CLI updates",
       "license": "MIT",
       "previous_registration": null,
       "license_paths": [
         "skills/awesome-interface/LICENSE",
+        "skills/awesome-interface/LICENSE.emilkowalski",
         "skills/awesome-interface/LICENSE.taste-skill"
       ],
       "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
@@ -113,6 +114,23 @@
           "license_path": "LICENSE"
         },
         {
+          "source": "https://github.com/emilkowalski/skills",
+          "commit": "85e8e2363b713506e1d5b6e07a0eb2da66be1bc3",
+          "paths": [
+            "LICENSE",
+            "skills/emil-design-eng/SKILL.md",
+            "skills/animate/SKILL.md",
+            "skills/animate/RECIPES.md",
+            "skills/apple-design/SKILL.md",
+            "skills/review-animations/SKILL.md",
+            "skills/review-animations/STANDARDS.md"
+          ],
+          "snapshot_sha256": "625e6b37fa1ba598dc9ebd4e280ca76cbd1463d961dfcaf89c40414447ad1cab",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Selectively adapt web motion decisions, anchored entrances, gesture continuity and verification; exclude general styling, mobile-web baselines, native APIs, library-selection and audit/prototype workflows."
+        },
+        {
           "source": "https://github.com/Leonxlnx/taste-skill",
           "commit": "ccbc15639c97057cbfcf32ecebc38ef716e4bb37",
           "paths": [
@@ -130,6 +148,8 @@
         "Preserve review-only and explicit task intent boundaries; remove dependencies on independently installed upstream skills.",
         "Use project conventions and existing color notation; separate accessibility requirements from aesthetic starting points.",
         "Deduplicate shared UI rules and retain generation, improvement, review, stress, variant and explanation workflows.",
+        "Adapt Emil Kowalski's motion material into the existing UI domain and one conditional web-gesture reference; preserve project tokens, component/library contracts, accessibility and evidence-based review instead of mandatory curves, timing limits or package choices.",
+        "Clarify signed recent release velocity, pointer cancellation versus normal capture release, re-grab continuity and reduced-motion state geometry; retain upstream MIT notice and keep native APIs outside this branch.",
         "Selectively adapt taste-skill and redesign-skill into conditional art-direction and preservation-first redesign references; omit theme/output entry points and arbitrary aesthetic bans."
       ],
       "excluded_sources": [

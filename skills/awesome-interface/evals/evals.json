@@ -138,6 +138,42 @@
         "Plans verification of the purchase interaction and responsive states, not just a before/after screenshot.",
         "Does not fabricate social proof or perform implementation."
       ]
+    },
+    {
+      "id": 13,
+      "name": "motion-project-contract",
+      "prompt": "웹 팝오버의 모션 설계만 검토해 주세요. Vue와 자체 컴포넌트를 쓰며 Motion이나 Base UI는 없습니다. 위치 엔진은 --popover-origin을 제공합니다. 승인된 진입은 opacity만 180ms ease-out이고 키보드로 열어도 즉시 조작 가능합니다. 화면은 아직 제공하지 않았습니다. 이 설계를 반드시 바꿔야 하는지와 확인할 항목을 말하고, 파일 수정이나 패키지 설치는 하지 마세요.",
+      "expected_output": "Preserves the existing stack, component contract and valid opacity feedback; distinguishes potential checks from observed defects.",
+      "files": [],
+      "expectations": [
+        "Does not require Motion, React, Base UI attributes, a custom easing curve, or removing animation solely because activation is by keyboard.",
+        "Uses the actual positioning contract if a scale entrance is proposed and keeps that change optional rather than replacing the accepted fade.",
+        "Names interruption, exit and reduced-motion checks without claiming rendered verification or making changes."
+      ]
+    },
+    {
+      "id": 14,
+      "name": "gesture-release-lifecycle",
+      "prompt": "웹 드로어의 드래그 설계를 검토해 주세요. 해제 속도는 Math.abs(totalDistance) / totalElapsed로 계산하고 숫자 그대로 px/s spring API에 넘깁니다. pointerup은 닫힘을 확정한 다음 capture를 해제하며, lostpointercapture는 무조건 열림으로 되돌립니다. 닫힘 도중 다시 잡으면 논리 목표 위치에서 드래그를 시작합니다. 수정 코드는 쓰지 말고 실제로 깨질 동작과 수정·검증 계획을 설명하세요.",
+      "expected_output": "Separates recent signed release velocity and units from total average speed; distinguishes cancellation from normal capture release and re-grabs from presentation state.",
+      "files": [],
+      "expectations": [
+        "Addresses late flicks, reversals and pauses using recent signed velocity with explicit clock/unit handling rather than an absolute whole-drag average.",
+        "Prevents normal capture release from rolling back a completed pointerup while retaining a non-committing cancellation path.",
+        "Starts a re-grab at the current rendered position, guards stale settling callbacks, and plans second-pointer and cancellation checks without claiming device execution."
+      ]
+    },
+    {
+      "id": 15,
+      "name": "gesture-reduced-motion-geometry",
+      "prompt": "웹 드로어는 닫힘 상태를 translateX(-100%)로 표현합니다. reduced-motion 대응으로 모든 transform을 none !important로 바꾸고, animationend에서만 포커스를 복원하려고 합니다. 이 접근을 검토하고 대안을 설명해 주세요. 마우스 자동화만 가능하며 휴대폰 실기기는 없습니다. 구현하거나 실행했다고 말하지 마세요.",
+      "expected_output": "Preserves closed-state geometry and completion semantics while reducing movement; keeps the non-drag path reachable and limits touch verification claims.",
+      "files": [],
+      "expectations": [
+        "Explains that clearing state transforms can expose a closed drawer and changes motion treatment without erasing open/closed geometry.",
+        "Keeps focus and essential completion correct when animation is immediate, interrupted or canceled rather than depending only on animationend.",
+        "Includes a non-drag interaction path and marks physical touch feel/browser gesture arbitration unverified."
+      ]
     }
   ]
 }

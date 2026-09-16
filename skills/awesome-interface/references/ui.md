@@ -33,6 +33,24 @@ A trailing icon may need slightly less padding on its side; about `2px` is a sta
 
 Use the accessibility reference for icon-only control names, decorative glyph exposure and persistent non-motion state cues. A correct-looking icon does not prove an operable control.
 
+## Decide before animating
+
+Within the requested surface, establish frequency, purpose and the smallest useful transition before choosing values. Motion should convey feedback, state or a spatial relationship, bridge an otherwise confusing change, or explain a rare event. An immediate state change is a valid result when movement adds no information. Reduce repeated delay on frequent actions; input modality or an assumed daily-use count alone is not a ban on animation.
+
+Reuse the project's easing and duration tokens. Choose timing for the travel distance, surface size and input response: an ease-out can make a user-triggered entrance respond promptly, ease-in-out can suit on-screen repositioning, and linear timing can communicate constant progress. These are starting choices, not mandatory curves or a universal duration ceiling. Distinguish deliberate hold progress from a prompt release response. Preserve useful context through the exit rather than forcing identical travel or timing in both directions.
+
+Select the smallest existing mechanism that handles the lifecycle:
+
+| Need | Starting mechanism and boundary |
+| --- | --- |
+| Hover, press or class/attribute-driven state interpolation | CSS transition; see interruption rules below. |
+| Entry from a newly rendered state | `@starting-style` where the supported browsers allow it; the base style remains visible and usable without it. It does not solve exit/unmount lifecycle by itself. |
+| A predetermined sequence | CSS keyframes or the project's existing timeline mechanism. |
+| Programmatic playback, cancellation or retargeting | WAAPI when it meets the task; preserve the current rendered value when replacing an animation and clean up its effects. |
+| Spring, layout, presence or gesture continuity | The existing animation mechanism and its installed version's APIs. Read [web gestures](gestures.md) for drag, swipe, momentum and snapping, not for ordinary fades. |
+
+These are capabilities, not a package shopping list. Inspect installed dependencies before using library examples. React hooks, Motion imports and component state attributes are adapters, not framework requirements. Add a dependency only when the requested behavior needs it and the project permits it; a simple transition does not justify one.
+
 ## Interruptible state changes
 
 Prefer CSS transitions for ordinary hover, toggle and open/close interpolation: they retarget toward the current state when the user changes intent. Use keyframes or the existing motion library for sequences whose timeline matters. These are implementation choices, not claims that every keyframe or library animation is inherently uninterruptible; test the actual state machine.
@@ -46,6 +64,10 @@ Keep high-frequency actions immediate or brief; a small color/opacity transition
 For an infrequent entrance where order conveys hierarchy, group semantic chunks rather than animating every character. A stagger around `100ms` between a few chunks is a starting point; check total delay to the last action. Leave frequent tab changes, row hovers and typing unstaggered. Content and controls should not become unusable while waiting for decorative motion.
 
 Keep context-preserving exits quieter than entrances: a small fixed displacement, such as `12px`, and a short fade can be enough. Full travel is appropriate when it communicates a drawer closing or a card returning to a source. Immediate removal is valid when motion adds no information. Integrate exit lifecycle with the existing component mechanism so the node is not removed before its intended exit or left as an invisible interaction blocker afterward.
+
+For trigger-anchored popovers, menus and tooltips that scale, align the transform origin with the trigger and actual placement, including collision flips. Use the component's documented positioning values. Base UI's `--transform-origin` and its state attributes are library contracts, not standard CSS supplied by every popover. Keep centered dialogs centered; an opacity-only entrance is also valid.
+
+For a tooltip group, preserve the initial accidental-hover delay but use the existing provider's skip-delay behavior for nearby subsequent tooltips where supported. Consider skipping their entrance animation too. Verify focus entry, dismissal and pointer travel as well as hover; avoid a second timer system or library-specific attributes on unrelated primitives.
 
 For a contextual icon swap, first decide whether a direct swap is already clear. If cross-fading improves continuity, keep a stable wrapper and overlap the two glyphs so the button does not resize. With plain CSS, keep one glyph in flow and position the other over it; transition opacity on both. Scope pointer handling and accessibility exposure through the control's established semantics. Opacity alone does not remove an element from focus or hit testing.
 
@@ -63,6 +85,8 @@ For a custom controller, suppression must surround the actual theme mutation: ap
 
 Transforms and opacity are often compositor-friendly; filters, especially large blurs, can still be expensive depending on the browser and surface. Profile the changed interaction before claiming improved frame rate. Prefer removing an unnecessary effect over masking its cost with a hint.
 
+CSS and WAAPI can run eligible animations off the main thread; neither guarantees acceleration for every property, browser or animation configuration. If a Motion animation stutters under load, check its installed version's handling of individual transforms before considering a full `transform` string. Preserve existing transform composition and measure the same interaction before and after; a shorthand prop alone is not a performance defect.
+
 Use `will-change` only after observing and diagnosing first-frame stutter. Apply it to the specific moving element and property for the needed lifetime, then release it. Extra layers consume memory; blanket hints or `will-change: all` are not a performance strategy. Check layout/paint work and dropped frames on the target browser rather than guaranteeing GPU acceleration from a property name.
 
 When implementing motion, apply the reduced-motion and persistent-feedback contract from [accessibility](accessibility.md). The final state must remain understandable when the decorative transition does not run. Do not make initial `opacity: 0` depend on an animation that is disabled under that preference.
@@ -75,6 +99,8 @@ For each changed or reviewed component, walk applicable default, hover, focus, p
 - Open, close and reopen rapidly; navigate away during an exit; verify no invisible layer remains over the next interaction.
 - Refresh with an already-selected state; verify initial-animation suppression and intentional page entrance independently.
 - Compare stable button bounds during icon swaps and loading transitions; inspect the smallest icon size.
+- Check trigger placement and collision flips for anchored entrances; traverse a tooltip group by pointer and keyboard.
+- For drag, swipe or spring-driven snapping, run the interruption and cancellation checks in [web gestures](gestures.md).
 - Replay animation slowly where tooling permits, then at normal speed. If performance is the finding, capture the actual trace or timing evidence.
 
 Record the exact component, state, interaction and observed result. Source can show durations, property lists and lifecycle handlers, but not prove optical balance, interruption quality or frame rate. Mark unavailable browser/device and unexercised cases not verified. Propose changes for concrete lost context, unclear state, clipping, jitter or inconsistency; leave taste-only alternatives out of actionable findings.
