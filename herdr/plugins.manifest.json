@@ -23,8 +23,8 @@
   {
     "plugin_id": "usagebar",
     "source_slug": "huketo/herdr-agent-usage",
-    "requested_ref": "b939286b237ce591efccf9e6374e9560d0a939bb",
-    "resolved_commit": "b939286b237ce591efccf9e6374e9560d0a939bb",
+    "requested_ref": "7894d503dfaa67e272bb44f3bf5876edb4cb060c",
+    "resolved_commit": "7894d503dfaa67e272bb44f3bf5876edb4cb060c",
     "version": "0.5.12"
   }
 ]
