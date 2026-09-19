@@ -165,11 +165,11 @@ Regression boundary는 같은 model을 쓰는 두 session 중 한쪽의 effort �
 | herdr-cron | 0.2.2 | `3805d2c` |
 | Herdr HITL | 0.2.1 | `b478557` |
 | Herdr Sheep | 0.3.1 | `dc60164` |
-| Agent Usage | 0.5.12 | `7cdbc13` |
+| Agent Usage | 0.5.12 | `b939286` |
 
 HITL 기록을 0.2.0에서 [0.2.1](https://github.com/huketo/herdr-hitl/releases/tag/v0.2.1)로 갱신했습니다. 이 릴리스의 [IPC 수정](https://github.com/huketo/herdr-hitl/commit/d594c5eb023fc4bb87b15d87ff8a21124320d164)은 timeout 미지정과 명시적인 `0`을 구분하고 알림 유지 시간을 daemon 설정에 맡깁니다. 이는 설치된 핀의 변경이력이며 Telegram rate limit을 해결했다고 주장하지 않습니다.
 
-Agent Usage는 AGY 지원 등이 포함된 `huketo/herdr-agent-usage` fork를 유지합니다. [upstream과의 비교](https://github.com/huketo/herdr-agent-usage/compare/7cdbc13a3443d3868496d3d3f821bca2710b4b81...df95abc0ba2edb002697d49a218868f87f823a3e)에서는 fork 고유 커밋 6개와 upstream 고유 커밋 3개가 확인되었습니다. Upstream의 0.5.13·sidebar cache diagnostics는 별도 통합 검토 대상이며, 설치 핀을 upstream으로 교체하지 않았습니다.
+Agent Usage는 `huketo/herdr-agent-usage` fork의 `b939286`을 사용합니다. 이 핀은 Claude가 로컬에 기록한 모델 전용 주간 한도에서 Fable 사용량을 표시하고, 안정적인 비대화형 인증 경로가 없는 Antigravity provider를 제거합니다. Upstream 0.5.13과 sidebar cache diagnostics 통합은 별도 검토 대상입니다.
 
 ## 10. awesome-interface 편입과 검증 (2026-09-09)
 
