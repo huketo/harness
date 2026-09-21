@@ -7,7 +7,7 @@
 - 현재 설치기는 OMP CLI와 SDK를 패치하지 않습니다. 계정 선택은 내장 `/session pin`, 압축은 관리 설정과 내장 `/compact`를 사용합니다. 현재 설치·설정의 정본은 [설치 안내](guides/installation.md)입니다.
 - Bun 1.3.14가 설치기, TypeScript extension, `omp-profile`, `harness-run`, cost audit, host-sync의 기준 환경입니다.
 - Python 3 표준 라이브러리의 `sqlite3`와 `json`은 benchmark와 collector에 사용됩니다. `sqlite3`나 `jq` CLI가 모든 Herdr/cron 환경에 있다고 가정하지 않습니다.
-- 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL에서 Windows Chrome을 연결하는 기능은 전체 Windows 설치 지원과 별개입니다.
+- 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL2의 BrowserSkill 연결 검증은 전체 Windows 설치 지원과 별개입니다.
 
 ## 2. OMP 비대화형 실행
 
@@ -98,11 +98,11 @@ OMP 18.1.13에서 `/fresh`, 컨텍스트 초기화, 명시적 provider session I
 - `harness-run`은 retained Herdr tab에서 long-running command와 independent agent를 시작하고 state/log를 XDG state directory에 둡니다. `--detach`는 handle만 반환하며 readiness를 증명하지 않습니다.
 - Built-in task agents는 OMP Agent Hub에 남습니다. `harness-run agent`는 별도 conversation이므로 explicit brief가 필요합니다.
 
-### WSL에서 Windows Chrome
+### BrowserSkill on WSL2
 
-기록된 NAT-mode WSL 환경에서 Windows Chrome은 remote-debugging address를 지정해도 loopback에만 listen했고 WSL-to-host gateway access가 차단되었습니다. `skills/windows-chrome/scripts/windows-chrome.js`는 Windows `node.exe` relay를 process마다 interop으로 연결해 이를 우회합니다.
+2026-09-21에 Linux x64 `bsk 0.3.0`과 Windows Chrome 152의 BrowserSkill extension 0.3.0을 확인했습니다. WSL loopback의 기본 port 52800에서 daemon protocol 1.3과 extension protocol 1.3이 연결됐고, `bsk doctor --json`은 manager-owned `codex`·`claude-code` skill을 포함해 `fail`이나 `warn` 없이 통과했습니다.
 
-WSL과 Windows가 같은 port를 쓰면 localhost forwarding과 relay가 서로 되돌아오는 loop가 생길 수 있어 WSL 9222와 Windows 19222를 분리합니다. Chrome이 반환하는 WebSocket URL은 request `Host` header를 따르므로 relay가 client-facing host로 normalize합니다. 이는 관측한 WSL/Chrome 조합의 mechanism이며 모든 network mode의 보장이 아닙니다.
+CLI session은 `https://example.com`을 열어 “Example Domain”과 documentation-use 설명을 관찰한 뒤 중지됐고, fresh OMP 실행은 `--skills=browser-skill`로 같은 BrowserSkill workflow를 완료했습니다. 이는 해당 WSL2/Windows Chrome 조합의 local connection과 skill discovery를 확인한 결과이며 다른 network mode나 future release의 보장이 아닙니다.
 
 ### Herdr와 AGY
 

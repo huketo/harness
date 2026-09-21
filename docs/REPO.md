@@ -78,7 +78,7 @@ bun test herdr/cron/host-sync.test.mjs
 
 현재 스킬 목록은 `skills/`에서 확인합니다. 특정 프로젝트의 비공개 용어, endpoint, 고정 보고 양식, 사내 저장소를 전제로 하지 않습니다. 공개 `daily-report` 스킬은 `glab`을 통한 GitLab 수집과 iCal/`khal` 일정 수집, 근거 있는 초안, 사용자의 수동 Daou Office UI 입력까지만 설명합니다.
 
-외부 도구에 종속된 스킬은 해당 공개 프로젝트와 설치 관리자가 소유합니다. `third-party/skills.lock.json`은 공개 의존성의 비교 핀만 보존하며, 설치 디렉터리 사본을 두 번째 정본으로 만들지 않습니다.
+외부 도구에 종속된 스킬은 해당 공개 프로젝트와 설치 관리자가 소유합니다. `browser-skill`은 Tencent의 `bsk install-skill`이 설치하고 갱신하며 이 저장소에 사본을 두지 않습니다. `third-party/skills.lock.json`은 공개 의존성의 비교 핀만 보존하며, 설치 디렉터리 사본을 두 번째 정본으로 만들지 않습니다.
 
 ### 상류 스킬을 개인 정본으로 편입하기
 

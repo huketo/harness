@@ -2,13 +2,13 @@
 
 Use this reference after a deck runs and before delivery. Verification means exercising the actual presentation and each requested output, not inferring quality from source, a successful build, or one representative screenshot.
 
-Use available built-in tools and the project's existing preview/export mechanisms. Choose the browser by the requested verification purpose: Windows Chrome for visible Windows/user-assisted review, built-in or headless browsers for automation. In WSL, read `windows-chrome` for this distinction; WSLg GUI operation is not a valid substitute for the intended development/compatibility environment. Follow an explicit user browser choice rather than silently substituting another mode.
+Use available built-in tools and the project's existing preview/export mechanisms. Choose the browser by the requested verification purpose: BrowserSkill for visible logged-in Windows Chrome or user-assisted review, built-in or headless browsers for automation and export. In WSL2, the `browser-skill` instructions own its session lifecycle; WSLg GUI operation is not a valid substitute for the intended development or compatibility environment. Follow an explicit user browser choice rather than silently substituting another mode.
 
-### WSL: one Windows browser owner
+### WSL2: one BrowserSkill session owner
 
-Read `windows-chrome`, run its `scripts/windows-chrome.js start` command, and attach to the returned `endpoint:` through CDP. Prepare a dedicated review tab, select it with a unique URL/title target, and verify the actual URL before navigation. An OMP handle name does not create a separate Chrome tab. Serve WSL files over a Windows-reachable local HTTP route or use an actual Windows-readable file URL; Linux `/home/...` file URLs do not identify Windows files.
+Use `browser-skill` to start one Agent Window, navigate to a Windows-reachable HTTP preview URL, and observe the actual page before interacting. A Linux `/home/...` file URL does not identify a Windows file; serve WSL artifacts over localhost when the Windows browser must read them. Borrow an existing user tab only when the task requires it, return it promptly, and stop the BrowserSkill session on success or failure.
 
-For parallel authoring, workers can build independent sources while one integration owner performs Windows Chrome rendering, PDF export, and visual checks sequentially. Do not let several agents navigate the same real tab or compete for visibility. Use the official screenshot helper; a visibility warning requires correcting the target/visible tab, not bypassing the guard through raw Puppeteer screenshots. Detach tool handles afterward and leave Chrome running unless the user asks to close it.
+For parallel authoring, workers can build independent sources while one integration owner performs Windows Chrome interaction and visual checks sequentially. Do not let several agents operate the same session or user tab. BrowserSkill screenshots and observations cover the controlled tab; use the deck's supported headless/export mechanism for PDF or PPTX generation rather than assuming BrowserSkill exposes arbitrary CDP APIs.
 
 For automated checks, OMP's built-in browser or a headless browser can run inside WSL without being a WSLg GUI browser. Record the actual host, product, and headed/headless mode. Such evidence does not replace Windows-visible verification when the user specifically requested it.
 

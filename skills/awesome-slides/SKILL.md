@@ -73,7 +73,7 @@ For conversions, inventory text, tables, charts, images, ordering, and notes aga
 
 Read [Verification](references/verification.md). Exercise the actual presentation and requested export files. Inspect every slide and meaningful reveal state for legibility, missing material, overflow, and overlap; check the required navigation and notes. Render at the intended display and a narrow viewing size where relevant. A fixed-ratio mobile preview is not proof of a readable mobile handout.
 
-Choose the browser by verification purpose. In WSL, read `windows-chrome` for an actual visible Windows browser or user-assisted review; built-in/headless browsers remain valid for automated rendering and checks. Do not use a WSLg GUI browser as development or compatibility evidence merely because it opens. Honor an explicit browser request and record the real host/mode; the verification reference covers CDP tab ownership and Windows-readable paths.
+Choose the browser by verification purpose. In WSL2, use the external `browser-skill` when an actual visible, logged-in Windows browser or user-assisted review is required; built-in/headless browsers remain valid for automated rendering, exports, and checks. Do not use a WSLg GUI browser as development or compatibility evidence merely because it opens. Honor an explicit browser request and record the real host/mode; the verification reference covers BrowserSkill session ownership and Windows-reachable preview URLs.
 
 Fix observed failures at their source and recheck the affected state. A build success, source audit, or screenshot of the cover alone cannot approve the whole deck. State any missing runtime or unresolved required asset instead of claiming a finished result.
 

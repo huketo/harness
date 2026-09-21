@@ -13,7 +13,7 @@ Harness configures an existing coding-agent workstation. It does not install OMP
 | Bun | **1.3.14**. The installer, extensions, and helper CLIs use Bun; other releases are not maintained compatibility targets. |
 | Python 3 | Required for `omp/config.apply.sh`, benchmarks, and selected skill collectors. |
 | Existing personal instructions | `~/.claude/CLAUDE.md` must already be a file you maintain. The installer links it into AGY's global rules. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
-| Optional integrations | Install and authenticate Herdr and AGY before using their commands. Windows Chrome and the daily-report drafting workflow have separate prerequisites. |
+| Optional integrations | Install and authenticate Herdr and AGY before using their commands. BrowserSkill and the daily-report drafting workflow have separate prerequisites. |
 
 See [recorded compatibility evidence](../FACTS.md). This is a recommended personal setup, not a compatibility or support commitment.
 
@@ -82,14 +82,30 @@ The installer does **not** restore cron jobs, copy AGY settings, install plugin 
 - Repository-owned and adopted skills are linked by `install.sh`. Provenance and retained licenses are recorded in [adopted-skills.json](../../third-party/adopted-skills.json) and component license files.
 - [skills.lock.json](../../third-party/skills.lock.json) is a comparison snapshot of publicly available manager-owned skills, not a portable lockfile with a verified bulk restore command. Install only what you choose to trust.
 - [plugins.manifest.json](../../herdr/plugins.manifest.json) records public plugin repositories and pinned references. Review each license and prerequisite before installing it with its owning tool.
-- The browser CLI and its external skill are installed separately when needed:
+- BrowserSkill is an external CLI and manager-owned skill. On WSL2, install the Linux CLI in WSL and the extension in Windows Chrome:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tencent/BrowserSkill/main/install.sh | sh
+export PATH="${BSK_INSTALL_DIR:-$HOME/.local/bin}:$PATH"
+bsk install-skill --harness codex --json
+bsk install-skill --harness claude-code --json
+bsk doctor
+```
+
+  Follow the [upstream agent install guide](https://github.com/Tencent/BrowserSkill/blob/main/AGENT_INSTALL.md). The `codex` target writes `~/.agents/skills/browser-skill`, which OMP and AGY discover; `claude-code` writes its own managed copy. Do not copy either installation into this repository. Install the extension from its official store in Windows Chrome, select **Local connection**, and match the WSL daemon port (default `52800`). This path needs no `sudo`, Windows Node.js, CDP relay, firewall rule, or dedicated Chrome profile.
+- Playwright CLI remains an independent fallback for isolated automation:
 
 ```bash
 npm install -g @playwright/cli@latest
 npx skills add microsoft/playwright-cli --skill playwright-cli --global --agent universal --agent claude-code -y
 ```
 
-The `latest` example is not a reproducible version pin. Review the selected release and let the skill manager own its local lock state.
+The unpinned examples are not reproducible pins. Review the selected releases and let each owning installer manage its local state.
+
+
+### BrowserSkill migration
+
+`browser-skill` replaces the repository-owned `windows-chrome` skill for visible, logged-in Windows Chrome work from WSL2. Before removing the old source, inspect `~/.agents/skills/windows-chrome` and `~/.claude/skills/windows-chrome` with `readlink` and remove only symlinks that still route to this checkout's retired `skills/windows-chrome`. Remove the Claude link first. Preserve regular directories, external links, the old dedicated Chrome profile, and unrelated runtime state. Install BrowserSkill through `bsk`, run `bsk doctor`, verify a page in a stopped test session, and start a new agent session so the managed skill is discovered.
 
 ### Diagram skill migration
 
