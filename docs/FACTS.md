@@ -112,7 +112,7 @@ Herdr의 화면 기반 완료 감지는 integration마다 신뢰도가 다릅니
 
 ## 8. 모델 프로필·컨텍스트 정책의 근거 (2026-09-07)
 
-현재 정책의 정본은 `omp/profiles.json`입니다. Fable 5.1과 Astra는 medium, AGY Flash는 high를 사용하며 AGY Opus 4.6 Thinking은 별도 effort 선택을 노출하지 않습니다. Model guide, OMP catalog, runtime behavior를 분리해 해석합니다.
+현재 정책의 정본은 `omp/profiles.json`입니다. Fable 5.1과 Astra는 medium, AGY Flash는 high를 사용하며 AGY Opus 4.6 Thinking은 별도 effort 선택을 노출하지 않습니다. Model guide, OMP catalog, runtime behavior를 분리해 해석합니다. 이 절의 모델·effort는 2026-09-07 기준이며, 2026-09-23 개편 이후의 선택과 근거는 12절에 있습니다.
 
 - [OpenAI Compaction](https://developers.openai.com/api/docs/guides/compaction)의 `context_management`는 Responses request field입니다. 문서 예시 threshold는 보편적인 optimum이 아닙니다. Standalone compaction의 반환 window는 일부 item만 골라내지 않고 전체를 다음 request에 전달해야 합니다.
 - [Claude Compaction](https://platform.claude.com/docs/en/build-with-claude/compaction)은 beta와 strategy를 request와 replay 양쪽에 요구합니다. Minimum input token 조건에 못 미친 요청은 성공한 compaction으로 표시하지 않습니다.
@@ -192,3 +192,50 @@ OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 
 같은 로더로 같은 설치 목록을 읽은 조건에서 가시 이름·설명 문자 수는 8,241자에서 6,554자로 줄었습니다(항목 30개 동일). 라우팅 프로브는 OMP SDK `openai-codex/gpt-6-astra:low`, 도구 read/glob/grep, 빈 합성 작업 디렉터리에서 긍정 13·부정 7 프롬프트를 각 1회 실행했고 기준선과 후보 모두 20/20 통과했습니다. 각 사례 1회이므로 호출 정확도의 통계적 개선이나 전체 토큰·비용 절감을 주장하지 않습니다. 제한 SDK 리뷰어(다른 모델 계열) 1회차에서 blocking은 없었고 nit 4건을 반영했습니다.
 
 `herdr-hitl`의 description은 upstream v0.3.1에서 줄였고, 따옴표 없는 값의 `: `를 엄격한 YAML 파서가 거부하여 v0.3.2에서 값을 인용했습니다. OMP 로더가 경고 없이 읽는 것과 `skills` CLI가 설치할 수 있는 것은 다른 조건입니다.
+
+## 12. 새 모델 기준 라우팅 개편 (2026-09-23)
+
+2026-09-22에 공개된 Claude Opus 5.5, GPT-6 Sol, GPT-6 Luna를 기준으로 용도 프로필, 내장 역할, 모델별 지침, 벤치 후보를 다시 정했습니다. Fable 5.1과 GPT-6 Astra가 맡던 역할은 Opus 5.5로 옮기고 Sol과 Luna는 비용 계층으로 둡니다. 근거는 아래 공급사 자료와 Artificial Analysis(AA) 조회이며, 측정값은 조회 시점의 외부 결과이지 이 하네스 안의 성능 보장이 아닙니다.
+
+### 공급사 자료
+
+- [Opus 5.5 발표](https://www.anthropic.com/claude-opus-5-5)는 대부분의 작업에서 Fable 5.1 수준이고 기본 설정에서 Opus 5보다 40% 적게 든다고 밝힙니다. 단가는 입력 $4, 출력 $20, 캐시 읽기 $0.20입니다.
+- [Opus 5.5 프롬프트 가이드](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)는 기본 effort `medium`(Opus 5는 `high`)에서 시작해 자체 평가로 여러 단계를 비교하라고 권하고, `xhigh`·`max`는 품질 향상을 측정한 작업에만 쓰라고 적습니다. 요청 최상위 effort를 바꾸면 프롬프트 캐시가 무효화되고, 도구 없이 effort를 올려도 차트 읽기는 거의 나아지지 않는다고 설명합니다. 무인 실행 절은 도구 호출 없이 끝난 턴을 완료가 아니라 보고로 다루라고 하며, 소스 코드의 취약점 찾기는 사이버보안 안전장치의 허용 범위로 적습니다.
+- [GPT-6 Sol·Luna 발표](https://openai.com/index/introducing-gpt-6-sol-and-luna/)는 두 모델 API 단가를 GPT-5.6 대비 50% 내린 $2/$10, $0.10/$0.50로 밝힙니다.
+- [GPT-6 가이드](https://developers.openai.com/api/docs/guides/latest-model)는 이전 모델의 실효 reasoning effort를 유지하라고 권하고, Sol과 Luna는 `none`을 지원하지만 Astra는 지원하지 않는다고 적습니다. 자율 진행, 지시·스킬 우선순위, 평이한 문장, 위임, 테스트 범위 조절 지침이 있습니다.
+
+`omp/prompts/claude-opus-5-5.txt`, `gpt-6-sol.txt`, `gpt-6-luna.txt`는 이 중 완료 조건, 진행 알림, 자율 진행, 지시 우선순위, 필요한 만큼의 검증, 간결한 문장만 짧게 담습니다.
+
+### Artificial Analysis
+
+[모델 리더보드](https://artificialanalysis.ai/leaderboards/models)(Intelligence Index v4.3.2, 2026-09-23 조회)의 값입니다. Anthropic 행은 AA 표기상 "with fallback" 조건이고, 작업당 비용은 AA 지수 실행의 API 비용입니다.
+
+| 모델·강도 | Intelligence | Terminal-Bench 4.0 | 작업당 비용 | 출력 tok/s 중앙값 | 첫 청크 s 중앙값 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Opus 5.5 max | 58 | 60% | $5.98 | — | — |
+| Opus 5.5 xhigh | 56 | 60% | $3.46 | 76 | 165.2 |
+| Opus 5.5 high | 54 | 57% | $1.82 | 90 | 12.8 |
+| Opus 5.5 medium | 51 | 53% | $1.34 | 76 | 22.8 |
+| Fable 5.1 high | 51 | 52% | $3.91 | 56 | 26.2 |
+| Astra high | 51 | 54% | $1.73 | 49 | 79.0 |
+| Sol max | 48 | 44% | $1.06 | 115 | 102.2 |
+| Sol xhigh | 44 | 30% | $0.53 | 128 | 46.5 |
+| Sol high | 43 | 26% | $0.37 | 119 | 9.9 |
+| Luna max | 37 | 13% | $0.07 | 154 | 124.2 |
+| Luna xhigh | 34 | 8% | $0.04 | 153 | 22.5 |
+
+### 강도 결정
+
+- **Opus 5.5 일상 작업은 high**입니다(`frontend`·`orchestrate`·`opus-code`, `default`·`designer`·`plan`·`vision` 역할). 이전 Opus 코딩 프로필이 high였고, AA에서 high는 medium보다 지수 3점, Terminal-Bench 4%p 높습니다. 비코딩 `opus-general`은 공급사 기본값 medium입니다.
+- **어려운 작업과 최상위 계층은 xhigh**입니다(`hard-code`·`best`, `slow`·`advisor` 역할). AA에서 high보다 2점과 3%p 높지만 비용은 약 1.9배입니다. 공급사 권고에 따라 일상 역할에는 쓰지 않고, AA Terminal-Bench가 xhigh와 같은 `max`는 쓰지 않습니다.
+- **`vision` 역할은 `best`가 아니라 `frontend`를 따릅니다.** `read <image>?q=`의 위임 질문은 `images.questionTimeoutMs` 안에 끝나야 하는데 AA의 xhigh 첫 청크 중앙값은 165초이고, 공급사는 도구 없이 effort를 올려도 차트 읽기가 거의 나아지지 않는다고 적습니다.
+- **Sol `code`는 high, `general`은 medium**입니다. GPT-6 가이드의 권고대로 이전 GPT-5.6 Sol의 강도를 유지했습니다. AA에서 xhigh는 1점과 4%p 높지만 비용이 약 1.4배입니다.
+- **Luna는 max를 유지**합니다. 이전 강도와 같고 AA에서 xhigh보다 3점과 5%p 높지만, 첫 청크 중앙값이 124초 대 22초입니다. OMP의 `tiny` 역할은 세션 제목 같은 배경 작업에도 쓰이므로 이 지연을 감수하는 선택입니다.
+- Fable 5.1과 Astra는 모든 프로필과 역할에서 뺐고, 모델 항목만 명시적 선택과 비교 실행에 남깁니다.
+
+### 설정·러너 변경
+
+- `omp/config.apply.sh`는 OMP 18.2에서 없어진 `librarian` override를 빼고, 18.2.10이 알 수 없는 키로 거부하는 `providers.imageOrder` 대신 `modelRoles.image`를 선언합니다. OMP가 이전 목록을 옮겨 적은 `retry.fallbackChains.image`는 `modelRoles.default`처럼 호스트 값을 채택합니다.
+- `bench/bench.py`에 `run --suite`, 과제 `setup`, 버전이 붙은 카탈로그 행 병합을 추가했고 고정 override 키에서 `librarian`을 뺐습니다. `bench/config.json`의 후보와 심판도 새 모델로 바꿨습니다.
+- 비용 감사의 반사실 단가는 GPT-6 Luna·Sol이며, 저강도 탐지는 Opus의 `minimal`·`low`만 셉니다.
+- 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.

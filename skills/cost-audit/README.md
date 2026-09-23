@@ -29,8 +29,8 @@ python3 skills/cost-audit/analyze.py --days 7 --format markdown
 
 - `context_bloat`: `input_tokens + cache_read_tokens + cache_write_tokens`가 임계값을 넘는 요청을 찾고 `cost_cache_read`를 귀속합니다. 전체 요청의 평균·중위·p90·p99·최댓값도 제시합니다.
 - `cache_rebuild`: `cache_write_tokens > 20,000`인 요청과 직전 동일 `session_file` 요청의 시간 간격을 계산합니다. 5분 초과, 5~60분, 60분 초과를 분리합니다. 1시간 보존의 순이익은 관측된 5~60분 재구축 비용에서 전체 캐시 쓰기에 대한 추정 프리미엄 증가분을 뺀 값입니다. 5분 1.25배와 1시간 2배는 추정 상수입니다.
-- `model_misroute`: Opus를 사용한 subagent 요청을 파일별로 모으고 `models.db`의 Luna·Sol 단가와 long-context 구간을 적용하여 반사실 비용을 계산합니다. 통계에는 역할명이 없으므로 Luna 절감액은 상한이고 Sol 결과는 별도 비교값입니다.
-- `low_effort_expensive`: JSONL의 `thinking_level_change`와 assistant 요청을 연결하여 Opus의 `minimal`·`low`·`medium` 구간을 찾습니다. 외부 기준에서 Opus low 58%/$1.66가 Luna max 67%/$0.61에 지배된다는 근거를 함께 표시합니다.
+- `model_misroute`: Opus를 사용한 subagent 요청을 파일별로 모으고 `models.db`의 GPT-6 Luna·Sol 단가와 long-context 구간을 적용하여 반사실 비용을 계산합니다. 통계에는 역할명이 없으므로 Luna 절감액은 상한이고 Sol 결과는 별도 비교값입니다. `openai-codex:0.155.1`처럼 버전이 붙은 카탈로그 행은 `:` 앞의 공급자로 합쳐 읽습니다.
+- `low_effort_expensive`: JSONL의 `thinking_level_change`와 assistant 요청을 연결하여 Opus의 `minimal`·`low` 구간을 찾습니다. Opus 5.5의 기본값이자 하네스가 일반 작업에 쓰는 `medium`은 세지 않습니다. 근거로 Artificial Analysis Intelligence Index v4.3.2(2026-09-23)의 Opus 5.5 low 42/$0.55, GPT-6 Sol high 43/$0.37, GPT-6 Luna max 37/$0.07을 표시하며, Terminal-Bench 4.0에서는 Opus 5.5 low가 Sol high보다 높으므로 엄격한 지배 관계로 주장하지 않습니다.
 - `fat_tool_result`: 도구 이름별 결과 문자 수와 이후 동일 세션 요청 수를 합산합니다. 4문자당 1토큰으로 환산하고 이후 요청 모델의 cache-read 단가를 적용합니다.
 - `error_and_retry_spend`: 오류·중단 계열 `stop_reason`이나 비어 있지 않은 `error_message`를 묶고 해당 요청의 명목 비용을 합산합니다.
 - `compaction_churn`: JSONL의 `compaction.tokensBefore`와 바로 다음 요청의 캐시 쓰기를 연결합니다. 세션별 횟수와 60분 이내 최대 밀도로 우선순위를 정합니다.

@@ -66,7 +66,11 @@ export const ROLE_PURPOSE_MAP: Record<string, string> = {
 	smol: "economical",
 	tiny: "economical",
 	commit: "economical",
-	vision: "best",
+	// Delegated image questions (`read <image>?q=`) wait on this role under
+	// `images.questionTimeoutMs`; Anthropic reports that raising Opus 5.5's
+	// effort does little for chart reading without tools, so vision follows the
+	// daily profile rather than the slower `best` tier.
+	vision: "frontend",
 	advisor: "hard-code",
 };
 

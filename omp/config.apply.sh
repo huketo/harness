@@ -61,25 +61,30 @@ skills.enablePiUser|false
 skills.enablePiProject|false
 skills.enableAgentsProject|false
 skills.enableAgentsUser|true
-task.agentModelOverrides|{"librarian":"@smol","reviewer":"@slow","scout":"@smol","security-reviewer":"@slow","sonic":"@smol","task":"@mid"}
+task.agentModelOverrides|{"reviewer":"@slow","scout":"@smol","security-reviewer":"@slow","sonic":"@smol","task":"@mid"}
 retry.fallbackChains|{}
 retry.maxDelayMs|0
 retry.usageAwareFallback|true
 retry.usageReservePct|10
 retry.usageReservePolicy|"auto"
 cycleOrder|["smol","mid","default","slow"]
-providers.imageOrder|["openai-codex"]
 providers.cacheRetention|"auto"
 EOF
 
-roles="$(bun "$ROOT/profiles.ts" roles | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin), separators=(",", ":")))')"
+# The image role replaces the retired `providers.imageOrder` list; it is not a
+# purpose profile, so it is declared here beside the profile-derived roles.
+image_role="openai-codex/gpt-image-1"
+roles="$(bun "$ROOT/profiles.ts" roles | python3 -c 'import json,sys; roles=json.load(sys.stdin); roles["image"]=sys.argv[1]; print(json.dumps(roles, separators=(",", ":")))' "$image_role")"
 sol="$(bun "$ROOT/profiles.ts" selector code --defaults)"
 opus="$(bun "$ROOT/profiles.ts" selector opus-code --defaults)"
+# Each chain crosses to the other provider. Anthropic-backed roles (default,
+# plan, designer, advisor, slow, vision) share the `anthropic/*` key, which
+# takes precedence over a role key, so they need no role entry of their own.
 fallbacks="$(python3 - "$sol" "$opus" <<'PY'
 import json, sys
 sol, opus = sys.argv[1:]
 print(json.dumps({
-    "anthropic/*": [sol], "mid": [opus], "slow": [opus],
+    "anthropic/*": [sol], "mid": [opus],
     "smol": [sol, opus], "tiny": [sol, opus],
 }, separators=(",", ":")))
 PY
@@ -99,23 +104,25 @@ config_argument() {
   python3 -c 'import json, sys; value=json.load(sys.stdin); print(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))'
 }
 
-# `modelRoles.default` is session-owned: OMP writes the running session's
-# selector back into it whenever a session resolves or switches its model, so
-# the value above is only a bootstrap default for a machine that has none.
-# Adopting the live value keeps `--check` from reporting a session's model as
-# drift and keeps `apply` from yanking the model out from under a live session.
-adopt_session_owned() {
+# Some subkeys belong to the host, not to this declaration. `modelRoles.default`
+# is session-owned: OMP writes the running session's selector back into it
+# whenever a session resolves or switches its model, so the value above is only
+# a bootstrap default for a machine that has none. `retry.fallbackChains.image`
+# is the provider chain OMP wrote when it migrated `providers.imageOrder`; the
+# harness declares only the primary image model. Adopting the live values keeps
+# `--check` from reporting them as drift and keeps `apply` from deleting them.
+adopt_host_owned() {
   python3 - "$1" "$2" "$3" <<'PY'
 import json
 import sys
 
-SESSION_OWNED = {"modelRoles": ("default",)}
+HOST_OWNED = {"modelRoles": ("default",), "retry.fallbackChains": ("image",)}
 
 key, current_raw, desired_raw = sys.argv[1:4]
 current = json.loads(current_raw)
 desired = json.loads(desired_raw)
 if isinstance(current, dict) and isinstance(desired, dict):
-    for subkey in SESSION_OWNED.get(key, ()):
+    for subkey in HOST_OWNED.get(key, ()):
         if subkey in current:
             desired[subkey] = current[subkey]
 print(json.dumps(desired, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
@@ -139,8 +146,8 @@ for setting in "${SETTINGS[@]}"; do
     exit 2
   fi
 
-  if ! desired="$(adopt_session_owned "$key" "$current" "$desired")"; then
-    echo "error: failed to resolve session-owned subkeys of $key" >&2
+  if ! desired="$(adopt_host_owned "$key" "$current" "$desired")"; then
+    echo "error: failed to resolve host-owned subkeys of $key" >&2
     exit 2
   fi
 

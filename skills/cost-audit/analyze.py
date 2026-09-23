@@ -32,7 +32,9 @@ SHORT_CACHE_WRITE_PREMIUM_ESTIMATE = 1.25
 LONG_CACHE_WRITE_PREMIUM_ESTIMATE = 2.0
 CHARS_PER_TOKEN_ESTIMATE = 4
 MARKDOWN_FINDINGS_LIMIT = 10
-LOW_EFFORT_LEVELS = {"minimal", "low", "medium"}
+# Opus 5.5 defaults to `medium`, which the harness uses on purpose, so only the
+# levels below it count as low-effort use of an expensive model.
+LOW_EFFORT_LEVELS = {"minimal", "low"}
 ERROR_STOP_MARKERS = ("error", "abort", "fail", "timeout", "cancel")
 NOTICE = (
     "Costs are nominal catalog-price equivalents for subscription accounts, "
@@ -207,23 +209,33 @@ def load_tool_calls(
 
 
 def load_prices(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
+    """Catalog costs keyed by `(provider, model id)`.
+
+    OMP can cache one provider under a versioned id (`openai-codex:0.155.1`)
+    beside an older plain row, and only the versioned row lists the newest
+    models, so rows merge under the id before the first `:`; the most recently
+    updated row wins a model both rows list.
+    """
     if not path.is_file():
         raise RuntimeError(f"Model catalog not found at {path}")
     prices: dict[tuple[str, str], dict[str, Any]] = {}
     with open_read_only(path) as connection:
-        for row in connection.execute("SELECT provider_id, models FROM model_cache"):
+        for row in connection.execute(
+            "SELECT provider_id, models FROM model_cache ORDER BY updated_at, provider_id"
+        ):
             try:
                 models = json.loads(row["models"])
             except (TypeError, json.JSONDecodeError):
                 continue
             if not isinstance(models, list):
                 continue
+            provider = str(row["provider_id"]).split(":", 1)[0]
             for model in models:
                 if not isinstance(model, dict) or not isinstance(model.get("cost"), dict):
                     continue
                 model_id = model.get("id")
                 if isinstance(model_id, str):
-                    prices[(row["provider_id"], model_id)] = model["cost"]
+                    prices[(provider, model_id)] = model["cost"]
     return prices
 
 
@@ -577,10 +589,10 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
     for session_file, group in grouped.items():
         actual = sum(number(row.get("cost_total")) for row in group)
         luna_values = [
-            counterfactual_cost(data.prices, row, "openai-codex", "gpt-5.6-luna") for row in group
+            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6-luna") for row in group
         ]
         sol_values = [
-            counterfactual_cost(data.prices, row, "openai-codex", "gpt-5.6-sol") for row in group
+            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6-sol") for row in group
         ]
         if any(value is None for value in luna_values + sol_values):
             unpriced += len(group)
@@ -684,16 +696,20 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
         findings,
         total_cost,
         (
-            "Use modelRoles.smol for low-effort work and reserve the Opus role for high-effort "
-            "tasks. The supplied benchmark strictly dominates Opus low (58%, $1.66) with "
-            "Luna max (67%, $0.61); it does not establish strict dominance for every medium segment."
+            "Use modelRoles.smol for low-effort work and reserve the Opus role for work that needs "
+            "its default medium effort or more. Artificial Analysis Intelligence Index v4.3.2 "
+            "(2026-09-23) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6 Sol high at 43 "
+            "for $0.37; Terminal-Bench 4.0 ranks the pair the other way, so this is not strict dominance."
         ),
         {
             "segment_count": len(findings),
             "request_count": request_count,
             "levels": sorted(LOW_EFFORT_LEVELS),
             "attributed_cost_usd": round(total_cost, 6),
-            "benchmark_reason": "Opus low 58%/$1.66 is strictly dominated by Luna max 67%/$0.61.",
+            "benchmark_reason": (
+                "AA Intelligence Index v4.3.2: Opus 5.5 low 42/$0.55 vs GPT-6 Sol high 43/$0.37 "
+                "and GPT-6 Luna max 37/$0.07 per task."
+            ),
         },
     )
 

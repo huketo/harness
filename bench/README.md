@@ -15,8 +15,8 @@ python3 bench/bench.py run --dry-run
 ```bash
 python3 bench/bench.py run \
   --task bugfix-python \
-  --model openai-codex/gpt-5.6-luna:max \
-  --model openai-codex/gpt-5.6-sol:high \
+  --model openai-codex/gpt-6-luna:max \
+  --model openai-codex/gpt-6-sol:xhigh \
   --repeat 1 \
   --budget-usd 1.0
 ```
@@ -71,7 +71,7 @@ python3 bench/bench.py run --model agy/gemini-3.8-flash-high --repeat 1
 OMP 후보에는 설정 변형을 붙일 수 있습니다. 후보 문자열은 `<공급자>/<모델>:<사고강도>@<변형>` 형태이고, 변형 이름은 `config.json`의 `variants`에 정의되어 있어야 합니다. 정의되지 않은 이름을 쓰면 실행이 시작되기 전에 오류로 끝납니다. `agy` 후보에는 설정 오버레이가 없으므로 `@변형`을 붙이면 오류입니다.
 
 ```bash
-python3 bench/bench.py run --model "openai-codex/gpt-5.6-luna:max@cache-long" --task bugfix-python --repeat 1
+python3 bench/bench.py run --model "openai-codex/gpt-6-luna:max@cache-long" --task bugfix-python --repeat 1
 ```
 
 변형은 같은 모델의 다른 설정을 별개 후보로 취급하기 위한 축입니다. 보고서의 그룹 키는 변형을 포함한 후보 문자열 전체이며, `runs` 테이블에는 후보 문자열과 별도로 `variant` 열이 남습니다. 지금 정의된 변형은 캐시 보존과 압축 임계 두 개이고 근거는 `docs/PRICING.md` §5입니다.
@@ -90,7 +90,7 @@ OMP 후보 실행에는 임시 JSON 오버레이 파일을 만들고 다음 형�
 omp -p <prompt> --config <temporary-overlay.json> --model <selector> --cwd <fixture-copy> --auto-approve --session-dir <dedicated-temp-directory> --max-time <seconds>
 ```
 
-JSON은 YAML의 부분집합이므로 OMP의 `config.yml` 형식 오버레이로 읽힙니다. 오버레이는 `modelRoles`의 모든 역할(`default, slow, mid, smol, tiny, commit, plan, designer, advisor`)과 `task.agentModelOverrides`의 알려진 키(`scout, librarian, sonic, task, reviewer, security-reviewer`)를 모두 후보 셀렉터로 고정하고 `retry.fallbackChains`를 빈 객체로 비웁니다. 기본 역할만 고정하면 서브에이전트가 사용자 설정의 다른 모델로 돌아 후보 비교가 두 모델의 혼합이 되고, 폴백 체인을 남겨 두면 공급자 장애가 조용히 다른 모델로 갈아탑니다. 변형의 dotted 키는 중첩 객체로 바꿔 이 기본값 위에 마지막으로 덮어쓰지만, 위 세 경로는 변형이 옮길 수 없습니다. `--model`도 같은 후보를 명시합니다. 러너는 `~/.omp/agent/config.yml`을 쓰지 않고 `omp config set`도 호출하지 않습니다.
+JSON은 YAML의 부분집합이므로 OMP의 `config.yml` 형식 오버레이로 읽힙니다. 오버레이는 `modelRoles`의 모든 역할(`default, slow, mid, smol, tiny, commit, plan, designer, advisor`)과 `task.agentModelOverrides`의 알려진 키(`scout, sonic, task, reviewer, security-reviewer`)를 모두 후보 셀렉터로 고정하고 `retry.fallbackChains`를 빈 객체로 비웁니다. 기본 역할만 고정하면 서브에이전트가 사용자 설정의 다른 모델로 돌아 후보 비교가 두 모델의 혼합이 되고, 폴백 체인을 남겨 두면 공급자 장애가 조용히 다른 모델로 갈아탑니다. 변형의 dotted 키는 중첩 객체로 바꿔 이 기본값 위에 마지막으로 덮어쓰지만, 위 세 경로는 변형이 옮길 수 없습니다. `--model`도 같은 후보를 명시합니다. 러너는 `~/.omp/agent/config.yml`을 쓰지 않고 `omp config set`도 호출하지 않습니다.
 
 전용 세션 디렉터리는 시스템 임시 디렉터리에 남겨 두며, 데이터베이스의 `session_file`과 `session_files_json`에 경로를 기록합니다. 이 경로는 운영체제의 임시 파일 정리 정책에 따라 나중에 사라질 수 있습니다.
 
@@ -152,6 +152,7 @@ omp -p <judge-prompt> --model <judge> --mode json --no-skills --no-session --app
 - `rubric`은 선택 항목이며 `grading`이 `rubric`인 부류의 과제에만 씁니다. `output`은 에이전트가 fixture 사본 안에 써야 하는 산출물의 상대 경로, `reference`는 `bench/` 기준 기준 산출물 경로, `criteria`는 0·1·2점으로 채점할 기준 문장 배열, `pass_threshold`는 합격 문턱(기본 0.7)입니다. `reference`는 `fixtures/` 아래에 둘 수 없습니다. fixture는 에이전트의 작업 디렉터리로 복사되므로 그 아래의 정답은 채점받는 후보가 읽을 수 있기 때문이며, 로드할 때 경로와 존재 여부를 함께 검사합니다.
 - `rubric.context`는 선택 항목이며 fixture 기준 상대 경로의 배열입니다. 심판 프롬프트에 원문으로 실을 입력 자료를 지정하고, 로드할 때 각 경로가 fixture 안의 실제 파일인지 검사합니다. 절대 경로는 fixture 안을 가리켜도 거부합니다. 프롬프트가 이 파일을 과제가 준 상대 경로로 이름 붙이고, 러너는 실행 전에 fixture를 다른 위치로 복사하기 때문입니다. 입력 충실도를 보는 기준이 있는 과제에만 씁니다.
 - `protected_paths`는 에이전트가 바꾸면 안 되는 fixture 기준 파일 경로 배열입니다. 테스트, 채점 스크립트, 조사 원본을 보호하는 데 사용합니다.
+- `setup`은 선택 항목이며 셸을 거치지 않고 실행하는 준비 명령의 문자열 배열입니다. 러너는 fixture를 작업 사본으로 복사한 직후, 사전 검증보다 먼저 이 명령을 작업 사본에서 실행합니다. 의존성 설치처럼 과제마다 같은 준비를 fixture에 담지 않고 매번 새로 하게 할 때 씁니다. 사전 점검과 모든 실행이 같은 준비를 거치며, 실패하거나 `setup_timeout_seconds`(기본 900초)를 넘기면 후보의 불합격이 아니라 과제·환경 오류로 보고 명령 전체를 멈춥니다.
 
 과제 JSON 밖에 두는 자료가 두 종류 있습니다.
 
@@ -159,6 +160,14 @@ omp -p <judge-prompt> --model <judge> --mode json --no-skills --no-session --app
 - `bench/references/<task-id>/`에는 `rubric` 부류의 기준 산출물을 둡니다. 과제의 `reference`가 가리키는 경로이며 `fixtures/` 아래에 둘 수 없으므로 이 위치가 관례입니다. 기준 산출물은 과제를 만드는 사람이 합성 입력만 보고 직접 씁니다.
 
 현재 저장소에는 9개 부류의 합성 과제 12건이 있습니다. task ID, 부류, 검증 명령과 관찰 경계는 `bench/TAXONOMY.md`의 표를 기준으로 확인합니다. 실제 실행 범위는 `bench/tasks/*.json`에서 로드되므로 문서의 목록을 실행 입력으로 사용하지 않습니다.
+
+## 비공개 스위트
+
+`run --suite <디렉터리>`는 번들 `bench/` 대신 다른 스위트를 실행합니다. 스위트는 `bench/`와 같은 배치를 따릅니다. `tasks/*.json`이 과제이고, 과제의 `fixture`는 그 스위트의 `fixtures/` 아래를, `rubric.reference`는 스위트 안이되 `fixtures/` 밖을 가리켜야 합니다. `classes.json`과 `config.json`은 번들 것을 그대로 쓰므로 비공개 과제도 같은 부류와 후보 표로 집계됩니다. `score`, `report`, `routing`은 과제 정의를 부류 보정에만 쓰고 실행 행이 부류를 이미 기록하므로 `--suite` 없이 같은 `--db`를 읽습니다.
+
+커밋할 수 없는 과제 자료는 무시되는 `var/` 아래에 두고, 해답도 스위트 밖에 둡니다. 의존성 설치나 빌드처럼 작업 사본마다 필요한 준비는 과제의 `setup`이 맡습니다.
+
+이런 스위트는 사용자의 개발 서비스에 닿지 않게 실행 환경을 좁혀야 합니다. 러너의 자식 프로세스(`setup`, 에이전트와 그 도구, `verify`)는 러너의 환경을 물려받으므로, 스위트 옆의 실행 스크립트가 테스트 DB 같은 서비스 주소를 닿지 않는 포트로 바꾸고 `docker`·`glab`·`gh` 같은 외부 도구를 거부 스텁으로 가립니다. 러너 자체는 이 환경을 만들지 않습니다.
 
 ## 저장 지표와 보고서 해석
 
@@ -172,7 +181,7 @@ omp -p <judge-prompt> --model <judge> --mode json --no-skills --no-session --app
 
 `agy` 후보는 `quota_fraction_used`에 주간 한도의 소진 비율을 남기고 `cost_total`은 0으로 남깁니다. 실제로 돈이 나가지 않기 때문이며, 그래서 `report`의 Pareto 전선은 `agy` 후보를 유료 후보와 같은 축에서 비교하지 못합니다. 보고서는 그런 행이 있으면 그 사실을 아래에 적으며, `agy` 후보끼리는 `Quota/task` 열로 비교해야 합니다.
 
-`Catalog est/task`는 관측 토큰에 `~/.omp/agent/models.db`의 실제 모델 기본 단가를 적용한 작업당 비용입니다. `Actual/task`는 세션의 `usage.cost.total`을 합산한 작업당 비용입니다. 장문 컨텍스트 별도 구간과 공급자별 정산 방식 때문에 두 값이 다를 수 있습니다. 두 비용 모두 구독 계정의 현금 청구액이 아니라 카탈로그 단가로 환산한 명목 비용일 수 있습니다.
+`Catalog est/task`는 관측 토큰에 `~/.omp/agent/models.db`의 실제 모델 기본 단가를 적용한 작업당 비용입니다. OMP는 한 공급자를 `openai-codex:0.155.1`처럼 버전이 붙은 id로도 캐시하고 최신 모델은 그 행에만 있을 수 있으므로, 러너는 `:` 앞을 공급자로 보고 행을 합치며 두 행에 같은 모델이 있으면 나중에 갱신된 행을 씁니다. `Actual/task`는 세션의 `usage.cost.total`을 합산한 작업당 비용입니다. 장문 컨텍스트 별도 구간과 공급자별 정산 방식 때문에 두 값이 다를 수 있습니다. 두 비용 모두 구독 계정의 현금 청구액이 아니라 카탈로그 단가로 환산한 명목 비용일 수 있습니다.
 
 합격률 신뢰구간은 95% Wilson 구간입니다. `Cost/pass`는 후보의 전체 실제 비용을 합격 실행 수로 나눈 값이며, 합격이 없으면 `n/a`로 표시합니다. Pareto 판정은 관측 합격률과 실제 작업당 비용만 사용합니다. 다른 후보보다 합격률이 높지 않고 비용도 낮지 않으면서 적어도 한 축에서 열세이면 지배당한 후보로 분류합니다. 평균 시간은 별도로 표시하지만 Pareto 축에는 넣지 않습니다.
 
@@ -190,7 +199,7 @@ omp -p <judge-prompt> --model <judge> --mode json --no-skills --no-session --app
 
 루브릭 채점에는 추가 변동 요인이 있습니다. 심판 모델의 판정은 결정적이지 않고, 심판을 바꾸면 같은 산출물의 `quality_score`가 달라지며, 심판과 후보의 공급자가 같은 행은 독립 측정이 아닙니다. 그래서 부류별 표의 quality 열은 후보 간 순위를 정하는 값이 아니라 같은 심판 아래에서의 상대 비교로만 읽어야 합니다.
 
-러너의 판정 규칙에는 회귀 테스트가 있습니다. `python3 -m unittest discover -s bench/tests`로 돌리며 모델을 호출하지 않고 과제 fixture도 읽지 않습니다(입력이 필요한 경우는 임시 디렉터리에 만듭니다). 오버레이 변환과 고정 경로 침범 거부, 후보 문자열 문법, 루브릭 산술과 문턱 경계, `rubric.context` 경로 검사와 `grade_rubric`이 심판에게 넘기는 입력(원본 fixture의 원문이 기준 산출물 앞에 실리고 작업 사본의 내용은 실리지 않음), 심판 스트림 파싱과 엄격한 JSON 판정(실패 경로 포함), 장문 구간 카탈로그 비용, 라우팅 충돌 규칙과 `agy` 대체, 서브에이전트 관측 조건, apply.sh 부분 갱신과 별칭 유지, `--check` 종료 코드 판정, 그리고 `--write`가 CRLF가 섞인 사본에서도 두 줄 외의 바이트를 바꾸지 않는다는 성질을 덮습니다.
+러너의 판정 규칙에는 회귀 테스트가 있습니다. `python3 -m unittest discover -s bench/tests`로 돌리며 모델을 호출하지 않고 과제 fixture도 읽지 않습니다(입력이 필요한 경우는 임시 디렉터리에 만듭니다). 오버레이 변환과 고정 경로 침범 거부, 후보 문자열 문법, 루브릭 산술과 문턱 경계, `rubric.context` 경로 검사와 `grade_rubric`이 심판에게 넘기는 입력(원본 fixture의 원문이 기준 산출물 앞에 실리고 작업 사본의 내용은 실리지 않음), 심판 스트림 파싱과 엄격한 JSON 판정(실패 경로 포함), 장문 구간 카탈로그 비용, 버전이 붙은 공급자 id의 카탈로그 병합, `--suite` 기준의 fixture 해석과 스위트 밖 fixture 거부, `setup`이 사전 검증보다 먼저 사본에서 돌고 실패하면 명령을 멈춘다는 규칙, 라우팅 충돌 규칙과 `agy` 대체, 서브에이전트 관측 조건, apply.sh 부분 갱신과 별칭 유지, `--check` 종료 코드 판정, 그리고 `--write`가 CRLF가 섞인 사본에서도 두 줄 외의 바이트를 바꾸지 않는다는 성질을 덮습니다.
 
 ## 라우팅 제안
 

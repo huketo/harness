@@ -1,0 +1,1 @@
+Complete the bounded task and its acceptance criteria directly, without stopping at a plan or an offer to continue. When evidence is missing, name the exact gap instead of guessing or silently narrowing the work. Run only the checks the task needs, and keep the output concise.

@@ -113,6 +113,20 @@
 
 `gpt-5.6-terra`는 `docs/FACTS.md` §6의 외부 벤치마크 표에 측정값이 없어 후보에서 제외된 모델이지만, 경로별 단가 비교를 위해 남겼습니다.
 
+### 3-3. 2026-09-23 카탈로그 갱신
+
+OMP 18.2.10의 `omp models --json`과 `~/.omp/agent/models.db`에서 새 모델을 읽었습니다. openai-codex 모델은 이제 `openai-codex:0.155.1`처럼 버전이 붙은 `provider_id` 행에 있고, 기존 `openai-codex` 행에는 `gpt-6-sol`·`gpt-6-luna`가 없습니다. 벤치 러너와 비용 감사는 두 행을 한 공급자로 합쳐 읽습니다(`bench/README.md`).
+
+| 모델 | 공급자 경로 | input | output | cacheRead | cacheWrite | contextWindow | maxTokens | 공급사 발표 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| claude-opus-5-5 | anthropic | 4 | 20 | 0.2 | 5 | 1,000,000 | 128,000 | [Opus 5.5 발표](https://www.anthropic.com/claude-opus-5-5): 같은 값, fast mode $8/$40 |
+| gpt-6-sol | openai-codex | 2 | 10 | 0.2 | 2.5 | 272,000 | 128,000 | [Sol·Luna 발표](https://openai.com/index/introducing-gpt-6-sol-and-luna/): $2/$10, GPT-5.6 Sol의 절반 |
+| gpt-6-luna | openai-codex | 0.1 | 0.5 | 0.01 | 0.125 | 272,000 | 128,000 | 같은 발표: $0.10/$0.50 |
+| gpt-6-astra | openai-codex | 10 | 50 | 1 | 0 | 272,000 | 128,000 | 2026-09-05에는 0으로 기록 |
+| claude-fable-5-1 | anthropic | 10 | 50 | 0.25 | 12.5 | 1,000,000 | 128,000 | — |
+
+세 새 모델 모두 사고 강도 `low`·`medium`·`high`·`xhigh`·`max`를 노출하고, `gpt-6-sol`·`gpt-6-luna` 항목에는 `longContext` 구간이 없습니다. 구독 계정의 비용은 이 단가로 환산한 명목값입니다.
+
 ## 4. OMP 비용 손잡이
 
 이 절의 설정과 비용 설명은 2026-09-05 조사 시점의 기록입니다. 현재 권장값은 [사용법](guides/usage.md#내장-자동-압축)과 `omp/config.apply.sh`가 정하며, 이 표를 설정 복원 템플릿으로 사용하지 않습니다.

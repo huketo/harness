@@ -25,7 +25,11 @@ from typing import Any, Iterable, Mapping, Sequence
 BENCH_DIR = Path(__file__).resolve().parent
 ROOT = Path(__file__).resolve().parents[1]
 FACTS_FILE = ROOT / "docs" / "FACTS.md"
-TASKS_DIR = BENCH_DIR / "tasks"
+# A suite directory holds `tasks/*.json`, the `fixtures/` they copy, and the
+# `references/` a rubric reads. The bundled suite is this directory; `run
+# --suite` points at another one, such as an ignored private corpus.
+SUITE_TASKS = "tasks"
+SUITE_FIXTURES = "fixtures"
 DEFAULT_CONFIG = BENCH_DIR / "config.json"
 CLASSES_FILE = BENCH_DIR / "classes.json"
 DEFAULT_DB = ROOT / "var" / "bench.db"
@@ -41,6 +45,9 @@ GRADING_MODES = ("verify", "rubric")
 DEFAULT_PASS_THRESHOLD = 0.7
 JUDGE_PARSE_ERROR = "judge_parse_error"
 JUDGE_TIMEOUT_SECONDS = 900
+# A task's `setup` prepares each fresh work copy before its baseline check, so
+# it may install dependencies; the bound only ends a hang.
+DEFAULT_SETUP_TIMEOUT_SECONDS = 900
 # The agent is given `--max-time`; if it still has not exited 45 seconds later the
 # runner kills it and records the run as failed instead of aborting the batch.
 EXTERNAL_TIMEOUT = "external_timeout"
@@ -54,7 +61,7 @@ EXTERNAL_TIMEOUT_EXIT = 124
 # candidate's measurement, so a variant that moved them would be measuring
 # something else under the candidate's name.
 MODEL_ROLES = ("default", "slow", "mid", "smol", "tiny", "commit", "plan", "designer", "advisor")
-AGENT_OVERRIDE_KEYS = ("scout", "librarian", "sonic", "task", "reviewer", "security-reviewer")
+AGENT_OVERRIDE_KEYS = ("scout", "sonic", "task", "reviewer", "security-reviewer")
 PINNED_OVERLAY_PATHS = (
     "modelRoles",
     "task.agentModelOverrides",
@@ -148,6 +155,8 @@ class TaskDefinition:
     estimated_usage: dict[str, int]
     protected_paths: tuple[str, ...]
     rubric: RubricDefinition | None = None
+    setup: tuple[str, ...] = ()
+    setup_timeout_seconds: int = DEFAULT_SETUP_TIMEOUT_SECONDS
 
 
 @dataclass(frozen=True)
@@ -301,17 +310,17 @@ def load_classes(path: Path = CLASSES_FILE) -> dict[str, TaskClass]:
     return parsed
 
 
-def resolve_fixture(relative_path: Any, source: Path) -> Path:
+def resolve_fixture(relative_path: Any, source: Path, suite: Path = BENCH_DIR) -> Path:
     if not isinstance(relative_path, str) or not relative_path:
         raise BenchError(f"fixture in {source} must be a non-empty string")
-    resolved = (BENCH_DIR / relative_path).resolve()
-    fixtures_root = (BENCH_DIR / "fixtures").resolve()
+    resolved = (suite / relative_path).resolve()
+    fixtures_root = (suite / SUITE_FIXTURES).resolve()
     if not resolved.is_relative_to(fixtures_root) or not resolved.is_dir():
         raise BenchError(f"fixture in {source} must name a directory below {fixtures_root}")
     return resolved
 
 
-def parse_rubric(raw: Any, source: Path, fixture: Path) -> RubricDefinition | None:
+def parse_rubric(raw: Any, source: Path, fixture: Path, suite: Path = BENCH_DIR) -> RubricDefinition | None:
     if raw is None:
         return None
     if not isinstance(raw, dict):
@@ -325,10 +334,11 @@ def parse_rubric(raw: Any, source: Path, fixture: Path) -> RubricDefinition | No
     reference = raw.get("reference")
     if not isinstance(reference, str) or not reference:
         raise BenchError(f"rubric.reference in {source} must be a non-empty string")
-    resolved = (BENCH_DIR / reference).resolve()
-    if not resolved.is_relative_to(BENCH_DIR):
-        raise BenchError(f"rubric.reference in {source} must stay below {BENCH_DIR}")
-    if resolved.is_relative_to((BENCH_DIR / "fixtures").resolve()):
+    suite = suite.resolve()
+    resolved = (suite / reference).resolve()
+    if not resolved.is_relative_to(suite):
+        raise BenchError(f"rubric.reference in {source} must stay below {suite}")
+    if resolved.is_relative_to((suite / SUITE_FIXTURES).resolve()):
         # The reference is the expected answer. A fixture is copied into the
         # agent's workspace, so a reference stored there would be readable by
         # the candidate it grades.
@@ -360,10 +370,11 @@ def parse_rubric(raw: Any, source: Path, fixture: Path) -> RubricDefinition | No
     )
 
 
-def load_tasks(classes: Mapping[str, TaskClass]) -> list[TaskDefinition]:
-    task_files = sorted(TASKS_DIR.glob("*.json"))
+def load_tasks(classes: Mapping[str, TaskClass], suite: Path = BENCH_DIR) -> list[TaskDefinition]:
+    tasks_dir = suite / SUITE_TASKS
+    task_files = sorted(tasks_dir.glob("*.json"))
     if not task_files:
-        raise BenchError(f"no task definitions found in {TASKS_DIR}")
+        raise BenchError(f"no task definitions found in {tasks_dir}")
     tasks: list[TaskDefinition] = []
     seen: set[str] = set()
     for source in task_files:
@@ -399,12 +410,15 @@ def load_tasks(classes: Mapping[str, TaskClass]) -> list[TaskDefinition]:
         usage = {key: require_int(estimated[key], f"{source}: estimated_usage.{key}") for key in TOKEN_KEYS}
         if not isinstance(protected, list) or not all(isinstance(x, str) and x for x in protected):
             raise BenchError(f"protected_paths in {source} must be a string array")
-        fixture = resolve_fixture(raw.get("fixture"), source)
+        setup = raw.get("setup", [])
+        if not isinstance(setup, list) or not all(isinstance(x, str) and x for x in setup):
+            raise BenchError(f"setup in {source} must be a string array")
+        fixture = resolve_fixture(raw.get("fixture"), source, suite)
         for relative in protected:
             protected_file = (fixture / relative).resolve()
             if not protected_file.is_relative_to(fixture) or not protected_file.is_file():
                 raise BenchError(f"protected path does not name a fixture file: {relative} ({source})")
-        rubric = parse_rubric(raw.get("rubric"), source, fixture)
+        rubric = parse_rubric(raw.get("rubric"), source, fixture, suite)
         expects_rubric = classes[task_class].grading == "rubric"
         if expects_rubric and rubric is None:
             raise BenchError(f"class {task_class} is graded by rubric, so {source} must define a rubric block")
@@ -425,6 +439,12 @@ def load_tasks(classes: Mapping[str, TaskClass]) -> list[TaskDefinition]:
                 estimated_usage=usage,
                 protected_paths=tuple(protected),
                 rubric=rubric,
+                setup=tuple(setup),
+                setup_timeout_seconds=require_int(
+                    raw.get("setup_timeout_seconds", DEFAULT_SETUP_TIMEOUT_SECONDS),
+                    f"{source}: setup_timeout_seconds",
+                    minimum=1,
+                ),
             )
         )
         seen.add(task_id)
@@ -564,15 +584,26 @@ def candidate_overlay(selector: str, overrides: Mapping[str, Any]) -> dict[str, 
 
 
 def load_model_rates(path: Path = MODEL_DB) -> dict[tuple[str, str], ModelRate]:
+    """Catalog rates keyed by `(provider, model id)`.
+
+    OMP may cache one provider under a versioned id such as
+    `openai-codex:0.155.1` beside an older plain `openai-codex` row, and only
+    the versioned row lists the newest models. Both rows are the same provider,
+    so they merge under the id before the first `:`; for a model listed in
+    both, the more recently updated row wins.
+    """
     if not path.is_file():
         raise BenchError(f"OMP model catalog not found: {path}")
     rates: dict[tuple[str, str], ModelRate] = {}
     try:
         with sqlite3.connect(path) as connection:
-            rows = connection.execute("SELECT provider_id, models FROM model_cache").fetchall()
+            rows = connection.execute(
+                "SELECT provider_id, models FROM model_cache ORDER BY updated_at, provider_id"
+            ).fetchall()
     except sqlite3.Error as exc:
         raise BenchError(f"could not read OMP model catalog {path}: {exc}") from exc
-    for provider, encoded_models in rows:
+    for provider_id, encoded_models in rows:
+        provider = str(provider_id).split(":", 1)[0]
         try:
             models = json.loads(encoded_models)
         except (TypeError, json.JSONDecodeError):
@@ -648,9 +679,14 @@ def fixture_digest(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def run_verify(task: TaskDefinition, cwd: Path) -> subprocess.CompletedProcess[str]:
+def task_command_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    return environment
+
+
+def run_verify(task: TaskDefinition, cwd: Path) -> subprocess.CompletedProcess[str]:
+    environment = task_command_environment()
     try:
         return subprocess.run(
             task.verify,
@@ -665,6 +701,36 @@ def run_verify(task: TaskDefinition, cwd: Path) -> subprocess.CompletedProcess[s
         raise BenchError(f"verification executable not found for {task.task_id}: {task.verify[0]}") from exc
     except subprocess.TimeoutExpired as exc:
         raise BenchError(f"verification timed out for {task.task_id}") from exc
+
+
+def run_setup(task: TaskDefinition, cwd: Path) -> None:
+    """Prepare a fresh work copy before its baseline check.
+
+    A setup failure is the task's or the machine's, never the candidate's, so it
+    stops the command instead of being recorded as a failed run.
+    """
+    if not task.setup:
+        return
+    try:
+        completed = subprocess.run(
+            task.setup,
+            cwd=cwd,
+            env=task_command_environment(),
+            text=True,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=task.setup_timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise BenchError(f"setup executable not found for {task.task_id}: {task.setup[0]}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise BenchError(f"setup timed out for {task.task_id}") from exc
+    if completed.returncode != 0:
+        raise BenchError(
+            f"setup failed for {task.task_id} with exit {completed.returncode}: "
+            f"{abbreviated_output(completed) or 'no output'}"
+        )
 
 
 def abbreviated_output(completed: subprocess.CompletedProcess[str], limit: int = 1200) -> str:
@@ -1269,6 +1335,7 @@ def validate_task_baseline(task: TaskDefinition) -> None:
     work_copy = work_parent / "workspace"
     try:
         shutil.copytree(task.fixture, work_copy)
+        run_setup(task, work_copy)
         baseline = run_verify(task, work_copy)
         if baseline.returncode == 0:
             raise BenchError(f"task {task.task_id} is invalid: verification already passes before the task")
@@ -1426,6 +1493,7 @@ def execute_one(
     )
     try:
         shutil.copytree(task.fixture, work_copy)
+        run_setup(task, work_copy)
         baseline = run_verify(task, work_copy)
         if baseline.returncode == 0:
             raise BenchError(f"task {task.task_id} is invalid: verification already passes before the task")
@@ -1522,7 +1590,7 @@ def command_run(args: argparse.Namespace) -> int:
         raise BenchError(f"repository root check failed; missing {FACTS_FILE}")
     config = load_config(args.config.resolve())
     classes = load_classes()
-    tasks = select_tasks(load_tasks(classes), args.task)
+    tasks = select_tasks(load_tasks(classes, args.suite.resolve()), args.task)
     models = select_models(config, args.model)
     rates = load_model_rates()
     judge_selector = args.judge or config["judge"]
@@ -2623,6 +2691,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="run or preview benchmark combinations")
     run_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="benchmark JSON configuration")
+    run_parser.add_argument(
+        "--suite",
+        type=Path,
+        default=BENCH_DIR,
+        help="suite directory holding tasks/ and fixtures/ (default: the bundled bench/ suite)",
+    )
     run_parser.add_argument("--task", action="append", help="task id to run; repeat for multiple tasks")
     run_parser.add_argument(
         "--model",

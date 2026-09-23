@@ -23,14 +23,14 @@ test("model and purpose overrides stay independent across save/reload", () => {
 	const dir = mkdtempSync(join(tmpdir(), "harness-profiles-"));
 	try {
 		const state = loadState(dir);
-		state.modelEffort["gpt-5.6-sol"] = "max";
+		state.modelEffort["gpt-6-sol"] = "max";
 		state.profileEffort.code = "low";
 		saveState(dir, state);
 		const restored = loadState(dir);
 		const profiles = loadProfiles();
 		expect(resolveProfile(profiles, restored, "code").effort).toBe("low");
 		expect(resolveProfile(profiles, restored, "general").effort).toBe("medium");
-		expect(restored.modelEffort["gpt-5.6-sol"]).toBe("max");
+		expect(restored.modelEffort["gpt-6-sol"]).toBe("max");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -54,9 +54,9 @@ test("personal CLI effort overrides do not create compatibility-role drift", () 
 	try {
 		const roles = cli("roles");
 		cli("effort", "set", "code", "low");
-		expect(cli("selector", "code")).toBe("openai-codex/gpt-5.6-sol:low");
+		expect(cli("selector", "code")).toBe("openai-codex/gpt-6-sol:low");
 		expect(cli("selector", "code", "--defaults")).toBe(
-			"openai-codex/gpt-5.6-sol:high",
+			`openai-codex/gpt-6-sol:${loadProfiles().models["gpt-6-sol"].effort}`,
 		);
 		expect(cli("roles")).toBe(roles);
 	} finally {
@@ -68,12 +68,14 @@ test("requested routes expose their selected effort capabilities", () => {
 	const profiles = loadProfiles();
 	const state = { version: 1 as const, modelEffort: {}, profileEffort: {} };
 	const best = resolveProfile(profiles, state, "best");
-	expect(best.model).toBe("gpt-6-astra");
-	expect(best.effort).toBe("medium");
+	expect(best.model).toBe("claude-opus-5-5");
+	expect(best.effort).toBe("xhigh");
 	const hardCode = resolveProfile(profiles, state, "hard-code");
-	expect(hardCode.model).toBe("claude-fable-5-1");
-	expect(hardCode.effort).toBe("medium");
-	expect(resolveProfile(profiles, state, "economical").effort).toBe("max");
+	expect(hardCode.model).toBe("claude-opus-5-5");
+	expect(hardCode.effort).toBe("xhigh");
+	expect(resolveProfile(profiles, state, "economical").model).toBe(
+		"gpt-6-luna",
+	);
 	const flash = resolveProfile(profiles, state, "media");
 	expect(flash.model).toBe("gemini-3.8-flash-high");
 	expect(flash.effort).toBe("high");
@@ -130,18 +132,18 @@ test("portable compaction finishes before a cross-provider switch; failure preve
 		> = {};
 		// Provider doubles contain only fields consumed by this boundary; no provider call is claimed.
 		const old = {
-			id: "gpt-6-astra",
+			id: "gpt-6-sol",
 			provider: "openai-codex",
 			contextWindow: 272000,
 			maxTokens: 128000,
-			thinking: { efforts: ["medium"] },
+			thinking: { efforts: ["high"] },
 		} as unknown as Model;
 		const next = {
-			id: "claude-fable-5-1",
+			id: "claude-opus-5-5",
 			provider: "anthropic",
 			contextWindow: 1000000,
 			maxTokens: 128000,
-			thinking: { efforts: ["medium"] },
+			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
 		} as unknown as Model;
 		let native = true;
 		let fail = true;
@@ -212,7 +214,7 @@ test("ordinary high-context input is left to OMP automatic maintenance", async (
 	try {
 		const handlers = new Map<string, CallableFunction>();
 		const model = {
-			id: "gpt-6-astra",
+			id: "gpt-6-sol",
 			provider: "openai-codex",
 			contextWindow: 272000,
 			maxTokens: 128000,
@@ -261,29 +263,29 @@ async function effortSession(
 	let idle = true;
 	const notifications: { message: string; severity: string }[] = [];
 	const catalog: Record<string, Model> = {
-		"openai-codex/gpt-5.6-sol": {
-			id: "gpt-5.6-sol",
+		"openai-codex/gpt-6-sol": {
+			id: "gpt-6-sol",
 			provider: "openai-codex",
 			contextWindow: 272000,
 			maxTokens: 128000,
-			thinking: { efforts: ["low", "medium", "high", "max"] },
+			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
 		} as Model,
-		"openai-codex/gpt-6-astra": {
-			id: "gpt-6-astra",
+		"openai-codex/gpt-6-luna": {
+			id: "gpt-6-luna",
 			provider: "openai-codex",
 			contextWindow: 272000,
 			maxTokens: 128000,
-			thinking: { efforts: ["low", "medium", "high", "max"] },
+			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
 		} as Model,
-		"anthropic/claude-fable-5-1": {
-			id: "claude-fable-5-1",
+		"anthropic/claude-opus-5-5": {
+			id: "claude-opus-5-5",
 			provider: "anthropic",
 			contextWindow: 1000000,
 			maxTokens: 128000,
-			thinking: { efforts: ["low", "medium", "high"] },
+			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
 		} as Model,
 	};
-	let model = catalog["openai-codex/gpt-5.6-sol"];
+	let model = catalog["openai-codex/gpt-6-sol"];
 	const pi = {
 		pi: { getAgentDir: () => dir },
 		registerFlag() {},
@@ -366,7 +368,7 @@ test("session effort changes never change another session or shared preferences"
 	try {
 		const shared = {
 			version: 1 as const,
-			modelEffort: { "gpt-5.6-sol": "medium" },
+			modelEffort: { "gpt-6-sol": "medium" },
 			profileEffort: {},
 		};
 		saveState(dir, shared);
@@ -398,7 +400,7 @@ test("session effort overrides profile changes until reset or explicit profile s
 	try {
 		saveState(dir, {
 			version: 1,
-			modelEffort: { "gpt-5.6-sol": "medium" },
+			modelEffort: { "gpt-6-sol": "medium" },
 			profileEffort: {},
 		});
 		const a = await effortSession(dir);
@@ -422,7 +424,7 @@ test("session effort overrides profile changes until reset or explicit profile s
 		await a.profile("general");
 		await a.request();
 		expect(a.level()).toBe("medium");
-		expect(loadState(dir).modelEffort["gpt-5.6-sol"]).toBe("medium");
+		expect(loadState(dir).modelEffort["gpt-6-sol"]).toBe("medium");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -434,7 +436,7 @@ test("native model switch cannot leave an unrelated profile selected after a ses
 		const shared = { version: 1 as const, modelEffort: {}, profileEffort: {} };
 		saveState(dir, shared);
 		const session = await effortSession(dir);
-		session.selectModel("gpt-6-astra");
+		session.selectModel("gpt-6-luna");
 		await session.command("high");
 		await expect(session.command("low --profile")).rejects.toThrow();
 		expect(loadState(dir)).toEqual(shared);
@@ -470,15 +472,15 @@ test("profile switch within same provider is deferred during streaming until age
 		const session = await effortSession(dir);
 		session.setIdle(false);
 		session.clearNotifications();
-		// "best" uses openai-codex/gpt-6-astra (same provider as gpt-5.6-sol)
-		await session.profile("best");
+		// "economical" uses openai-codex/gpt-6-luna (same provider as gpt-6-sol)
+		await session.profile("economical");
 		// Model must NOT change immediately while streaming
-		expect(session.model().id).toBe("gpt-5.6-sol");
+		expect(session.model().id).toBe("gpt-6-sol");
 		const notes = session.notifications();
 		expect(
 			notes.some((n) =>
 				n.message.includes(
-					"현재 응답이 끝난 뒤 best(gpt-6-astra) 프로필로 전환됩니다.",
+					"현재 응답이 끝난 뒤 economical(gpt-6-luna) 프로필로 전환됩니다.",
 				),
 			),
 		).toBe(true);
@@ -486,8 +488,8 @@ test("profile switch within same provider is deferred during streaming until age
 		// When turn completes (agent_end with willContinue=false), profile switches
 		session.setIdle(true);
 		await session.agentEnd({ willContinue: false });
-		expect(session.model().id).toBe("gpt-6-astra");
-		expect(session.level()).toBe("medium");
+		expect(session.model().id).toBe("gpt-6-luna");
+		expect(session.level()).toBe(loadProfiles().models["gpt-6-luna"].effort);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -501,9 +503,9 @@ test("profile switch across providers is blocked during streaming", async () => 
 		const session = await effortSession(dir);
 		session.setIdle(false);
 		session.clearNotifications();
-		// "hard-code" uses anthropic/claude-fable-5-1 (cross-provider from openai-codex)
+		// "hard-code" uses anthropic/claude-opus-5-5 (cross-provider from openai-codex)
 		await session.profile("hard-code");
-		expect(session.model().id).toBe("gpt-5.6-sol");
+		expect(session.model().id).toBe("gpt-6-sol");
 		const notes = session.notifications();
 		expect(
 			notes.some(
@@ -518,7 +520,7 @@ test("profile switch across providers is blocked during streaming", async () => 
 		// agent_end should NOT trigger any switch since it was blocked
 		session.setIdle(true);
 		await session.agentEnd({ willContinue: false });
-		expect(session.model().id).toBe("gpt-5.6-sol");
+		expect(session.model().id).toBe("gpt-6-sol");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -531,14 +533,14 @@ test("deferred profile switch is cancelled on session switch", async () => {
 	try {
 		const session = await effortSession(dir);
 		session.setIdle(false);
-		await session.profile("best");
-		expect(session.model().id).toBe("gpt-5.6-sol");
+		await session.profile("economical");
+		expect(session.model().id).toBe("gpt-6-sol");
 
 		// User switches sessions before turn completes
 		await session.switchTo([]);
 		session.setIdle(true);
 		await session.agentEnd({ willContinue: false });
-		expect(session.model().id).toBe("gpt-5.6-sol");
+		expect(session.model().id).toBe("gpt-6-sol");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

@@ -960,3 +960,89 @@ class ExternalTimeoutTest(unittest.TestCase):
         self.assertEqual(completed.returncode, bench.EXTERNAL_TIMEOUT_EXIT)
         self.assertEqual(completed.stdout, "partial")
         self.assertTrue(metrics.termination_reason.startswith(bench.EXTERNAL_TIMEOUT))
+
+
+class SuiteSetupTest(unittest.TestCase):
+    """A suite outside `bench/` resolves against itself, and `setup` precedes the baseline."""
+
+    CLASSES = {"dev-fix": bench.TaskClass("dev-fix", "버그 수정", 1.0, "verify", ("default",), ())}
+
+    def suite(self, root: Path, *, fixture: str = "fixtures/app", **fields: Any) -> Path:
+        (root / "tasks").mkdir(parents=True)
+        (root / "fixtures" / "app").mkdir(parents=True)
+        task = {
+            "id": "t",
+            "title": "t",
+            "class": "dev-fix",
+            "fixture": fixture,
+            "prompt": "do it",
+            "verify": [sys.executable, "-c", "import os, sys; sys.exit(0 if os.path.exists('ready') else 1)"],
+            "timeout_seconds": 30,
+            "default_repetitions": 1,
+            "estimated_usage": {"input": 1, "output": 1, "cacheRead": 0, "cacheWrite": 0},
+            **fields,
+        }
+        (root / "tasks" / "t.json").write_text(json.dumps(task), encoding="utf-8")
+        return root
+
+    def test_a_task_resolves_its_fixture_below_the_chosen_suite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = self.suite(Path(directory) / "private")
+            (task,) = bench.load_tasks(self.CLASSES, suite)
+            self.assertEqual(task.fixture, (suite / "fixtures" / "app").resolve())
+
+    def test_a_fixture_outside_the_suite_fixtures_fails_to_load(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = self.suite(Path(directory) / "private", fixture="tasks")
+            with self.assertRaises(bench.BenchError):
+                bench.load_tasks(self.CLASSES, suite)
+
+    def test_setup_prepares_the_copy_before_the_baseline_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = self.suite(
+                Path(directory) / "private", setup=[sys.executable, "-c", "open('ready', 'w').close()"]
+            )
+            (task,) = bench.load_tasks(self.CLASSES, suite)
+            # The setup makes verify pass, so the baseline check must see its effect.
+            with self.assertRaisesRegex(bench.BenchError, "already passes"):
+                bench.validate_task_baseline(task)
+            self.assertFalse((task.fixture / "ready").exists())
+
+    def test_a_failing_setup_stops_the_command_instead_of_scoring_a_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = self.suite(Path(directory) / "private", setup=[sys.executable, "-c", "raise SystemExit(3)"])
+            (task,) = bench.load_tasks(self.CLASSES, suite)
+            with self.assertRaisesRegex(bench.BenchError, "setup failed"):
+                bench.validate_task_baseline(task)
+
+
+class CatalogRatesTest(unittest.TestCase):
+    """A provider cached under a versioned id still prices its newest models."""
+
+    def catalog(self, directory: str, rows: Sequence[tuple[str, int, list]]) -> Path:
+        path = Path(directory) / "models.db"
+        with sqlite3.connect(path) as connection:
+            connection.execute("CREATE TABLE model_cache (provider_id TEXT, updated_at INTEGER, models TEXT)")
+            connection.executemany(
+                "INSERT INTO model_cache VALUES (?, ?, ?)",
+                [(provider, updated, json.dumps(models)) for provider, updated, models in rows],
+            )
+        return path
+
+    def model(self, model_id: str, price: float) -> dict:
+        return {"id": model_id, "cost": {"input": price, "output": price, "cacheRead": 0.0, "cacheWrite": 0.0}}
+
+    def test_versioned_and_plain_rows_merge_under_the_provider(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.catalog(
+                directory,
+                [
+                    ("openai-codex", 2, [self.model("gpt-6-astra", 10.0)]),
+                    ("openai-codex:0.155.1", 1, [self.model("gpt-6-astra", 9.0), self.model("gpt-6-sol", 2.0)]),
+                ],
+            )
+            rates = bench.load_model_rates(path)
+        self.assertEqual(rates[("openai-codex", "gpt-6-sol")].base["input"], 2.0)
+        # The row updated last wins a model both rows list.
+        self.assertEqual(rates[("openai-codex", "gpt-6-astra")].base["input"], 10.0)
+        self.assertNotIn(("openai-codex:0.155.1", "gpt-6-sol"), rates)
