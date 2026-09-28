@@ -42,6 +42,19 @@
         "green 후 필요한 리팩터링과 재검증을 TDD 사이클 안에 둔다.",
         "행동 assertion 실패를 red로 구분하고 문서 오타에 행동 테스트를 강제하지 않는다."
       ]
+    },
+    {
+      "id": 4,
+      "name": "authoring-gate",
+      "prompt": "캐시 모듈의 TTL 만료 동작에 테스트를 추가하려 합니다. api.test.ts는 이미 실제 HTTP 경계에서 가짜 시계로 만료 전후 응답을 검증합니다. 담당자는 cache.ts에 export function __setNowForTests(fn)을 추가해 단위 테스트를 새로 쓰고, 기대값은 cache.get()이 반환한 값을 스냅샷으로 저장하자고 합니다. 지금은 실행·편집하지 말고 새 테스트를 추가할지, 추가한다면 어떤 형태인지 제시하세요.",
+      "expected_output": "Names why existing coverage misses the defect before adding; rejects the test-only export and self-produced snapshot oracle; extends the owner suite only for a distinct risk.",
+      "files": [],
+      "expectations": [
+        "기존 api.test.ts가 이미 잡는 결함인지 먼저 따지고, 놓치는 고유 위험이 없으면 추가하지 않는다.",
+        "프로덕션 호출자가 없는 테스트 전용 export를 거부하고 실제 경계나 기존 시계 주입을 사용한다.",
+        "테스트 대상의 출력으로 만든 스냅샷을 독립 기대값으로 인정하지 않는다.",
+        "추가가 필요하면 근접 중복 대신 기존 table case나 fixture를 확장한다."
+      ]
     }
   ]
 }

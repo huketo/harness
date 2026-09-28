@@ -11,13 +11,15 @@ Produce a test that detects the intended defect, a minimal change that passes it
 
 Read the affected code, neighboring tests, runner configuration and applicable repository instructions. Use domain terminology and existing fixtures. List the requested behaviors; for each, name the observable result and smallest boundary that can detect a plausible defect. This list is analysis, not a batch of speculative test implementations.
 
+Each contract has one primary test owner at the strongest boundary that can reach it. Before adding a test, name why existing coverage misses its defect; a second layer needs a distinct risk the owner cannot reach, such as a transport or lifecycle failure. Extend a table case or shared fixture instead of adding a near-duplicate. A test that needs a production seam no production caller uses (an export, flag, wrapper or injection hook) belongs at the real boundary instead. Where the `test-audit` skill is installed, check each new test against its junk-pattern checklist (`patterns.md`).
+
 Choose established boundaries autonomously. Ask only when unresolved product behavior, an interface tradeoff or authority actually needs a human decision. If another instruction blocks authorized work, quote its exact source and resolve the conflict rather than silently abandoning the task.
 
 Read [tests.md](tests.md) before choosing assertions or reviewing coverage, and [mocking.md](mocking.md) before choosing doubles or integration boundaries. Read [vitest.md](vitest.md) for Vitest advice, edits or execution; read [playwright.md](playwright.md) for the equivalent Playwright work.
 
 Choose assertions by the contract, not a blanket ban: durable storage may require direct SQL; exactly-once charging requires observing the external fake/provider's charge ledger or calls. A local order row cannot prove a provider was not charged twice.
 
-**Done:** each requested behavior has an observation, a test location and a focused command; the required broader gates and infrastructure prerequisites are identified. Documentation-only changes need document validation, not invented behavioral tests.
+**Done:** each requested behavior has an observation, a test location, a focused command and the reason existing coverage misses it; the required broader gates and infrastructure prerequisites are identified. Documentation-only changes need document validation, not invented behavioral tests.
 
 ## 2. Isolation
 

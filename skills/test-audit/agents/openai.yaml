@@ -1,0 +1,3 @@
+interface:
+  display_name: "Test Audit"
+  short_description: "Prune low-value tests and test-only seams"

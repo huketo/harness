@@ -79,3 +79,28 @@ You win twice: fewer tokens, and a sharper hook for the agent to hang its thinki
 - The **environment** is a source of truth too — `package.json` scripts, config files, the directory layout, `--help` output — and a document that restates it is a **cache**: a copy of a lookup, earning its load only when the lookup is expensive. Cache what the agent cannot find by looking: the unwritten convention, the reason behind a choice, the gotcha no config confesses. Leave the one-file, one-command lookups to the environment, where they cannot go stale.
 - Check every line for **relevance**: does it still bear on what the document does? A line loses relevance by never bearing on the task (mere exposition, or a branch that should be disclosed) or by going stale as the behaviour or world it describes changes. Shorter documents are easier to keep relevant. Without a pruning discipline the default fate is **sediment**: stale layers that settle because adding feels safe and removing feels risky, until you must core down through them to find what is still live.
 - Hunt **no-ops** sentence by sentence: an instruction the model already obeys by default pays load to say nothing. The test — does it change behaviour versus the default? — is model-relative, not reader-relative: two people disagreeing about a no-op disagree about the default, and settle it by running the document, not by debate. When a sentence fails, delete the whole sentence rather than trim words from it. The test also grades leading words: a word too weak to beat the default (_be thorough_ when the agent is already thorough-ish) is a no-op, and the fix is a stronger word (_relentless_), not a different technique.
+
+## Corrections become constraints
+
+A recurring correction is a signal about the environment, not only about the agent. Before writing a rule for it, pick the smallest mechanism that makes the mistake hard to repeat:
+
+| Failure | Mechanism |
+|---|---|
+| An invalid state or dependency can be designed out | Constrain the architecture, API or data model. |
+| A bad pattern can be detected mechanically | Add or reuse a type, lint, compiler, hook or CI check. |
+| The decision needs context and judgment | Write a concise project rule or review criterion. |
+| The agent lacks a repeatable procedure | Capture the workflow in a skill and evaluate it. |
+
+Prefer the enforceable rung where feasible; written rules and automated review remain fallible. A new check must reject the bad case and accept a valid one — run both. Record the general principle and when it applies, not the incident's names and history, and extend the rule that already owns the topic instead of adding a sibling. A ban that one project chose stays in that project.
+
+## Evaluating a change
+
+A document change is a hypothesis about behavior; running it is the test.
+
+- Start from an observed failure and name the behavior that should change.
+- Use representative tasks with observable criteria: did the agent inspect the relevant code, exercise the flow and report valid evidence? Include one routine task, so the change is also checked for adding process a small job does not need.
+- Keep expected answers out of the evaluated task. Run fresh sessions on the intended model and environment where available.
+- Compare runs before and after the change when practical, judging tool calls, edits and artifacts rather than stated confidence or a score alone.
+- Refine the smallest instruction or tool that explains a failure, then rerun the affected cases. A revision that was not run is labelled untested, not improved.
+
+A skill keeps its cases in `evals/evals.json` (`skill_name`, and `evals[]` entries of `id`, `name`, `prompt`, `expected_output`, `files`, `expectations`). Put run outputs outside version control.

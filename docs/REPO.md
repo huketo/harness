@@ -96,6 +96,10 @@ bun test herdr/cron/host-sync.test.mjs
 
 `git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)의 MIT 스킬을 2026-09-09에 편입했습니다. 본문은 그대로 두고 description만 트리거 조건으로 줄였습니다. 같은 날 `daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description도 줄였습니다. description은 시스템 프롬프트에 항상 실리는 유일한 부분이므로 절차 설명은 본문에 두고, 이웃 스킬과 겹치는 트리거는 한쪽에만 둡니다. 근거는 `docs/FACTS.md` 11절에 있습니다.
 
+2026-09-28에는 [openclaw/openclaw](https://github.com/openclaw/openclaw/tree/80930af448ebabc84174146b56bc106d37fab3b4/.agents/skills/test-audit)의 MIT `test-audit`을 범용 스킬로 편입했습니다. 이 스킬은 기존 테스트의 감사·정리와 테스트 전용 production seam 제거를 소유하며, 대상 프로젝트의 runner·gate·게시 흐름은 그 프로젝트의 지침·CI·매니페스트에서 찾습니다. 새 테스트의 작성 게이트는 트리거가 겹치지 않도록 `tdd`로 옮겼고, 두 스킬이 함께 쓰는 정크 패턴 목록은 `skills/test-audit/patterns.md` 한 곳에 둡니다. `tdd`는 `test-audit`이 설치되지 않아도 동작합니다. 판단 평가는 `skills/test-audit/evals/evals.json`에 있습니다.
+
+같은 날 [unicodef1wn/lauren-poteto-rules](https://github.com/unicodef1wn/lauren-poteto-rules/tree/a6f818e107855df5603c8f36f626de4b1125e5b7)의 MIT 원칙 가운데 반복 교정을 설계·기계 검사·규칙·스킬 순의 제약으로 바꾸는 기준과 지침 변경의 평가 절차를 `writing-for-agents`에, 검증된 재현 경로 기록과 기계적 재발 방지 검토를 `diagnosing-bugs`에 다시 써서 넣었습니다. 나머지 원칙은 기존 지침과 겹치고 description이 이웃 스킬의 트리거와 충돌하므로 스킬 전체는 편입하지 않았습니다. 두 출처의 고정 revision·입력 해시·로컬 변경은 `third-party/adopted-skills.json`, 원저작자 고지는 `skills/test-audit/LICENSE`, `skills/tdd/LICENSE.openclaw`, 각 스킬의 `LICENSE.lauren-poteto-rules`에 있습니다.
+
 ## 서드파티 스킬과 Herdr 플러그인
 
 설치 관리자가 내려받은 스킬과 플러그인 checkout은 이 레포가 소유하지 않습니다. 관리형 디렉터리를 복사하면 상류 업데이트와 로컬 사본이 갈라지므로, 공개 핀과 필요한 패치만 보존합니다.

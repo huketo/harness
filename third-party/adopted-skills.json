@@ -300,7 +300,28 @@
         "installedAt": "2026-05-06T05:31:26.974Z",
         "updatedAt": "2026-08-06T12:13:15.261Z"
       },
-      "installed_snapshot_sha256": "020e48193f19c303f462ac6c6bf16548f10e3b1f706df562f8fb8f6b3efb43a6"
+      "installed_snapshot_sha256": "020e48193f19c303f462ac6c6bf16548f10e3b1f706df562f8fb8f6b3efb43a6",
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/openclaw/openclaw",
+          "commit": "80930af448ebabc84174146b56bc106d37fab3b4",
+          "paths": [
+            "LICENSE",
+            ".agents/skills/test-audit"
+          ],
+          "snapshot_sha256": "27e644317dc38dea93bfbd675a85bf1146972c4ca8056c96702f1413d94e7235",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "license_paths": [
+        "skills/tdd/LICENSE",
+        "skills/tdd/LICENSE.openclaw"
+      ],
+      "local_changes": [
+        "2026-09-28: Add the one-owner, existing-coverage and test-only-seam authoring gate adapted from openclaw test-audit; defer the junk-pattern checklist to the test-audit skill when installed."
+      ]
     },
     "diagnosing-bugs": {
       "previous_registration": {
@@ -313,7 +334,30 @@
         "installedAt": "2026-07-09T01:30:03.686Z",
         "updatedAt": "2026-08-06T12:13:15.251Z"
       },
-      "installed_snapshot_sha256": "46f4f1d573d4384818efe1fc6a366cb4a22fc4a5633175a86b4288ef24062cfe"
+      "installed_snapshot_sha256": "46f4f1d573d4384818efe1fc6a366cb4a22fc4a5633175a86b4288ef24062cfe",
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/unicodef1wn/lauren-poteto-rules",
+          "commit": "a6f818e107855df5603c8f36f626de4b1125e5b7",
+          "paths": [
+            "EXAMPLES.md",
+            "LICENSE",
+            "README.md",
+            "SKILL.md"
+          ],
+          "snapshot_sha256": "2ccea66b890cd08e13f93400f25a77bb8f74caf7959150fac2c0db50e14f2653",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "license_paths": [
+        "skills/diagnosing-bugs/LICENSE",
+        "skills/diagnosing-bugs/LICENSE.lauren-poteto-rules"
+      ],
+      "local_changes": [
+        "2026-09-28: Add the verified-route checklist item and mechanical-check prevention question re-authored from lauren-poteto-rules principles 3 and 5; preserve the notice in LICENSE.lauren-poteto-rules."
+      ]
     },
     "code-review": {
       "previous_registration": {
@@ -443,7 +487,30 @@
         "installedAt": "2026-08-06T12:13:15.267Z",
         "updatedAt": "2026-08-06T12:13:15.267Z"
       },
-      "installed_snapshot_sha256": "ab9bd0b8194e79b371583548024d57781eda0f6797d39d64f0bdd81ba585b705"
+      "installed_snapshot_sha256": "ab9bd0b8194e79b371583548024d57781eda0f6797d39d64f0bdd81ba585b705",
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/unicodef1wn/lauren-poteto-rules",
+          "commit": "a6f818e107855df5603c8f36f626de4b1125e5b7",
+          "paths": [
+            "EXAMPLES.md",
+            "LICENSE",
+            "README.md",
+            "SKILL.md"
+          ],
+          "snapshot_sha256": "2ccea66b890cd08e13f93400f25a77bb8f74caf7959150fac2c0db50e14f2653",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "license_paths": [
+        "skills/writing-for-agents/LICENSE",
+        "skills/writing-for-agents/LICENSE.lauren-poteto-rules"
+      ],
+      "local_changes": [
+        "2026-09-28: Add corrections-become-constraints and evaluating-a-change sections re-authored from lauren-poteto-rules principles 5 and 7; preserve the notice in LICENSE.lauren-poteto-rules."
+      ]
     },
     "wait-what": {
       "previous_registration": {
@@ -470,6 +537,36 @@
         "updatedAt": "2026-08-06T12:13:15.256Z"
       },
       "installed_snapshot_sha256": "c97a305f5ca0b6fa21ca82a009ac5a553acd02aab63cf59de939f75ac7797393"
+    },
+    "test-audit": {
+      "adopted_on": "2026-09-28",
+      "source": "https://github.com/openclaw/openclaw",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/test-audit/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/openclaw/openclaw",
+          "commit": "80930af448ebabc84174146b56bc106d37fab3b4",
+          "paths": [
+            "LICENSE",
+            ".agents/skills/test-audit"
+          ],
+          "snapshot_sha256": "27e644317dc38dea93bfbd675a85bf1146972c4ca8056c96702f1413d94e7235",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Generalize for any project: discover the runner, gates and publication flow from project instructions, CI and manifests instead of OpenClaw scripts; replace autoreview and PR tooling with the code-review and git-commit skills when available.",
+        "Move the authoring gate into tdd; keep audit, retention bar, candidate evidence, edit shape, validation and handoff here, with the junk-pattern checklist in patterns.md for both skills.",
+        "Exclude test-shaped data such as benchmark fixtures, oracles, generated suites and evaluation datasets; record copies of a test in other repositories or branches as candidate evidence.",
+        "Generalize the campaign procedure and its upstream Telegram examples; require a keeper mutation for every moved contract.",
+        "Add Korean judgment evals, including a routine control case."
+      ],
+      "excluded_sources": []
     },
     "git-commit": {
       "adopted_on": "2026-09-09",

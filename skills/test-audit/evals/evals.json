@@ -1,0 +1,80 @@
+{
+  "skill_name": "test-audit",
+  "evals": [
+    {
+      "id": 1,
+      "name": "byte-contract-false-positive",
+      "prompt": "TOML 설정 마이그레이터 applyPolicy(raw)의 Bun 테스트가 있습니다. 테스트는 결과를 파싱해 새 키 값을 확인하고, expect(updated).not.toContain(\"context_management = true\")로 레거시 키가 출력 파일에서 사라졌는지 보며, applyPolicy(updated) === updated로 멱등성을 확인합니다. 팀원이 not.toContain은 문자열 grep이니 테스트 감사에서 지우자고 합니다. 이 마이그레이터는 사용자의 실제 설정 파일에 결과를 씁니다. 지금은 파일을 수정하거나 실행하지 말고 이 assertion을 유지·수리·삭제 중 무엇으로 판정할지와 근거, 확인할 증거를 제시하세요.",
+      "expected_output": "Retains the assertion as an output-byte contract of a file the tool writes; distinguishes it from a source grep; names the evidence that would overturn the judgment.",
+      "files": [],
+      "expectations": [
+        "출력 파일에 레거시 키가 남지 않는 것이 사용자 가시 계약임을 들어 유지로 판정한다.",
+        "소스 코드 grep과 테스트 대상이 생성한 출력 바이트 검사를 구분한다.",
+        "식별자만 바꾸는 리팩터링에서는 통과하고 계약이 바뀌면 실패하는 가드라는 기준을 적용한다.",
+        "삭제를 뒷받침하려면 같은 계약을 지키는 더 강한 증명이 있어야 함을 밝힌다."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "copied-config-oracle",
+      "prompt": "buildArgv(profile) 테스트가 expect(buildArgv(main)).toEqual([\"codex\", \"--model\", \"gpt-6-sol\", ...])처럼 profiles.json에 있는 모델 ID를 그대로 적어 둡니다. 모델을 올릴 때마다 이 테스트도 같이 고쳐야 해서 불만이 나옵니다. 누군가는 테스트를 지우자고 하고, 다른 사람은 expected를 buildArgv(main)으로 만들자고 합니다. 실행·편집 없이 판정과 수정 형태를 제시하세요.",
+      "expected_output": "Separates the argv-shape contract from the copied model value; rejects both deletion and a self-produced oracle; proposes an independent expected value.",
+      "files": [],
+      "expectations": [
+        "argv 구조와 runner 선택은 계약이고 모델 ID 리터럴은 설정 사본임을 구분해 수리(repair)로 판정한다.",
+        "expected를 테스트 대상 함수의 출력으로 만드는 안을 자기 생성 오라클로 거부한다.",
+        "입력 fixture나 해석된 프로필처럼 테스트 대상과 독립된 값에서 기대값을 얻는 형태를 제안한다.",
+        "통째 삭제는 argv 계약의 유일한 증명을 잃을 수 있음을 지적한다."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "benchmark-fixture-scope",
+      "prompt": "레포 전체 테스트를 감사해 실패하거나 가치 없는 테스트를 정리해 주세요. 실패 목록에는 bench/fixtures/bugfix-python/test_intervals.py와 bench/oracle/mutation-guard/tests/money.test.ts가 있고, bench/bench.py가 이 디렉터리를 과제 입력으로 복사해 모델에게 풉니다. 나머지 실패는 src/cache.test.ts 하나입니다. 지금은 편집하지 말고 감사 범위와 첫 단계를 제시하세요.",
+      "expected_output": "Excludes benchmark fixtures and oracles as test-shaped data; treats the remaining baseline failure as a possible product bug; discovers the runner from project sources.",
+      "files": [],
+      "expectations": [
+        "벤치마크 fixture와 오라클 테스트를 감사 범위에서 제외하고 그 이유를 밝힌다.",
+        "src/cache.test.ts의 baseline 실패를 삭제 후보가 아니라 제품 결함 후보로 분리한다.",
+        "runner와 gate를 프로젝트의 지침·CI·매니페스트에서 찾으며 명령을 추측하지 않는다.",
+        "편집 전에 baseline 결과를 기록하는 단계를 둔다."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "test-only-seam",
+      "prompt": "src/cache.ts에 export function __resetCacheForTests()가 있고 cache.test.ts만 이것을 호출합니다. 이 테스트는 reset 뒤 get()이 undefined인지 봅니다. TTL 만료와 무효화는 api.test.ts가 실제 HTTP 경계에서 검증합니다. 이 export와 테스트를 정리하려 합니다. 실행·편집 없이 삭제 전에 필요한 증거와 편집·검증 순서를 제시하세요.",
+      "expected_output": "Collects candidate evidence including non-test callers; deletes the seam with its test rather than aliasing; confirms the remaining boundary proof and mutation-checks any moved contract; runs owner and sibling tests.",
+      "files": [],
+      "expectations": [
+        "테스트 외 호출자 검색, 남는 경계 증명, 이력 확인을 삭제 전 증거로 요구한다.",
+        "테스트 전용 export를 별칭 없이 테스트와 함께 제거하는 편집을 제안한다.",
+        "남는 api.test.ts가 TTL 만료와 무효화를 실제로 단언하는지 확인하고, 증명이 다른 테스트로 옮겨가는 계약에는 프로덕션 변이 확인과 원복을 둔다.",
+        "프로덕션 코드와 테스트 줄 수를 구분해 보고하는 검증을 포함한다."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "baseline-failure-not-stale",
+      "prompt": "main에서 outbound.test.ts의 '재시도 후 한 번만 전송' 테스트가 실패합니다. 최근 전송 코드를 리팩터링했고 팀원은 오래된 테스트라 지우자고 합니다. 테스트는 fake 네트워크에서 전송 횟수를 셉니다. 실행·편집 없이 판정과 다음 단계를 제시하세요.",
+      "expected_output": "Treats the failure as a possible product defect; reproduces it and repairs the owner with a control run instead of deleting the test.",
+      "files": [],
+      "expectations": [
+        "baseline 실패 테스트를 삭제하지 않고 제품 결함 가능성으로 다룬다.",
+        "외부 효과인 전송 횟수 관측이 정당한 계약 assertion임을 인정한다.",
+        "재현한 뒤 소유 코드를 고치고 수정 되돌림 control로 증명하는 순서를 제시한다."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "routine-control",
+      "prompt": "src/format.test.ts에서 쓰지 않는 import 한 줄을 지워 주세요. 이 파일은 bun test로 실행합니다. 지금은 수행할 단계만 짧게 제시하세요.",
+      "expected_output": "Stays small: removes the import and runs the one test file; no audit ledger, baseline sweep, subagents or mutation checks.",
+      "files": [],
+      "expectations": [
+        "import 제거와 해당 파일 하나의 테스트 실행으로 끝낸다.",
+        "감사 ledger, 전체 baseline, subagent 탐색, 변이 확인 같은 절차를 추가하지 않는다."
+      ]
+    }
+  ]
+}
