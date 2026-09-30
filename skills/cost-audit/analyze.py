@@ -592,7 +592,7 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
             counterfactual_cost(data.prices, row, "openai-codex", "gpt-6-luna") for row in group
         ]
         sol_values = [
-            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6-sol") for row in group
+            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6.1-sol") for row in group
         ]
         if any(value is None for value in luna_values + sol_values):
             unpriced += len(group)
@@ -698,8 +698,8 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
         (
             "Use modelRoles.smol for low-effort work and reserve the Opus role for work that needs "
             "its default medium effort or more. Artificial Analysis Intelligence Index v4.3.2 "
-            "(2026-09-23) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6 Sol high at 43 "
-            "for $0.37; Terminal-Bench 4.0 ranks the pair the other way, so this is not strict dominance."
+            "(2026-09-30) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6.1 Sol medium at 48 "
+            "for $0.21; Terminal-Bench 4.0 agrees (31% vs 48%)."
         ),
         {
             "segment_count": len(findings),
@@ -707,7 +707,7 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
             "levels": sorted(LOW_EFFORT_LEVELS),
             "attributed_cost_usd": round(total_cost, 6),
             "benchmark_reason": (
-                "AA Intelligence Index v4.3.2: Opus 5.5 low 42/$0.55 vs GPT-6 Sol high 43/$0.37 "
+                "AA Intelligence Index v4.3.2: Opus 5.5 low 42/$0.55 vs GPT-6.1 Sol medium 48/$0.21 "
                 "and GPT-6 Luna max 37/$0.07 per task."
             ),
         },

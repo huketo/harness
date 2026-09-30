@@ -239,3 +239,45 @@ OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 
 - `bench/bench.py`에 `run --suite`, 과제 `setup`, 버전이 붙은 카탈로그 행 병합을 추가했고 고정 override 키에서 `librarian`을 뺐습니다. `bench/config.json`의 후보와 심판도 새 모델로 바꿨습니다.
 - 비용 감사의 반사실 단가는 GPT-6 Luna·Sol이며, 저강도 탐지는 Opus의 `minimal`·`low`만 셉니다.
 - 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.
+
+## 13. GPT-6.1 Sol 도입 판단 (2026-09-30)
+
+2026-09-29에 공개된 GPT-6.1 Sol로 GPT-6 Sol을 교체했습니다. `code`(`mid`·`task` 역할과 Sol 폴백)는 공급사 기본값 medium, `general`은 low입니다. 근거는 아래 공급사 자료와 Artificial Analysis(AA) 조회이며, 측정값은 조회 시점의 외부 결과이지 이 하네스 안의 성능 보장이 아닙니다.
+
+### 공급사 자료
+
+- [GPT-6.1 Sol 발표](https://openai.com/index/introducing-gpt-6-1-sol/)는 GPT-6 Sol의 후속으로 에이전트 코딩·컴퓨터 사용·전문 업무에서 Astra에 가까운 성능을 Astra 단가의 1/5로 낸다고 밝힙니다. 단가는 GPT-6 Sol과 같은 $2/$10이고 캐시 입력만 $0.10으로 절반입니다.
+- [모델 페이지](https://developers.openai.com/api/docs/models/gpt-6.1-sol)와 [GPT-6 가이드](https://developers.openai.com/api/docs/guides/latest-model)는 effort 기본값을 `medium`으로 두고 `none`·`minimal`은 지원하지 않는다고 적습니다. [모델 선택 안내](https://developers.openai.com/api/docs/guides/model-selection)는 복잡한 기술 작업에 GPT-6.1 Sol medium, 완성도 높은 산출물에 xhigh를 제시합니다. 12절의 "이전 모델의 실효 effort 유지" 권고는 GPT-6 전환 때의 문구이고 6.1 Sol 항목에는 없습니다.
+- [시스템 카드 부록](https://deploymentsafety.openai.com/gpt-6-1-sol)은 GPT-6.1 Sol을 사이버보안 Critical로 분류하고 Astra와 같은 안전장치를 적용한다고 적습니다. 보안 리뷰 역할은 Opus 5.5이므로 이번 변경의 영향 범위 밖입니다.
+
+### Artificial Analysis
+
+[모델 리더보드](https://artificialanalysis.ai/leaderboards/models)(Intelligence Index v4.3.2, 2026-09-30 조회)의 값입니다. Anthropic 행은 AA 표기상 "with fallback" 조건이고, 작업당 비용은 AA 지수 실행의 API 비용입니다.
+
+| 모델·강도 | Intelligence | Terminal-Bench 4.0 | 작업당 비용 | 출력 tok/s 중앙값 | 첫 청크 s 중앙값 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GPT-6.1 Sol max | 52 | 56% | $0.72 | 68 | 247.8 |
+| GPT-6.1 Sol xhigh | 51 | 54% | $0.39 | 64 | 69.2 |
+| GPT-6.1 Sol high | 50 | 52% | $0.32 | 65 | 57.6 |
+| GPT-6.1 Sol medium | 48 | 48% | $0.21 | 61 | 5.5 |
+| GPT-6.1 Sol low | 42 | 31% | $0.13 | 69 | 2.0 |
+| GPT-6 Sol max | 48 | 44% | $1.05 | 76 | 185.7 |
+| GPT-6 Sol high | 43 | 26% | $0.38 | 66 | 16.4 |
+| GPT-6 Sol medium | 40 | 19% | $0.25 | — | — |
+| Astra high | 51 | 54% | $1.73 | 47 | 41.7 |
+| Opus 5.5 high | 54 | 57% | $1.82 | 74 | 33.2 |
+| Opus 5.5 low | 42 | 31% | $0.55 | 73 | 14.3 |
+| Luna max | 37 | 13% | $0.07 | 145 | 110.5 |
+
+### 결정
+
+- **GPT-6 Sol을 GPT-6.1 Sol로 교체합니다.** AA에서 모든 강도가 GPT-6 Sol보다 점수가 높고 비용은 같거나 낮습니다. 12절의 대체 관례대로 `gpt-6-sol` 모델 항목과 지침 파일을 지웠고, `omp/prompts/gpt-6.1-sol.txt`는 이전 지침을 그대로 옮긴 것입니다.
+- **`code`는 medium**입니다. 공급사 기본값이고, 이전 `code`(6 Sol high)보다 Intelligence 5점, Terminal-Bench 22%p 높으면서 작업당 비용은 55%, 첫 청크는 1/3입니다. high는 2점·4%p 더 높지만 첫 청크가 57.6초로 늘어 서브에이전트 지연이 커집니다.
+- **`general`은 low**입니다. `code`보다 한 단계 낮은 기존 구성을 유지하며, 이전 `general`(6 Sol medium)보다 두 지수가 높고 비용은 절반입니다.
+- Luna 역할(`smol`·`tiny`·`commit`)과 Opus 역할은 바꾸지 않습니다. 6.1 low는 AA에서 Luna max보다 높고 빠르지만 비용이 약 2배이고, Opus 5.5 high는 6.1 high보다 4점·5%p 높습니다.
+
+### 설정·도구 변경
+
+- `omp/config.apply.sh`의 `spelling.autocomplete`를 `"off"`로 선언합니다. OMP 18.4.4는 이 키를 열거형(`off`, `auto`, `ngram`, `smollm`, `apple`)으로 바꿔 `false`를 거부하고, 변경 모드는 그 지점에서 멈춰 뒤의 역할·폴백을 적용하지 못합니다.
+- `bench/config.json` 후보를 GPT-6.1 Sol medium·high·xhigh로, 비용 감사의 Sol 반사실 단가를 `gpt-6.1-sol`로 바꿨습니다. 저강도 탐지의 AA 근거는 Opus 5.5 low 42/$0.55 대 GPT-6.1 Sol medium 48/$0.21이며 Terminal-Bench에서도 같은 방향입니다.
+- 단가와 한도는 [PRICING 3-4절](PRICING.md#3-4-2026-09-30-카탈로그-갱신)에 있습니다. 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.

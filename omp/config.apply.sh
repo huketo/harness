@@ -52,7 +52,7 @@ startup.checkUpdate|true
 marketplace.autoUpdate|"notify"
 recap.enabled|false
 spelling.typoDetection|false
-spelling.autocomplete|false
+spelling.autocomplete|"off"
 power.sleepPrevention|"off"
 skills.enableCodexUser|false
 skills.enableClaudeUser|false

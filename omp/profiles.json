@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"_comment": "Model-specific saved effort + named purpose profiles, independent of OMP's built-in modelRoles. Owned by omp/extensions/profiles + omp/profiles.ts. Exact catalog IDs/contextWindow/maxTokens verified against the installed `omp models --json` catalog on 2026-09-23 (not vendor-advertised specs, which run higher for the openai-codex models below -- the installed catalog figure is what the running session actually budgets against). Efforts follow the 2026-09-23 vendor effort guidance and Artificial Analysis results in docs/FACTS.md §12; they are starting points, not claimed optima; adjust via /effort or `bun omp/profiles.ts effort set`.",
+	"_comment": "Model-specific saved effort + named purpose profiles, independent of OMP's built-in modelRoles. Owned by omp/extensions/profiles + omp/profiles.ts. Exact catalog IDs/contextWindow/maxTokens verified against the installed `omp models --json` catalog on 2026-09-23 (gpt-6.1-sol on 2026-09-30; not vendor-advertised specs, which run higher for the openai-codex models below -- the installed catalog figure is what the running session actually budgets against). Efforts follow the vendor effort guidance and Artificial Analysis results in docs/FACTS.md §12-13; they are starting points, not claimed optima; adjust via /effort or `bun omp/profiles.ts effort set`.",
 	"models": {
 		"opus-5-5": {
 			"provider": "anthropic",
@@ -9,11 +9,11 @@
 			"prompt": "prompts/claude-opus-5-5.txt",
 			"compaction": { "thresholdPercent": 75 }
 		},
-		"gpt-6-sol": {
+		"gpt-6.1-sol": {
 			"provider": "openai-codex",
-			"model": "gpt-6-sol",
-			"effort": "high",
-			"prompt": "prompts/gpt-6-sol.txt",
+			"model": "gpt-6.1-sol",
+			"effort": "medium",
+			"prompt": "prompts/gpt-6.1-sol.txt",
 			"compaction": { "thresholdPercent": 70 }
 		},
 		"gpt-6-luna": {
@@ -75,13 +75,13 @@
 			"purpose": "Opus 5.5 at xhigh for difficult coding and implementation"
 		},
 		"code": {
-			"model": "gpt-6-sol",
-			"purpose": "GPT-6 Sol for routine coding work"
+			"model": "gpt-6.1-sol",
+			"purpose": "GPT-6.1 Sol at its default medium effort for routine coding work"
 		},
 		"general": {
-			"model": "gpt-6-sol",
-			"effort": "medium",
-			"purpose": "GPT-6 Sol at reduced (medium) effort for general/noncoding tasks"
+			"model": "gpt-6.1-sol",
+			"effort": "low",
+			"purpose": "GPT-6.1 Sol at reduced (low) effort for general/noncoding tasks"
 		},
 		"opus-code": {
 			"model": "opus-5-5",

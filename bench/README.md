@@ -16,7 +16,7 @@ python3 bench/bench.py run --dry-run
 python3 bench/bench.py run \
   --task bugfix-python \
   --model openai-codex/gpt-6-luna:max \
-  --model openai-codex/gpt-6-sol:xhigh \
+  --model openai-codex/gpt-6.1-sol:medium \
   --repeat 1 \
   --budget-usd 1.0
 ```
