@@ -599,6 +599,118 @@
         "Shorten description to commit, /commit, conventional commit message generation, and staging triggers; preserve the upstream body."
       ],
       "excluded_sources": []
+    },
+    "marketing": {
+      "adopted_on": "2026-10-06",
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/marketing/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/coreyhaines31/marketingskills",
+          "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+          "paths": [
+            "LICENSE",
+            "skills/product-marketing",
+            "skills/marketing-plan",
+            "skills/marketing-ideas",
+            "skills/marketing-psychology",
+            "skills/offers",
+            "skills/customer-research",
+            "skills/competitor-profiling",
+            "skills/competitors",
+            "skills/launch",
+            "skills/public-relations",
+            "skills/events",
+            "skills/directory-submissions",
+            "skills/community-marketing",
+            "skills/influencer-marketing",
+            "skills/co-marketing",
+            "skills/referrals",
+            "skills/copywriting",
+            "skills/copy-editing",
+            "skills/social",
+            "skills/seo-audit",
+            "skills/site-architecture",
+            "skills/schema",
+            "skills/programmatic-seo",
+            "skills/ai-seo",
+            "skills/content-strategy",
+            "skills/cro",
+            "skills/signup",
+            "skills/onboarding",
+            "skills/analytics",
+            "skills/ab-testing",
+            "skills/attribution",
+            "skills/marketing-loops"
+          ],
+          "snapshot_sha256": "d960c6cd9695429db27901e37e2b34c81dab82e72ac2bbf2261e46e683e9c35b",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-authored 32 of 50 upstream skills into one entry point with eleven plain-file references; no upstream file is copied verbatim."
+        }
+      ],
+      "local_changes": [
+        "Consolidate 32 upstream skills into one model-invoked `marketing` entry with references for context, strategy, research, launch, community, copy, social, seo, activation, measurement and loops; one short description replaces 50 always-loaded descriptions.",
+        "Replace the fixed `.agents/product-marketing.md` file with project-convention discovery, a source authority order (shipped behavior, accepted decisions and policy, requirements, strategy drafts, archives) and a claim ledger that every deliverable cites.",
+        "Make publishing, sending, scheduling, outreach, directory submission, ad spend and live tracking changes draft-only until explicitly authorized; unattended loops stage output and record blockers.",
+        "Treat upstream benchmarks, prices, platform specs and statistics as rules of thumb requiring dated current sources; generalize B2B SaaS assumptions to consumer, community, creator and marketplace products; add audience-language transcreation and multi-market search-engine notes.",
+        "Route UI implementation, image generation, decks, diagrams, open-ended research, long-form reports, scheduling and contested decisions to existing harness skills when installed, with a written brief as the fallback.",
+        "Remove the tools registry, 64 CLIs, integration guides, partner and sponsor material, plugin manifests, version machinery and Claude-specific scheduling syntax.",
+        "Add six Korean synthetic evaluation cases on a fictional product fixture, including a routine UI-label control."
+      ],
+      "excluded_sources": [
+        {
+          "source": "https://github.com/coreyhaines31/marketingskills",
+          "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+          "paths": [
+            "skills/pricing",
+            "skills/paywalls",
+            "skills/emails",
+            "skills/churn-prevention",
+            "skills/ads",
+            "skills/ad-creative"
+          ],
+          "reason": "Deferred: monetization, lifecycle email, subscription retention and paid acquisition are outside the current target product stage; add as references when that stage is approved."
+        },
+        {
+          "source": "https://github.com/coreyhaines31/marketingskills",
+          "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+          "paths": [
+            "skills/cold-email",
+            "skills/prospecting",
+            "skills/revops",
+            "skills/sales-enablement",
+            "skills/lead-magnets",
+            "skills/free-tools",
+            "skills/popups",
+            "skills/sms",
+            "skills/aso",
+            "skills/image",
+            "skills/video",
+            "skills/marketing-council"
+          ],
+          "reason": "Excluded: B2B sales and lead-generation workflows, channels without a current target surface, image and video generation owned by imagegen, and simulated real-person advisors overlapping herdr-quorum."
+        },
+        {
+          "source": "https://github.com/coreyhaines31/marketingskills",
+          "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+          "paths": [
+            "tools",
+            "partners.json",
+            ".claude-plugin",
+            ".codex-plugin",
+            ".agents/plugins",
+            "scripts",
+            "tests",
+            "VERSIONS.md"
+          ],
+          "reason": "Excluded: external-write API CLIs, sponsor material and upstream distribution or versioning machinery."
+        }
+      ]
     }
   },
   "removed_on": "2026-09-09",

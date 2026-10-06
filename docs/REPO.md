@@ -100,6 +100,8 @@ bun test herdr/cron/host-sync.test.mjs
 
 같은 날 [unicodef1wn/lauren-poteto-rules](https://github.com/unicodef1wn/lauren-poteto-rules/tree/a6f818e107855df5603c8f36f626de4b1125e5b7)의 MIT 원칙 가운데 반복 교정을 설계·기계 검사·규칙·스킬 순의 제약으로 바꾸는 기준과 지침 변경의 평가 절차를 `writing-for-agents`에, 검증된 재현 경로 기록과 기계적 재발 방지 검토를 `diagnosing-bugs`에 다시 써서 넣었습니다. 나머지 원칙은 기존 지침과 겹치고 description이 이웃 스킬의 트리거와 충돌하므로 스킬 전체는 편입하지 않았습니다. 두 출처의 고정 revision·입력 해시·로컬 변경은 `third-party/adopted-skills.json`, 원저작자 고지는 `skills/test-audit/LICENSE`, `skills/tdd/LICENSE.openclaw`, 각 스킬의 `LICENSE.lauren-poteto-rules`에 있습니다.
 
+2026-10-06에는 [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills/tree/dda3841f0b294e01e93b1541486beefbfab0915e)의 MIT 마케팅 스킬 50개 가운데 32개를 단일 진입점 `marketing`으로 다시 써서 편입했습니다. 상류의 50개 description은 합계 37,200자이므로 그대로 설치하지 않고, 짧은 description 하나와 영역별 참조 11개(`references/`)로 나눴습니다. 상류의 고정 컨텍스트 파일 `.agents/product-marketing.md` 대신, 대상 레포의 문서 관례에서 마케팅 컨텍스트를 찾고 출처 권위 순서와 claim ledger로 모든 제품 주장을 근거에 묶습니다. 게시·발송·예약·연락·광고 집행은 명시적 승인 전까지 초안으로만 남깁니다. 가격·이메일·광고·이탈 방지 6개는 보류하고, B2B 영업·리드 수집·SMS·ASO·이미지·영상·실존 인물 페르소나 12개와 `tools/`의 CLI·파트너 자료는 제외했습니다. 고정 revision·입력 해시·로컬 변경·제외 목록은 `third-party/adopted-skills.json`, 원저작자 고지는 `skills/marketing/LICENSE`에 있습니다. 판단 평가는 가상 제품 fixture를 쓰는 `skills/marketing/evals/evals.json`에 있습니다.
+
 ## 서드파티 스킬과 Herdr 플러그인
 
 설치 관리자가 내려받은 스킬과 플러그인 checkout은 이 레포가 소유하지 않습니다. 관리형 디렉터리를 복사하면 상류 업데이트와 로컬 사본이 갈라지므로, 공개 핀과 필요한 패치만 보존합니다.
