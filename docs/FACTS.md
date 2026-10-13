@@ -281,3 +281,55 @@ OMP 18.1.15, `openai-codex/gpt-6-astra:low`에서 합성 입력 10개와 기존 
 - `omp/config.apply.sh`의 `spelling.autocomplete`를 `"off"`로 선언합니다. OMP 18.4.4는 이 키를 열거형(`off`, `auto`, `ngram`, `smollm`, `apple`)으로 바꿔 `false`를 거부하고, 변경 모드는 그 지점에서 멈춰 뒤의 역할·폴백을 적용하지 못합니다.
 - `bench/config.json` 후보를 GPT-6.1 Sol medium·high·xhigh로, 비용 감사의 Sol 반사실 단가를 `gpt-6.1-sol`로 바꿨습니다. 저강도 탐지의 AA 근거는 Opus 5.5 low 42/$0.55 대 GPT-6.1 Sol medium 48/$0.21이며 Terminal-Bench에서도 같은 방향입니다.
 - 단가와 한도는 [PRICING 3-4절](PRICING.md#3-4-2026-09-30-카탈로그-갱신)에 있습니다. 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.
+
+## 14. Claude Haiku 5.5 도입 판단 (2026-10-13)
+
+2026-10-07에 공개된 Claude Haiku 5.5로 GPT-6 Luna가 맡던 `economical` 프로필과 내장 `smol`·`tiny`·`commit` 역할을 옮겼습니다. 강도는 high입니다. 근거는 아래 공급사 자료와 Artificial Analysis(AA) 조회이며, 측정값은 조회 시점의 외부 결과이지 이 하네스 안의 성능 보장이 아닙니다.
+
+### 공급사 자료
+
+2026-10-13에 조회한 공개 자료입니다.
+
+- [Haiku 5.5 발표](https://www.anthropic.com/claude-haiku-5-5)는 고용량·비용 민감 작업용 모델이며 코딩 작업에서 Opus 5.5·Sonnet 5.5의 서브에이전트로 맞는다고 적습니다. GPT-6 Luna와 비교한 값은 Terminal-Bench 4.0 39.2% 대 16.4%, GDPval-AA v2.1 1620 대 1437, FrontierCode 1.1 46.4% 대 42.4%, OSWorld 2.1 오프라인 부분집합 72.4% 대 48.9%입니다. 같은 글은 복잡한 에이전트 코딩에는 Sonnet·Opus를 권하고 Haiku는 압축·요약·서브에이전트처럼 범위가 좁은 작업에 맞는다고 적습니다.
+- [모델 개요](https://platform.claude.com/docs/en/models/haiku-5-5/overview)는 1M 창, 최대 출력 128K, 기본 effort `medium`, 100,000 토큰을 경계로 한 두 단가 구간을 적습니다. 단가와 OMP의 실효 창은 [PRICING 3-5절](PRICING.md#3-5-2026-10-13-카탈로그-갱신)에 있습니다.
+- [프롬프트 가이드](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)는 effort를 사고량의 주 조절 수단으로 둡니다. `low`는 긴 에이전트 프롬프트에서 검색 생략·조기 종료·확인 생략이 잦고, `medium`은 기본값이며, `high`는 지식 작업·긴 에이전트 작업·엄격한 지시 준수에 맞다고 적습니다. 긴 코딩 에이전트 프롬프트에서 조기 종료와 확인 없는 완료 보고를 막는 시스템 프롬프트 문구도 제시합니다. `omp/prompts/claude-haiku-5-5.txt`는 이 두 문구를 줄여 담았습니다.
+- 같은 가이드는 안전 분류기가 요청을 `stop_reason: "refusal"`로 거절할 수 있고 서버 측 폴백이 없다고 적습니다. 보안 리뷰는 기존처럼 Opus 5.5(`slow`)가 맡습니다.
+
+### Artificial Analysis
+
+[모델 리더보드](https://artificialanalysis.ai/leaderboards/models)(Intelligence Index v4.3.2, 2026-10-13 조회)의 값입니다. 비교 행도 같은 날 값이며 Luna max는 13절의 37에서 38로 바뀌었습니다. 작업당 비용은 AA 지수 실행의 API 비용이며 구독 한도 소모량과 같지 않습니다.
+
+| 모델·강도 | Intelligence | Terminal-Bench 4.0 | 작업당 비용 | 출력 tok/s 중앙값 | 첫 청크 s 중앙값 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Haiku 5.5 max | 43 | 33% | $0.21 | 236 | 309.8 |
+| Haiku 5.5 xhigh | 41 | 29% | $0.12 | 187 | 79.1 |
+| Haiku 5.5 high | 38 | 22% | $0.08 | 175 | 24.6 |
+| Haiku 5.5 medium | 34 | 15% | $0.05 | 171 | 12.7 |
+| Haiku 5.5 low | 29 | 13% | $0.02 | 164 | 8.8 |
+| Luna max | 38 | 13% | $0.07 | 134 | 120.3 |
+| Luna xhigh | 35 | 8% | $0.04 | 126 | 41.7 |
+| Luna high | 33 | 5% | $0.03 | 134 | 19.7 |
+| GPT-6.1 Sol low | 42 | 31% | $0.13 | 52 | 2.4 |
+| GPT-6.1 Sol medium | 48 | 48% | $0.21 | 55 | 7.6 |
+| Sonnet 5.5 low | 36 | 21% | $0.35 | 100 | 0.6 |
+| Opus 5.5 low | 42 | 31% | $0.55 | 80 | 12.4 |
+
+Haiku 5.5 high는 Luna max와 Intelligence가 같고 Terminal-Bench가 9%p 높습니다. 작업당 비용은 1.14배이고 첫 청크는 약 1/5입니다. Haiku xhigh는 Luna max보다 3점·16%p 높지만 비용은 약 1.7배이고 첫 청크는 79.1초입니다. max는 xhigh보다 2점·4%p 높은 대신 비용이 1.75배이고 첫 청크가 약 310초입니다. Sol low는 Haiku xhigh와 점수가 비슷하고 첫 청크가 짧지만 출력 속도는 약 0.28배이고 Codex의 Sol 한도를 씁니다.
+
+### 결정
+
+- **`economical`을 Haiku 5.5 high로 바꿉니다.** `smol`(`scout`·`sonic`), `tiny`, `commit`이 따라 바뀝니다. AA에서 Luna max와 Intelligence가 같고 Terminal-Bench가 높으며 첫 청크가 약 1/5입니다. 공급사도 범위가 좁은 서브에이전트 작업을 권합니다.
+- **강도는 high입니다.** xhigh는 Luna max 대비 AA 작업당 비용이 약 1.7배이고 첫 청크가 79초여서 `tiny`의 세션 제목 같은 배경 작업에는 지연이 큽니다. medium은 공급사 기본값이지만 Luna max보다 Intelligence가 4점 낮습니다. 가이드는 긴 에이전트 프롬프트에서 `low`·`medium`의 조기 종료·확인 생략을 경고하므로 긴 OMP 시스템 프롬프트에는 high로 시작합니다. 이것이 최적 강도라는 주장은 아닙니다.
+- **폴백에서 `smol`·`tiny` 역할별 체인을 지웁니다.** 모델 지향 `anthropic/*` 키가 역할 키보다 우선하므로 Haiku를 쓰는 두 역할의 체인은 쓰이지 않습니다. `anthropic/*` → GPT-6.1 Sol medium과 `mid` → Opus 5.5 high는 유지합니다.
+- **Luna 모델 항목과 지침 파일은 남깁니다.** 12절의 Fable 5.1·Astra처럼 용도와 역할에서만 빠지고 명시적 선택과 벤치 후보로 남습니다. 같은 계열의 후속 모델로 대체한 13절과 달리 이번에는 다른 공급자로 옮깁니다.
+- **남은 위험은 창과 구독 한도입니다.** 실효 창이 Luna의 272,000에서 100,000으로 줄어 75% 기준 압축이 약 75,000토큰에서 시작됩니다. 긴 조사에서 더 잦은 압축이 품질에 미치는 영향은 별도 관측이 필요합니다. 창을 넓히려면 전역 `extendedContext`나 모델별 `contextWindow` 재정의가 필요하고 100,000 토큰 초과 요청에는 5배 단가가 붙습니다. 이번에는 바꾸지 않았습니다. 세 역할의 부하가 Codex에서 Opus와 공유하는 Anthropic 한도로 옮겨 갑니다. Anthropic 한도가 소진되면 `retry.usageAwareFallback`과 위 폴백이 Sol로 넘깁니다. 실제 구독 한도 소모량과 안전 분류기의 거절 빈도는 이 외부 표로 알 수 없습니다.
+
+### 설정·도구 변경
+
+- `omp/profiles.json`: 모델 `haiku-5-5`(`anthropic/claude-haiku-5-5`, high, 압축 75%)를 추가하고 `economical`이 이 항목을 쓰게 했습니다. `smol`·`tiny`·`commit` 선언은 `anthropic/claude-haiku-5-5:high`이고 다른 역할은 유지합니다.
+- `omp/prompts/claude-haiku-5-5.txt`를 추가했습니다.
+- `omp/config.apply.sh`: `retry.fallbackChains`에서 `smol`·`tiny` 항목을 지웠습니다.
+- `omp/extensions/profiles/profiles.test.ts`: 같은 제공자 안의 지연 전환과 세션 전환 시 취소를 Opus 5.5에서 Haiku 5.5로 가는 경로로 검사합니다.
+- `bench/config.json` 후보에 `anthropic/claude-haiku-5-5:high`·`:xhigh`를 추가하고 `bench/TAXONOMY.md`의 `smol` 라우팅 선언을 바꿨습니다.
+- `skills/cost-audit/analyze.py`와 `README.md`: `model_misroute` 저가 반사실 단가를 `anthropic/claude-haiku-5-5`로 바꾸고 출력 키를 `counterfactual_haiku_usd`·`potential_savings_haiku_usd`로 바꿨습니다. `low_effort_expensive`의 AA 근거도 2026-10-13 값으로 고쳤습니다.
+- 단가와 실효 창은 [PRICING 3-5절](PRICING.md#3-5-2026-10-13-카탈로그-갱신), 사용 안내는 [사용법](guides/usage.md#용도별-모델과-effort)에 있습니다. 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.

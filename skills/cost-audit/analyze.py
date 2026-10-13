@@ -583,37 +583,37 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
         grouped[str(row["session_file"])].append(row)
     findings: list[dict[str, Any]] = []
     total_actual = 0.0
-    total_luna = 0.0
+    total_haiku = 0.0
     total_sol = 0.0
     unpriced = 0
     for session_file, group in grouped.items():
         actual = sum(number(row.get("cost_total")) for row in group)
-        luna_values = [
-            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6-luna") for row in group
+        haiku_values = [
+            counterfactual_cost(data.prices, row, "anthropic", "claude-haiku-5-5") for row in group
         ]
         sol_values = [
             counterfactual_cost(data.prices, row, "openai-codex", "gpt-6.1-sol") for row in group
         ]
-        if any(value is None for value in luna_values + sol_values):
+        if any(value is None for value in haiku_values + sol_values):
             unpriced += len(group)
-        luna = sum(value or 0 for value in luna_values)
+        haiku = sum(value or 0 for value in haiku_values)
         sol = sum(value or 0 for value in sol_values)
         total_actual += actual
-        total_luna += luna
+        total_haiku += haiku
         total_sol += sol
         evidence_rows = sorted(group, key=lambda row: number(row.get("cost_total")), reverse=True)[:3]
         findings.append(
             {
                 "count": len(group),
-                "estimated_usd": round(max(0.0, actual - luna), 6),
+                "estimated_usd": round(max(0.0, actual - haiku), 6),
                 "summary": (
                     f"{Path(session_file).name}: Opus ${actual:.4f}; "
-                    f"Luna ${luna:.4f}; Sol ${sol:.4f}"
+                    f"Haiku ${haiku:.4f}; Sol ${sol:.4f}"
                 ),
                 "actual_opus_usd": round(actual, 6),
-                "counterfactual_luna_usd": round(luna, 6),
+                "counterfactual_haiku_usd": round(haiku, 6),
                 "counterfactual_sol_usd": round(sol, 6),
-                "potential_savings_luna_usd": round(actual - luna, 6),
+                "potential_savings_haiku_usd": round(actual - haiku, 6),
                 "potential_savings_sol_usd": round(actual - sol, 6),
                 "evidence": [
                     {
@@ -630,7 +630,7 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
             }
         )
     findings.sort(key=lambda item: item["estimated_usd"], reverse=True)
-    upper_bound_savings = max(0.0, total_actual - total_luna)
+    upper_bound_savings = max(0.0, total_actual - total_haiku)
     return make_result(
         "model_misroute",
         "Subagents routed to an expensive model",
@@ -645,16 +645,16 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
             "request_count": len(rows),
             "session_file_count": len(grouped),
             "actual_opus_usd": round(total_actual, 6),
-            "counterfactual_luna_usd": round(total_luna, 6),
+            "counterfactual_haiku_usd": round(total_haiku, 6),
             "counterfactual_sol_usd": round(total_sol, 6),
-            "potential_savings_luna_usd": round(total_actual - total_luna, 6),
+            "potential_savings_haiku_usd": round(total_actual - total_haiku, 6),
             "potential_savings_sol_usd": round(total_actual - total_sol, 6),
             "unpriced_request_count": unpriced,
             "pricing_source": str(MODELS_PATH),
             "role_attribution_limitation": (
-                "stats.db identifies subagents but not their smol/mid role. Luna savings are an "
-                "upper bound; Sol savings are a separate counterfactual and may be negative under "
-                "long-context catalog tiers."
+                "stats.db identifies subagents but not their smol/mid role. Haiku savings are an "
+                "upper bound; Sol savings are a separate counterfactual. Both apply the catalog's "
+                "long-context tiers."
             ),
         },
     )
@@ -698,7 +698,7 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
         (
             "Use modelRoles.smol for low-effort work and reserve the Opus role for work that needs "
             "its default medium effort or more. Artificial Analysis Intelligence Index v4.3.2 "
-            "(2026-09-30) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6.1 Sol medium at 48 "
+            "(2026-10-13) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6.1 Sol medium at 48 "
             "for $0.21; Terminal-Bench 4.0 agrees (31% vs 48%)."
         ),
         {
@@ -708,7 +708,7 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
             "attributed_cost_usd": round(total_cost, 6),
             "benchmark_reason": (
                 "AA Intelligence Index v4.3.2: Opus 5.5 low 42/$0.55 vs GPT-6.1 Sol medium 48/$0.21 "
-                "and GPT-6 Luna max 37/$0.07 per task."
+                "and Claude Haiku 5.5 high 38/$0.08 per task."
             ),
         },
     )

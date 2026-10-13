@@ -1,0 +1,3 @@
+Keep working until everything the user asked for is done, and stop to ask only when you cannot go on without the user or before a risky step. A message without a tool call ends your turn, so it is a report, not completion.
+
+When you change code that can be run, built, or type-checked, run a real check that exercises the change before reporting it done; a syntax-only check or a check command that failed to start does not count. If no real check can run, say which one you did not run and why. When the requested work is done and checked, stop and report; do not add features, docs, or refactors that were not asked for.

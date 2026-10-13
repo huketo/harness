@@ -137,6 +137,19 @@ OMP 18.4.4의 `omp models --json`과 `~/.omp/agent/models.db`의 버전이 붙�
 
 공급사 모델 페이지의 창은 1,050,000(최대 입력 922,000)이지만 설치 카탈로그의 272,000이 실행 중 세션이 쓰는 값입니다. GPT-6 Sol과 달리 `none`·`minimal` effort는 지원하지 않습니다. 구독 한도에서는 [ChatGPT 요금 안내](https://learn.chatgpt.com/docs/pricing)의 5시간당 로컬 메시지가 GPT-6.1 Sol 15–160, GPT-6 Sol 15–150이고, 100만 토큰당 크레딧은 GPT-6.1 Sol이 입력 50·캐시 입력 2.5·출력 250, GPT-6 Sol이 50·5·250입니다. 공급사 표 기준으로는 Sol을 6.1로 바꿔도 Codex 한도 부담이 늘지 않습니다.
 
+### 3-5. 2026-10-13 카탈로그 갱신
+
+OMP 18.10.3의 `omp models --json`에 Claude Haiku 5.5가 있습니다. [모델 개요](https://platform.claude.com/docs/en/models/haiku-5-5/overview)와 [Haiku 5.5 발표](https://www.anthropic.com/claude-haiku-5-5)는 프롬프트 100,000 토큰 이하에서 입력 $0.10·출력 $0.50·5분 캐시 쓰기 $0.125·1시간 캐시 쓰기 $0.20·캐시 읽기 $0.01, 100,000 토큰 초과에서 각각 5배($0.50·$2.50·$0.625·$1·$0.05)라고 적습니다. 카탈로그 값도 같습니다. 아래 단가는 USD/MTok입니다.
+
+| 모델 | 공급자 경로 | input | output | cacheRead | cacheWrite | longContext 임계 | contextWindow | maxTokens | 사고 강도 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| claude-haiku-5-5 | anthropic | 0.1 | 0.5 | 0.01 | 0.125 | 100,000 (0.5 / 2.5 / 0.05 / 0.625) | 100,000 | 128,000 | low·medium·high·xhigh·max |
+| gpt-6-luna (비교) | openai-codex | 0.1 | 0.5 | 0.01 | 0 | 없음 | 272,000 | 128,000 | low·medium·high·xhigh·max |
+
+공급사 창은 1M이지만 `extendedContext: false`(§4)가 `longContext.inputThreshold`를 가진 모델의 창을 그 임계값으로 낮추므로 실행 중 세션의 창은 100,000입니다. 이 설정에서는 Haiku 5.5 요청이 장문 단가에 들어가지 않고, 대신 Luna(272,000)보다 일찍 압축됩니다. §6 6번의 장문 프리미엄이 없다는 관측은 당시 조사한 모델에 관한 것이며 Haiku 5.5에는 적용되지 않습니다.
+
+기본 단가는 GPT-6 Luna와 같습니다. 두 모델은 서로 다른 구독 한도를 씁니다. Luna는 Codex 한도의 저가 계층이고(§2), Haiku 5.5는 Opus 5.5와 공유하는 Anthropic 한도(전 모델 공통)를 씁니다. Haiku 5.5가 그 한도를 Opus보다 얼마나 덜 쓰는지는 공급사 자료에 없습니다. 역할 변경의 판단과 위험은 [FACTS 14절](FACTS.md#14-claude-haiku-55-도입-판단-2026-10-13)에 있습니다.
+
 ## 4. OMP 비용 손잡이
 
 이 절의 설정과 비용 설명은 2026-09-05 조사 시점의 기록입니다. 현재 권장값은 [사용법](guides/usage.md#내장-자동-압축)과 `omp/config.apply.sh`가 정하며, 이 표를 설정 복원 템플릿으로 사용하지 않습니다.

@@ -73,9 +73,6 @@ test("requested routes expose their selected effort capabilities", () => {
 	const hardCode = resolveProfile(profiles, state, "hard-code");
 	expect(hardCode.model).toBe("claude-opus-5-5");
 	expect(hardCode.effort).toBe("xhigh");
-	expect(resolveProfile(profiles, state, "economical").model).toBe(
-		"gpt-6-luna",
-	);
 	const flash = resolveProfile(profiles, state, "media");
 	expect(flash.model).toBe("gemini-3.8-flash-high");
 	expect(flash.effort).toBe("high");
@@ -284,6 +281,13 @@ async function effortSession(
 			maxTokens: 128000,
 			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
 		} as Model,
+		"anthropic/claude-haiku-5-5": {
+			id: "claude-haiku-5-5",
+			provider: "anthropic",
+			contextWindow: 100000,
+			maxTokens: 128000,
+			thinking: { efforts: ["low", "medium", "high", "xhigh", "max"] },
+		} as Model,
 	};
 	let model = catalog["openai-codex/gpt-6.1-sol"];
 	const pi = {
@@ -354,6 +358,9 @@ async function effortSession(
 		},
 		selectModel(id: string) {
 			model = { ...model, id };
+		},
+		useModel(key: string) {
+			model = catalog[key];
 		},
 		async switchTo(next: typeof entries) {
 			entries = structuredClone(next);
@@ -470,17 +477,18 @@ test("profile switch within same provider is deferred during streaming until age
 	);
 	try {
 		const session = await effortSession(dir);
+		session.useModel("anthropic/claude-opus-5-5");
 		session.setIdle(false);
 		session.clearNotifications();
-		// "economical" uses openai-codex/gpt-6-luna (same provider as gpt-6.1-sol)
+		// "economical" uses anthropic/claude-haiku-5-5 (same provider as Opus 5.5)
 		await session.profile("economical");
 		// Model must NOT change immediately while streaming
-		expect(session.model().id).toBe("gpt-6.1-sol");
+		expect(session.model().id).toBe("claude-opus-5-5");
 		const notes = session.notifications();
 		expect(
 			notes.some((n) =>
 				n.message.includes(
-					"현재 응답이 끝난 뒤 economical(gpt-6-luna) 프로필로 전환됩니다.",
+					"현재 응답이 끝난 뒤 economical(claude-haiku-5-5) 프로필로 전환됩니다.",
 				),
 			),
 		).toBe(true);
@@ -488,8 +496,8 @@ test("profile switch within same provider is deferred during streaming until age
 		// When turn completes (agent_end with willContinue=false), profile switches
 		session.setIdle(true);
 		await session.agentEnd({ willContinue: false });
-		expect(session.model().id).toBe("gpt-6-luna");
-		expect(session.level()).toBe(loadProfiles().models["gpt-6-luna"].effort);
+		expect(session.model().id).toBe("claude-haiku-5-5");
+		expect(session.level()).toBe(loadProfiles().models["haiku-5-5"].effort);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -532,15 +540,16 @@ test("deferred profile switch is cancelled on session switch", async () => {
 	);
 	try {
 		const session = await effortSession(dir);
+		session.useModel("anthropic/claude-opus-5-5");
 		session.setIdle(false);
 		await session.profile("economical");
-		expect(session.model().id).toBe("gpt-6.1-sol");
+		expect(session.model().id).toBe("claude-opus-5-5");
 
 		// User switches sessions before turn completes
 		await session.switchTo([]);
 		session.setIdle(true);
 		await session.agentEnd({ willContinue: false });
-		expect(session.model().id).toBe("gpt-6.1-sol");
+		expect(session.model().id).toBe("claude-opus-5-5");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

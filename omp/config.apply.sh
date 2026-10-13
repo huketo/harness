@@ -78,15 +78,13 @@ roles="$(bun "$ROOT/profiles.ts" roles | python3 -c 'import json,sys; roles=json
 sol="$(bun "$ROOT/profiles.ts" selector code --defaults)"
 opus="$(bun "$ROOT/profiles.ts" selector opus-code --defaults)"
 # Each chain crosses to the other provider. Anthropic-backed roles (default,
-# plan, designer, advisor, slow, vision) share the `anthropic/*` key, which
-# takes precedence over a role key, so they need no role entry of their own.
+# plan, designer, advisor, slow, vision, and the Haiku-backed smol, tiny and
+# commit) share the `anthropic/*` key, which takes precedence over a role key,
+# so they need no role entry of their own.
 fallbacks="$(python3 - "$sol" "$opus" <<'PY'
 import json, sys
 sol, opus = sys.argv[1:]
-print(json.dumps({
-    "anthropic/*": [sol], "mid": [opus],
-    "smol": [sol, opus], "tiny": [sol, opus],
-}, separators=(",", ":")))
+print(json.dumps({"anthropic/*": [sol], "mid": [opus]}, separators=(",", ":")))
 PY
 )"
 for i in "${!SETTINGS[@]}"; do

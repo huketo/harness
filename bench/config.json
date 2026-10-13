@@ -3,6 +3,8 @@
 		"anthropic/claude-opus-5-5:medium",
 		"anthropic/claude-opus-5-5:high",
 		"anthropic/claude-opus-5-5:xhigh",
+		"anthropic/claude-haiku-5-5:high",
+		"anthropic/claude-haiku-5-5:xhigh",
 		"openai-codex/gpt-6.1-sol:medium",
 		"openai-codex/gpt-6.1-sol:high",
 		"openai-codex/gpt-6.1-sol:xhigh",

@@ -135,16 +135,18 @@
 
 `classes.json`의 `harness_roles`와 `agent_overrides`는 각 부류가 닿을 수 있는 OMP 역할을 나타낸다.
 
+현재 선언 모델은 `omp/profiles.json`과 `omp/config.apply.sh`가 정한다. 2026-10-13의 `smol` 선언은 `haiku-5-5:high`이며, 도입 근거는 [FACTS 14절](../docs/FACTS.md#14-claude-haiku-55-도입-판단-2026-10-13)에 있다. 호스트에 적용되기 전에는 실행 중 역할과 다를 수 있다.
+
 | class | 역할 |
 | --- | --- |
 | `dev-feature` | `default`, `mid`; `task` |
-| `docs-technical` | `default`, `smol`; `scout` |
+| `docs-technical` | `default`, `smol`(`haiku-5-5:high`); `scout` |
 | `dev-infra-ops` | `default` |
 | `docs-business` | `default` |
 | `dev-refactor` | `default`, `mid`; `task` |
 | `dev-test-ci` | `default`, `mid`; `task` |
 | `dev-fix` | `default` |
-| `research` | `default`, `smol`; `scout` |
+| `research` | `default`, `smol`(`haiku-5-5:high`); `scout` |
 | `dev-review` | `default`, `slow`; `reviewer` |
 
 과제 프롬프트는 서브에이전트 사용을 강제하지 않는다. 따라서 `mid`, `smol`, `slow`와 대응 override는 실행 기록에서 `subagent_request_count > 0`이 관찰된 부류에만 라우팅 근거가 된다. 관찰되지 않은 역할은 성능이 낮은 것이 아니라 측정되지 않은 것이다.
