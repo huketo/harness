@@ -21,7 +21,7 @@ function fixture(t) {
   const peer = join(root,'peer');
   mkdirSync(join(peer,'skills',skill), {recursive:true});
   mkdirSync(join(peer,'omp'), {recursive:true});
-  writeFileSync(join(peer,'.harness-owner'), peerOwner+'\n');
+  writeFileSync(join(peer,'.harness-owner'), peerOwner);
   writeFileSync(join(peer,'skills',skill,'SKILL.md'), 'Peer canonical skill.');
   writeFileSync(join(peer,'omp','profiles.ts'), 'Peer canonical profile.');
   return {root,home,peer,run};
