@@ -48,6 +48,8 @@ bash install.sh --with-config
 
 모델 라우팅, fallback, 스킬 탐색, 내장 압축 정책, Auto QA 동의 설정 등이 적용됩니다. 확장 연결만 하려면 필요하지 않습니다. 설치기는 AGY 설정과 cron 작업을 복원하지 않습니다.
 
+Linux 설치기는 `.harness-owner`로 공개·개인 하네스 체크아웃을 식별합니다. 설치 순서와 관계없이 겹치는 슬롯은 개인 하네스가 우선하며, 공개 설치기의 `--with-config`도 개인 프로필 위에 기본값을 적용하지 않습니다. 알 수 없는 링크와 사용자 파일은 기존 충돌 규칙으로 보호합니다. `bstack`·`bstack-*` 스킬은 별도 팀 플러그인 설치기가 소유합니다. 공존·보존 동작은 `node --test scripts/install-coexistence.test.mjs`로 임시 HOME에서 확인합니다.
+
 ## 일상적인 사용
 
 OMP 안에서:

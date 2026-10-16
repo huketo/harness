@@ -48,6 +48,8 @@ bash install.sh --with-config
 
 This includes model routing, fallback behavior, skill discovery, the built-in compaction policy, and Auto QA consent. It is not required merely to link extensions. AGY settings and cron jobs are not restored by the installer.
 
+The Linux installer recognizes peer checkouts through `.harness-owner`: private Harness owns shared slots ahead of public Harness, regardless of install order. The public installer preserves those links and does not apply its OMP defaults over the private profile. Unknown links and user files retain the existing conflict rules. `bstack` and `bstack-*` skill names belong to the separate team plugin installer; neither Harness claims them. `node --test scripts/install-coexistence.test.mjs` exercises coexistence in a temporary home.
+
 ## Everyday use
 
 Inside OMP:

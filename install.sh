@@ -2,6 +2,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/install-ownership.sh
+. "$REPO/scripts/install-ownership.sh"
 SKILLS_DEST="$HOME/.agents/skills"
 AGY_CONFIG="$HOME/.gemini/config"
 DRY_RUN=false
@@ -63,6 +65,9 @@ link_skill() {
   local dest="${2:-$SKILLS_DEST}"
   local name target
   name="$(basename "$src")"
+  case "$name" in
+    bstack|bstack-*) echo "reserved team skill: $name (install with bstack)"; return ;;
+  esac
   target="$dest/$name"
 
   if same_link "$target" "$src"; then
@@ -71,7 +76,12 @@ link_skill() {
   fi
 
   if [[ -L "$target" ]]; then
-    if ! points_into_repo "$target"; then
+    peer_link_policy "$src" "$target"
+    if [[ "$PEER_ACTION" = keep ]]; then
+      echo "kept preferred harness skill: $target"
+      return
+    fi
+    if ! points_into_repo "$target" && [[ "$PEER_ACTION" != replace ]]; then
       echo "skipped skill $name: links outside this repo to $(readlink -f -- "$target" 2>/dev/null || readlink -- "$target")" >&2
       conflicts+=("$target")
       return
@@ -118,7 +128,12 @@ link_dir() {
   fi
 
   if [[ -L "$target" ]]; then
-    if ! points_into_repo "$target"; then
+    peer_link_policy "$src" "$target"
+    if [[ "$PEER_ACTION" = keep ]]; then
+      echo "kept preferred harness asset: $target"
+      return
+    fi
+    if ! points_into_repo "$target" && [[ "$PEER_ACTION" != replace ]]; then
       echo "skipped asset: $target links outside this repo to $(readlink -f -- "$target" 2>/dev/null || readlink -- "$target")" >&2
       conflicts+=("$target")
       return
@@ -161,6 +176,11 @@ retire_link() {
   fi
 
   if [[ -e "$target" || -L "$target" ]]; then
+    peer_link_policy "$src" "$target"
+    if [[ "$PEER_ACTION" != foreign ]]; then
+      echo "kept peer harness retired slot: $target"
+      return
+    fi
     echo "skipped retired asset: $target is not this repo's managed link" >&2
     conflicts+=("$target")
   fi
@@ -221,7 +241,12 @@ migrate_file() {
   fi
 
   if [[ -L "$target" ]]; then
-    if ! points_into_repo "$target"; then
+    peer_link_policy "$src" "$target"
+    if [[ "$PEER_ACTION" = keep ]]; then
+      echo "kept preferred harness asset: $target"
+      return
+    fi
+    if ! points_into_repo "$target" && [[ "$PEER_ACTION" != replace ]]; then
       echo "skipped asset: $target links outside this repo to $(readlink -f -- "$target" 2>/dev/null || readlink -- "$target")" >&2
       conflicts+=("$target")
       return
@@ -340,7 +365,10 @@ if (( ${#conflicts[@]} > 0 )); then
   exit 1
 fi
 
-if $WITH_CONFIG; then
+peer_link_policy "$REPO/omp/profiles.ts" "$HOME/.local/bin/omp-profile"
+if $WITH_CONFIG && [[ "$PEER_ACTION" = keep ]]; then
+  echo "omp settings unchanged: preferred peer harness owns the profile"
+elif $WITH_CONFIG; then
   if $DRY_RUN; then
     echo "would apply omp settings: $REPO/omp/config.apply.sh"
   else
