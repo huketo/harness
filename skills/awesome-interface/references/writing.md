@@ -8,7 +8,7 @@ This domain owns product terminology, voice, labels, instructions and state mess
 
 Read nearby copy, the actual action or validation behavior, the content style guide and localization conventions. Identify the audience, its current task, the state that triggers the message and what the product can truthfully do next. Build a small working vocabulary from existing nouns and verbs: if the menu says “Archive,” the confirmation should not call the same operation “Move to storage.”
 
-When generating new copy, determine the action and consequence from the specification or implementation. When revising, compare the visible promise with the actual behavior before shortening it. Do not invent retry support, data retention, security guarantees, timing, eligibility rules or validation restrictions to make a sentence sound helpful. If a needed fact is missing, identify it and draft only the parts supported by evidence.
+When generating new copy, determine the action and consequence from the specification or implementation. When revising, compare the visible promise with the actual behavior before shortening it, then list the facts each original string states and confirm every one survives in the replacement; shortening removes words, not facts. Do not invent retry support, data retention, security guarantees, timing, eligibility rules, outcomes of a failure or validation restrictions to make a sentence sound helpful. If a needed fact is missing, identify it and draft only the parts supported by evidence.
 
 A local request is not permission to rename product concepts or rewrite the whole voice. Prefer the smallest edit that removes ambiguity, inconsistency or a blocked next step. Review requests propose replacements without applying them unless implementation was requested.
 
@@ -34,11 +34,19 @@ Stop when the requested states have usable copy, not when an arbitrary set of al
 | Errors and destructive confirmations | Calm, specific and free of jokes |
 | Security, data loss or irreversible effects | Explicit about scope and consequence |
 
-Address the reader as “you” in instructions rather than “the user.” Use possessives only when they distinguish ownership; “Favorites” often needs no “Your.” Keep perspective consistent across the flow. An established first-person brand voice can remain where it is clear, but vague “we're having trouble” language should not displace the actual state or recovery.
+Address the reader as “you” in instructions rather than “the user.” Use possessives only when they distinguish ownership; “Favorites” often needs no “Your.” Keep perspective consistent across the flow. An established first-person brand voice can remain where it is clear, but vague “we're having trouble” language should not displace the actual state or recovery. Korean and Japanese copy follow [Language-specific copy](#language-specific-copy) instead.
 
 Use plain words a tired reader can understand on the first pass. Remove filler, not information needed for a safe decision. Avoid idioms, unnecessary gender and jokes that fail in translation. Use device-neutral verbs such as “select” when pointer, touch and keyboard are all possible; name a gesture only when the instruction genuinely requires it.
 
+Give each sentence one claim. When a sentence carries three or more conditions, amounts or limits, lead with the main fact and group the remaining conditions into one or two follow-up sentences or labelled items; every condition survives the split. State each claim once per surface: an eyebrow, heading and subtitle should each add different information, and body text adds what the labels do not say rather than repeating a button name.
+
 Use sentence case as a safe default when no policy exists. Otherwise preserve the project's capitalization by element type, including product names and proper nouns. Authored capitalization belongs here; CSS transformations and typographic rendering belong to [typography.md](typography.md).
+
+## Choices stated without pressure
+
+Let people decide on facts. Describe what accepting provides, including why the permission or data is needed, and what actually happens next. Name a consequence of declining only when the product enforces it, and point to the supported alternative path. Word the decline action as neutrally and specifically as the accept action, such as “Allow location access” and “Don't allow.” Describe verifiable outcomes rather than predicting how the person will feel. Mention a deadline or limit only when it is real and enforced.
+
+Loss framing (“You'll miss today's discount”), decline labels that shame the choice, and asserted feelings (“Shop with peace of mind”) are defects to replace, not tone options.
 
 ## Labels that predict the outcome
 
@@ -114,7 +122,36 @@ Use the existing localization mechanism and stable message keys. Translate compl
 
 Give translators enough context to distinguish an action from a noun, a heading from a sentence and the meaning of substituted values. Keep one concept consistent without forcing the same source string into contexts that require different grammar. Preserve brand names, identifiers and code tokens intentionally using the project's translation convention, not by globally preventing translation.
 
+Keep one language per screen. Retain another language only for brand and product names, code identifiers and terms the project's glossary keeps untranslated.
+
 Check zero, one and multiple-item wording and the actual formatted values used by the application. Preserve locale-aware number/date formatting. Space for expansion belongs to [layout.md](layout.md); bidirectional rendering and punctuation belong to [typography.md](typography.md).
+
+## Language-specific copy
+
+Apply the subsection for each interface language in scope; a multilingual product applies each one to its own strings. The rules above still apply.
+
+### Korean
+
+- Keep one sentence ending across the product surface, 해요체 or 합니다체, following the existing copy. Check every new string against it, including errors, confirmations and helper text; one 합니다 sentence among 해요 copy reads as a different speaker. Legal notices use 합니다체.
+- Use `-세요` for requests and reserve `-십시오` for legal text.
+- Leave the subject implicit or name the task, rather than addressing the reader as 당신 or 사용자님. Describe what the person is doing or waiting for (“쿠폰을 불러오는 중이에요”) rather than what the system is processing.
+- Use a neutral decline such as “허용 안 함”; “다음에 할게요” fits only when the flow asks again.
+- Write amounts with the project's number format, such as thousands separators in 3,000원, and keep one unit notation per surface.
+- Vary predicates across adjacent strings so `-(으)ㄹ 수 있어요` does not end several sentences in a row, and drop doubled words such as “매년마다”.
+
+### English
+
+- Keep one register across the product: contractions or none, and one term per concept (“sign in” or “log in”).
+- Use the same verb in a confirmation title and its action (“Cancel plan?” and “Cancel plan”).
+- Keep emoji out of functional copy: labels, errors, billing and legal text.
+
+### Japanese
+
+- Use 敬体 across the product. Write descriptions as complete です・ます sentences rather than noun fragments, and keep casual calls such as 「〜しよう！」 out of a 敬体 surface.
+- Use nouns for page and section titles (「アカウント設定」); a permission or confirmation heading may be a question (「〜を許可しますか？」). Label buttons with the action; する may be dropped (「追加」「削除」「保存」). Keep paired buttons in the same form (「許可する」「許可しない」) and avoid a bare 「OK」 or 「はい」.
+- 「あとで」 fits a decline only when the flow asks again.
+- Name the destination in link text (「パスワードの変更方法」) rather than 「こちら」.
+- Prefer the words people use over katakana loanwords (「位置情報」 rather than 「ロケーション」). Use half-width digits with thousands separators (「2,000円」) and the 、。 punctuation.
 
 ## Verification evidence
 

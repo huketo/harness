@@ -197,6 +197,8 @@ The commitment pass reduces uncertainty; it does not promise zero risk. A guaran
 
 ### Final language checks
 
+For Korean, English or Japanese copy, also apply the Common section of the matching style reference: [Korean](../../writing-for-humans/references/style-ko.md), [English](../../writing-for-humans/references/style-en.md), [Japanese](../../writing-for-humans/references/style-ja.md).
+
 - Prefer verbs to bulky noun phrases: “decide” rather than “make a decision.”
 - Use simpler wording where meaning survives: “use,” “help,” “start,” and “because.”
 - Cut throat-clearing, empty intensifiers, repeated claims, and decorative transitions.

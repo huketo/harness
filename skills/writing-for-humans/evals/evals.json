@@ -1,0 +1,47 @@
+{
+  "skill_name": "writing-for-humans",
+  "evals": [
+    {
+      "id": 1,
+      "name": "ko-draft-rewrite",
+      "prompt": "fixtures/draft-ko.md는 사내 기술 블로그에 올릴 글의 초안입니다. 독자는 다른 팀 개발자입니다. 사실과 수치는 바꾸지 말고 문장을 다듬어 out.md에 Markdown으로 저장해 주세요.",
+      "expected_output": "Korean Markdown rewrite in out.md that keeps every fact and number, removes the draft's AI-writing patterns and decorative formatting, and adds no new facts.",
+      "files": [
+        "fixtures/draft-ko.md"
+      ],
+      "expectations": [
+        "out.md exists and keeps every number, name and limitation from the draft; adds no cause, metric or claim the draft lacks.",
+        "Removes the draft's strong patterns listed in the Korean style reference and its emoji and label-restating bold lists.",
+        "Keeps one sentence ending, uses no em dash, and leaves the unquantified DB load reduction unquantified."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "en-draft-rewrite",
+      "prompt": "fixtures/draft-en.md는 회사 영어 엔지니어링 블로그에 올릴 글의 초안입니다. 독자는 외부 개발자입니다. 사실과 수치는 바꾸지 말고 영어로 다듬어 out.md에 Markdown으로 저장해 주세요.",
+      "expected_output": "English Markdown rewrite in out.md that keeps every fact and number, removes the draft's AI-writing patterns and decorative formatting, and adds no new facts.",
+      "files": [
+        "fixtures/draft-en.md"
+      ],
+      "expectations": [
+        "out.md exists and keeps every number, name and limitation from the draft; adds no cause, metric or claim the draft lacks.",
+        "Removes the draft's strong patterns listed in the English style reference and its emoji and label-restating bold lists.",
+        "Uses sentence-case headings and keeps 24 to 9 minutes as the only performance figure."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "ja-draft-rewrite",
+      "prompt": "fixtures/draft-ja.md는 일본 팀과 공유하는 설계 문서의 일부입니다. 독자는 일본어를 쓰는 백엔드 개발자입니다. 사실은 바꾸지 말고 일본어로 다듬어 out.md에 Markdown으로 저장해 주세요.",
+      "expected_output": "Japanese Markdown rewrite in out.md that keeps every fact and number, removes the draft's AI-writing patterns and decorative formatting, and adds no new facts.",
+      "files": [
+        "fixtures/draft-ja.md"
+      ],
+      "expectations": [
+        "out.md exists and keeps every number, name and limitation from the draft; adds no cause, metric or claim the draft lacks.",
+        "Removes the draft's strong patterns listed in the Japanese style reference and its emoji and label-restating bold lists.",
+        "Uses 敬体 throughout, replaces metaphor verbs such as 壊れる, 倒す, 効く, 溶かす with literal verbs, and does not invent what 'silently broke' meant."
+      ]
+    }
+  ]
+}

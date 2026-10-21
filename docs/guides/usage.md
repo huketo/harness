@@ -182,6 +182,8 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 
 검증용 합성 입력은 [marketing evals](../../skills/marketing/evals/evals.json)에 있으며, 가상 제품 fixture를 사례별 격리 작업공간에 복사해 실행합니다. 실제 모델 응답은 버전 관리하지 않습니다.
 
+한국어·영어·일본어로 쓰는 SNS·블로그 글과 기술 문서는 `writing-for-humans`의 언어별 스타일 레퍼런스([한국어](../../skills/writing-for-humans/references/style-ko.md), [English](../../skills/writing-for-humans/references/style-en.md), [日本語](../../skills/writing-for-humans/references/style-ja.md))를 따릅니다. 화면 문구의 언어별 규칙은 `awesome-interface`의 [문구 참조](../../skills/awesome-interface/references/writing.md#language-specific-copy)에 있습니다. 문서 다듬기 평가 사례는 [writing-for-humans evals](../../skills/writing-for-humans/evals/evals.json)에 있습니다.
+
 ## 다이어그램과 문서 양식
 
 [`diagram-design`](../../skills/diagram-design/SKILL.md)은 상류의 의미 패턴, 유형별 배치, 브랜드 디자인, import/export를 유지하는 다이어그램 스킬입니다. 40개 유형의 지침을 모두 포함하며, [로컬 갤러리](../../skills/diagram-design/assets/harness-gallery.html)에는 한국어와 Slate 문서 테마를 적용한 합성 예제 네 개가 있습니다.

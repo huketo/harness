@@ -57,6 +57,8 @@ For ideation, inspect a relevant mix of established and emerging accounts. Colle
 
 Choose the narrative before writing. Give each post one main idea, a specific opening, enough context to stand alone, and a proportionate next step. An informative closing can be better than a forced question.
 
+Write Korean, English or Japanese posts with the Common and social sections of the matching style reference: [Korean](../../writing-for-humans/references/style-ko.md), [English](../../writing-for-humans/references/style-en.md), [Japanese](../../writing-for-humans/references/style-ja.md).
+
 | Format | Narrative structure | Best fit |
 |---|---|---|
 | Story | Outcome or tension → setting → challenge → action → result → lesson | A real experience with a transferable lesson |

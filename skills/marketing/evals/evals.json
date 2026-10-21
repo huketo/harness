@@ -149,6 +149,51 @@
         "app/src/app/settings/page.tsx의 버튼 라벨만 한국어(예: '저장')로 바꾼다.",
         "마케팅 계획·claim ledger·컨텍스트 문서 생성 같은 추가 절차를 만들지 않는다."
       ]
+    },
+    {
+      "id": 7,
+      "name": "ko-release-posts",
+      "prompt": "fixtures/mokuji/release.md의 사실만 사용해서 X와 LinkedIn에 올릴 한국어 게시글 초안을 social.md에 써 주세요. 게시는 하지 마세요.",
+      "expected_output": "Korean X and LinkedIn drafts limited to release facts, stating the two-person limit and the undated iOS plan, without hype patterns.",
+      "files": [
+        "fixtures/mokuji/release.md"
+      ],
+      "expectations": [
+        "Drafts are in Korean for X and LinkedIn and are not posted.",
+        "Uses only release.md facts: two-person limit, web and macOS support, iOS planned for November with no date, no extra cost; invents no metrics, satisfaction figures or user counts.",
+        "Opens with what changed; no hype openers, rhetorical hooks, emoji bullets, engagement bait or more than three hashtags.",
+        "Follows the Korean style reference: consistent register and none of its strong AI-writing patterns."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "en-release-posts",
+      "prompt": "fixtures/mokuji/release.md의 사실만 사용해서 X와 LinkedIn에 올릴 영어 게시글 초안을 social.md에 써 주세요. 게시는 하지 마세요.",
+      "expected_output": "English X and LinkedIn drafts limited to release facts, stating the two-person limit and the undated iOS plan, without hype patterns.",
+      "files": [
+        "fixtures/mokuji/release.md"
+      ],
+      "expectations": [
+        "Drafts are in English for X and LinkedIn and are not posted.",
+        "Uses only release.md facts: two-person limit, web and macOS support, iOS planned for November with no date, no extra cost; invents no metrics, satisfaction figures or user counts.",
+        "Opens with what changed; no hype openers, rhetorical hooks, emoji bullets, engagement bait or more than three hashtags.",
+        "Follows the English style reference: consistent register and none of its strong AI-writing patterns."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "ja-release-posts",
+      "prompt": "fixtures/mokuji/release.md의 사실만 사용해서 X와 LinkedIn에 올릴 일본어 게시글 초안을 social.md에 써 주세요. 게시는 하지 마세요.",
+      "expected_output": "Japanese X and LinkedIn drafts limited to release facts, stating the two-person limit and the undated iOS plan, without hype patterns.",
+      "files": [
+        "fixtures/mokuji/release.md"
+      ],
+      "expectations": [
+        "Drafts are in Japanese for X and LinkedIn and are not posted.",
+        "Uses only release.md facts: two-person limit, web and macOS support, iOS planned for November with no date, no extra cost; invents no metrics, satisfaction figures or user counts.",
+        "Opens with what changed; no hype openers, rhetorical hooks, emoji bullets, engagement bait or more than three hashtags.",
+        "Follows the Japanese style reference: consistent register and none of its strong AI-writing patterns."
+      ]
     }
   ]
 }

@@ -70,14 +70,15 @@
     },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
-      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill + emilkowalski/skills",
+      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill + emilkowalski/skills + toss/apps-in-toss-harness",
       "ownership": "harness-owned; excluded from skills CLI updates",
-      "license": "MIT",
+      "license": "MIT AND BSD-3-Clause",
       "previous_registration": null,
       "license_paths": [
         "skills/awesome-interface/LICENSE",
         "skills/awesome-interface/LICENSE.emilkowalski",
-        "skills/awesome-interface/LICENSE.taste-skill"
+        "skills/awesome-interface/LICENSE.taste-skill",
+        "skills/awesome-interface/LICENSE.toss-apps-in-toss-harness"
       ],
       "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
       "upstreams": [
@@ -141,6 +142,19 @@
           "snapshot_sha256": "149899fa31cc721a67163cd509d0145bd7e39404ddd87cdd352fc52ec2005f12",
           "license": "MIT",
           "license_path": "LICENSE"
+        },
+        {
+          "source": "https://github.com/toss/apps-in-toss-harness",
+          "commit": "255b636812d8b3a9b048d0a700644b9cbd8532c4",
+          "paths": [
+            "LICENSE",
+            "packages/agent-plugin/shared/skills/ux-writing/SKILL.md",
+            "packages/agent-plugin/shared/skills/design/references/quality-bar.md"
+          ],
+          "snapshot_sha256": "ce69431fbb66720eca82ccdbe6c37978dabee1eb37d1fae41bc32addb1cc0006",
+          "license": "BSD-3-Clause",
+          "license_path": "LICENSE",
+          "use": "Re-author selected copy principles (gain over loss framing, no asserted feelings, condition density, single-claim surfaces, one language per screen, Korean sentence-ending consistency) into references/writing.md; exclude the separate skill, /ait commands, design G6 hand-off, docs MCP lookups, mandatory confirmation before applying, and upstream before/after examples."
         }
       ],
       "local_changes": [
@@ -150,7 +164,9 @@
         "Deduplicate shared UI rules and retain generation, improvement, review, stress, variant and explanation workflows.",
         "Adapt Emil Kowalski's motion material into the existing UI domain and one conditional web-gesture reference; preserve project tokens, component/library contracts, accessibility and evidence-based review instead of mandatory curves, timing limits or package choices.",
         "Clarify signed recent release velocity, pointer cancellation versus normal capture release, re-grab continuity and reduced-motion state geometry; retain upstream MIT notice and keep native APIs outside this branch.",
-        "Selectively adapt taste-skill and redesign-skill into conditional art-direction and preservation-first redesign references; omit theme/output entry points and arbitrary aesthetic bans."
+        "Selectively adapt taste-skill and redesign-skill into conditional art-direction and preservation-first redesign references; omit theme/output entry points and arbitrary aesthetic bans.",
+        "2026-10-21: Re-author selected ux-writing principles from toss/apps-in-toss-harness into references/writing.md: claim density and repetition, choices stated without pressure, one language per screen and a Korean copy section; retain the BSD-3-Clause notice in LICENSE.toss-apps-in-toss-harness.",
+        "2026-10-21: Replace the Korean copy section of references/writing.md with Korean, English and Japanese interface notes; Japanese notes re-author yomiyasu and SmartHR conventions (recorded under writing-for-humans for yomiyasu)."
       ],
       "excluded_sources": [
         {
@@ -158,6 +174,72 @@
           "commit": "daa2ec87cc80bc7e7e812f84c5b34d5990240fcb",
           "reason": "No license identified in the cloned tree; no text or examples adopted. OKLCH guidance derives from the MIT better-colors source above."
         }
+      ]
+    },
+    "writing-for-humans": {
+      "adopted_on": "2026-10-21",
+      "source": "blader/humanizer + choconyam/humanizer-ko + nanaism/yomiyasu",
+      "ownership": "harness-owned; selected rules re-authored into references/style-*.md",
+      "license": "MIT",
+      "previous_registration": null,
+      "license_paths": [
+        "skills/writing-for-humans/LICENSE.humanizer",
+        "skills/writing-for-humans/LICENSE.humanizer-ko",
+        "skills/writing-for-humans/LICENSE.yomiyasu"
+      ],
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/blader/humanizer",
+          "commit": "8c307f367c91bd974002f10f2be2965d642c13df",
+          "paths": [
+            "LICENSE",
+            "README.md",
+            "SKILL.md"
+          ],
+          "snapshot_sha256": "5106b01512a50481afc194eb0a3c5f66c5c45f2b1e22de627bb5152ba8c3502d",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author pattern strength levels, the English AI-writing pattern table, mark-then-rewrite and fact-diff checks into style-en.md and the shared procedure of style-ko.md and style-ja.md; exclude installation, word lists copied verbatim, the absolute dash ban and unsourced claims."
+        },
+        {
+          "source": "https://github.com/choconyam/humanizer-ko",
+          "commit": "1f58e6cd5e59c10524e6384f95826a7d5f467778",
+          "paths": [
+            "LICENSE",
+            "NOTICE.md",
+            "SKILL.md",
+            "references/english-patterns.md",
+            "references/fidelity-review.md",
+            "references/korean-genres.md",
+            "references/terminology"
+          ],
+          "snapshot_sha256": "215a9abf7edb3af9ba674b6072a8420bc00906b2d959724aceaf5b6bed1cbfc2",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author Korean checkpoints (register, translationese, passives, noun stacks, stock phrases, chatbot residue), fidelity comparison and scope-word list into style-ko.md; exclude field terminology guides, the checker script and packaging."
+        },
+        {
+          "source": "https://github.com/nanaism/yomiyasu",
+          "commit": "fbe02c93877d697cc53d9377b7a45dd8a1dd99b3",
+          "paths": [
+            "LICENSE",
+            "skills/yomiyasu/SKILL.md",
+            "skills/yomiyasu/references/doc-types",
+            "skills/yomiyasu/references/fact-recovery.md",
+            "skills/yomiyasu/references/gemini-syntax.md",
+            "skills/yomiyasu/references/rephrase-test.md",
+            "skills/yomiyasu/references/review-points.md",
+            "skills/yomiyasu/references/slop-catalog.md"
+          ],
+          "snapshot_sha256": "cf45b5de4f00c799288edfa208310061460addac60844fa7953673edef389f09",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author Japanese rules (metaphor verbs, personification, negative contrast, preambles, pause commas and sentence-length targets, statement type and modality, six-point rephrase test, doc-type exemptions) into style-ja.md and Japanese interface notes in awesome-interface; exclude lint/diff scripts, persona mechanics and dated vocabulary lists."
+        }
+      ],
+      "local_changes": [
+        "2026-10-21: Add references/style-ko.md, style-en.md and style-ja.md for social, blog and technical prose; move the Korean sentence clauses from SKILL.md into style-ko.md; cite Toss, Microsoft, Google, Mailchimp, JTF (CC BY 4.0), Agency for Cultural Affairs, SmartHR and National Institute of Korean Language guidance by link without copying text."
       ]
     },
     "image-to-code": {

@@ -174,6 +174,51 @@
         "Keeps focus and essential completion correct when animation is immediate, interrupted or canceled rather than depending only on animationend.",
         "Includes a non-drag interaction path and marks physical touch feel/browser gesture arbitration unverified."
       ]
+    },
+    {
+      "id": 16,
+      "name": "korean-consent-copy",
+      "prompt": "fixtures/consent.html 위치 권한 요청 화면의 문구를 다듬어 주세요. 버튼 동작·배치·스타일은 바꾸지 말고 문구만 수정해 주세요. 확인된 사실: 허용 버튼은 위치 권한을 요청하고, 거절해도 지역을 직접 검색해 매장을 찾을 수 있습니다.",
+      "expected_output": "Copy-only edit in one Korean sentence ending and one language; replaces loss framing, asserted feelings and the shaming decline label with facts and the confirmed alternative; splits the coupon conditions into labelled items with formatted amounts.",
+      "files": [
+        "fixtures/consent.html"
+      ],
+      "expectations": [
+        "Keeps ids, classes, button types and element order; any markup change stays inside the coupon text.",
+        "Uses one sentence ending (해요체 or 합니다체) throughout and translates the English badge.",
+        "Removes the missed-discount threat and the asserted peace of mind; states the confirmed manual-search alternative and labels both buttons neutrally by outcome.",
+        "Breaks the coupon's amount, minimum order, store, deadline and per-person limit into short statements or labelled items so no sentence carries three or more conditions, formats 3,000원 and 15,000원, and invents no new conditions."
+      ]
+    },
+    {
+      "id": 17,
+      "name": "english-cancel-copy",
+      "prompt": "fixtures/cancel.html 요금제 해지 화면의 영어 문구를 다듬어 주세요. 버튼 동작·배치·스타일은 바꾸지 말고 문구만 수정해 주세요. 확인된 사실: 해지 버튼은 현재 결제 기간이 끝나는 6월 30일에 해지되도록 예약합니다. 그 뒤 프로젝트는 읽기 전용이 되고 내보내기는 90일 동안 가능하며 언제든 다시 구독할 수 있습니다. 오류 문구는 결제 대행사에 연결하지 못했을 때 표시되며 다시 시도할 수 있습니다.",
+      "expected_output": "Copy-only edit: neutral cancel and keep labels by outcome, no guilt or emoji, sentence-case heading, retry-capable error naming the payment provider failure, and billing terms split into short sentences with June 30, read-only and 90-day export preserved.",
+      "files": [
+        "fixtures/cancel.html"
+      ],
+      "expectations": [
+        "Keeps ids, classes, button types and element order; only text changes.",
+        "Removes the sad emoji, the loss threat, the invented 'thousands of happy customers' claim and the shaming cancel label; both buttons name their outcome neutrally.",
+        "The error names the failed payment connection and offers retry without exclamation marks.",
+        "Billing terms keep June 30, no further charge, read-only projects, 90-day export and resubscribe, split into short sentences."
+      ]
+    },
+    {
+      "id": 18,
+      "name": "japanese-notify-copy",
+      "prompt": "fixtures/notify.html 알림 권한 요청 화면의 일본어 문구를 다듬어 주세요. 버튼 동작·배치·스타일은 바꾸지 말고 문구만 수정해 주세요. 확인된 사실: 허용 버튼은 OS 알림 권한 요청을 띄웁니다. 거절해도 앱의 「お知らせ」 탭에서 쿠폰을 확인할 수 있습니다. 오류 문구는 OS가 권한 요청을 막았을 때 표시되며, 기기 설정에서 알림을 켜면 해결됩니다.",
+      "expected_output": "Copy-only edit in consistent 敬体 Japanese: noun or action labels instead of OK, neutral decline, no loss framing or asserted excitement, error with cause and settings guidance, coupon conditions split with 500円 and 2,000円.",
+      "files": [
+        "fixtures/notify.html"
+      ],
+      "expectations": [
+        "Keeps ids, classes, button types and element order; only text changes.",
+        "Uses 敬体 throughout, translates the English badge and removes the casual 「オンにしよう！」.",
+        "Replaces 「OK」 with an action label, words the decline neutrally, removes the missed-coupon threat and 「ワクワク」, and mentions the お知らせ tab alternative.",
+        "The error explains that the OS blocked the request and points to device settings; coupon conditions are split so no sentence carries three or more."
+      ]
     }
   ]
 }
