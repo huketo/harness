@@ -32,7 +32,7 @@ Reserve distinct ports and data namespaces for separate invocations. `reuseExist
 
 Browser `page.route` does not intercept server-side application fetches. Use the repository's server-side double or real integration harness for those calls. Treat unexpected requests and incomplete fixture setup as failures rather than supplying catch-all success.
 
-Fix the environment an assertion depends on. Use the repository's configured `reducedMotion`, `timezoneId` and `locale` defaults, and state any value an assertion relies on with `test.use()` in the spec; when the repository defines none, propose the defaults there. Control time with `page.clock` (`setFixedTime`, or `install` with a fixed `time`) for dates and relative-time text. `timezoneId` and `locale` emulate only the browser; set `TZ` where the test runner or a server formats the asserted text. Take screenshots with `animations: "disabled"` and reduced motion.
+Fix the environment an assertion depends on. Use the repository's configured `reducedMotion`, `timezoneId` and `locale` defaults, and state any value an assertion relies on with `test.use()` in the spec; when the repository defines none, propose the defaults there. For static dates and relative-time text, pin time with [`page.clock.setFixedTime`](https://playwright.dev/docs/clock); `install` lets time keep flowing from its start value, so use `install` followed by `pauseAt`, `runFor` or `fastForward` only when the test drives timers. `timezoneId` and `locale` emulate only the browser; set `TZ` where the test runner or a server formats the asserted text. Take screenshots with `animations: "disabled"` and reduced motion.
 
 ## Diagnose without hiding the first failure
 
