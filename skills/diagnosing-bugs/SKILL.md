@@ -43,6 +43,8 @@ A tight loop is the smallest useful observation for this defect, not a fixed run
 
 Pin the input, clock or schedule where possible. A race can often be reproduced deterministically with a gate at the contested operation. Where control is unavailable, choose a finite stress/repetition budget and record failures over attempts, seeds, load and environment. Preserve every failure; a clean sample does not prove the race is absent. Parallel stress needs owned resources before it starts.
 
+For an intermittent browser test, put the test's own synchronisation and isolation among the first hypotheses: a fixed sleep, a request probe read right after the action, interaction before hydration, or state shared between tests. A retry or longer timeout hides these causes instead of distinguishing them.
+
 ### When you genuinely cannot build a loop
 
 State the missing observation and what was tried. Continue safe inspection and artifact analysis; ask only for evidence or access unavailable through the current tools. Keep proposed causes explicitly hypothetical and do not claim a speculative edit is a verified repair.

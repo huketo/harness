@@ -38,7 +38,7 @@ Keep a test when it independently enforces a public API, SDK, protocol, configur
 - source inspection when it is the cheapest independent guard: it fails when the contract changes (the user-facing key, byte or path) and survives an identifier-only refactor;
 - a retained test that fails on the baseline: reproduce it, repair the owner in its own commit, and prove the repair with a control run that reverts it and shows the old failure.
 
-Static or slow is not a deletion reason. A test that must change under a behavior-preserving refactor is suspect, not automatically deletable: when it happens to cover a real contract, rewrite it at the owning boundary; delete it only once the evidence below shows no independent contract.
+Static, slow or flaky is not a deletion reason. For a flaky browser test, look first for a broken synchronisation or isolation rule (a fixed sleep, a request probe read without polling, interaction before hydration, mutable state shared between tests) and repair it; a retry or longer timeout hides the cause. A test that must change under a behavior-preserving refactor is suspect, not automatically deletable: when it happens to cover a real contract, rewrite it at the owning boundary; delete it only once the evidence below shows no independent contract.
 
 ### Candidate evidence
 

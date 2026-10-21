@@ -75,6 +75,18 @@
         "import 제거와 해당 파일 하나의 테스트 실행으로 끝낸다.",
         "감사 ledger, 전체 baseline, subagent 탐색, 변이 확인 같은 절차를 추가하지 않는다."
       ]
+    },
+    {
+      "id": 7,
+      "name": "flaky-e2e-not-deleted",
+      "prompt": "E2E 스위트를 감사하는 중입니다. 주문 목록 필터의 Playwright 시험이 지난달 CI에서 일곱 번 flaky로 기록됐습니다. 담당자 한 명은 flaky하니 삭제하고 다른 시험이 대충 덮는다고 하고, 다른 한 명은 retries를 늘리고 timeout을 두 배로 하자고 합니다. 이 시험은 필터를 바꿨을 때 서버로 보내는 질의 문자열과 주소로 다시 열었을 때의 필터 복원을 확인하는 유일한 시험입니다. 코드를 보면 page.route 핸들러가 질의를 배열에 넣고, 시험은 toHaveURL 직후 queries.at(-1)을 바로 읽으며, page.goto 직후 select 트리거를 클릭합니다. 실행·편집하지 말고 판정과 근거를 제시하세요.",
+      "expected_output": "Retains and repairs the only proof of the query and restore contract; rejects deletion for flakiness and retry or timeout masking; names the immediate probe read and interaction before hydration as cause candidates first.",
+      "files": [],
+      "expectations": [
+        "flaky하다는 사실만으로 삭제하지 않고, 같은 계약의 유일한 증명임을 들어 유지·수리로 판정한다.",
+        "재시도나 timeout 증가를 수리로 인정하지 않는다.",
+        "요청 probe 즉시 읽기와 hydration 전 조작을 원인 후보로 먼저 짚고, expect.poll이나 조작 전에 등록한 waitForRequest와 hydration 신호 대기를 수리 형태로 제시한다."
+      ]
     }
   ]
 }
