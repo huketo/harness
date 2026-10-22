@@ -48,6 +48,12 @@ bash install.sh --with-config
 
 This includes model routing, fallback behavior, skill discovery, the built-in compaction policy, and Auto QA consent. It is not required merely to link extensions. AGY settings and cron jobs are not restored by the installer.
 
+On a shared workstation, `bash install.sh --skills-only` links only skills and
+leaves tool configuration and commands unchanged. Keep the clone at a stable
+path; `bash /path/to/harness/update.sh --skills-only` fast-forwards a clean `main`
+clone and reinstalls. Review updates first because installed links are live.
+See [installation and update boundaries](docs/guides/installation.md).
+
 ## Everyday use
 
 Inside OMP:

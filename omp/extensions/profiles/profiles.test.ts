@@ -73,16 +73,49 @@ test("requested routes expose their selected effort capabilities", () => {
 	const hardCode = resolveProfile(profiles, state, "hard-code");
 	expect(hardCode.model).toBe("claude-opus-5-5");
 	expect(hardCode.effort).toBe("xhigh");
+	const sonnet = resolveProfile(profiles, state, "sonnet-code");
+	expect(buildArgv(sonnet)).toEqual([
+		"omp",
+		"--harness-profile",
+		"sonnet-code",
+		"--model",
+		"anthropic/claude-sonnet-5-5",
+		"--thinking",
+		"medium",
+	]);
 	const flash = resolveProfile(profiles, state, "media");
 	expect(flash.model).toBe("gemini-3.8-flash-high");
 	expect(flash.effort).toBe("high");
 	expect(buildArgv(flash)).toContain(process.cwd());
 	const fallback = resolveProfile(profiles, state, "fallback");
-	expect(fallback.effort).toBeNull();
-	expect(buildArgv(fallback)).not.toContain("--effort");
+	expect(fallback.model).toBe("claude-opus-5-5-high");
+	expect(fallback.effort).toBe("high");
+	const review = resolveProfile(profiles, state, "agy-review");
+	expect(review.model).toBe("gemini-4-argon-high");
+	expect(resolveProfile(profiles, state, "agy-hard")).toMatchObject({
+		runner: "agy",
+		model: "gemini-4-argon-high",
+		effort: "high",
+	});
+	const lowered = resolveProfile(
+		profiles,
+		{ ...state, profileEffort: { "agy-review": "low" } },
+		"agy-review",
+	);
+	expect(lowered.model).toBe("gemini-4-argon-low");
+	expect(buildArgv(lowered)).toEqual(
+		expect.arrayContaining(["--model", "gemini-4-argon-low", "--effort", "low"]),
+	);
+	expect(
+		resolveProfile(
+			profiles,
+			{ ...state, profileEffort: { fallback: "medium" } },
+			"fallback",
+		).model,
+	).toBe("claude-opus-5-5-medium");
 });
 
-test("CLI rejects effort overrides for models without effort selection", () => {
+test("CLI rejects efforts the AGY runner cannot select", () => {
 	const dir = mkdtempSync(join(tmpdir(), "harness-cli-unsupported-effort-"));
 	try {
 		const result = Bun.spawnSync(
@@ -91,8 +124,8 @@ test("CLI rejects effort overrides for models without effort selection", () => {
 				join(import.meta.dir, "../../profiles.ts"),
 				"effort",
 				"set",
-				"fallback",
-				"high",
+				"agy-review",
+				"xhigh",
 			],
 			{
 				env: {
@@ -104,7 +137,7 @@ test("CLI rejects effort overrides for models without effort selection", () => {
 		);
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr.toString()).toContain(
-			'Model "agy-opus-thinking" does not support effort selection.',
+			"Supported efforts: low, medium, high; or reset",
 		);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

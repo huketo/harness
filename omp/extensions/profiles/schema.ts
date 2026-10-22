@@ -209,15 +209,16 @@ export function resolveProfile(
 		effortSource = "model-default";
 	}
 
+	// AGY model IDs carry their thinking level as a suffix; select the sibling
+	// model ID as well as the CLI effort when applying an override.
+	const agyLevel = /^(.+)-(low|medium|high)$/.exec(modelEntry.model);
 	return {
 		name,
 		runner,
 		provider: modelEntry.provider,
 		model:
-			modelEntry.provider === "agy" &&
-			effort !== null &&
-			/^gemini-3\.8-flash-(low|medium|high)$/.test(modelEntry.model)
-				? `gemini-3.8-flash-${effort}`
+			modelEntry.provider === "agy" && effort !== null && agyLevel
+				? `${agyLevel[1]}-${effort}`
 				: modelEntry.model,
 		modelKey: profile.model,
 		effort,

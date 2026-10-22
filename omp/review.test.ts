@@ -1,111 +1,172 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type {
-	CreateAgentSessionResult,
-	ExtensionFactory,
-} from "@oh-my-pi/pi-coding-agent";
+import { join, resolve } from "node:path";
+import {
+	loadProfiles,
+	loadState,
+	resolveProfile,
+} from "./extensions/profiles/schema";
 import {
 	assertRestrictedReviewCapabilities,
-	buildRestrictedReviewSessionOptions,
-	createRestrictedReviewSession,
-	initializeReviewExtensions,
+	parseReviewArgs,
+	type ReviewCapabilitySnapshot,
 } from "./review";
-import { resolveReviewDependency, sdk } from "./review-sdk";
 
-const { createAgentSession, Settings } = sdk;
-// Match the OMP installation selected by the launcher rather than Bun's package cache.
-const { createMockModel } = await import(
-	resolveReviewDependency("@oh-my-pi/pi-ai/providers/mock")
-);
+const REVIEW_ENTRY = join(import.meta.dir, "review.ts");
 
-test("restricted reviewer excludes ambient capabilities and inline extensions after initialization", async () => {
-	const root = await mkdtemp(join(tmpdir(), "harness-review-"));
-	const model = createMockModel();
-	let inlineFactoryRan = false;
-	const inlineExtension: ExtensionFactory = () => {
-		inlineFactoryRan = true;
-	};
-	let result: CreateAgentSessionResult | undefined;
-	try {
-		result = await createAgentSession({
-			...buildRestrictedReviewSessionOptions({
-				cwd: root,
-				agentDir: root,
-				settings: Settings.isolated(),
-			}),
-			model,
-			getApiKey: async () => "synthetic-test-key",
-			extensions: [inlineExtension],
-		});
-		await initializeReviewExtensions(result.session);
-		const capabilities = assertRestrictedReviewCapabilities(result);
-		expect(capabilities).toEqual({
-			enabledTools: ["glob", "grep", "read"],
-			registeredTools: ["glob", "grep", "read"],
-			mountedTools: [],
-			evalBridgeTools: ["glob", "grep", "read"],
-			extensions: [],
-			mcpEnabled: false,
-		});
-		expect(inlineFactoryRan).toBe(false);
-	} finally {
-		if (result && !result.session.isDisposed) await result.session.dispose();
-		await rm(root, { recursive: true, force: true });
-	}
-});
+const restricted: ReviewCapabilitySnapshot = {
+	enabledTools: ["glob", "grep", "read"],
+	registeredTools: ["glob", "grep", "read"],
+	mountedTools: [],
+	evalBridgeTools: ["glob", "grep", "read"],
+	extensions: [],
+	mcpEnabled: false,
+};
 
-test("capability guard rejects a real SDK session with restriction disabled before prompting", async () => {
-	const root = await mkdtemp(join(tmpdir(), "harness-review-"));
-	let result: CreateAgentSessionResult | undefined;
-	let inlineFactoryRan = false;
-	try {
-		result = await createAgentSession({
-			...buildRestrictedReviewSessionOptions({
-				cwd: root,
-				agentDir: root,
-				settings: Settings.isolated(),
-			}),
-			restrictToolNames: false,
-			model: createMockModel(),
-			getApiKey: async () => "synthetic-test-key",
-			extensions: [
-				() => {
-					inlineFactoryRan = true;
+/**
+ * Plant one custom tool module and one stdio MCP server in each place omp
+ * discovers them (agent directory and project `.omp/`). Each writes its own
+ * marker file when evaluated or started.
+ */
+async function plantAmbientCapabilities(
+	configDirs: Record<string, string>,
+	markerDir: string,
+): Promise<string[]> {
+	const markers: string[] = [];
+	for (const [scope, dir] of Object.entries(configDirs)) {
+		const toolMarker = join(markerDir, `custom-tool-${scope}`);
+		const mcpMarker = join(markerDir, `mcp-${scope}`);
+		markers.push(toolMarker, mcpMarker);
+		await mkdir(join(dir, "tools"), { recursive: true });
+		await writeFile(
+			join(dir, "tools", `ambient-${scope}.ts`),
+			`import { writeFileSync } from "node:fs";\n` +
+				`writeFileSync(${JSON.stringify(toolMarker)}, "imported");\n` +
+				`export default () => ({ name: "ambient_${scope}", label: "ambient", description: "fixture", parameters: { type: "object", properties: {} }, execute: async () => ({ content: [] }) });\n`,
+		);
+		await writeFile(
+			join(dir, "mcp.json"),
+			JSON.stringify({
+				mcpServers: {
+					[`ambient-${scope}`]: {
+						command: "/bin/sh",
+						args: ["-c", `echo started > '${mcpMarker}'; exec sleep 2`],
+					},
 				},
+			}),
+		);
+	}
+	return markers;
+}
+
+/**
+ * Run the real launcher against the PATH omp with an isolated agent directory
+ * that also carries ambient custom tools and MCP servers. The synthetic key
+ * only lets omp consider Anthropic models selectable; no test path prompts a
+ * model. Returns the ambient markers that appeared.
+ */
+async function runReviewer(args: string[]) {
+	const root = await mkdtemp(join(tmpdir(), "harness-review-test-"));
+	try {
+		const agentDir = join(root, "agent");
+		const project = join(root, "project");
+		const markerDir = join(root, "markers");
+		await mkdir(markerDir);
+		const markers = await plantAmbientCapabilities(
+			{ user: agentDir, project: join(project, ".omp") },
+			markerDir,
+		);
+		const child = Bun.spawn(
+			[
+				process.execPath,
+				"--no-install",
+				REVIEW_ENTRY,
+				"--cwd",
+				project,
+				...args,
 			],
-		});
-		await initializeReviewExtensions(result.session);
-		expect(inlineFactoryRan).toBe(true);
-		const initialized = result;
-		expect(() => assertRestrictedReviewCapabilities(initialized)).toThrow();
+			{
+				env: {
+					...process.env,
+					PI_CODING_AGENT_DIR: agentDir,
+					ANTHROPIC_API_KEY: "synthetic-test-key",
+				},
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		const [stdout, stderr, exitCode] = await Promise.all([
+			new Response(child.stdout).text(),
+			new Response(child.stderr).text(),
+			child.exited,
+		]);
+		// The old host waited out omp's MCP startup window (250 ms) after spawning
+		// the server, long after the marker write; no extra wait is needed.
+		const ambientRan = markers.filter((marker) => existsSync(marker));
+		return { stdout, stderr, exitCode, ambientRan };
 	} finally {
-		if (result && !result.session.isDisposed) await result.session.dispose();
 		await rm(root, { recursive: true, force: true });
+	}
+}
+
+test("capability guard accepts only the exact read-only tool boundary", () => {
+	expect(() => assertRestrictedReviewCapabilities(restricted)).not.toThrow();
+	for (const widened of [
+		{ enabledTools: ["bash", "glob", "grep", "read"] },
+		{ registeredTools: ["glob", "grep", "read", "write"] },
+		{ evalBridgeTools: ["eval", "glob", "grep", "read"] },
+		{ enabledTools: ["glob", "read"] },
+		{ mountedTools: ["browser"] },
+		{ extensions: ["/tmp/extension.ts"] },
+		{ mcpEnabled: true },
+	]) {
+		expect(() =>
+			assertRestrictedReviewCapabilities({ ...restricted, ...widened }),
+		).toThrow(/Restricted reviewer/);
 	}
 });
 
-test("reviewer rejects a partial model selector rather than selecting a sibling model", async () => {
-	const root = await mkdtemp(join(tmpdir(), "harness-review-"));
-	let result: CreateAgentSessionResult | undefined;
-	try {
-		await expect(
-			createRestrictedReviewSession({
-				cwd: root,
-				agentDir: root,
-				selection: {
-					profile: "best",
-					model: "openai-codex/gpt-5.6",
-					thinking: "medium",
-					effortSource: "command-line",
-				},
-			}).then((review) => {
-				result = review.result;
-			}),
-		).rejects.toThrow(/exact model/);
-	} finally {
-		if (result && !result.session.isDisposed) await result.session.dispose();
-		await rm(root, { recursive: true, force: true });
-	}
-}, 20_000);
+test("relative --cwd resolves against the launcher, not the omp host directory", () => {
+	expect(parseReviewArgs(["--cwd", "sub/dir", "--inspect-tools"])).toMatchObject(
+		{ cwd: resolve("sub/dir") },
+	);
+});
+
+test("installed omp resolves the opus-code profile model exactly with only read tools", async () => {
+	const expected = resolveProfile(
+		loadProfiles(),
+		loadState(join(tmpdir(), "harness-review-no-state")),
+		"opus-code",
+	);
+	// The synthetic credential above covers Anthropic only.
+	expect(expected.provider).toBe("anthropic");
+	const run = await runReviewer(["--profile", "opus-code", "--inspect-tools"]);
+	expect(run.stderr).toBe("");
+	expect(run.exitCode).toBe(0);
+	expect(JSON.parse(run.stdout)).toMatchObject({
+		model: `${expected.provider}/${expected.model}`,
+		compactionMethodOrder: ["remote", "handoff", "soft"],
+		...restricted,
+	});
+}, 60_000);
+
+test("reviewer host never evaluates ambient custom tools or starts MCP servers", async () => {
+	const run = await runReviewer(["--profile", "opus-code", "--inspect-tools"]);
+	expect(run.exitCode).toBe(0);
+	expect(run.ambientRan).toEqual([]);
+}, 60_000);
+
+test("installed omp rejects a partial model selector instead of a sibling model", async () => {
+	const run = await runReviewer([
+		"--model",
+		"anthropic/claude-opus",
+		"--thinking",
+		"medium",
+		"--inspect-tools",
+	]);
+	expect(run.exitCode).toBe(1);
+	expect(run.stdout).toBe("");
+	expect(run.stderr).toMatch(/exact model "anthropic\/claude-opus"/);
+}, 60_000);

@@ -48,6 +48,16 @@ bash -n install.sh
 bash -n omp/config.apply.sh
 ```
 
+The installer/update integration test uses temporary local Git remotes and an
+isolated HOME. It proves skills-only ownership, fast-forward reinstallation,
+and refusal of dirty, topic-branch, or divergent checkouts without a live install:
+
+```bash
+bash -n update.sh update.test.sh
+bash update.test.sh
+bash skills/herdr-orchestrate/scripts/review-tier.test.sh
+```
+
 Use `shellcheck` only when it is available; it is not a repository-installed mandatory tool. Parser or static-analysis success does not prove link ownership, backup behavior, installed tool versions, or live configuration.
 
 ## Host-aware inspections

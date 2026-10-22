@@ -235,7 +235,7 @@ test("slash command transitions restore only removed tools and reset mode and mo
 			sendMessage(){}});
 		const ctx={hasUI:true,isIdle(){return true},ui:{
 			notify(message,level){notices.push({message,level})},
-			async select(){return "agy-opus-thinking"}
+			async select(){return "agy-argon"}
 		}};
 		await handlers.session_start();
 		await commands.delegation.handler("",ctx);
@@ -280,7 +280,7 @@ test("slash command transitions restore only removed tools and reset mode and mo
 	expect(result.native.active).not.toContain("eval");
 	expect(result.native.notice.message).toContain("Delegation mode: native");
 	expect(result.selected.message).toContain(
-		"default worker model: agy-opus-thinking (profile agy-review)",
+		"default worker model: agy-argon (profile agy-review)",
 	);
 	expect(result.off.active).toEqual(["read", "other", "late", "herdr_agent"]);
 	expect(result.blocked.block).toBe(true);
@@ -383,7 +383,7 @@ if (args[0] === "wait") {
 		const ctx={cwd:${JSON.stringify(dir)}};
 		const commandCtx={hasUI:false,isIdle(){return true},
 			ui:{notify(message,level){notices.push({message,level})}}};
-		await commands.delegation.handler("model agy-opus-thinking",commandCtx);
+		await commands.delegation.handler("model agy-argon",commandCtx);
 		const failed=await tool.execute("failed",{action:"start",name:"failed",prompt:"Inspect failure"},undefined,undefined,ctx);
 		const start=await tool.execute("1",{action:"start",name:"worker",profile:"agy-work",role:"implementer",prompt:"Implement the assigned behavior"},undefined,undefined,ctx);
 		await commands.delegation.handler("off",commandCtx);

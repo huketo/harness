@@ -7,6 +7,13 @@
 # `here` clears AFK; `away` replaces it. AFK is a command, not a config value.
 channel = "auto"
 
+# Optional exact-label workspace routing (herdr-hitl 0.4.0+).
+# HITL_CHANNEL and --channel take precedence; active AFK still overrides them.
+# A workspace label may belong to only one route.
+# [[workspace]]
+# labels = ["example-workspace"]
+# channel = "terminal"
+
 [telegram]
 bot_token = "REPLACE_WITH_TELEGRAM_BOT_TOKEN"
 chat_id = "REPLACE_WITH_TELEGRAM_CHAT_ID"

@@ -43,9 +43,25 @@ OMP 안에서는 `/profile` 선택기 또는 `/profile code`로 용도를 선택
 
 내장 `smol`·`mid`·`slow` 역할은 기존 서브에이전트와의 호환에만 사용합니다. 이 용도 프로필은 인증·세션 전체를 격리하는 OMP의 `--profile` 옵션과 다릅니다.
 
-Opus 5.5는 high로 프런트엔드·일상 코딩·조정(`frontend`·`opus-code`·`orchestrate`)과 이미지 질문(`vision` 역할)을 맡고, 어려운 구현(`hard-code`)과 최고 품질 작업(`best`)은 xhigh, 비코딩 `opus-general`은 공식 기본값인 medium입니다. GPT-6.1 Sol은 일상 코딩(`code`, 내장 `mid`·`task` 역할)이 공식 기본값인 medium, 일반 작업(`general`)이 low이고, Claude Haiku 5.5(`economical`, 내장 `smol`·`tiny`·`commit` 역할)는 high입니다. GPT-6 Sol은 GPT-6.1 Sol로 교체되어 프로필과 역할에서 빠졌습니다. Fable 5.1, Astra, GPT-6 Luna는 용도와 내장 역할에서 빠졌고, 모델 항목만 명시적 선택과 비교 실행을 위해 남습니다. Flash의 기계적 작업·검색·미디어·자동화 프로필은 high입니다. AGY Opus 4.6 Thinking의 `fallback` 프로필은 별도 effort 선택을 지원하지 않습니다. 실제 이름과 최종 모델·effort는 `list`·`show` 출력이 정본이고, 선택 근거는 [FACTS 12절](../FACTS.md#12-새-모델-기준-라우팅-개편-2026-09-23), [13절](../FACTS.md#13-gpt-61-sol-도입-판단-2026-09-30), [14절](../FACTS.md#14-claude-haiku-55-도입-판단-2026-10-13)에 있습니다. 확정되지 않은 “최적 effort”나 서로 다른 실행기 사이의 강도 동등성을 주장하지 않습니다.
+현재 용도와 최종 모델·effort는 `omp-profile list`와 `show` 출력, `omp/profiles.json`이 정합니다. `code`는 GPT-6.1 Sol medium, `sonnet-code`는 Claude Sonnet 5.5 medium입니다. Opus의 `frontend`·`opus-code`·`orchestrate`는 high, `hard-code`·`best`는 xhigh이며 `economical`은 Haiku 5.5 high입니다. AGY의 `agy-work`는 Flash, `agy-review`·`agy-hard`는 Gemini 4 Argon High, `fallback`은 AGY Claude Opus 5.5 High를 선택합니다. 다른 CLI의 effort 의미나 계정 한도를 같은 것으로 취급하지 않습니다. 프로필은 모델 접근 권한이나 가용성을 보장하지 않습니다.
 
 컨텍스트는 실행 중 모델의 실제 한도와 출력 여유를 기준으로 관리합니다. 네이티브 압축 지원과 다른 제공자로의 이동은 구분하며, 이동 전 읽을 수 있는 인계문을 사용합니다. 긴 대화에서 `/model`로 바로 바꾸기보다 `/profile`의 보호된 전환을 사용합니다. AGY의 내부 압축 설정은 OMP에서 조절할 수 없습니다. 모델별 공식 근거와 그 한계는 [FACTS 8절](../FACTS.md#8-모델-프로필컨텍스트-정책의-근거-2026-09-07)에 있습니다.
+
+### 제한된 독립 리뷰
+
+`bun --no-install omp/review.ts --cwd <worktree> --profile code --inspect-tools`로
+모델 호출 없이 도구 경계를 확인합니다. 리뷰 실행에는 `--brief`를 줍니다.
+진입점은 PATH의 OMP를 trusted extension `omp/review-host.ts`와 함께 실행하여
+일반 사용자 세션이 초기화되기 전에 제한 세션을 만듭니다. 리뷰 도구는
+`glob`·`grep`·`read`이며 사용자 custom tool, MCP 서버, 다른 확장은 로드하지
+않습니다. 모델과 effort override는 정확히 일치해야 하며 임의로 대체하지
+않습니다. 이는 모델 도구의 capability 경계이지 OS 파일 읽기 샌드박스나
+자격증명 격리는 아닙니다.
+
+`herdr-orchestrate`의 위험 등급 스크립트는 독립 리뷰 횟수의 하한을 정합니다.
+문서·테스트만 바꿔도 지시 문서나 보안 경계에 해당하면 상위 등급이 적용되며,
+리뷰어는 놓친 보안 경계를 올릴 수 있습니다. 브리프 전달에는 스킬의
+`scripts/send-brief.sh`를 사용합니다. 구체적인 절차는 설치된 스킬을 읽습니다.
 
 ### 내장 자동 압축
 
@@ -104,7 +120,7 @@ Herdr 안에서 `herdr` 확장을 로드한 OMP는 공개 확장 API로 위임 �
 /delegation model agy-flash  모델 키를 직접 지정
 ```
 
-일반 시작값은 `native`입니다. `agy` 모드에서는 OMP가 목표·분해·통합·검증을 맡고 독립적인 조사·구현·검토를 작업자에게 배분합니다. 짧은 작업까지 무조건 위임하는 분류기는 없습니다. `agy-work`가 기본 프로필이고 독립 검토는 `agy-review`를 선택할 수 있습니다.
+일반 시작값은 `native`입니다. `agy` 모드에서는 OMP가 목표·분해·통합·검증을 맡고 독립적인 조사·구현·검토를 작업자에게 배분합니다. 짧은 작업까지 무조건 위임하는 분류기는 없습니다. `agy-work`가 기본 프로필이고 독립 검토는 `agy-review`, 어려운 AGY 작업은 `agy-hard`를 명시적으로 선택할 수 있습니다.
 
 `agy`와 `off`는 내장 `task` 및 `eval`을 제외합니다. 공개 API에서 Eval의 `agent()`·`workpool()`만 따로 끌 수 없어 일반 계산 기능도 함께 빠집니다. `native`로 돌아가면 모드가 제거했던 도구를 복원합니다. `off`는 새 Herdr 작업자의 `start`·`dispatch`도 거절하지만 기존 작업자의 조회·대기·후속 지시·정리는 허용합니다. 직접 CLI 호출을 막는 보안 기능은 아닙니다.
 

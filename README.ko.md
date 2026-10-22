@@ -48,6 +48,8 @@ bash install.sh --with-config
 
 모델 라우팅, fallback, 스킬 탐색, 내장 압축 정책, Auto QA 동의 설정 등이 적용됩니다. 확장 연결만 하려면 필요하지 않습니다. 설치기는 AGY 설정과 cron 작업을 복원하지 않습니다.
 
+공유 워크스테이션에서는 `bash install.sh --skills-only`로 스킬만 연결하고 도구 설정과 명령은 유지할 수 있습니다. 체크아웃 경로를 고정하고 `bash /path/to/harness/update.sh --skills-only`를 실행하면 깨끗한 `main`을 fast-forward한 뒤 다시 설치합니다. 설치 링크에는 변경이 즉시 반영되므로 먼저 업데이트를 검토합니다. [설치와 갱신 경계](docs/guides/installation.md)를 참고하세요.
+
 ## 일상적인 사용
 
 OMP 안에서:

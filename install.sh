@@ -6,13 +6,15 @@ SKILLS_DEST="$HOME/.agents/skills"
 AGY_CONFIG="$HOME/.gemini/config"
 DRY_RUN=false
 WITH_CONFIG=false
+SKILLS_ONLY=false
 
 usage() {
   cat <<EOF
-usage: $0 [--dry-run] [--with-config]
+usage: $0 [--dry-run] [--with-config | --skills-only]
 
   --dry-run      show links, backups, and replacements without changing files
   --with-config  apply omp/config.apply.sh after all links succeed
+  --skills-only link skills only; leave Herdr, OMP, AGY, and commands unchanged
 EOF
 }
 
@@ -20,11 +22,17 @@ while (( $# > 0 )); do
   case "$1" in
     --dry-run) DRY_RUN=true ;;
     --with-config) WITH_CONFIG=true ;;
+    --skills-only) SKILLS_ONLY=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
+
+if $SKILLS_ONLY && $WITH_CONFIG; then
+  echo "--skills-only cannot be combined with --with-config" >&2
+  exit 2
+fi
 
 points_into_repo() {
   local resolved
@@ -301,6 +309,16 @@ if ensure_dir "$HOME/.claude/skills"; then
     link_skill "$SKILLS_DEST/$(basename "$(dirname "$skill_md")")" "$HOME/.claude/skills"
   done
   shopt -u nullglob
+fi
+
+if $SKILLS_ONLY; then
+  if (( ${#conflicts[@]} > 0 )); then
+    printf 'error: skill ownership conflicts:\n' >&2
+    printf '  %s\n' "${conflicts[@]}" >&2
+    exit 1
+  fi
+  echo "skills processed; workstation configuration unchanged"
+  exit 0
 fi
 
 migrate_file "$REPO/herdr/config.toml" "$HOME/.config/herdr/config.toml"

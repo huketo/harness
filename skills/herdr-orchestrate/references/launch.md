@@ -26,26 +26,40 @@ herdr worktree remove --workspace <ws>          # 통합 뒤 정리
 herdr worktree list --cwd "$PWD"                 # 열린 워크트리와 워크스페이스 대응
 ```
 
+## 브리프 보내기
+
+`herdr agent`로 브리프나 후속 지시를 보낼 때는 이 스킬의 `scripts/send-brief.sh`만 쓴다. `herdr agent prompt`를 직접 부르지 않는다.
+
+```sh
+scripts/send-brief.sh <name> "Read <절대경로>/brief.md and carry it out exactly." [초]
+herdr agent wait <name> --timeout 1800000
+```
+
+- 첫 글자(앞 공백 제외)가 `!`, `/`, `$`이면 아무것도 보내지 않고 종료 코드 `3`으로 거부한다. 실행기 TUI가 이를 셸·슬래시·Python 명령으로 해석할 수 있으므로, 자연어 지시로 시작하고 브리프 경로는 그 뒤에 둔다.
+- 보낸 뒤 에이전트가 `working`이 되는 것을 지정한 초(기본 30) 안에 관측하면 `0`, 아니면 herdr 응답을 stderr에 남기고 `1`로 끝난다. 완료는 그다음 `agent wait`와 `report.md`로 판정한다.
+- `@`(파일 언급)와 Claude Code의 빈 입력 `?`(도움말)는 실행이 아니므로 거부하지 않는다. 제출이 멈추면 `working` 확인이 잡는다.
+
 ## omp 에이전트
 
 ```sh
 herdr agent start <name> --kind omp --pane <pane> -- --approval-mode yolo [--model <계열>]
-herdr agent prompt <name> "Read <절대경로>/brief.md and carry it out exactly." --wait --timeout 1800000
+scripts/send-brief.sh <name> "Read <절대경로>/brief.md and carry it out exactly."
+herdr agent wait <name> --timeout 1800000
 herdr agent read <name> --source recent-unwrapped --lines 120
 ```
 
-- `--wait`는 `idle`/`done`/`blocked` 중 첫 안정 상태에서 돌아온다. omp 확장의 `screen_detection_skipped: true`는 생명주기 보고 경로를 뜻하며, 개별 요청의 산출물 완성을 증명하지 않는다. 실행 중 steering을 보냈다면 이전 생성의 종료와 인계 답변의 완료를 구분한다.
+- `agent wait`는 `idle`/`done`/`blocked` 중 첫 안정 상태에서 돌아온다. omp 확장의 `screen_detection_skipped: true`는 생명주기 보고 경로를 뜻하며, 개별 요청의 산출물 완성을 증명하지 않는다. 실행 중 steering을 보냈다면 이전 생성의 종료와 인계 답변의 완료를 구분한다.
 - 여러 줄 프롬프트도 받지만, 브리프는 파일로 두고 프롬프트는 한 줄로 유지한다. agy와 같은 규약을 쓰기 위해서다.
 - `omp-profile`이 설치되어 있으면 `omp-profile list`로 용도를 고르고 `omp-profile selector <용도>`가 반환한 전체 `provider/model:effort`를 `--model`에 넘긴다. 없으면 `omp models`로 확인하여 전체 셀렉터와 effort를 명시한다. 리뷰어는 워커와 모델 계열이 다른 후보를 고른다. 역할 설정이나 전역 기본 모델은 바꾸지 않는다.
 - `--approval-mode yolo`는 승인창을 없앤다. 워크트리 안에서만 일하는 브리프에 쓴다.
-- 이미 `blocked`인 에이전트에 `prompt`를 보내면 `agent_blocked`로 거절된다. 먼저 `agent read`로 화면을 읽고 `send-keys`로 답한다.
+- 이미 `blocked`인 에이전트에 프롬프트를 보내면 `agent_blocked`로 거절된다. 먼저 `agent read`로 화면을 읽고 `send-keys`로 답한다.
 - 제공자 오류나 `working` 정체가 반복되면 `agent get`/`agent read`로 현재 오류·진행·대기 중 입력을 확인한다. timeout만으로 세션이 복구 불가능하다고 단정하거나 같은 요청을 반복 전송하지 않는다. 인계가 필요하면 원 agent가 편집을 멈춘 사실과 남은 범위·승인·프로세스를 확보한 뒤 소유권을 옮긴다. 긴 답변이 화면에서 잘리면 임시 인계 파일을 요청한다. 생성 취소와 프로세스 종료는 다르며, 원 세션·dirty work는 보존한다.
 - 제공자 전환은 실제 장애 근거와 기존 모델 승인 범위를 확인한 뒤 새 세션에서 한다. 오케스트레이터의 모델·effort를 임의로 바꾸지 않는다. 실제 모델 계열을 기록해 실행기만 다른 같은 계열을 독립된 목소리로 세지 않는다.
 - `send-keys <name> ctrl+c ctrl+c`는 omp와 agy 모두를 종료한다. 종료되면 에이전트 이름이 풀리고 페인은 셸 프롬프트로 돌아온다.
 
 ## 제한 reviewer
 
-일반 `reviewer` 역할이나 `--approval-mode yolo`는 읽기 전용 권한 경계가 아니다. 리뷰에는 Harness SDK 진입점을 사용한다. PATH의 실제 `omp` 설치에서 SDK를 해석하므로 별도 패키지 다운로드나 설치본 패치가 필요하지 않다.
+일반 `reviewer` 역할이나 `--approval-mode yolo`는 읽기 전용 권한 경계가 아니다. 리뷰에는 이 저장소의 `omp/review.ts` SDK 진입점을 사용한다. 진입점은 PATH의 `omp`에 `--trusted-extension`으로 `review-host.ts`만 싣는다. 그 모듈은 omp가 자기 세션을 만들기 전, 확장 로딩 단계에서 제한 세션을 만들고 리뷰를 마친 뒤 프로세스를 끝낸다. 그래서 바깥 omp도 사용자 custom tool 모듈을 평가하거나 MCP 서버를 시작하지 않는다. SDK와 모델 카탈로그는 `omp models`와 같고, 별도 패키지 다운로드나 설치본 패치가 필요하지 않다. 결과는 진입점의 stdout으로만 돌아오며, 호스트 stderr는 실패할 때만 보인다.
 
 ```sh
 bun --no-install <harness>/omp/review.ts \
@@ -57,7 +71,7 @@ bun --no-install <harness>/omp/review.ts \
 
 `--inspect-tools`는 모델을 호출하지 않는다. enabled/registered/bridge 목록은 모두 `glob`, `grep`, `read`이며 mounted tools·extensions는 비고 MCP는 꺼져 있어야 한다. bridge 목록이 존재해도 eval 도구는 등록하지 않는다. 다른 capability가 보이면 진입점이 모델 호출 전에 거부한다.
 
-`--model <provider/id>`와 `--thinking <effort>`는 이번 reviewer에만 적용하는 명시적 override다. 모델은 정확한 provider/id가 일치해야 하며 축약·오타를 다른 모델로 대체하지 않는다. 그 외에는 프로필의 저장된 선택을 따른다. effort 선택자가 없는 프로필을 OMP 모델로 전환할 때는 `--thinking`도 지정한다. native 압축 순서는 이 프로세스의 읽기 전용 설정에서 `remote/handoff/soft`로 제한하며, 전역 설정과 계정·압축 확장을 변경하지 않는다. 파일·artifact 읽기는 유지한다.
+`--model <provider/id>`와 `--thinking <effort>`는 이번 reviewer에만 적용하는 명시적 override다. 모델은 정확한 provider/id가 일치해야 하며 축약·오타를 다른 모델로 대체하지 않는다. effort도 `omp --thinking`의 선택자를 정확한 철자로 쓴다. 그 외에는 프로필의 저장된 선택을 따른다. effort 선택자가 없는 프로필을 OMP 모델로 전환할 때는 `--thinking`도 지정한다. native 압축 순서는 이 프로세스의 읽기 전용 설정에서 `remote/handoff/soft`로 제한하며, 전역 설정과 계정·압축 확장을 변경하지 않는다. 파일·artifact 읽기는 유지한다.
 
 stdout의 최종 판정은 오케스트레이터가 review 파일로 저장한다. 실패한 프로세스나 빈 출력을 완료로 세지 않는다. 이 경로는 모델 도구의 capability 경계이며 OS 파일 읽기 sandbox나 자격증명 격리를 뜻하지 않는다.
 
@@ -65,7 +79,8 @@ stdout의 최종 판정은 오케스트레이터가 review 파일로 저장한�
 
 ```sh
 herdr agent start <name> --kind agy --pane <pane> -- --model <agy-model-id> --add-dir <state>
-herdr agent prompt <name> "Read <절대경로>/brief.md and carry it out exactly; write the result to <절대경로>/report.md." --wait --timeout 900000
+scripts/send-brief.sh <name> "Read <절대경로>/brief.md and carry it out exactly; write the result to <절대경로>/report.md."
+herdr agent wait <name> --timeout 900000
 ```
 
 - 프롬프트는 반드시 한 줄이다. 줄바꿈이 있으면 제출되지 않고 `agent_prompt_stalled`로 끝난다.
@@ -91,7 +106,7 @@ herdr pane read <pane> --source recent-unwrapped --lines 200
 
 ## 여러 에이전트 기다리기
 
-`agent prompt --wait`는 한 에이전트만 막는다. 웨이브를 띄울 때는 프롬프트를 `--wait` 없이 차례로 보내고, 그다음 에이전트마다 `agent wait`를 순서대로 부른다. 앞 에이전트를 기다리는 동안 나머지는 계속 일하므로 전체 대기 시간은 가장 오래 걸리는 하나의 시간이다.
+`agent wait`는 한 에이전트만 막는다. 웨이브를 띄울 때는 `send-brief.sh`로 프롬프트를 차례로 보내고(각 호출은 `working` 확인까지만 기다린다), 그다음 에이전트마다 `agent wait`를 순서대로 부른다. 앞 에이전트를 기다리는 동안 나머지는 계속 일하므로 전체 대기 시간은 가장 오래 걸리는 하나의 시간이다.
 
 ```sh
 for a in <run>-work-a <run>-work-b <run>-work-c; do

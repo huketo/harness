@@ -608,7 +608,7 @@ harness-run wait NAME [--timeout MS]
 harness-run send NAME TEXT [--wait] [--timeout MS]
 harness-run close NAME
 
-Default placement: a no-focus tab in the same cwd; finite command tabs close after their result is captured.
+Default placement: a no-focus tab in the current workspace and cwd; finite command tabs close after their result is captured.
 Use command --detach --name NAME for retained servers/REPLs; it returns a running handle, NOT readiness.
 Prune finished single-pane command tabs: --dry-run (default) previews candidates; --apply closes them.
 read/send/wait remain available during retained execution. --timeout bounds waiting, not the visible process.

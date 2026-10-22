@@ -150,6 +150,21 @@ OMP 18.10.3의 `omp models --json`에 Claude Haiku 5.5가 있습니다. [모델 
 
 기본 단가는 GPT-6 Luna와 같습니다. 두 모델은 서로 다른 구독 한도를 씁니다. Luna는 Codex 한도의 저가 계층이고(§2), Haiku 5.5는 Opus 5.5와 공유하는 Anthropic 한도(전 모델 공통)를 씁니다. Haiku 5.5가 그 한도를 Opus보다 얼마나 덜 쓰는지는 공급사 자료에 없습니다. 역할 변경의 판단과 위험은 [FACTS 14절](FACTS.md#14-claude-haiku-55-도입-판단-2026-10-13)에 있습니다.
 
+### 추가 후보의 공개 가격 근거 (2026-10-22 확인)
+
+`bench/config.json`의 추가 후보는 가격이나 가용성을 보장하는 선택이 아닙니다.
+[Sonnet 5.5 안내](https://claude.dev/blog/building-with-claude-sonnet-5-5/)는
+100만 토큰당 입력 $2, 출력 $10, 5분 캐시 쓰기 $2.50, 1시간 쓰기 $4,
+캐시 읽기 $0.20을 명시합니다. 최소 캐시 프롬프트는 512토큰이며
+컨텍스트는 1M, 일반 최대 출력은 128K입니다.
+
+[Gemini 4 Argon 발표](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/)는
+소개 단가를 100만 토큰당 입력 $2, 출력 $10, 캐시 입력을 입력 단가의
+95% 할인으로 명시합니다. 소개 기간 후 단가는 $4/$20이며 종료일은
+발표문에 없습니다. 발표 시점에는 단계적으로 접근을 확대하는 중이므로
+`agy/gemini-4-argon-high` 사용 가능 여부는 자신의 CLI와 계정에서 확인합니다.
+API 가격과 AGY 구독 한도는 같은 비용 지표가 아닙니다.
+
 ## 4. OMP 비용 손잡이
 
 이 절의 설정과 비용 설명은 2026-09-05 조사 시점의 기록입니다. 현재 권장값은 [사용법](guides/usage.md#내장-자동-압축)과 `omp/config.apply.sh`가 정하며, 이 표를 설정 복원 템플릿으로 사용하지 않습니다.

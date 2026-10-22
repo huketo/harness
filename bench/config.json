@@ -3,6 +3,8 @@
 		"anthropic/claude-opus-5-5:medium",
 		"anthropic/claude-opus-5-5:high",
 		"anthropic/claude-opus-5-5:xhigh",
+		"anthropic/claude-sonnet-5-5:medium",
+		"anthropic/claude-sonnet-5-5:high",
 		"anthropic/claude-haiku-5-5:high",
 		"anthropic/claude-haiku-5-5:xhigh",
 		"openai-codex/gpt-6.1-sol:medium",
@@ -10,7 +12,8 @@
 		"openai-codex/gpt-6.1-sol:xhigh",
 		"openai-codex/gpt-6-luna:xhigh",
 		"openai-codex/gpt-6-luna:max",
-		"agy/gemini-3.8-flash-high"
+		"agy/gemini-3.8-flash-high",
+		"agy/gemini-4-argon-high"
 	],
 	"variants": {
 		"cache-long": {

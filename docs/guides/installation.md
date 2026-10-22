@@ -30,6 +30,19 @@ Read [install.sh](../../install.sh) and [config.apply.sh](../../omp/config.apply
 
 The installer is not transactional. It can create links before discovering a later conflict. Resolve each reported path issue deliberately; a failed run does not imply that nothing changed.
 
+### Shared machines: skills only
+
+Use `bash install.sh --skills-only --dry-run`, then
+`bash install.sh --skills-only` to link only `skills/*` into the two skill
+directories. This mode needs no personal Claude instruction file and leaves
+Herdr configuration, OMP extensions and settings, AGY slots, and command links
+unchanged. It cannot be combined with `--with-config`. Existing foreign skill
+names remain ownership conflicts; the installer does not rename or overwrite them.
+
+Keep the clone at a stable path because the installed skills point into it.
+Compare its skill directory names with the other tool's installed names before
+installation. A pin or lock snapshot does not install manager-owned skills.
+
 ## Install and verify
 
 After reviewing and accepting the workstation changes:
@@ -118,5 +131,26 @@ Repository adoption does not apply these host changes automatically. See the [di
 ## Updating and undoing
 
 The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun dry-run and installation, then restart OMP. Review compatibility deliberately before changing OMP or Bun versions.
+
+For a clean `main` clone tracking the public repository, update from any working
+directory with:
+
+```bash
+bash "$HOME/.local/share/harness-public/update.sh" --skills-only
+```
+
+Use the actual stable clone path. The script requires `main` and a clean worktree,
+runs `git pull --ff-only origin main`, then reruns the installer with the same
+options. It refuses a topic branch, detached revision, dirty checkout, or divergent
+history rather than switching branches, stashing, merging, or resetting local work.
+Review the remote changes before running it: pulling changes live symlink targets
+before reinstallation, and an installation conflict does not roll back that pull.
+Omit `--skills-only` only for an intentionally full workstation installation;
+`--with-config` additionally opts into OMP settings.
+
+For a fixed release pin, keep the clone detached and deliberately select the next
+reviewed public commit, then rerun `bash install.sh --skills-only`. The updater
+does not advance detached pins. Neither update mode installs OMP, Bun, or external
+skills, or changes another tool's installation.
 
 There is no automated uninstaller. Inspect each installed link and remove only links still pointing into this checkout; restore matching `.bak` files where appropriate. Settings applied with `--with-config` require deliberate rollback; removing links does not undo them. Keep credentials, manager-owned skills, transcripts, backups, and unrelated configuration intact. If an older Harness release patched OMP, reinstall stock OMP through its original package manager rather than restoring an old backup over a different version; the current installer does not alter those backups.

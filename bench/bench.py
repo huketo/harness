@@ -48,6 +48,8 @@ JUDGE_TIMEOUT_SECONDS = 900
 # A task's `setup` prepares each fresh work copy before its baseline check, so
 # it may install dependencies; the bound only ends a hang.
 DEFAULT_SETUP_TIMEOUT_SECONDS = 900
+# Each verification is bounded independently of the model run.
+DEFAULT_VERIFY_TIMEOUT_SECONDS = 120
 # The agent is given `--max-time`; if it still has not exited 45 seconds later the
 # runner kills it and records the run as failed instead of aborting the batch.
 EXTERNAL_TIMEOUT = "external_timeout"
@@ -157,6 +159,7 @@ class TaskDefinition:
     rubric: RubricDefinition | None = None
     setup: tuple[str, ...] = ()
     setup_timeout_seconds: int = DEFAULT_SETUP_TIMEOUT_SECONDS
+    verify_timeout_seconds: int | None = None
 
 
 @dataclass(frozen=True)
@@ -445,6 +448,11 @@ def load_tasks(classes: Mapping[str, TaskClass], suite: Path = BENCH_DIR) -> lis
                     f"{source}: setup_timeout_seconds",
                     minimum=1,
                 ),
+                verify_timeout_seconds=(
+                    None
+                    if raw.get("verify_timeout_seconds") is None
+                    else require_int(raw["verify_timeout_seconds"], f"{source}: verify_timeout_seconds", minimum=1)
+                ),
             )
         )
         seen.add(task_id)
@@ -694,7 +702,7 @@ def run_verify(task: TaskDefinition, cwd: Path) -> subprocess.CompletedProcess[s
             env=environment,
             text=True,
             capture_output=True,
-            timeout=min(task.timeout_seconds, 120),
+            timeout=task.verify_timeout_seconds or min(task.timeout_seconds, DEFAULT_VERIFY_TIMEOUT_SECONDS),
             check=False,
         )
     except FileNotFoundError as exc:

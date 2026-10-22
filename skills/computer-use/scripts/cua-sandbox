@@ -1,0 +1,189 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.12,<3.14"
+# dependencies = ["cua==0.1.6", "cua-sandbox==0.8.0"]
+# ///
+"""Drive a disposable local cua Linux desktop container from the shell.
+
+Each subcommand connects to the named sandbox, performs one action, prints one
+JSON object, and disconnects; the container keeps running until `down`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+from cua import Image, Sandbox
+from cua_sandbox.runtime import docker as docker_runtime
+
+DEFAULT_NAME = "omp-desktop"
+SHOT_DIR = Path(os.environ.get("CUA_SANDBOX_OUT", Path(tempfile.gettempdir()) / "cua-sandbox"))
+
+
+class LoopbackPublish:
+    """The runtime's `subprocess`, except `docker run -p H:C` publishes on 127.0.0.1.
+
+    cua-sandbox 0.8.0 publishes the unauthenticated computer-server API and noVNC
+    on every interface; Docker Desktop would expose them beyond this machine.
+    """
+
+    def __getattr__(self, name: str):
+        return getattr(subprocess, name)
+
+    @staticmethod
+    def run(cmd, *args, **kwargs):
+        if cmd[1:2] == ["run"]:
+            cmd = [
+                f"127.0.0.1:{arg}" if prev == "-p" and arg.count(":") == 1 else arg
+                for prev, arg in zip([None, *cmd], cmd)
+            ]
+        return subprocess.run(cmd, *args, **kwargs)
+
+
+docker_runtime.subprocess = LoopbackPublish()
+
+
+def emit(payload: dict) -> None:
+    print(json.dumps(payload, ensure_ascii=False))
+
+
+def docker(*args: str) -> str:
+    return subprocess.run(["docker", *args], capture_output=True, text=True, check=False).stdout.strip()
+
+
+async def up(args: argparse.Namespace) -> None:
+    # The runtime force-removes any container with this name before starting.
+    if docker("ps", "-aq", "--filter", f"name=^/{args.name}$"):
+        sys.exit(f"cua-sandbox: container {args.name!r} already exists; reuse it or run `down --name {args.name}` first")
+    started = time.monotonic()
+    sb = await Sandbox.create(
+        Image.linux(kind="container"),
+        name=args.name,
+        local=True,
+        telemetry_enabled=False,
+    )
+    try:
+        width, height = await sb.screen.size()
+        emit({"name": args.name, "width": width, "height": height,
+              "seconds": round(time.monotonic() - started, 1)})
+    finally:
+        await sb.disconnect()
+
+
+async def ls(_: argparse.Namespace) -> None:
+    rows = await Sandbox.list(local=True)
+    emit({"sandboxes": [{"name": r.name, "status": r.status} for r in rows]})
+
+
+async def down(args: argparse.Namespace) -> None:
+    await Sandbox.delete(args.name, local=True)
+    emit({"name": args.name, "deleted": True})
+
+
+def url(args: argparse.Namespace) -> None:
+    port = docker("inspect", "--format", '{{(index (index .NetworkSettings.Ports "6080/tcp") 0).HostPort}}', args.name)
+    if not port.isdigit():
+        sys.exit(f"cua-sandbox: no published noVNC port for {args.name!r}")
+    emit({"url": f"http://localhost:{port}/vnc.html"})
+
+
+async def act(args: argparse.Namespace) -> None:
+    async with Sandbox.connect(args.name, local=True, telemetry_enabled=False) as sb:
+        match args.command:
+            case "sh":
+                result = await sb.shell.run(" ".join(args.cmd), timeout=args.timeout, background=args.background)
+                emit({"returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
+                if result.returncode:
+                    sys.exit(result.returncode)
+            case "shot":
+                out = Path(args.out) if args.out else SHOT_DIR / f"{args.name}-{time.strftime('%Y%m%d-%H%M%S')}.png"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(await sb.screen.screenshot())
+                width, height = await sb.screen.size()
+                emit({"path": str(out), "width": width, "height": height})
+            case "click":
+                if args.double:
+                    await sb.mouse.double_click(args.x, args.y)
+                else:
+                    await sb.mouse.click(args.x, args.y, button=args.button)
+                emit({"clicked": [args.x, args.y], "button": args.button, "double": args.double})
+            case "type":
+                await sb.keyboard.type(args.text)
+                emit({"typed": len(args.text)})
+            case "key":
+                await sb.keyboard.keypress(args.keys)
+                emit({"pressed": args.keys})
+            case "scroll":
+                await sb.mouse.scroll(args.x, args.y, scroll_x=args.dx, scroll_y=args.dy)
+                emit({"scrolled": [args.dx, args.dy], "at": [args.x, args.y]})
+            case "drag":
+                await sb.mouse.drag(args.x1, args.y1, args.x2, args.y2)
+                emit({"dragged": [args.x1, args.y1, args.x2, args.y2]})
+
+
+def parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="cua-sandbox", description=__doc__)
+    sub = p.add_subparsers(dest="command", required=True)
+
+    def named(name: str, help_text: str) -> argparse.ArgumentParser:
+        sp = sub.add_parser(name, help=help_text)
+        sp.add_argument("--name", default=DEFAULT_NAME, help=f"sandbox name (default {DEFAULT_NAME})")
+        return sp
+
+    named("up", "create and start the desktop container")
+    sub.add_parser("ls", help="list local sandboxes")
+    named("down", "delete the sandbox and its container")
+    sp = named("sh", "run a shell command inside the desktop")
+    sp.add_argument("--timeout", type=int, default=60)
+    sp.add_argument("--background", action="store_true", help="start the command detached, e.g. a GUI app")
+    sp.add_argument("cmd", nargs=argparse.REMAINDER, help="command after --")
+    sp = named("shot", "save a PNG screenshot and print its path")
+    sp.add_argument("--out", help="output path (default $CUA_SANDBOX_OUT or $TMPDIR/cua-sandbox)")
+    sp = named("click", "click at screen pixel x y")
+    sp.add_argument("x", type=int)
+    sp.add_argument("y", type=int)
+    sp.add_argument("--button", choices=["left", "right", "middle"], default="left")
+    sp.add_argument("--double", action="store_true")
+    sp = named("type", "type text into the focused element")
+    sp.add_argument("text")
+    sp = named("key", "press one key or a chord, e.g. enter | ctrl l | ctrl shift t")
+    sp.add_argument("keys", nargs="+")
+    sp = named("scroll", "scroll at x y")
+    sp.add_argument("x", type=int)
+    sp.add_argument("y", type=int)
+    sp.add_argument("--dx", type=int, default=0)
+    sp.add_argument("--dy", type=int, default=3)
+    sp = named("drag", "drag from x1 y1 to x2 y2")
+    for axis in ("x1", "y1", "x2", "y2"):
+        sp.add_argument(axis, type=int)
+    named("url", "print the noVNC URL for a human viewer on this machine")
+    return p
+
+
+def main() -> None:
+    args = parser().parse_args()
+    if args.command == "sh":
+        if args.cmd[:1] == ["--"]:
+            args.cmd = args.cmd[1:]
+        if not args.cmd:
+            parser().error("sh requires a command after --")
+    if args.command == "url":
+        url(args)
+        return
+    handler = {"up": up, "ls": ls, "down": down}.get(args.command, act)
+    try:
+        asyncio.run(handler(args))
+    except RuntimeError as exc:  # computer-server reports failed actions this way
+        sys.exit(f"cua-sandbox: {exc}")
+
+
+if __name__ == "__main__":
+    main()

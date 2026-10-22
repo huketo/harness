@@ -1,0 +1,23 @@
+# Review tiers for scripts/review-tier.sh: none = no independent review, logic = one round, security = up to three.
+# Columns (tab-separated): tier, kind, extended regex matched case-insensitively.
+# Kinds: path = the changed file's path matches; content = a changed line or its hunk's context line matches;
+#        lines = every changed non-blank line matches.
+# Per file the first applicable row wins and an unmatched file is logic; the change takes its highest file tier.
+# Order security before instruction documents before none, so a misclassification can only raise a tier.
+# A repository extends this list with .review-tiers.tsv at its root, read from the review base; its rows go first.
+security	path	(^|/)\.?review-tiers\.tsv$
+security	path	(secret|credential|oauth|auth([^o]|$)|egress|allow-?list|approv|(^|[^a-z])sudo|permission|firewall|nftables|iptables|netpol|network-?polic|openbao|vault)
+security	content	(secret|credential|password|passwd|private[_-]?key|deploy[_ -]?key|(access|auth|api|bearer|bot|gitlab|github|refresh|session)[_-]?token)
+security	content	(oauth|authorization:|bearer |bao_addr|bao (kv|read|write|login)|vault (kv|read|write|login))
+security	content	(nopasswd|sudoers|visudo|iptables|nftables|nft (add|insert|delete)|ufw (allow|deny)|egress|allow-?list|productionhosts)
+security	content	(approv|permission|bypass|protected_branches|merge_access|push_access|allowed_to_(merge|push)|access_level|-x ?(post|put|patch|delete))
+security	content	(allowed_|deny_|user_?ids?|(^|[^a-z])(users?|tokens?|hosts?|roles?|members?|chat_id|channel_id)([^a-z]|$))
+logic	path	(^|/)(skill|agents|claude|gemini|role|core|append_system|system)\.md$
+logic	path	(^|/)skills/[^/]+/references/
+logic	path	(^|/)(\.omp|prompts?)/
+none	path	\.(md|mdx|rst|adoc|txt)$
+none	path	(^|/)docs?/
+none	path	(^|/)(tests?|__tests__|fixtures?)/
+none	path	[._-](test|spec)\.[a-z0-9]+$
+none	path	(^|/)test_[^/]*\.py$
+none	lines	^[[:space:]]*(#|//|/\*|\*|--|<!--)

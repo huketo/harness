@@ -1015,6 +1015,21 @@ class SuiteSetupTest(unittest.TestCase):
             with self.assertRaisesRegex(bench.BenchError, "setup failed"):
                 bench.validate_task_baseline(task)
 
+    def test_verify_timeout_is_independent_of_the_agent_limit(self):
+        for configured, expected in ((None, 30), (300, 300)):
+            with self.subTest(configured=configured), tempfile.TemporaryDirectory() as directory:
+                suite = self.suite(Path(directory), verify_timeout_seconds=configured)
+                (task,) = bench.load_tasks(self.CLASSES, suite)
+                with mock.patch.object(bench.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+                    bench.run_verify(task, task.fixture)
+                self.assertEqual(run.call_args.kwargs["timeout"], expected)
+
+    def test_verify_timeout_rejects_nonpositive_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = self.suite(Path(directory), verify_timeout_seconds=0)
+            with self.assertRaisesRegex(bench.BenchError, "verify_timeout_seconds"):
+                bench.load_tasks(self.CLASSES, suite)
+
 
 class CatalogRatesTest(unittest.TestCase):
     """A provider cached under a versioned id still prices its newest models."""
