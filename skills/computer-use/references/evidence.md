@@ -3,7 +3,7 @@
 이 스킬은 `cua==0.1.6`, `cua-sandbox==0.8.0`을 사용하는 래퍼를 배포한다. 아래는 해당 버전을 대상으로 한 구현상의 제약이며 다른 버전의 호환성을 약속하지 않는다. 공개본에서 실행 검증한 결과를 뜻하지 않는다.
 
 - `Image.linux(kind="container")`는 공개 이미지 `public.ecr.aws/k5j5w0x5/cua-ubuntu-24.04:docker-latest`를 사용한다. SDK 버전 핀과 달리 이 이미지 태그는 가변이므로 이미지 내용이나 다운로드 크기는 고정하지 않는다.
-- SDK Docker 런타임은 computer-server API(8000, 인증 없는 root 셸)와 noVNC(6080)를 `-p`로 게시한다. 래퍼의 `LoopbackPublish`는 자신의 프로세스 안에서 포트 인자를 `127.0.0.1:`로 바꿔 다른 호스트에 직접 게시하지 않도록 한다. 원격 전달이나 터널은 별도 권한이 필요한 외부 노출이다.
+- SDK Docker 런타임은 computer-server API(8000, 인증 없는 root 셸)와 noVNC(6080)를 `-p`로 게시한다. 래퍼의 `LoopbackPublish`는 분리된 `-p HOST_PORT:CONTAINER_PORT` 형식만 `127.0.0.1:`로 바꾸고, 다른 publish 옵션이나 매핑은 Docker 실행 전에 거부한다. 이 argv 경계는 `scripts/test_cua_sandbox.py`가 SDK import와 subprocess 전송만 대체하여 검증하며 실제 컨테이너 실행 검증은 아니다. 원격 전달이나 터널은 별도 권한이 필요한 외부 노출이다.
 - SDK 런타임이 생성 전에 같은 이름의 컨테이너를 제거할 수 있으므로 `up`은 같은 이름이 이미 있으면 거부한다. 작업별 고유 이름을 사용한다.
 - 래퍼는 `Sandbox.create`와 `Sandbox.connect`에 `telemetry_enabled=False`를 넘긴다.
 - 로컬 전송의 표시 URL 대신 `url` 명령이 Docker의 게시된 6080 포트를 읽어 noVNC 주소를 만든다.

@@ -136,15 +136,18 @@ For a clean `main` clone tracking the public repository, update from any working
 directory with:
 
 ```bash
-bash "$HOME/.local/share/harness-public/update.sh" --skills-only
+bash /path/to/harness/update.sh --skills-only --dry-run
+bash /path/to/harness/update.sh --skills-only
 ```
 
 Use the actual stable clone path. The script requires `main` and a clean worktree,
-runs `git pull --ff-only origin main`, then reruns the installer with the same
-options. It refuses a topic branch, detached revision, dirty checkout, or divergent
-history rather than switching branches, stashing, merging, or resetting local work.
-Review the remote changes before running it: pulling changes live symlink targets
-before reinstallation, and an installation conflict does not roll back that pull.
+runs `git fetch origin main` and `git log --oneline HEAD..origin/main` to show
+incoming commits, then `git merge --ff-only FETCH_HEAD` and installation.
+`--dry-run` fetches and shows commits without changing the checkout or installed
+assets. A topic branch, detached revision, dirty checkout, or divergent history
+is not switched, stashed, rebased, merged with a merge commit, or reset.
+Review the dry-run before updating: fast-forwarding changes live symlink targets
+before reinstallation, and an installation conflict does not roll back that merge.
 Omit `--skills-only` only for an intentionally full workstation installation;
 `--with-config` additionally opts into OMP settings.
 

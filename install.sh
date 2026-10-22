@@ -306,7 +306,13 @@ fi
 if ensure_dir "$HOME/.claude/skills"; then
   shopt -s nullglob
   for skill_md in "$REPO"/skills/*/SKILL.md; do
-    link_skill "$SKILLS_DEST/$(basename "$(dirname "$skill_md")")" "$HOME/.claude/skills"
+    skill_link="$SKILLS_DEST/$(basename "$(dirname "$skill_md")")"
+    if points_into_repo "$skill_link"; then
+      link_skill "$skill_link" "$HOME/.claude/skills"
+    elif ! $DRY_RUN; then
+      conflicts+=("$skill_link")
+      echo "skipped Claude skill: $skill_link is not owned by this checkout" >&2
+    fi
   done
   shopt -u nullglob
 fi

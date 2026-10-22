@@ -31,6 +31,14 @@ printf '%s\n' '---' 'name: added' '---' > "$TMP/author/skills/added/SKILL.md"
 git -C "$TMP/author" add .
 git -C "$TMP/author" commit -qm add-skill
 git -C "$TMP/author" push -q origin main
+# Fetch preview must neither advance HEAD nor install the incoming skill.
+before="$(git -C "$TMP/installed" rev-parse HEAD)"
+preview="$(bash "$TMP/installed/update.sh" --skills-only --dry-run)"
+[[ "$preview" == *add-skill* ]]
+[[ "$(git -C "$TMP/installed" rev-parse HEAD)" == "$before" ]]
+[[ ! -e "$HOME/.agents/skills/added" ]]
+# A user's rebase preference must not change the fast-forward-only mechanism.
+git -C "$TMP/installed" config pull.rebase true
 bash "$TMP/installed/update.sh" --skills-only
 [[ -L "$HOME/.agents/skills/added" && -L "$HOME/.claude/skills/added" ]]
 [[ "$(git -C "$TMP/installed" rev-parse HEAD)" == "$(git -C "$TMP/author" rev-parse HEAD)" ]]
@@ -39,6 +47,7 @@ rm "$HOME/.claude/skills/added" "$HOME/.agents/skills/added"
 mkdir "$HOME/.agents/skills/added"
 if bash "$TMP/installed/install.sh" --skills-only; then exit 1; fi
 [[ -d "$HOME/.agents/skills/added" && ! -L "$HOME/.agents/skills/added" ]]
+[[ ! -e "$HOME/.claude/skills/added" && ! -L "$HOME/.claude/skills/added" ]]
 # Invalid options, dirty work and topic branches never update the checkout.
 if bash "$TMP/installed/update.sh" --skills-only --with-config; then exit 1; fi
 printf 'dirty\n' > "$TMP/installed/untracked"

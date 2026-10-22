@@ -9,7 +9,7 @@ security	path	(^|/)\.?review-tiers\.tsv$
 security	path	(secret|credential|oauth|auth([^o]|$)|egress|allow-?list|approv|(^|[^a-z])sudo|permission|firewall|nftables|iptables|netpol|network-?polic|openbao|vault)
 security	content	(secret|credential|password|passwd|private[_-]?key|deploy[_ -]?key|(access|auth|api|bearer|bot|gitlab|github|refresh|session)[_-]?token)
 security	content	(oauth|authorization:|bearer |bao_addr|bao (kv|read|write|login)|vault (kv|read|write|login))
-security	content	(nopasswd|sudoers|visudo|iptables|nftables|nft (add|insert|delete)|ufw (allow|deny)|egress|allow-?list|productionhosts)
+security	content	(nopasswd|sudoers|visudo|iptables|nftables|nft (add|insert|delete)|ufw (allow|deny)|egress|allow-?list|production[_-]?hosts?)
 security	content	(approv|permission|bypass|protected_branches|merge_access|push_access|allowed_to_(merge|push)|access_level|-x ?(post|put|patch|delete))
 security	content	(allowed_|deny_|user_?ids?|(^|[^a-z])(users?|tokens?|hosts?|roles?|members?|chat_id|channel_id)([^a-z]|$))
 logic	path	(^|/)(skill|agents|claude|gemini|role|core|append_system|system)\.md$

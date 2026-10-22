@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -29,7 +30,7 @@ SHOT_DIR = Path(os.environ.get("CUA_SANDBOX_OUT", Path(tempfile.gettempdir()) / 
 
 
 class LoopbackPublish:
-    """The runtime's `subprocess`, except `docker run -p H:C` publishes on 127.0.0.1.
+    """Publish known separate port mappings on loopback; reject other publish forms.
 
     cua-sandbox 0.8.0 publishes the unauthenticated computer-server API and noVNC
     on every interface; Docker Desktop would expose them beyond this machine.
@@ -40,11 +41,14 @@ class LoopbackPublish:
 
     @staticmethod
     def run(cmd, *args, **kwargs):
-        if cmd[1:2] == ["run"]:
-            cmd = [
-                f"127.0.0.1:{arg}" if prev == "-p" and arg.count(":") == 1 else arg
-                for prev, arg in zip([None, *cmd], cmd)
-            ]
+        cmd = list(cmd)
+        for index, arg in enumerate(cmd):
+            if arg == "-p":
+                if index + 1 >= len(cmd) or not re.fullmatch(r"\d+:\d+(?:/(?:tcp|udp|sctp))?", cmd[index + 1]):
+                    raise ValueError("unsupported Docker publish mapping; refusing non-loopback exposure")
+                cmd[index + 1] = f"127.0.0.1:{cmd[index + 1]}"
+            elif arg.startswith("--publish") or re.match(r"^-[^-]*[pP]", arg):
+                raise ValueError("unsupported Docker publish option; use separate -p HOST_PORT:CONTAINER_PORT")
         return subprocess.run(cmd, *args, **kwargs)
 
 
