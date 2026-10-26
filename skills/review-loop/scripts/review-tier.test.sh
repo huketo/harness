@@ -57,9 +57,10 @@ escalated() { # <name> <expected tier> <review text>: feeds one review to review
   got=$("$here/review-escalate.sh" "$esc/review-tier.txt" "$esc/review-r1.md"); got=${got%% *}; got=${got#tier=}
   if [ "$got" = "$2" ]; then echo "PASS $1: $got"; else echo "FAIL $1: expected $2, got ${got:-error}"; fail=1; fi
 }
-verdict='# 판정\nblocking 1, should 0, nit 0, local-convention 0\n'
-escalated 'tier line outside the verdict header is ignored' logic "${verdict}\n# 항목\ntier: security\n"
-escalated 'restrictToolNames: logic (escalated by review)' security "${verdict}tier: security\n\n# 항목\n- [blocking] omp/review.ts:2\n"
-escalated 'a later review stating none does not lower it' security "${verdict}tier: none\n"
+verdict='VERDICT: CHANGES\n'
+escalated 'tier line after the first finding is ignored' logic "${verdict}S1 [blocker] omp/review.ts:2 claim. Fix: x\nTIER: security\n"
+escalated 'an unknown tier word is ignored' logic "${verdict}TIER: critical\n"
+escalated 'restrictToolNames: logic (escalated by review)' security "${verdict}TIER: security\nS1 [blocker] omp/review.ts:2 claim. Fix: x\n"
+escalated 'a later review stating none does not lower it' security "${verdict}TIER: none\n"
 
 exit $fail

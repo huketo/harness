@@ -1,4 +1,4 @@
-# Review tiers for scripts/review-tier.sh: none = no independent review, logic = one round, security = up to three.
+# Review tiers for scripts/review-tier.sh: none = no independent review, logic = up to three rounds, security = up to five.
 # Columns (tab-separated): tier, kind, extended regex matched case-insensitively.
 # Kinds: path = the changed file's path matches; content = a changed line or its hunk's context line matches;
 #        lines = every changed non-blank line matches.

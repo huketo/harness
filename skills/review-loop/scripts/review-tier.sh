@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # review-tier.sh <repo> <base> [head]
 # Classifies the change merge-base(base, head)..head by review-tiers.tsv and prints
-# `tier=<none|logic|security> rounds=<0|1|3> files=<n>`, then `<tier>\t<file>\t<rule>` per changed file.
+# `tier=<none|logic|security> rounds=<0|3|5> files=<n>`, then `<tier>\t<file>\t<rule>` per changed file.
 set -euo pipefail
 [ $# -ge 2 ] && [ $# -le 3 ] || { echo 'usage: review-tier.sh <repo> <base> [head]' >&2; exit 2; }
 repo=$1 base=$2 head=${3:-HEAD}
@@ -18,7 +18,7 @@ function applies(i, f, p,   c, k) {
   for (c = 1; c <= cnt[f]; c++) if (line[f, c] !~ /^[[:space:]]*$/) { if (line[f, c] !~ re[i]) return 0; k++ }
   return k > 0
 }
-BEGIN { rank["none"] = 0; rank["logic"] = 1; rank["security"] = 2; rounds["none"] = 0; rounds["logic"] = 1; rounds["security"] = 3 }
+BEGIN { rank["none"] = 0; rank["logic"] = 1; rank["security"] = 2; rounds["none"] = 0; rounds["logic"] = 3; rounds["security"] = 5 }
 FNR == NR {
   if (/^#/ || !NF) next
   split($0, r, "\t")

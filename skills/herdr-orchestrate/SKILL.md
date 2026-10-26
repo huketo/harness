@@ -15,7 +15,7 @@ description: Herdr에서 독립 구현을 여러 워크트리의 에이전트로
 | --- | --- | --- |
 | 오케스트레이터 | 이 세션 | 분해, 브리프, 감시, 검수 판정, 통합, 사람과의 유일한 접점 |
 | 워커 | 프로필의 실행기 | 슬라이스 하나를 자기 워크트리에서 구현하고 브랜치에 커밋, `report.md` 작성 |
-| 리뷰어 | 제한 SDK 진입점, 워커와 다른 모델 계열 | 미리 저장된 diff와 파일만 읽고 [references/review.md](references/review.md) 기준으로 stdout 판정 |
+| 리뷰어 | 제한 SDK 진입점, 워커와 다른 모델 계열 | 미리 저장된 diff와 파일만 읽고 [review.md](../review-loop/references/review.md) 기준으로 stdout 판정 |
 | 스카우트 | agy 또는 omp | 웹·문서 조사. 출처 URL 필수 |
 | 쿼럼 | 세 계열 혼합 | 갈리는 기술 결정을 `herdr-quorum` 스킬로 결정 |
 
@@ -94,10 +94,10 @@ herdr agent wait <run>-work-<slice> --timeout 1800000
 
 1. `report.md`에 `REPORT_DONE`이 있고 브랜치에 커밋이 있는지 확인한다. 없으면 완료가 아니다.
 2. 수용 기준의 명령을 직접 실행한다. 짧은 검증은 native 도구로, 오래 걸리거나 사람이 관찰·조작할 실행은 명시한 Herdr 페인으로 수행한다. 워커의 "통과했다"는 근거가 아니라 주장이므로 변경 경로를 덮는 테스트를 돌리고 그 SHA의 CI 결과를 확인한다. 이미 통과한 SHA에서 로컬 전체 스위트를 다시 돌리지 않는다("검증 정책").
-3. `scripts/review-tier.sh <worktree> <기준 ref>`로 위험 등급의 하한을 정한다([review.md](references/review.md#위험-등급)). `none`이면 독립 리뷰 없이 생략 사유를 review 파일에 남긴다. 그 밖에는 [references/launch.md](references/launch.md)의 제한 reviewer를 새 컨텍스트로 실행하고 [references/review.md](references/review.md)의 브리프를 준다. 오케스트레이터가 저장한 diff와 커밋 목록, 수용 기준, 관례 문서 경로를 입력으로 제공하고 stdout 판정을 review 파일에 저장한다. 판정 머리에 `tier:` 줄이 있으면 `scripts/review-escalate.sh`로 등급을 올리고, 이후 회차는 그 등급을 따른다. 워커의 `report.md`는 첫 판정 뒤에만 대조한다.
-4. `review-<n>.md`의 `blocking`을 근거(`file:line`, 재현 명령, 참고 URL)로 판정한다. 확인되지 않은 주장을 그대로 워커에게 보내지 않는다. 확인된 `blocking`이 없으면 통과하며, 반복 검토는 새 결함·변경·근거가 있을 때만 한다. 사실은 먼저 직접 확인하고, 중요한 선택지가 근거로 계속 갈릴 때만 `herdr-quorum`을 사용한다.
+3. `../review-loop/scripts/review-tier.sh <worktree> <기준 ref>`로 위험 등급의 하한을 정한다([review.md](../review-loop/references/review.md#위험-등급과-회차-예산)). 리뷰 기준과 등급 스크립트는 `review-loop` 스킬이 소유하며 이 스킬과 `t3-orchestrate`가 함께 쓴다. `none`이면 독립 리뷰 없이 생략 사유를 review 파일에 남긴다. 그 밖에는 [references/launch.md](references/launch.md)의 제한 reviewer를 새 컨텍스트로 실행하고 [review.md](../review-loop/references/review.md)의 브리프를 준다. 오케스트레이터가 저장한 diff와 커밋 목록, 수용 기준, 관례 문서 경로를 입력으로 제공하고 stdout 판정을 review 파일에 저장한다. 판정 머리에 `TIER:` 줄이 있으면 `../review-loop/scripts/review-escalate.sh`로 등급을 올리고, 이후 회차는 그 등급을 따른다. 워커의 `report.md`는 첫 판정 뒤에만 대조한다.
+4. `review-<n>.md`의 `blocker`·`should`를 근거(`file:line`, 재현 명령, 참고 URL)로 판정한다. 확인되지 않은 주장을 그대로 워커에게 보내지 않는다. 확인된 `blocker`·`should`가 없으면 통과하며, 반복 검토는 새 결함·변경·근거가 있을 때만 한다. 사실은 먼저 직접 확인하고, 중요한 선택지가 근거로 계속 갈릴 때만 `herdr-quorum`을 사용한다.
 5. 같은 문제가 반복되면 재현과 실패 원인을 확인하고 접근을 바꾼다. 새 컨텍스트가 필요할 때만 `handoff.md`에 완료한 일·남은 범위·근거를 남기고 워커를 교체한다. 근거 없이 같은 리뷰를 다시 요청하지 않는다.
-6. 등급의 최대 회차(`logic` 1회, `security` 3회)를 넘기면 루프를 멈추고 `run.md`에 막힌 이유를 적는다. 기술적 갈림이면 쿼럼, 사람의 결정이 필요한 갈림이면 채널을 확인한다. 사람이 AFK 상태이면 질문 대신 해당 슬라이스만 유예하고 다른 독립 슬라이스는 계속 진행한다.
+6. 등급의 최대 회차(`logic` 3회, `security` 5회)를 넘기면 루프를 멈추고 `run.md`에 막힌 이유를 적는다. 기술적 갈림이면 쿼럼, 사람의 결정이 필요한 갈림이면 채널을 확인한다. 사람이 AFK 상태이면 질문 대신 해당 슬라이스만 유예하고 다른 독립 슬라이스는 계속 진행한다.
 
 리뷰어가 "이 저장소의 기존 관례 자체가 비표준"이라고 표시한 항목은 워커에게 고치라고 보내지 않는다. 관례 변경은 결정이므로 `decisions.md`에 올리고 쿼럼 또는 사람이 정한다.
 
@@ -110,7 +110,7 @@ herdr agent wait <run>-work-<slice> --timeout 1800000
 
 ### 7. 보고
 
-최종 응답에 슬라이스별 결과, 리뷰 회차 수, 남은 `blocking`, 통합 브랜치 이름, 실행한 검증 명령과 결과, 사람이 정해야 할 남은 결정을 적는다. `run.md`가 같은 내용을 담고 있어야 한다.
+최종 응답에 슬라이스별 결과, 리뷰 회차 수, 남은 `blocker`·`should`, 통합 브랜치 이름, 실행한 검증 명령과 결과, 사람이 정해야 할 남은 결정을 적는다. `run.md`가 같은 내용을 담고 있어야 한다.
 
 ## 검증 정책
 
@@ -163,6 +163,6 @@ herdr agent wait <run>-work-<slice> --timeout 1800000
 
 ## 이 스킬이 쓰는 다른 스킬
 
-없어도 동작하지만 있으면 쓴다. `herdr`(CLI 세부), `herdr-hitl`(질문 규약), `herdr-quorum`(합의), `resolving-merge-conflicts`(통합 충돌), `handoff`(워커 교체 문서 형식). 리뷰는 다른 리뷰 스킬을 부르지 않고 review.md의 리뷰어 브리프로만 한다. 리뷰어가 diff만 보고 시작한다는 격리가 그 브리프에 들어 있기 때문이다.
+`review-loop`(리뷰 기준과 등급 스크립트)은 필수다. 나머지는 없어도 동작하지만 있으면 쓴다. `herdr`(CLI 세부), `herdr-hitl`(질문 규약), `herdr-quorum`(합의), `resolving-merge-conflicts`(통합 충돌), `handoff`(워커 교체 문서 형식). 리뷰는 `review-loop`의 리뷰 기준과 리뷰어 브리프를 쓰되 그 스킬의 리뷰어 선택 절차는 따르지 않고 이 문서의 제한 reviewer로 실행한다. 리뷰어가 diff만 보고 시작한다는 격리가 그 브리프에 들어 있기 때문이다.
 
 설계 근거와 출처는 [references/sources.md](references/sources.md)에 있다.
