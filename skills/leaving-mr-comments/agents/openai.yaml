@@ -1,0 +1,4 @@
+interface:
+  display_name: "Leaving MR Comments"
+  short_description: "Format agent-authored GitLab MR and GitHub PR comments"
+  default_prompt: "Use $leaving-mr-comments when posting this comment on my behalf."
