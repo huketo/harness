@@ -75,6 +75,9 @@ test("merge commands are recognized through shell composition", () => {
 	expect(mergeCommand("glab api --method POST graphql -f query='mutation { mergeRequestAccept(input: {}) { errors } }'")).toBe("glab");
 	expect(mergeCommand("gh api -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }' graphql")).toBe("gh");
 	expect(mergeCommand("gh api graphql -F query=@mutation.graphql")).toBe("gh");
+	expect(mergeCommand("gh api graphql -F query='@mutation.graphql'")).toBe("gh");
+	expect(mergeCommand('gh api graphql -F "query=@mutation.graphql"')).toBe("gh");
+	expect(mergeCommand("glab api graphql -F 'query'=@mutation.graphql")).toBe("glab");
 	expect(mergeCommand("glab api graphql --input body.json")).toBe("glab");
 	expect(mergeCommand("gh api graphql -f query='query { viewer { login } }'")).toBeNull();
 	expect(mergeCommand("gh pr list --search merge")).toBe("gh");
