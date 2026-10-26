@@ -97,16 +97,21 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 		await writeFile(logFile, "");
 		await mkdir(join(root, "home"));
 		await mkdir(join(root, "codex-home"));
-		Bun.spawnSync(["git", "init", "-q", repo]);
+		// No real user home, Git configuration, or Codex configuration is visible to the run.
+		const isolated = {
+			HOME: join(root, "home"),
+			CODEX_HOME: join(root, "codex-home"),
+			GIT_CONFIG_GLOBAL: "/dev/null",
+			GIT_CONFIG_NOSYSTEM: "1",
+		};
+		Bun.spawnSync(["git", "init", "-q", repo], { env: { ...process.env, ...isolated } });
 		const child = Bun.spawn(
 			[process.execPath, "--no-install", REVIEW_ENTRY, "--cwd", repo, ...args],
 			{
 				env: {
 					...process.env,
 					PATH: `${bin}:${process.env.PATH}`,
-					// No real user home or Codex configuration is visible to the run.
-					HOME: join(root, "home"),
-					CODEX_HOME: join(root, "codex-home"),
+					...isolated,
 					REAL_CODEX,
 					FAKE_CODEX_LOG: logFile,
 					FAKE_MODELS_JSON: FAKE_MODELS,
