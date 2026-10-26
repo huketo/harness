@@ -348,13 +348,28 @@ migrate_file "$REPO/herdr/scripts/harness-run.ts" "$HOME/.local/bin/harness-run"
 # to touch the path. The repo keeps `herdr/cron/jobs.snapshot.yaml` instead.
 
 # Antigravity CLI. `hooks.json` under $AGY_CONFIG belongs to herdr's integration
-# installer and `mcp_config.json` to `agy mcp`, so this repo stays out of both
-# and owns one plugin directory instead. The remaining two slots are linked to
-# the assets that already hold the canonical text: the skill tree shared with
-# OMP and Claude Code, and the user's Korean writing instructions.
-link_dir "$REPO/agy/config/plugins/harness" "$AGY_CONFIG/plugins/harness"
+# installer and `mcp_config.json` to `agy mcp`, so this repo stays out of both.
+# Its plugin is installed by plugin/install.mjs below. The remaining two slots are
+# linked to the assets that already hold the canonical text: the skill tree shared
+# with OMP and Claude Code, and the user's Korean writing instructions.
 link_foreign "$HOME/.agents/skills" "$AGY_CONFIG/skills"
 link_foreign "$HOME/.claude/CLAUDE.md" "$AGY_CONFIG/rules/AGENTS.md"
+
+# Codex loads every *.rules file in ~/.codex/rules; default.rules there is Codex's own.
+migrate_file "$REPO/codex/harness.rules" "$HOME/.codex/rules/harness.rules"
+
+# Plugin artifacts (Claude Code, agy) and guardrail deny rules. The planner prints
+# one line per step in the same would/unchanged/skipped form as this script.
+if command -v node >/dev/null 2>&1; then
+  plugin_args=()
+  if $DRY_RUN; then plugin_args+=(--dry-run); fi
+  if ! node "$REPO/plugin/install.mjs" "${plugin_args[@]}"; then
+    conflicts+=("plugin/install.mjs")
+  fi
+else
+  echo "error: node is required for plugin/install.mjs" >&2
+  conflicts+=("node")
+fi
 
 if (( ${#conflicts[@]} > 0 )); then
   echo >&2

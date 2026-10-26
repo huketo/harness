@@ -1,0 +1,6 @@
+interface:
+  display_name: "Full Stop"
+  short_description: "Prove, review, and prepare an MR without merging"
+  default_prompt: "Use $full-stop to make this MR ready for me to merge."
+policy:
+  allow_implicit_invocation: false

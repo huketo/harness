@@ -1,0 +1,6 @@
+# Harness execpolicy rules, linked to ~/.codex/rules/harness.rules by install.sh. Codex loads every *.rules file in
+# that directory, and a stricter decision wins over an `allow` rule from default.rules.
+# Merging needs the person's explicit decision: `prompt` asks under an approval policy that can ask, and becomes
+# `forbidden` under `approval_policy = "never"` (T3 full access), so a Codex session never merges on its own.
+prefix_rule(pattern=["gh", "pr", "merge"], decision="prompt", justification="harness: merging needs the person's explicit decision")
+prefix_rule(pattern=["glab", "mr", "merge"], decision="prompt", justification="harness: merging needs the person's explicit decision")

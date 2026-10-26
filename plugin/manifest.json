@@ -1,0 +1,8 @@
+{
+  "name": "harness",
+  "version": "0.1.0",
+  "description": "Personal harness guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity rules.",
+  "author": { "name": "huketo" },
+  "repository": "https://github.com/huketo/harness",
+  "license": "MIT"
+}

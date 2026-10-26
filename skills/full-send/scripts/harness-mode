@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# harness-mode — the work mode the merge guard hook reads, stored per worktree in its git dir.
+#   harness-mode set full-send|full-stop   record a mode; full-send outside an allowlisted repo degrades to full-stop
+#   harness-mode allow-merge <ref>         one merge without a mode, only after the person explicitly asked for it
+#   harness-mode show | clear | allowlist
+# File: $(git rev-parse --git-dir)/harness-mode, `key=value` lines: mode, origin, set_at, grant, grant_expires.
+# Allowlist: ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos, one `host/path` or `host/owner/*` per line, `#`
+# comments. The person writes it; without it, full-send never merges. plugin/hooks/merge-guard.mjs reads the same file.
+# This is a guardrail against accidental merges, not an authorization system: the agent can write these files too.
+set -euo pipefail
+GRANT_SECONDS=1800
+die() { echo "harness-mode: $*" >&2; exit 2; }
+file=$(git rev-parse --path-format=absolute --git-dir 2>/dev/null)/harness-mode || die "not inside a git worktree"
+origin=$(git remote get-url origin 2>/dev/null || echo none)
+config=${XDG_CONFIG_HOME:-}
+[[ $config == /* ]] || config=$HOME/.config
+ALLOW=$config/harness/full-send-repos
+write() { local tmp; tmp=$(mktemp "$file.XXXXXX"); printf '%s\n' "$@" > "$tmp"; mv "$tmp" "$file"; }
+
+# `host/path` of a remote URL without scheme, user, port, quotes, or `.git`; the same normalization as repoKey() in
+# merge-guard.mjs, so both read an allowlist entry the same way.
+repo_key() {
+  printf '%s\n' "$1" | sed -E "s#^[\"']|[\"']\$##g; s#^[a-z+]+://([^@/]+@)?##; s#^[^@/]+@([^:]+):#\\1/#; s#^([^/:]+):[0-9]+/#\\1/#; s#\\.git\$##; s#/+\$##" |
+    tr '[:upper:]' '[:lower:]'
+}
+
+allowed() { # <repo key>: exit 0 when an allowlist entry names it
+  local key=$1 entry
+  [ -f "$ALLOW" ] || return 1
+  while IFS= read -r entry || [ -n "$entry" ]; do
+    entry=${entry%%#*}
+    entry=$(printf '%s' "$entry" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    case $entry in
+      '') ;;
+      */\*) [[ $key == "${entry%\*}"?* ]] && return 0 ;;
+      *) [ "$key" = "$(repo_key "$entry")" ] && return 0 ;;
+    esac
+  done < "$ALLOW"
+  return 1
+}
+
+case ${1:-show} in
+  set)
+    [ $# -eq 2 ] || die "usage: harness-mode set full-send|full-stop"
+    mode=$2
+    case $mode in full-send|full-stop) ;; *) die "unknown mode: $mode" ;; esac
+    if [ "$mode" = full-send ] && ! allowed "$(repo_key "$origin")"; then
+      mode=full-stop
+      echo "full-send merges only repositories listed in $ALLOW; origin is $origin, so this task runs as full-stop"
+    fi
+    write "mode=$mode" "origin=$origin" "set_at=$(date +%s)"
+    echo "mode=$mode"
+    ;;
+  allow-merge)
+    [ $# -eq 2 ] || die "usage: harness-mode allow-merge <mr or pr ref the person named>"
+    keep=(); [ -f "$file" ] && mapfile -t keep < <(grep -E '^(mode|origin|set_at)=' "$file" || true)
+    write "${keep[@]}" "grant=$2" "grant_expires=$(( $(date +%s) + GRANT_SECONDS ))"
+    echo "one merge allowed for $2 within $((GRANT_SECONDS / 60)) minutes"
+    ;;
+  show) if [ -f "$file" ]; then cat "$file"; else echo "mode=none"; fi ;;
+  clear) rm -f "$file"; echo "mode=none" ;;
+  allowlist)
+    key=$(repo_key "$origin")
+    if allowed "$key"; then echo "allowed: $key is listed in $ALLOW"; else echo "not allowed: $key is not listed in $ALLOW"; fi
+    ;;
+  *) die "usage: harness-mode set full-send|full-stop | allow-merge <ref> | show | clear | allowlist" ;;
+esac

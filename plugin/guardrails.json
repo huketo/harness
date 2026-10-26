@@ -1,0 +1,31 @@
+{
+  "comment": "Deny rules that plugin/install.mjs unions into each agent's settings file. Only additions: a rule a person removes is re-added on the next install, and no existing rule is touched. Each rule is recorded as a decision in docs/AGENT-CONFIG.md.",
+  "settings": [
+    {
+      "agent": "claude",
+      "file": "${HOME}/.claude/settings.json",
+      "path": ["permissions", "deny"],
+      "rules": [
+        "Read(~/.ssh/**)",
+        "Read(~/.aws/**)",
+        "Read(~/.claude/.credentials.json)",
+        "Read(~/.config/gh/**)",
+        "Read(~/.config/glab-cli/**)",
+        "Read(~/.config/herdr-hitl/config.toml)",
+        "Read(~/.gemini/antigravity-cli/antigravity-oauth-token)",
+        "Read(~/.t3/userdata/providers/**)"
+      ]
+    },
+    {
+      "agent": "agy",
+      "file": "${HOME}/.gemini/antigravity-cli/settings.json",
+      "path": ["permissions", "deny"],
+      "rules": [
+        "read_file(${HOME}/.config/gh)",
+        "read_file(${HOME}/.config/glab-cli)",
+        "read_file(${HOME}/.claude/.credentials.json)",
+        "read_file(${HOME}/.t3/userdata/providers)"
+      ]
+    }
+  ]
+}

@@ -793,6 +793,245 @@
           "reason": "Excluded: external-write API CLIs, sponsor material and upstream distribution or versioning machinery."
         }
       ]
+    },
+    "full-send": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/full-send/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/full-send"
+          ],
+          "snapshot_sha256": "ac1c763ebf07c4f8efe2370ba46409d721826ae5d83414829847f5ffd70f12b1",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Rewrite in Korean as a user-invoked work mode (disable-model-invocation, Codex allow_implicit_invocation false) instead of a trigger phrase.",
+        "Record the mode with scripts/harness-mode; full-send applies only to repositories the person lists in ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos and degrades to full-stop elsewhere or without that file; the plugin merge guard hook reads the same allowlist.",
+        "Replace sol-loop with review-loop (council on request), file-pr with file-mr, babysit-pr with babysit-mr; adapt the merge gate to GitLab pipelines, approvals, discussions, and detailed_merge_status; route questions through docs/agents/hitl.md."
+      ],
+      "excluded_sources": []
+    },
+    "full-stop": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/full-stop/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/full-stop"
+          ],
+          "snapshot_sha256": "376459cbccdbf0327955680bc536a8f7f610e1be009ab0c448a2e37469e60618",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Rewrite in Korean as a user-invoked mode recorded with harness-mode; add GitLab auto-merge cancellation, hand review-bot results to the repository's bot-consumer skill when one exists, and use mr-wait --until ready as the mechanical gate check."
+      ],
+      "excluded_sources": []
+    },
+    "review-loop": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/review-loop/LICENSE.tstack",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/sol-loop"
+          ],
+          "snapshot_sha256": "84c3e9da91e60e166cf07101f71726c938a248be16b9db625c7ff9db6b583a87",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Merge sol-loop into the harness review policy formerly in herdr-orchestrate: the tier classifier, escalation script, and criteria move to review-loop and set the budget (none 0, logic 3, security 5) instead of a fixed rule; herdr-orchestrate and t3-orchestrate share them.",
+        "Default reviewer is Codex Sol resolved at run time by codex/review.ts; other providers run through delegate_task in a worktree with a tree-unchanged.sh snapshot check, or harness:reviewer from a Claude thread.",
+        "Keep sol-loop's brief, VERDICT reply format, blocker/should/nit severities, ledger, scope-creep guard, and push rule; add TIER escalation and the harness criteria (intent, conventionality, AI slop, correctness)."
+      ],
+      "excluded_sources": []
+    },
+    "council": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/council/LICENSE.tstack",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/council"
+          ],
+          "snapshot_sha256": "a922b82ce6a2f78fc5e2d0af80694b6327b3b9b2a4fba97cbd3620a5cb4a08f8",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Use tstack council's multi-angle review: one flagship per model family, read-only, scores per round, loop until all satisfied.",
+        "Resolve members from orchestrator_capabilities, count families by model, report unavailable members instead of substituting, inline rules in the Antigravity brief because T3 isolates its Gemini config, and verify worktree reviewers with tree-unchanged.sh."
+      ],
+      "excluded_sources": []
+    },
+    "file-mr": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/file-mr/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/file-pr"
+          ],
+          "snapshot_sha256": "65703104f1eacec841f4523faf05a782e12a47f392f606cde5aa9a22c9507248",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Target GitLab MRs with glab and GitHub PRs with gh; link the MR to the T3 thread; localize the model and harness footer for Korean descriptions; hand review-bot results to the repository's bot-consumer skill when one exists."
+      ],
+      "excluded_sources": []
+    },
+    "babysit-mr": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/babysit-mr/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/babysit-pr"
+          ],
+          "snapshot_sha256": "ccf5f4fbe1649bcef9563f6da696b8ea75726d7022bfff113dd6283df6078568",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Document T3 watch_pull_request behavior for GitLab MRs (single pipeline check, no approval or behind wakes); replace pr-wait with mr-wait that adds a GitLab backend; hand review-bot findings to the repository's bot-consumer skill when one exists, and report bot notes as ordinary events."
+      ],
+      "excluded_sources": []
+    },
+    "leaving-mr-comments": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/leaving-mr-comments/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/leaving-pr-comments"
+          ],
+          "snapshot_sha256": "66ed3ab7d2eef84ca17508d1526ef26a8921c6f80d50e35845cd52c36d411253",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Apply the note callout to GitLab (alerts render since 17.10) and Korean comments; use glab api REST calls for notes, replies, and resolution."
+      ],
+      "excluded_sources": []
+    },
+    "takeover": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/takeover/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/takeover"
+          ],
+          "snapshot_sha256": "718f519754c2d12f1e54fcfad4950e2f450b71ae3c34aa700890addcb8ff5b7d",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Translate to Korean and point at file-mr, babysit-mr, leaving-mr-comments, and modernize."
+      ],
+      "excluded_sources": []
+    },
+    "modernize": {
+      "adopted_on": "2026-10-26",
+      "source": "https://github.com/t3dotgg/tstack",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/modernize/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/t3dotgg/tstack",
+          "commit": "7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd",
+          "paths": [
+            "LICENSE",
+            "skills/modernize"
+          ],
+          "snapshot_sha256": "5764731d3cb5e42af4254569a689532b4b06130a7ef9b5df21946ab443fdd4e9",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Translate to Korean; record MR state through glab or gh; pin force-with-lease to the observed head."
+      ],
+      "excluded_sources": []
     }
   },
   "removed_on": "2026-09-09",
