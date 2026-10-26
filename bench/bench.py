@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -35,6 +36,10 @@ CLASSES_FILE = BENCH_DIR / "classes.json"
 DEFAULT_DB = ROOT / "var" / "bench.db"
 APPLY_SCRIPT = ROOT / "omp" / "config.apply.sh"
 MODEL_DB = Path.home() / ".omp" / "agent" / "models.db"
+# LiteLLM price document T3 Code downloads for its Usage view; fills models OMP's catalog lacks.
+T3_RATES = Path.home() / ".t3" / "userdata" / "usage-model-rates.json"
+# LiteLLM provider name -> the provider id this runner's candidate selectors use.
+LITELLM_PROVIDERS = {"anthropic": "anthropic", "openai": "openai-codex"}
 TOKEN_KEYS = ("input", "output", "cacheRead", "cacheWrite")
 CONTEXT_KEYS = ("input", "cacheRead", "cacheWrite")
 
@@ -591,7 +596,7 @@ def candidate_overlay(selector: str, overrides: Mapping[str, Any]) -> dict[str, 
     return nest_dotted(dotted)
 
 
-def load_model_rates(path: Path = MODEL_DB) -> dict[tuple[str, str], ModelRate]:
+def load_model_rates(path: Path = MODEL_DB, t3_rates: Path = T3_RATES) -> dict[tuple[str, str], ModelRate]:
     """Catalog rates keyed by `(provider, model id)`.
 
     OMP may cache one provider under a versioned id such as
@@ -599,10 +604,15 @@ def load_model_rates(path: Path = MODEL_DB) -> dict[tuple[str, str], ModelRate]:
     the versioned row lists the newest models. Both rows are the same provider,
     so they merge under the id before the first `:`; for a model listed in
     both, the more recently updated row wins.
+
+    T3's LiteLLM document supplies the base; the OMP catalog overrides it for
+    every model it lists, because OMP sessions were priced with that catalog.
     """
+    rates = load_litellm_rates(t3_rates) if t3_rates.is_file() else {}
     if not path.is_file():
-        raise BenchError(f"OMP model catalog not found: {path}")
-    rates: dict[tuple[str, str], ModelRate] = {}
+        if rates:
+            return rates
+        raise BenchError(f"no model catalog found: neither {path} nor {t3_rates}")
     try:
         with sqlite3.connect(path) as connection:
             rows = connection.execute(
@@ -630,6 +640,51 @@ def load_model_rates(path: Path = MODEL_DB) -> dict[tuple[str, str], ModelRate]:
                 base={key: float(cost[key]) for key in TOKEN_KEYS},
                 **long_context_band(cost.get("longContext")),
             )
+    return rates
+
+
+def load_litellm_rates(path: Path) -> dict[tuple[str, str], ModelRate]:
+    """Per-MTok rates from a LiteLLM price document (`{"document": {...}}` or the bare mapping).
+
+    Only bare model keys of the providers in LITELLM_PROVIDERS are read; routed
+    keys such as `bedrock/...` price a different endpoint.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BenchError(f"could not read LiteLLM price document {path}: {exc}") from exc
+    document = raw.get("document", raw) if isinstance(raw, dict) else None
+    if not isinstance(document, dict):
+        raise BenchError(f"LiteLLM price document {path} is not an object")
+    fields = {
+        "input": "input_cost_per_token",
+        "output": "output_cost_per_token",
+        "cacheRead": "cache_read_input_token_cost",
+        "cacheWrite": "cache_creation_input_token_cost",
+    }
+    rates: dict[tuple[str, str], ModelRate] = {}
+    for model_id, entry in document.items():
+        if "/" in model_id or not isinstance(entry, dict):
+            continue
+        provider = LITELLM_PROVIDERS.get(str(entry.get("litellm_provider")))
+        if provider is None:
+            continue
+        if not all(isinstance(entry.get(fields[key]), (int, float)) for key in ("input", "output")):
+            continue
+        base = {key: float(entry.get(name) or 0.0) * 1_000_000 for key, name in fields.items()}
+        band: dict[str, Any] = {"long_context": None, "long_context_threshold": None}
+        for name, value in entry.items():
+            match = re.fullmatch(r"input_cost_per_token_above_(\d+)k_tokens", name)
+            if match and isinstance(value, (int, float)):
+                suffix = name.removeprefix("input_cost_per_token")
+                band = {
+                    "long_context": {
+                        key: float(entry.get(f"{field}{suffix}", entry.get(field)) or 0.0) * 1_000_000
+                        for key, field in fields.items()
+                    },
+                    "long_context_threshold": int(match.group(1)) * 1000,
+                }
+        rates[(provider, model_id)] = ModelRate(base=base, **band)
     return rates
 
 

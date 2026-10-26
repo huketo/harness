@@ -1056,8 +1056,61 @@ class CatalogRatesTest(unittest.TestCase):
                     ("openai-codex:0.155.1", 1, [self.model("gpt-6-astra", 9.0), self.model("gpt-6-sol", 2.0)]),
                 ],
             )
-            rates = bench.load_model_rates(path)
+            rates = bench.load_model_rates(path, Path(directory) / "no-t3-rates.json")
         self.assertEqual(rates[("openai-codex", "gpt-6-sol")].base["input"], 2.0)
         # The row updated last wins a model both rows list.
         self.assertEqual(rates[("openai-codex", "gpt-6-astra")].base["input"], 10.0)
         self.assertNotIn(("openai-codex:0.155.1", "gpt-6-sol"), rates)
+
+    def litellm(self, directory: str, document: dict, wrapped: bool = True) -> Path:
+        path = Path(directory) / "usage-model-rates.json"
+        path.write_text(json.dumps({"fetchedAtMs": 1, "document": document} if wrapped else document))
+        return path
+
+    def test_t3_litellm_document_prices_models_without_an_omp_catalog(self):
+        document = {
+            "claude-opus-5-5": {
+                "litellm_provider": "anthropic",
+                "input_cost_per_token": 4e-06,
+                "output_cost_per_token": 2e-05,
+                "cache_read_input_token_cost": 2e-07,
+                "cache_creation_input_token_cost": 5e-06,
+            },
+            "gpt-6.1-sol": {
+                "litellm_provider": "openai",
+                "input_cost_per_token": 2e-06,
+                "output_cost_per_token": 1e-05,
+                "cache_read_input_token_cost": 1e-07,
+                "input_cost_per_token_above_272k_tokens": 4e-06,
+                "output_cost_per_token_above_272k_tokens": 1.5e-05,
+            },
+            "bedrock/claude-opus-5-5": {"litellm_provider": "bedrock", "input_cost_per_token": 9.0, "output_cost_per_token": 9.0},
+        }
+        for wrapped in (True, False):
+            with tempfile.TemporaryDirectory() as directory:
+                rates = bench.load_model_rates(Path(directory) / "missing.db", self.litellm(directory, document, wrapped))
+            opus = rates[("anthropic", "claude-opus-5-5")]
+            self.assertAlmostEqual(opus.base["input"], 4.0)
+            self.assertAlmostEqual(opus.base["cacheWrite"], 5.0)
+            sol = rates[("openai-codex", "gpt-6.1-sol")]
+            self.assertAlmostEqual(sol.base["cacheWrite"], 0.0)
+            self.assertEqual(sol.long_context_threshold, 272_000)
+            self.assertAlmostEqual(sol.long_context["input"], 4.0)
+            self.assertAlmostEqual(sol.long_context["cacheRead"], 0.1)
+            self.assertEqual(len(rates), 2)
+
+    def test_the_omp_catalog_overrides_litellm_for_models_it_lists(self):
+        document = {
+            "gpt-6-astra": {"litellm_provider": "openai", "input_cost_per_token": 1e-06, "output_cost_per_token": 1e-06},
+            "gpt-6-luna": {"litellm_provider": "openai", "input_cost_per_token": 3e-06, "output_cost_per_token": 3e-06},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.catalog(directory, [("openai-codex", 1, [self.model("gpt-6-astra", 10.0)])])
+            rates = bench.load_model_rates(path, self.litellm(directory, document))
+        self.assertEqual(rates[("openai-codex", "gpt-6-astra")].base["input"], 10.0)
+        self.assertAlmostEqual(rates[("openai-codex", "gpt-6-luna")].base["input"], 3.0)
+
+    def test_no_catalog_at_all_is_an_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(bench.BenchError, "no model catalog found"):
+                bench.load_model_rates(Path(directory) / "missing.db", Path(directory) / "missing.json")

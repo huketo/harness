@@ -1,8 +1,6 @@
 #!/usr/bin/env bun
-import { Database } from "bun:sqlite";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -68,27 +66,15 @@ async function run(argv, { capture = false, timeout = 120_000 } = {}) {
 }
 
 async function main() {
-	if (process.argv.length > 2)
-		throw new Error("usage: bun herdr/cron/cost-audit.mjs");
+	const args = process.argv.slice(2);
+	// An agent turn that runs this command can read the report itself, so it needs no second model call.
+	const summarize = args[0] !== "--no-summary";
+	if (args.length > (summarize ? 0 : 1))
+		throw new Error("usage: bun herdr/cron/cost-audit.mjs [--no-summary]");
 	// Collection and zero-data decisions are deterministic; Flash only interprets the resulting report.
-	await run(["omp", "stats", "--summary"]);
+	// OMP stays optional: the analyzer also reads Claude Code and Codex session logs.
+	if (Bun.which("omp")) await run(["omp", "stats", "--summary"]);
 	const analyzer = join(repo, "skills/cost-audit/analyze.py");
-	const db = new Database(join(homedir(), ".omp/stats.db"), { readonly: true });
-	let hasRequests;
-	try {
-		const now = Date.now();
-		hasRequests = db
-			.query(
-				"SELECT 1 FROM messages WHERE timestamp >= ? AND timestamp <= ? LIMIT 1",
-			)
-			.get(now - 7 * 86_400_000, now);
-	} finally {
-		db.close();
-	}
-	if (!hasRequests) {
-		console.log("NO_USAGE_DATA");
-		return;
-	}
 	const day = new Intl.DateTimeFormat("en-CA", {
 		timeZone: "Asia/Seoul",
 		year: "numeric",
@@ -98,8 +84,8 @@ async function main() {
 	const base = join(repo, "var/audit", `cost-audit-${day}`);
 	await mkdir(dirname(base), { recursive: true });
 	for (const [format, suffix] of [
-		["markdown", "md"],
 		["json", "json"],
+		["markdown", "md"],
 	]) {
 		await run([
 			"python3",
@@ -111,6 +97,17 @@ async function main() {
 			"--out",
 			`${base}.${suffix}`,
 		]);
+		if (format === "json") {
+			const report = JSON.parse(await readFile(`${base}.json`, "utf8"));
+			if (!report.baseline?.request_count) {
+				console.log("NO_USAGE_DATA");
+				return;
+			}
+		}
+	}
+	if (!summarize) {
+		console.log(`보고서: ${base}.md\n기계 판독: ${base}.json`);
+		return;
 	}
 	const profile = JSON.parse(
 		await run(["bun", join(repo, "omp/profiles.ts"), "show", "automation"], {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit OMP session statistics for avoidable nominal token spend."""
+"""Audit OMP, Claude Code and Codex CLI for avoidable nominal token spend."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import statistics
 import sys
 import time
 from collections import defaultdict
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -219,7 +220,7 @@ def load_prices(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
     if not path.is_file():
         raise RuntimeError(f"Model catalog not found at {path}")
     prices: dict[tuple[str, str], dict[str, Any]] = {}
-    with open_read_only(path) as connection:
+    with closing(open_read_only(path)) as connection:
         for row in connection.execute(
             "SELECT provider_id, models FROM model_cache ORDER BY updated_at, provider_id"
         ):
@@ -242,7 +243,10 @@ def load_prices(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
 def rates_for_row(
     prices: dict[tuple[str, str], dict[str, Any]], row: Message
 ) -> dict[str, Any] | None:
-    catalog = prices.get((str(row.get("provider", "")), str(row.get("model", ""))))
+    key = str(row.get("source") or row.get("provider", ""))
+    if key == "omp":
+        key = str(row.get("provider", ""))
+    catalog = prices.get((key, str(row.get("model", ""))))
     if not catalog:
         return None
     long_context = catalog.get("longContext")
@@ -273,6 +277,206 @@ def counterfactual_cost(
     ) / 1_000_000
 
 
+
+
+def load_rates(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
+    """Convert LiteLLM per-token USD to the detector's per-million rates."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(document, dict) and "fetchedAtMs" in document and "document" in document:
+        document = document["document"]
+    if not isinstance(document, dict):
+        raise ValueError("Rates must contain a LiteLLM object")
+    fields = {"input": "input_cost_per_token", "output": "output_cost_per_token",
+              "cacheRead": "cache_read_input_token_cost",
+              "cacheWrite": "cache_creation_input_token_cost"}
+    prices = {}
+    # Preserve exact IDs; a provider-qualified alias only fills an absent ID.
+    for model, value in document.items():
+        if isinstance(value, dict) and "input_cost_per_token" in value:
+            for source in ("claude", "codex"):
+                prices[(source, model)] = {
+                    name: number(value.get(field)) * 1_000_000 for name, field in fields.items()
+                }
+    for (source, model), rates in list(prices.items()):
+        prices.setdefault((source, model.rsplit("/", 1)[-1]), rates)
+    return prices
+
+
+def content_chars(value: Any) -> int:
+    if isinstance(value, str):
+        return len(value)
+    if isinstance(value, list):
+        return sum(content_chars(item) for item in value)
+    if isinstance(value, dict):
+        return content_chars(value.get("text", ""))
+    return 0
+
+
+def load_local_source(
+    source: str, directories: list[Path], prices: dict, start_ms: int, end_ms: int,
+    folder: str | None, session: str | None,
+) -> tuple[list[Message], list[dict], list[dict], list[str]]:
+    messages, tools, compactions, warnings = [], [], [], []
+    pattern = "projects/**/*.jsonl" if source == "claude" else "sessions/**/rollout-*.jsonl"
+    paths = sorted({path.resolve() for directory in directories for path in directory.glob(pattern)})
+    if not paths:
+        warnings.append(f"{source}: no local session logs found")
+    seen_claude = set()
+    session_mode, session_value = resolve_session_filter(session)
+    unpriced = set()
+    for path in paths:
+        if session_mode == "exact" and str(path) != session_value:
+            continue
+        if session_mode == "contains" and session_value not in str(path):
+            continue
+        cwd, model, effort = "", "unknown", None
+        agent = "subagent" if "subagents" in path.parts else "main"
+        calls, requests = {}, {}
+        file_tools, file_compactions = [], []
+        last_usage_key = None
+        last_timestamp = None
+        pending_compact_boundary = False
+        try:
+            with path.open(encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, 1):
+                    try:
+                        entry = json.loads(line)
+                        if not isinstance(entry, dict):
+                            raise ValueError("expected object")
+                    except (ValueError, TypeError):
+                        warnings.append(f"{source}: invalid JSON object at line {line_number}; skipped")
+                        continue
+                    kind = entry.get("type")
+                    timestamp = parse_timestamp_ms(entry.get("timestamp"))
+                    last_timestamp = timestamp if timestamp is not None else last_timestamp
+                    payload = (entry.get("payload") or {}) if source == "codex" else entry
+                    if not isinstance(payload, dict):
+                        continue
+                    cwd = payload.get("cwd") or cwd
+                    if source == "codex" and kind == "session_meta":
+                        origin = payload.get("source")
+                        if isinstance(origin, dict) and "subagent" in origin:
+                            agent = "subagent"
+                    if source == "codex" and kind == "turn_context":
+                        model = payload.get("model") or "unknown"
+                        effort = payload.get("effort") or payload.get("reasoning_effort")
+                        if effort is None and isinstance(payload.get("reasoning"), dict):
+                            effort = payload["reasoning"].get("effort")
+                    is_summary = kind == "summary" or entry.get("isCompactSummary") is True
+                    is_compaction = (
+                        source == "claude" and (entry.get("subtype") == "compact_boundary" or is_summary)
+                    ) or (source == "codex" and (
+                        kind in ("compacted", "compaction") or payload.get("type") in ("context_compacted", "compaction")
+                    ))
+                    if is_compaction and last_timestamp is not None:
+                        if source == "claude":
+                            if is_summary and pending_compact_boundary:
+                                continue
+                            pending_compact_boundary = entry.get("subtype") == "compact_boundary"
+                        metadata = entry.get("compactMetadata") or {}
+                        event = {"source": source, "session_file": str(path),
+                                 "timestamp_ms": last_timestamp, "timestamp": utc_iso(last_timestamp),
+                                 "tokens_before": integer(metadata.get("preTokens") or payload.get("tokens_before")),
+                                 "entry_id": entry.get("uuid"), "folder": cwd}
+                        # A summary at the same boundary describes the same compaction.
+                        if not file_compactions or file_compactions[-1]["timestamp_ms"] != last_timestamp:
+                            file_compactions.append(event)
+                        continue
+                    message = (entry.get("message") or {}) if source == "claude" else payload
+                    if not isinstance(message, dict):
+                        continue
+                    blocks = (message.get("content") or []) if source == "claude" else [payload]
+                    if not isinstance(blocks, list):
+                        blocks = []
+                    for block in blocks:
+                        if not isinstance(block, dict):
+                            continue
+                        block_type = block.get("type")
+                        call_id = block.get("id") if block_type == "tool_use" else block.get("call_id")
+                        if block_type in ("tool_use", "function_call", "custom_tool_call"):
+                            calls[call_id] = block.get("name") or "unknown"
+                        if block_type in ("tool_result", "function_call_output", "custom_tool_call_output") and timestamp is not None:
+                            call_id = block.get("tool_use_id") or block.get("call_id")
+                            result = block.get("content") if source == "claude" else block.get("output")
+                            file_tools.append({"source": source, "tool_name": calls.get(call_id, "unknown"),
+                                               "tool_call_id": call_id, "result_chars": content_chars(result),
+                                               "timestamp": timestamp, "session_file": str(path),
+                                               "model": model, "folder": cwd})
+                    if source == "claude":
+                        usage = message.get("usage")
+                        if kind != "assistant" or not isinstance(usage, dict) or timestamp is None:
+                            continue
+                        pending_compact_boundary = False
+                        model = message.get("model") or "unknown"
+                        identity = (message.get("id"), entry.get("requestId"))
+                        if not any(identity):
+                            identity = (str(path), line_number)
+                        if identity in seen_claude:
+                            continue
+                        input_tokens = integer(usage.get("input_tokens"))
+                        cache_read = integer(usage.get("cache_read_input_tokens"))
+                        cache_write = integer(usage.get("cache_creation_input_tokens"))
+                    else:
+                        info = payload.get("info")
+                        if kind != "event_msg" or payload.get("type") != "token_count" or not isinstance(info, dict) or timestamp is None:
+                            continue
+                        usage = info.get("last_token_usage")
+                        if not isinstance(usage, dict):
+                            continue
+                        # Repeated status notifications can carry the same request usage.
+                        # Totals identify a replay only; they are never added to usage.
+                        total = info.get("total_token_usage")
+                        usage_key = json.dumps(total, sort_keys=True) if isinstance(total, dict) else None
+                        if usage_key is not None and usage_key == last_usage_key:
+                            continue
+                        last_usage_key = usage_key
+                        identity = (str(path), line_number)
+                        cache_read = integer(usage.get("cached_input_tokens"))
+                        input_tokens = max(0, integer(usage.get("input_tokens")) - cache_read)
+                        cache_write = 0
+                    output_tokens = integer(usage.get("output_tokens"))
+                    row = {"source": source, "provider": "anthropic" if source == "claude" else "openai-codex",
+                           "model": model, "session_file": str(path),
+                           "entry_id": str(message.get("id") or entry.get("uuid") or f"line-{line_number}"),
+                           "timestamp": timestamp, "input_tokens": input_tokens, "output_tokens": output_tokens,
+                           "cache_read_tokens": cache_read, "cache_write_tokens": cache_write,
+                           "total_tokens": input_tokens + output_tokens + cache_read + cache_write,
+                           "stop_reason": message.get("stop_reason"), "error_message": entry.get("error"),
+                           "agent_type": agent, "folder": cwd, "effort": effort,
+                           "previous_timestamp": None}
+                    # Keep the final usage/stop reason of a streamed Claude response,
+                    # retaining its first timestamp for ordering and idle intervals.
+                    if identity in requests:
+                        row["timestamp"] = requests[identity]["timestamp"]
+                    requests[identity] = row
+        except OSError:
+            warnings.append(f"{source}: could not read a local session log")
+            continue
+        previous = None
+        for identity, row in sorted(requests.items(), key=lambda item: item[1]["timestamp"]):
+            if source == "claude":
+                seen_claude.add(identity)
+            row["previous_timestamp"] = previous
+            previous = row["timestamp"]
+            if not start_ms <= row["timestamp"] <= end_ms or (folder and folder not in row["folder"]):
+                continue
+            rates = rates_for_row(prices, row)
+            if rates is None:
+                unpriced.add(row["model"])
+            for component, token_key, rate_key in (
+                ("input", "input_tokens", "input"), ("output", "output_tokens", "output"),
+                ("cache_read", "cache_read_tokens", "cacheRead"), ("cache_write", "cache_write_tokens", "cacheWrite"),
+            ):
+                row[f"cost_{component}"] = row[token_key] * number((rates or {}).get(rate_key)) / 1_000_000
+            row["cost_total"] = sum(row[f"cost_{name}"] for name in ("input", "output", "cache_read", "cache_write"))
+            messages.append(row)
+        tools.extend(call for call in file_tools if start_ms <= call["timestamp"] <= end_ms and (not folder or folder in call["folder"]))
+        compactions.extend(event for event in file_compactions if start_ms <= event["timestamp_ms"] <= end_ms and (not folder or folder in event["folder"]))
+    if unpriced:
+        warnings.append(f"{source}: {len(unpriced)} model IDs have no rates; nominal costs for them are unavailable (stored as zero)")
+    if paths and not messages:
+        warnings.append(f"{source}: no request rows matched the selected period and filters")
+    return messages, tools, compactions, warnings
 
 
 def parse_session_events(
@@ -650,11 +854,11 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
             "potential_savings_haiku_usd": round(total_actual - total_haiku, 6),
             "potential_savings_sol_usd": round(total_actual - total_sol, 6),
             "unpriced_request_count": unpriced,
-            "pricing_source": str(MODELS_PATH),
+            "pricing_source": "OMP models.db for omp; --rates LiteLLM document for claude/codex",
             "role_attribution_limitation": (
                 "stats.db identifies subagents but not their smol/mid role. Haiku savings are an "
-                "upper bound; Sol savings are a separate counterfactual. Both apply the catalog's "
-                "long-context tiers."
+                "upper bound; Sol savings are a separate counterfactual. OMP uses its catalog's "
+                "long-context tiers; local JSONL sources use the supplied per-token rates."
             ),
         },
     )
@@ -1058,17 +1262,23 @@ def build_baseline(data: AuditData) -> dict[str, Any]:
     model_groups: dict[str, dict[str, Any]] = defaultdict(
         lambda: {"requests": 0, "nominal_cost_usd": 0.0}
     )
+    source_groups: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"requests": 0, "nominal_cost_usd": 0.0}
+    )
     agent_groups: dict[str, dict[str, Any]] = defaultdict(
         lambda: {"requests": 0, "nominal_cost_usd": 0.0}
     )
     for row in data.messages:
+        source = str(row.get("source") or "omp")
+        source_groups[source]["requests"] += 1
+        source_groups[source]["nominal_cost_usd"] += number(row.get("cost_total"))
         model = str(row.get("model") or "unknown")
         model_groups[model]["requests"] += 1
         model_groups[model]["nominal_cost_usd"] += number(row.get("cost_total"))
         agent_type = str(row.get("agent_type") or "unknown")
         agent_groups[agent_type]["requests"] += 1
         agent_groups[agent_type]["nominal_cost_usd"] += number(row.get("cost_total"))
-    for groups in (model_groups, agent_groups):
+    for groups in (model_groups, agent_groups, source_groups):
         for values in groups.values():
             values["nominal_cost_usd"] = round(values["nominal_cost_usd"], 6)
             values["cost_percent"] = round(
@@ -1091,6 +1301,7 @@ def build_baseline(data: AuditData) -> dict[str, Any]:
         "request_count": request_count,
         "total_tokens": sum(integer(row.get("total_tokens")) for row in data.messages),
         "nominal_cost_usd": round(total_cost, 6),
+        "source_spend": dict(source_groups),
         "model_spend": dict(
             sorted(model_groups.items(), key=lambda item: item[1]["nominal_cost_usd"], reverse=True)
         ),
@@ -1200,12 +1411,17 @@ def render_baseline_markdown(baseline: dict[str, Any]) -> list[str]:
             f"| {markdown_escape(agent_type)} | {format_integer(values['requests'])} | "
             f"{format_money(values['nominal_cost_usd'])} | {values['cost_percent']:.2f}% |"
         )
+    lines.extend(["", "### Source spend", "", "| Source | Requests | Nominal spend | Share |",
+                  "| --- | ---: | ---: | ---: |"])
+    for source, values in baseline["source_spend"].items():
+        lines.append(f"| {source} | {format_integer(values['requests'])} | "
+                     f"{format_money(values['nominal_cost_usd'])} | {values['cost_percent']:.2f}% |")
     return lines
 
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# OMP Cost Audit",
+        "# Session Cost Audit",
         "",
         f"> **Caution:** {NOTICE}",
         "",
@@ -1230,7 +1446,12 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- {key.replace('_', ' ').title()}: {markdown_escape(detail_text(value))}")
         findings = result.get("findings", [])
         if not findings:
-            lines.extend(["", "No findings in the selected period."])
+            message = (
+                "No findings from supported signals; see unsupported sources above."
+                if result.get("details", {}).get("unsupported_sources")
+                else "No findings in the selected period."
+            )
+            lines.extend(["", message])
             continue
         displayed = findings[:MARKDOWN_FINDINGS_LIMIT]
         lines.extend(
@@ -1267,6 +1488,11 @@ def resolve_output_path(raw: str) -> Path:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", choices=("omp", "claude", "codex", "all"), default="all")
+    parser.add_argument("--claude-dir", action="append", type=Path, metavar="DIR",
+                        help="Claude Code config directory; repeat to include multiple roots")
+    parser.add_argument("--codex-dir", type=Path, default=Path.home() / ".codex", metavar="DIR")
+    parser.add_argument("--rates", type=Path, default=Path.home() / ".t3/userdata/usage-model-rates.json")
     parser.add_argument("--days", type=positive_int, default=7, help="lookback days (default: 7)")
     parser.add_argument(
         "--format", choices=("markdown", "json"), default="markdown", help="report format"
@@ -1300,39 +1526,69 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(
             f"Repository root could not be verified: expected {FACTS_PATH}"
         )
-    if not STATS_PATH.is_file():
-        raise RuntimeError(
-            f"OMP statistics database not found at {STATS_PATH}. Run 'omp stats --summary' first."
-        )
     end_ms = int(time.time() * 1000)
     start_ms = end_ms - args.days * 86_400_000
-    try:
-        with open_read_only(STATS_PATH) as connection:
-            messages = load_messages(
-                connection, start_ms, end_ms, args.folder, args.session
-            )
-            tool_calls = (
-                []
-                if args.baseline
-                else load_tool_calls(
-                    connection, start_ms, end_ms, args.folder, args.session
+    messages, tool_calls, compactions, low_effort_segments, parse_warnings = [], [], [], [], []
+    prices = {}
+    sources = ("omp", "claude", "codex") if args.source == "all" else (args.source,)
+    if "omp" in sources:
+        if not STATS_PATH.is_file():
+            if args.source == "omp":
+                raise RuntimeError(
+                    f"OMP statistics database not found at {STATS_PATH}. Run 'omp stats --summary' first."
                 )
+            parse_warnings.append("omp: statistics database not found; source skipped")
+        else:
+            try:
+                with closing(open_read_only(STATS_PATH)) as connection:
+                    messages = load_messages(connection, start_ms, end_ms, args.folder, args.session)
+                    if not args.baseline:
+                        tool_calls = load_tool_calls(connection, start_ms, end_ms, args.folder, args.session)
+            except sqlite3.Error as error:
+                raise RuntimeError(f"Could not read OMP statistics at {STATS_PATH}: {error}") from error
+            if not messages and args.source == "omp":
+                raise RuntimeError(
+                    "No OMP request rows matched the selected period and filters. "
+                    "Run 'omp stats --summary' to synchronize statistics, then retry."
+                )
+            if not messages:
+                parse_warnings.append("omp: no request rows matched the selected period and filters")
+            for row in [*messages, *tool_calls]:
+                row["source"] = "omp"
+            if not args.baseline and messages:
+                prices.update(load_prices(MODELS_PATH))
+                low_effort_segments, compactions, warnings = parse_session_events(messages, start_ms, end_ms)
+                parse_warnings.extend(warnings)
+    if any(source != "omp" for source in sources):
+        try:
+            prices.update(load_rates(args.rates.expanduser()))
+        except (OSError, ValueError):
+            parse_warnings.append("Local model rates unavailable or invalid; unpriced nominal costs are stored as zero")
+        claude_dirs = args.claude_dir
+        if claude_dirs is None:
+            claude_dirs = [path for path in (Path.home() / ".claude",) if path.is_dir()]
+        for source in sources:
+            if source == "omp":
+                continue
+            directories = claude_dirs if source == "claude" else [args.codex_dir]
+            rows, calls, events, warnings = load_local_source(
+                source, [path.expanduser() for path in directories], prices,
+                start_ms, end_ms, args.folder, args.session,
             )
-    except sqlite3.Error as error:
-        raise RuntimeError(f"Could not read OMP statistics at {STATS_PATH}: {error}") from error
-    if not messages:
-        raise RuntimeError(
-            "No OMP request rows matched the selected period and filters. "
-            "Run 'omp stats --summary' to synchronize statistics, then retry."
-        )
-    prices = {} if args.baseline else load_prices(MODELS_PATH)
-    low_effort_segments: list[dict[str, Any]] = []
-    compactions: list[dict[str, Any]] = []
-    parse_warnings: list[str] = []
-    if not args.baseline:
-        low_effort_segments, compactions, parse_warnings = parse_session_events(
-            messages, start_ms, end_ms
-        )
+            messages.extend(rows)
+            if not args.baseline:
+                tool_calls.extend(calls)
+                compactions.extend(events)
+                for row in rows:
+                    if str(row["model"]).startswith("claude-opus") and row.get("effort") in LOW_EFFORT_LEVELS:
+                        low_effort_segments.append({
+                            "session_file": row["session_file"], "model": row["model"],
+                            "thinking_level": row["effort"], "request_count": 1,
+                            "start_timestamp": utc_iso(row["timestamp"]), "end_timestamp": utc_iso(row["timestamp"]),
+                            "total_tokens": row["total_tokens"], "cost_usd": row["cost_total"],
+                            "entry_ids": [row["entry_id"]],
+                        })
+            parse_warnings.extend(warnings)
     data = AuditData(
         messages=messages,
         tool_calls=tool_calls,
@@ -1340,12 +1596,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         start_ms=start_ms,
         end_ms=end_ms,
         context_threshold=args.ctx_threshold,
-        filters={"folder": args.folder, "session": args.session},
+        filters={"folder": args.folder, "session": args.session, "source": args.source},
         low_effort_segments=low_effort_segments,
         compactions=compactions,
         parse_warnings=parse_warnings,
     )
     detectors = [] if args.baseline else [detector(data) for detector in DETECTORS]
+    present = set(sources)
+    unsupported = {
+        "low_effort_expensive": {"claude": "Claude Code does not record request effort"},
+        "cache_rebuild": {"codex": "Codex does not record cache-write usage"},
+        "idle_session_resume": {"codex": "Idle intervals are available; cache-write attribution is unsupported"},
+        "compaction_churn": {"codex": "Compaction counts are available; cache-write attribution is unsupported"},
+        "error_and_retry_spend": {"codex": "token_count does not associate request stop/error status"},
+    }
+    for result in detectors:
+        missing = {source: reason for source, reason in unsupported.get(result["id"], {}).items() if source in present}
+        if missing:
+            result["details"]["unsupported_sources"] = missing
+            result["details"]["coverage"] = "Partial or unsupported; zero findings do not establish absence for these sources"
     return {
         "schema_version": 1,
         "mode": "baseline" if args.baseline else "audit",
@@ -1353,6 +1622,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "notice": NOTICE,
         "baseline": build_baseline(data),
         "detectors": detectors,
+        "parse_warnings": parse_warnings,
         "limitations": [
             "Catalog-equivalent costs do not represent the subscription invoice.",
             (

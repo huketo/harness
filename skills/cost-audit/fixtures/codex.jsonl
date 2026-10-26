@@ -1,0 +1,9 @@
+{"type": "session_meta", "timestamp": "2026-10-25T09:00:00Z", "payload": {"id": "synthetic-session", "cwd": "/synthetic/project", "source": {"subagent": {"thread_spawn": {}}}}}
+{"type": "turn_context", "payload": {"model": "gpt-6.1-sol", "effort": "low", "cwd": "/synthetic/project"}}
+{"type": "event_msg", "timestamp": "2026-10-25T10:00:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 1000, "cached_input_tokens": 600, "output_tokens": 100, "total_tokens": 1100}, "total_token_usage": {"input_tokens": 10000, "output_tokens": 1000, "total_tokens": 11000}}}}
+{"type": "response_item", "timestamp": "2026-10-25T10:00:01Z", "payload": {"type": "function_call", "name": "exec_command", "call_id": "tool-two"}}
+{"type": "response_item", "timestamp": "2026-10-25T10:00:02Z", "payload": {"type": "function_call_output", "call_id": "tool-two", "output": "synthetic output"}}
+{"type": "turn_context", "payload": {"model": "gpt-other", "effort": "high", "cwd": "/synthetic/project"}}
+{"type": "event_msg", "timestamp": "2026-10-25T10:02:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 200, "cached_input_tokens": 50, "output_tokens": 20, "total_tokens": 220}, "total_token_usage": {"input_tokens": 10200, "output_tokens": 1020, "total_tokens": 11220}}}}
+{"type": "event_msg", "timestamp": "2026-10-25T10:02:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 200, "cached_input_tokens": 50, "output_tokens": 20, "total_tokens": 220}, "total_token_usage": {"input_tokens": 10200, "output_tokens": 1020, "total_tokens": 11220}}}}
+{"type": "compacted", "timestamp": "2026-10-25T10:03:00Z", "payload": {"message": "synthetic summary"}}
