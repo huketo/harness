@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 이 작업의 브랜치에서 커밋, 푸시, rebase, 충돌 해결, `--force-with-lease`를 할 수 있다. 머지, 자동 머지 설정, 머지 큐 진입, 기본 브랜치 푸시, 브랜치 보호 우회, 이런 행동의 위임은 절대 하지 않는다. 머지 가드 훅이 이 모드에서 머지 명령을 막는다.
 
-작업을 시작하기 전에 기존 자동 머지를 끄고 머지 큐에서 빼며, 푸시할 때마다 다시 확인한다(GitLab `glab api -X POST projects/<id>/merge_requests/<iid>/cancel_merge_when_pipeline_succeeds`, GitHub `gh pr merge --disable-auto <n>`). 이 변경을 보고한다. 자동 머지를 막을 수 없으면 진행하기 전에 그 막힘을 보고한다.
+작업을 시작하기 전에 기존 자동 머지를 끄고 머지 큐에서 빼며, 푸시할 때마다 다시 확인한다(GitLab `glab api -X POST projects/<id>/merge_requests/<iid>/cancel_merge_when_pipeline_succeeds`, GitHub `gh api graphql -f query='mutation($id: ID!) { disablePullRequestAutoMerge(input: {pullRequestId: $id}) { clientMutationId } }' -f id=<PR node id>`, 노드 ID는 `gh pr view <n> --json id`). `gh pr merge --disable-auto`는 머지 가드와 Codex 실행 정책이 머지 명령으로 보고 막으므로 쓰지 않는다. 이 변경을 보고한다. 자동 머지를 막을 수 없으면 진행하기 전에 그 막힘을 보고한다.
 
 ## 관문에서 멈추기
 

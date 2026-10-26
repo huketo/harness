@@ -44,8 +44,9 @@ const restricted: ReviewBoundarySnapshot = {
 
 /**
  * PATH shim for `codex`: logs every invocation, answers `exec` itself so no
- * test reaches a model, optionally replaces `mcp list`, and forwards every
- * other subcommand to the installed codex.
+ * test reaches a model, answers `debug models` with a synthetic catalog,
+ * optionally replaces `mcp list`, and forwards every other subcommand to the
+ * installed codex under a temporary HOME and CODEX_HOME.
  */
 const FAKE_CODEX = `#!${process.execPath}
 const { appendFileSync, readFileSync, writeFileSync } = require("node:fs");
@@ -59,6 +60,10 @@ if (args[0] === "exec") {
 	process.stdout.write("exec progress on stdout\\n");
 	process.exit(Number(process.env.FAKE_EXEC_EXIT ?? "0"));
 }
+if (args[0] === "debug" && args[1] === "models") {
+	process.stdout.write(process.env.FAKE_MODELS_JSON);
+	process.exit(0);
+}
 if (args[0] === "mcp" && process.env.FAKE_MCP_JSON) {
 	process.stdout.write(process.env.FAKE_MCP_JSON);
 	process.exit(0);
@@ -68,6 +73,15 @@ process.exit(child.exitCode ?? 1);
 `;
 
 type LogEntry = { args: string[] } | { stdin: string };
+
+/** Synthetic catalog: the default resolves to the best-ranked listed `-sol` slug. */
+const FAKE_MODELS = JSON.stringify({
+	models: [
+		{ slug: "gpt-6-sol", priority: 5, visibility: "list", supported_reasoning_levels: [{ effort: "high" }] },
+		{ slug: "gpt-6.1-sol", priority: 1, visibility: "list", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
+		{ slug: "gpt-6.1-luna", priority: 0, visibility: "list", supported_reasoning_levels: [{ effort: "high" }] },
+	],
+});
 
 /** Run the CLI against a fresh git repository with the logging codex shim first on PATH. */
 async function runReviewer(args: string[], env: Record<string, string> = {}) {
@@ -81,6 +95,8 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 		await writeFile(join(bin, "codex"), FAKE_CODEX);
 		await chmod(join(bin, "codex"), 0o755);
 		await writeFile(logFile, "");
+		await mkdir(join(root, "home"));
+		await mkdir(join(root, "codex-home"));
 		Bun.spawnSync(["git", "init", "-q", repo]);
 		const child = Bun.spawn(
 			[process.execPath, "--no-install", REVIEW_ENTRY, "--cwd", repo, ...args],
@@ -88,8 +104,12 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 				env: {
 					...process.env,
 					PATH: `${bin}:${process.env.PATH}`,
+					// No real user home or Codex configuration is visible to the run.
+					HOME: join(root, "home"),
+					CODEX_HOME: join(root, "codex-home"),
 					REAL_CODEX,
 					FAKE_CODEX_LOG: logFile,
+					FAKE_MODELS_JSON: FAKE_MODELS,
 					...env,
 				},
 				stdout: "pipe",

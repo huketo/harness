@@ -194,6 +194,8 @@ async function supervise(job, run, dir, repo) {
 		child.once("close", (c, s) => done([c, s]));
 	});
 	clearTimeout(timer);
+	// The direct child may exit on SIGTERM while a descendant in its group ignores it.
+	if (timedOut) kill("SIGKILL");
 	let status = timedOut ? "timeout" : code === 0 ? "ok" : "failed";
 	if (status === "ok" && job.noOpMarker && lastLine(log) === job.noOpMarker) status = "noop";
 	recordEnd(dir, job, run, status, { exit: code, signal });

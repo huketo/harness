@@ -18,7 +18,7 @@ bun test codex/review.test.ts
 bun test t3/scheduled/guard.test.mjs
 ```
 
-The host-sync test uses temporary local Git repositories and is the focused boundary for `herdr/cron/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test exercises argument, catalog, and boundary logic without calling `codex`. The T3 guard test uses temporary job files and `XDG_STATE_HOME`.
+The host-sync test uses temporary local Git repositories and is the focused boundary for `herdr/cron/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test needs an installed `codex`: a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`.
 
 To check built plugin artifacts against installed CLIs, build into a temporary directory only:
 

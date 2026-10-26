@@ -28,8 +28,8 @@
 | --- | --- |
 | 없음 | 막습니다. 사람이 특정 MR의 머지를 요청한 뒤 `harness-mode allow-merge <번호>`를 기록하면, 30분 안에 그 번호를 명시한 머지 명령 하나만 통과합니다. |
 | `full-stop` | 항상 막습니다. |
-| `full-send` | 머지 대상 저장소가 허용 목록에 있을 때만 통과합니다. 허용 목록에 없는 저장소에서는 `harness-mode`가 모드를 `full-stop`으로 낮춥니다. |
-| 모든 모드 | `--admin`, 명령 연결·치환·`eval`, `GH_REPO`·`GH_HOST`·`GITLAB_HOST` 같은 대상 변경, 서로 다른 저장소를 가리키는 인자는 항상 막습니다. |
+| `full-send` | 머지 대상 저장소가 허용 목록에 있을 때만 통과합니다. 허용 목록에 없는 저장소에서는 `harness-mode`가 모드를 `full-stop`으로 낮춥니다. 대상 저장소를 명령에서 읽을 수 없는 GraphQL 머지는 막습니다. |
+| 모든 모드 | `--admin`, 명령 연결·치환·`eval`, `GH_REPO`·`GH_HOST`·`GITLAB_HOST`·`--hostname` 같은 대상 변경, 서로 다른 저장소를 가리키는 인자는 항상 막습니다. |
 
 허용 목록은 `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`이며 사람이 씁니다. 한 줄에 `<host>/<path>`(예: `github.com/<owner>/<repo>`) 하나나, 그 아래 모든 저장소를 뜻하는 `<host>/<owner>/*`를 적고 `#` 뒤는 주석입니다. 파일이 없거나 비어 있으면 `full-send`는 머지하지 않습니다. `skills/full-send/scripts/harness-mode`와 `plugin/hooks/merge-guard.mjs`가 같은 파일을 같은 정규화(스킴·사용자·포트·`.git` 제거, 소문자)로 읽으며, `plugin/hooks/merge-guard.test.mjs`가 두 쪽의 판정이 같은지 확인합니다. 머지 가드는 실행 시점에 허용 목록을 다시 읽으므로, 모드를 기록한 뒤 목록에서 지운 저장소도 막힙니다.
 

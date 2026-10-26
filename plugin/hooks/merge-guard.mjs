@@ -223,7 +223,7 @@ function ambiguous(command) {
 	// Environment that redirects gh or glab to another repository or host counts as ambiguous too.
 	return (
 		mergeCount(command) > 1 ||
-		/(?:^|[\s;&|])(?:export\s+)?(?:GH_REPO|GH_HOST|GITLAB_HOST|GITLAB_URI|GL_HOST)=|(?:^|[\s;&|])cd\s|git\s+-C\s/.test(command)
+		/(?:^|[\s;&|])(?:export\s+)?(?:GH_REPO|GH_HOST|GITLAB_HOST|GITLAB_URI|GL_HOST)=|(?:^|[\s;&|])cd\s|git\s+-C\s|(?:^|\s)["']?--hostname\b/.test(command)
 	);
 }
 
@@ -242,11 +242,14 @@ export function decide({ command, state, origin, now, allow = [] }) {
 	});
 	if (/--admin\b/.test(command)) return deny("--admin bypasses branch protection and is never allowed");
 	if (mode === "full-stop") return deny("full-stop never merges");
-	if (ambiguous(command)) return deny("merge one MR or PR per command, from the worktree, without GH_REPO, cd, or git -C");
+	if (ambiguous(command)) return deny("merge one MR or PR per command, from the worktree, without GH_REPO, --hostname, cd, or git -C");
 	if (compound(command)) return deny("run the merge as a single command, without chaining, substitution, or eval");
 	const repo = targetRepo(command);
 	if (repo === "conflict") return deny("the command names more than one repository");
 	if (mode === "full-send") {
+		// A GraphQL merge names an opaque node id, so its repository cannot be read from the command.
+		if (MERGE_PATTERNS.slice(4).some(({ re }) => re.test(command)))
+			return deny("a GraphQL merge does not name its repository; use the CLI or REST merge");
 		const key = mergeRepo(repo, origin, cli);
 		if (allowedRepo(key, allow)) return { action: "allow", reason: `full-send in allowlisted ${key}` };
 		return deny(`full-send merges only repositories on the allowlist, and ${key ?? "this target"} is not on it`);
