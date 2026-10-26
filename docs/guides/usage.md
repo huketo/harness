@@ -58,10 +58,10 @@ OMP 안에서는 `/profile` 선택기 또는 `/profile code`로 용도를 선택
 않습니다. 이는 모델 도구의 capability 경계이지 OS 파일 읽기 샌드박스나
 자격증명 격리는 아닙니다.
 
-`herdr-orchestrate`의 위험 등급 스크립트는 독립 리뷰 횟수의 하한을 정합니다.
+`review-loop`의 위험 등급 스크립트는 독립 리뷰 횟수의 하한을 정하며, `herdr-orchestrate`와 `t3-orchestrate`가 함께 씁니다.
 문서·테스트만 바꿔도 지시 문서나 보안 경계에 해당하면 상위 등급이 적용되며,
-리뷰어는 놓친 보안 경계를 올릴 수 있습니다. 브리프 전달에는 스킬의
-`scripts/send-brief.sh`를 사용합니다. 구체적인 절차는 설치된 스킬을 읽습니다.
+리뷰어는 놓친 보안 경계를 올릴 수 있습니다. Herdr에서 브리프를 전달할 때는
+`herdr-orchestrate`의 `scripts/send-brief.sh`를 사용합니다. 구체적인 절차는 설치된 스킬을 읽습니다.
 
 ### 내장 자동 압축
 
@@ -131,6 +131,49 @@ Herdr 안에서 `herdr` 확장을 로드한 OMP는 공개 확장 API로 위임 �
 작업자가 settled 상태가 되어도 산출물 검증이 끝난 것은 아닙니다. OMP가 결과를 읽고 검증해야 합니다. `blocked`·`unknown`·timeout은 기존 작업자를 확인할 이유이지 같은 지시를 재제출할 근거가 아닙니다. OMP 종료 시 감시만 해제하고 남은 작업자는 종료하지 않습니다. 자연어 완료 문구와 실제 goal 상태 전이는 별개입니다. 작은 fixture의 성공은 장기 운용·분해 품질·비용 우위를 보장하지 않습니다.
 
 관리 목록과 모델 선택은 OMP 프로세스 메모리에 있습니다. 프로세스 전체를 재시작하면 이전 관리 목록을 복원하지 않습니다. 남은 작업자는 종료하지 않으므로 retained 기록을 별도로 확인합니다.
+
+## T3 Code에서 쓰기
+
+[T3 Code](https://github.com/pingdotgg/t3code) 경로는 Herdr·OMP 경로와 나란히 동작합니다. 두 경로의 규칙은 섞지 않습니다. T3 스레드(사용 가능한 도구에 `t3-code` MCP가 있는 세션)에서는 [T3 사람 개입 규칙](../agents/hitl.md)을, Herdr 페인과 OMP 세션에서는 `.omp/APPEND_SYSTEM.md`를 따릅니다.
+
+### 스킬과 지침이 로드되는 경로
+
+`bash install.sh`와 `--skills-only`는 `skills/*/SKILL.md`가 있는 모든 디렉터리를 `~/.agents/skills`와 `~/.claude/skills`에 연결합니다. 따라서 `t3-orchestrate`, `review-loop`, `council`과 MR 수명주기 스킬도 별도 설정 없이 함께 연결됩니다.
+
+| 제공자 | 스킬 | 사용자 지침 | 저장소 지침 |
+| --- | --- | --- | --- |
+| Claude Code (`claudeAgent`) | `~/.claude/skills` | `~/.claude/CLAUDE.md` | `CLAUDE.md` → `AGENTS.md` |
+| Codex CLI (`codex`) | `~/.agents/skills` | `~/.codex/AGENTS.md` | `AGENTS.md` |
+| Antigravity (`antigravity`) | T3 전용 설정 디렉터리의 `skills` 링크 → `~/.gemini/config/skills` | 로드되지 않음 | 로드되지 않음 |
+
+T3는 agy CLI가 아니라 별도 ACP 서버를 T3 전용 설정 디렉터리에서 실행합니다. 그래서 호스트 agy 설정의 `rules`(한국어 작성 지침), 플러그인, 훅, `permissions.deny`가 T3의 Antigravity 세션에는 적용되지 않으며, Antigravity 자식에게는 필요한 규칙을 브리프에 직접 적습니다. 확인 경위는 [FACTS 15절](../FACTS.md#15-t3-code와-에이전트-설정-표면-2026-10-26)에 있습니다. Antigravity에 무인 Full access 작업을 맡길 때는 이 차이를 전제로 작업 범위를 프롬프트와 가드로 제한합니다.
+
+### 오케스트레이션, 리뷰 루프, 카운슬
+
+T3 스레드에서 독립 구현을 여러 워크트리로 나눌 때는 `t3-orchestrate`, 변경 하나를 다른 계열의 리뷰어로 반복 검토할 때는 `review-loop`, 설계나 변경을 세 계열의 플래그십으로 교차 검토하고 모두 만족할 때까지 고칠 때는 `council`을 사용합니다. 세 스킬은 `delegate_task`의 워크트리 자식을 쓰고, 용도별 제공자·모델 대응은 `skills/t3-orchestrate/references/targets.md`가 정합니다. Antigravity는 Auto 모드가 없으므로 자식에게 Full access를 명시해야 하며, 이것은 부모 스레드가 Full access일 때만 가능합니다.
+
+기본 독립 리뷰어는 읽기 전용 Codex 리뷰어 `codex/review.ts`입니다. `--model`을 생략하면 `codex debug models`에서 현재 Sol 모델을 고르고, 읽기 전용 샌드박스와 네트워크·MCP·하위 agent 차단을 모델 호출 전에 확인합니다. Claude Code 스레드에서는 하네스 플러그인의 `harness:reviewer` 하위 agent(`Read`, `Grep`, `Glob`만 사용)를 쓸 수 있습니다.
+
+```bash
+bun --no-install codex/review.ts --cwd <worktree> --inspect-tools
+bun --no-install codex/review.ts --cwd <worktree> --brief "Read <review-brief.md> and review its supplied diff."
+```
+
+### MR 수명주기와 작업 모드
+
+GitLab MR과 GitHub PR을 같은 스킬로 다룹니다. `file-mr`로 올리고, `babysit-mr`로 파이프라인과 리뷰를 지켜보며, `leaving-mr-comments`가 대신 다는 댓글의 형식을 정하고, `takeover`와 `modernize`가 남의 작업을 이어받거나 오래된 MR을 다시 맞춥니다. 저장소가 쓰는 리뷰 봇에 그 결과를 소비하는 스킬이 따로 있으면 이 스킬들은 그 스킬에 판단을 넘깁니다.
+
+T3의 `watch_pull_request`와 `link_pull_request`는 GitLab MR URL도 받습니다. 파이프라인은 `Pipeline` 검사 하나로 보이고 승인과 rebase 필요 상태는 스레드를 깨우지 않습니다. T3 밖에서는 `skills/babysit-mr/scripts/mr-wait`가 GitLab과 GitHub를 모두 기다립니다.
+
+작업 모드는 기본값이 아니며 사람이 작업마다 고릅니다. `/full-send`는 증명·리뷰·제출·감시·머지까지 맡기는 모드이고, `/full-stop`은 같은 일을 하되 사람이 머지할 수 있는 MR에서 멈춥니다. Codex에서는 `$full-send`, `$full-stop`으로 부릅니다. `full-send`는 사람이 직접 적은 허용 목록의 저장소에서만 머지하며, 목록이 없으면 `full-stop`으로 낮아집니다.
+
+```text
+# ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos
+github.com/<owner>/*
+gitlab.example/<group>/<repo>
+```
+
+한 줄에 `<host>/<path>` 하나를 적고, `<host>/<owner>/*`는 그 아래 모든 저장소를 뜻합니다. `skills/full-send/scripts/harness-mode allowlist`가 현재 저장소의 판정을 보여 줍니다. 머지 가드 훅(Claude Code·agy 플러그인)과 Codex 실행 정책(`codex/harness.rules`)이 모드가 허락하지 않는 머지를 막습니다. 판정 표는 [AGENT-CONFIG](../AGENT-CONFIG.md#2-머지-가드와-작업-모드)에 있습니다. 허용 목록과 모드 파일은 에이전트도 쓸 수 있으므로 이 장치는 실수로 머지하는 것을 막는 장치이지 권한 체계가 아닙니다.
 
 ## WSL2에서 Windows Chrome 쓰기
 

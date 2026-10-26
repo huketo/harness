@@ -9,8 +9,8 @@ Choose the document for the task rather than reading the entire directory. The R
 | Document | Read it for |
 | --- | --- |
 | [Installation](guides/installation.md) | Linux/WSL2 prerequisites, installer side effects, configuration opt-in, retired-link cleanup, updates, and manual rollback. |
-| [상세 사용법](guides/usage.md) | Built-in session pinning, profiles, session/shared effort, built-in compaction, Herdr execution, BrowserSkill on WSL2, and interface improvement/review. |
-| [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
+| [상세 사용법](guides/usage.md) | Built-in session pinning, profiles, session/shared effort, built-in compaction, Herdr execution, the T3 Code path (orchestration, review loop, council, MR lifecycle, work modes), BrowserSkill on WSL2, and interface improvement/review. |
+| [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, the T3 scheduled-task guard, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
 | [공개 배포 정책](public-release.md) | License, fresh-history, privacy, dependency, support, and publication invariants. |
 
 ## Maintenance / 유지관리와 Agent 지침
@@ -23,13 +23,15 @@ Choose the document for the task rather than reading the entire directory. The R
 | [Authority](agents/authority.md) | Local work versus host, external-write, and publication decisions. |
 | [Writing](agents/writing.md) | Document ownership, bilingual parity, and progressive disclosure. |
 | [Testing](agents/testing.md) | Focused Bash, Bun, and Python checks and what each proves. |
-| [OMP human-decision rules](../.omp/APPEND_SYSTEM.md) | Channel resolution and unattended-run behavior; not a general installation setting. |
+| [T3 human-decision rules](agents/hitl.md) | Thread questions, approvals, delegated children, and unattended scheduled runs in T3 Code. |
+| [OMP human-decision rules](../.omp/APPEND_SYSTEM.md) | Herdr/OMP channel resolution and unattended-run behavior; not a general installation setting. |
 
 ## Reference and evidence / 구조와 근거
 
 | Document | Role and limits |
 | --- | --- |
 | [REPO](REPO.md) | Maintained ownership and placement rules; repository sources versus runtime state. |
+| [AGENT-CONFIG](AGENT-CONFIG.md) | Claude Code, Codex, and AGY configuration surface versus the harness, what reaches T3 sessions, plugin packaging, the merge guard and full-send allowlist, and guardrail decisions. |
 | [FACTS](FACTS.md) | Dated compatibility, cost/model observations, and known technical limits without private work records. |
 | [PRICING](PRICING.md) | Dated provider/catalog pricing and cost-accounting evidence; not a live price feed. |
 | [BENCH-SURVEY](BENCH-SURVEY.md) | External benchmark research and design implications; historical descriptions may predate the current runner. |

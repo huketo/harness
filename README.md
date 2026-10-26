@@ -4,7 +4,7 @@
 
 **A version-controlled personal workstation setup for coding agents: shared skills, model profiles, visible execution, and task-based evaluation.**
 
-Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), [Herdr](https://github.com/herdrdev/herdr), and Antigravity CLI (`agy`) environment. Its OMP layer installs only the `profiles` and `herdr` extensions. Harness is a personal configuration and extension showcase, not a standalone agent, a hosted service, or a replacement for those tools.
+Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), [Herdr](https://github.com/herdrdev/herdr), and Antigravity CLI (`agy`) environment. Its OMP layer installs only the `profiles` and `herdr` extensions. Harness is a personal configuration and extension showcase, not a standalone agent, a hosted service, or a replacement for those tools. A [T3 Code](https://github.com/pingdotgg/t3code) path with Claude Code, Codex CLI, and AGY runs beside that setup.
 
 [Installation](docs/guides/installation.md) · [Documentation](docs/index.md) · [Usage](docs/guides/usage.md) · [Benchmarks](bench/README.md) · [Reuse policy](CONTRIBUTING.md) · [MIT License](LICENSE)
 
@@ -19,11 +19,13 @@ Harness connects an existing [Oh My Pi](https://github.com/can1357/oh-my-pi) (OM
 | Context compaction | OMP's built-in compaction, managed through six policy keys, without a custom OMP build or runtime patch. |
 | Visible execution | `harness-run` launches and revisits commands or independent agents in Herdr without moving existing task subagents. |
 | Task-based evaluation | Replayable fixtures, protected grading material, cost accounting, and routing proposals—not a universal model leaderboard. |
-| Personal operations | Cost audits, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
+| T3 Code path | `t3-orchestrate`, `review-loop`, and `council` delegate through T3's orchestration tools; [T3 human-in-the-loop rules](docs/agents/hitl.md) route questions through the thread; `codex/review.ts` runs an independent review in Codex's read-only sandbox; `t3/scheduled/guard.mjs` adds timeouts and run limits to scheduled tasks. |
+| MR lifecycle and work modes | GitLab MR and GitHub PR skills adapted from tstack (`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`) and the user-selected `full-send`/`full-stop` modes. A merge-guard hook in the `plugin/` artifacts for Claude Code and AGY, and `codex/harness.rules` for Codex, block merges the mode does not allow; `full-send` merges only in repositories you list in an allowlist. See [AGENT-CONFIG](docs/AGENT-CONFIG.md). |
+| Personal operations | Cost audits over OMP, Claude Code, and Codex sessions, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
 
 ## Recommended environment
 
-The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, a stock OMP installation available as `omp`, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows and macOS are not maintained installation targets. Future OMP or Bun releases must be reviewed rather than assumed compatible.
+The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, a stock OMP installation available as `omp`, and Bun 1.3.14**. Python 3 is needed for configuration inspection and benchmarks, and Node.js for the full installation's plugin step. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate the underlying tools separately. Native Windows and macOS are not maintained installation targets. Future OMP or Bun releases must be reviewed rather than assumed compatible.
 
 ```bash
 git clone https://github.com/huketo/harness.git
@@ -38,7 +40,7 @@ bash install.sh
 bash omp/config.apply.sh --check
 ```
 
-**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, and retires old `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout. A foreign or unexpected entry remains a conflict and is not removed; dry-run reports the plan without mutating it. The installer leaves authentication, saved preferences, session transcripts, and backups unchanged. Legacy Harness native-compaction replay and portable migration are no longer available, so a preserved legacy session is not guaranteed to resume. Restart every OMP process that was already loaded after installation.
+**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, installs the `harness` plugin into Claude Code and AGY when they are on `PATH`, adds credential-read deny rules to their settings files, links a Codex execpolicy file, and retires old `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout. A foreign or unexpected entry remains a conflict and is not removed; dry-run reports the plan without mutating it. The installer leaves authentication, saved preferences, session transcripts, and backups unchanged. Legacy Harness native-compaction replay and portable migration are no longer available, so a preserved legacy session is not guaranteed to resume. Restart every OMP process that was already loaded after installation.
 
 The settings check does not apply changes; exit `1` reports differences. To opt into the repository's personal OMP defaults after inspecting them:
 
@@ -46,7 +48,7 @@ The settings check does not apply changes; exit `1` reports differences. To opt 
 bash install.sh --with-config
 ```
 
-This includes model routing, fallback behavior, skill discovery, the built-in compaction policy, and Auto QA consent. It is not required merely to link extensions. AGY settings and cron jobs are not restored by the installer.
+This includes model routing, fallback behavior, skill discovery, the built-in compaction policy, and Auto QA consent. It is not required merely to link extensions. AGY settings, cron jobs, and T3 scheduled tasks are not restored by the installer.
 
 On a shared workstation, `bash install.sh --skills-only` links only skills and
 leaves tool configuration and commands unchanged. Keep the clone at a stable
@@ -102,7 +104,7 @@ Actual runs require authenticated model access and can incur charges. Results an
 
 - **One owner per asset:** hand-maintained assets are symlinked; tool-managed state stays with its owning tool. Distributed snapshots are review examples, not host backup or restore instructions.
 - **Credentials stay local:** keep API keys, OAuth state, private calendar URLs, messaging tokens, session logs, and report inputs outside version control. `.gitignore` is not a secret scanner and does not erase history.
-- **Review external effects:** cron activation, messages, plugin updates, remote writes, and Git publication require deliberate owner action. No distributed snapshot should be activated unchanged.
+- **Review external effects:** cron or T3 schedule activation, messages, plugin updates, remote writes, merges, and Git publication require deliberate owner action. The merge guard is a guardrail against accidental merges, not an authorization system. No distributed snapshot should be activated unchanged.
 - **No sandbox claim:** permission policies and file-tool deny rules do not isolate arbitrary shell access. Treat permissive workstation settings as personal risk choices, not security defaults.
 - **Live links matter:** editing or updating this checkout changes installed assets immediately. There is no automated uninstaller; [manual rollback boundaries](docs/guides/installation.md#updating-and-undoing) explain what link removal does not undo.
 
@@ -113,7 +115,10 @@ Actual runs require authenticated model access and can incur charges. Results an
 | [`omp/`](omp/) | The `profiles` and `herdr` extensions, model profiles, prompts, and declarative settings. |
 | [`herdr/`](herdr/) | Terminal integration, helper commands, plugin pins, cost audit, and guarded host sync. |
 | [`skills/`](skills/) | Personal skills and adopted skills with retained notices. |
-| [`agy/`](agy/) | AGY plugin and an example settings snapshot. |
+| [`plugin/`](plugin/) | One source for the Claude Code and AGY plugins: merge guard, read-only reviewer agent, AGY rules, builder, installer, and deny rules. |
+| [`codex/`](codex/) | Read-only Codex reviewer and the execpolicy rules that make Codex ask before merging. |
+| [`t3/`](t3/) | Guard for T3 Code scheduled tasks; the distributed job list is empty. |
+| [`agy/`](agy/) | An example AGY settings snapshot. |
 | [`bench/`](bench/) | Benchmark runner, tasks, fixtures, references, and oracles. |
 | [`third-party/`](third-party/) | External provenance, lock snapshots, and patches. |
 | [`docs/`](docs/index.md) | Installation, usage, ownership, evidence, and maintenance guidance. |

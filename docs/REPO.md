@@ -10,6 +10,9 @@
 - `~/.agents/.skill-lock.json`은 스킬 설치 관리자가 갱신합니다. `third-party/skills.lock.json`은 공개 의존성 핀의 비교 사본이며 실제 잠금 파일을 대체하지 않습니다.
 - Herdr cron의 live `jobs.yaml`은 `herdr-cron`이 교체할 수 있는 도구 소유 파일입니다. 심링크하지 않습니다. 공개 `herdr/cron/jobs.snapshot.yaml`은 `version: 1`, `jobs: []`인 빈 배포 상태이며 개인 일정의 백업이나 복원 입력이 아닙니다.
 - `agy/settings.snapshot.json`은 공개 가능한 개인 정책 예시입니다. live 설정을 복원하지 않고, trusted workspace·개인 경로·자격증명을 담지 않습니다.
+- Claude Code와 AGY 플러그인은 `plugin/`이 정본이고, 설치 대상은 `plugin/build.mjs`가 만든 산출물입니다. Claude Code는 산출물 디렉터리를 마켓플레이스로 읽고, AGY는 `agy plugin install`로 사본을 만듭니다. 두 CLI의 설정 파일(`~/.claude/settings.json`, `~/.gemini/antigravity-cli/settings.json`)은 도구 소유이므로 `plugin/install.mjs`는 `plugin/guardrails.json`의 거부 규칙을 합집합으로 더하기만 하고 다른 값을 바꾸지 않습니다.
+- T3 Code 예약 작업의 실제 상태는 T3 상태 DB가 소유합니다. `t3/scheduled/jobs.json`은 가드가 읽는 작업 정의이며 공개본에서는 빈 목록입니다. 가드의 실행 기록은 `${XDG_STATE_HOME:-~/.local/state}/harness-t3-jobs/`에 둡니다.
+- `full-send` 허용 목록(`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`)은 사람이 쓰는 사용자 설정입니다. 저장소는 이 파일을 만들거나 배포하지 않습니다.
 
 `install.sh`는 이 경계를 자동화합니다. 일반 파일을 심링크로 바꾸기 전에 `<경로>.bak`을 만들고, 이미 정확한 심링크가 있으면 유지합니다. 레포 밖을 가리키는 심링크나 심링크가 아닌 기존 스킬은 다른 소유자의 자산으로 보아 건너뛰고 충돌을 보고합니다. OMP 설정은 `--with-config`를 명시한 경우에만 적용합니다.
 
@@ -23,9 +26,12 @@
 | `herdr/cron/cost-audit.mjs` | 로컬 통계 분석과 해석 흐름. 입력과 결과는 `var/`에 유지 |
 | `herdr/cron/host-sync.mjs`, `host-sync.test.mjs` | 허용 목록 기반 동기화 guard와 임시 Git 저장소 회귀 테스트 |
 | `herdr/cron/jobs.snapshot.yaml` | 예약 작업이 없는 공개 배포 상태 |
+| `t3/scheduled/guard.mjs`, `guard.test.mjs`, `jobs.json` | T3 예약 작업에 없는 시간 초과·일일 실행 횟수·연속 실패 중지를 강제하는 가드와 회귀 테스트. `jobs.json`은 빈 공개 배포 상태 |
+| `plugin/` | Claude Code·AGY 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, AGY 규칙), 산출물 빌더 `build.mjs`, 설치 계획기 `install.mjs`, 설정에 합칠 거부 규칙 `guardrails.json`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
+| `codex/` | 읽기 전용 Codex 리뷰어 `review.ts`와 테스트, `~/.codex/rules/harness.rules`로 연결하는 실행 정책(머지 명령은 사람의 승인) |
 | `skills/` | 이 레포가 소유하는 개인 스킬과 고지를 유지한 편입 스킬 |
 | `skills/daily-report/` | GitLab/iCal 근거 수집과 초안 작성 지침. Daou Office 제출은 사용자 UI 작업 |
-| `agy/` | Antigravity CLI가 이 하네스를 사용하게 하는 플러그인과 공개 예시 설정 |
+| `agy/` | Antigravity CLI 설정의 공개 예시 스냅샷(`settings.snapshot.json`) |
 | `third-party/` | 공개 관리형 자산의 핀·패치와 직접 편입한 자산의 출처 |
 | `bench/` | 벤치마크 러너, 합성 과제 정의·fixture, oracle, 기준 자료, 회귀 테스트 |
 | `README.md`, `README.ko.md` | 영문·한글 시작 안내. 공통 기능·조건·안전 경계를 함께 갱신 |
@@ -35,6 +41,7 @@
 | `CONTRIBUTING.md` | 외부 기여·지원·제보를 받지 않는 정책과 독립 fork 안내 |
 | `docs/public-release.md` | 공개 배포의 라이선스·개인정보·의존성·이력 불변식 |
 | `docs/FACTS.md` | 공개 가능한 기술 관측과 한계 |
+| `docs/AGENT-CONFIG.md` | Claude Code·Codex·AGY 설정 표면, T3 도달 범위, 플러그인 배포 형태, 머지 가드와 가드레일 결정 |
 | `docs/BENCH-SURVEY.md` | 외부 벤치마크 조사와 판정 설계 |
 | `docs/PRICING.md` | 모델 단가와 캐시·장문 구간 비용 근거 |
 | `var/` | 버전 관리하지 않는 로컬 생성 산출물. `.gitkeep`만 추적 |
@@ -62,9 +69,9 @@ bun test herdr/cron/host-sync.test.mjs
 
 ## Antigravity CLI 자산의 경계
 
-`agy`는 `~/.gemini/config/` 아래의 rules, skills, plugins, hooks, MCP 설정을 읽습니다. Harness가 직접 소유하는 것은 `agy/config/plugins/harness/`와 공개 예시 스냅샷뿐입니다.
+`agy`는 `~/.gemini/config/` 아래의 rules, skills, plugins, hooks, MCP 설정을 읽습니다. Harness가 내용을 소유하는 것은 플러그인 하나와 공개 예시 스냅샷뿐입니다.
 
-- 플러그인 소스는 `~/.gemini/config/plugins/harness`로 심링크합니다.
+- 플러그인의 정본은 `plugin/`이며, `plugin/build.mjs`가 만든 산출물을 `plugin/install.mjs`가 `agy plugin install`로 `~/.gemini/config/plugins/harness`에 복사합니다. AGY 1.4.7은 심링크한 플러그인 디렉터리를 건너뛰므로 저장소 디렉터리를 심링크하지 않으며, 이전 설치기가 만든 checkout 소유 심링크는 사본으로 바꿉니다([FACTS 15절](FACTS.md#15-t3-code와-에이전트-설정-표면-2026-10-26)).
 - hooks와 MCP 설정은 각 설치 관리자가 쓰는 상태이므로 복사하거나 심링크하지 않습니다.
 - 공유 스킬 디렉터리는 `~/.agents/skills`의 정본을 사용합니다. 기계별 절대 경로를 설정 파일에 박아 넣는 사본을 만들지 않습니다.
 - 개인 instruction은 사용자가 소유한 기존 `~/.claude/CLAUDE.md`를 AGY rule 슬롯에 연결합니다. 저장소의 `CLAUDE.md`와 역할이 다릅니다.
@@ -98,6 +105,8 @@ bun test herdr/cron/host-sync.test.mjs
 
 `imagegen`의 독립 로고 분기는 워드마크·심벌·마스코트·조합형·엠블럼을 다룹니다. [s1dashu/ip-as-logo-skill](https://github.com/s1dashu/ip-as-logo-skill)의 조형 지침은 선택형 `references/logo/rounded-ip.md`에만 수용했고 `LICENSE.ip-as-logo`에 원저작자의 MIT 고지를 보존합니다. 고정 revision·입력 해시·로컬 변경은 같은 provenance 기록에 추가합니다. 별도 로고 스킬이나 상류의 고정 배치·무검수 생성 절차는 설치하지 않습니다.
 
+2026-10-26에는 [t3dotgg/tstack](https://github.com/t3dotgg/tstack/tree/7de017b3fc9d50c03cf3ecb98fb71e0ca65a78bd)의 MIT 스킬 가운데 PR 수명주기와 작업 모드를 한국어로 다시 써서 편입했습니다. `file-pr`·`babysit-pr`·`leaving-pr-comments`·`takeover`·`modernize`는 GitLab MR과 GitHub PR을 함께 다루는 `file-mr`·`babysit-mr`·`leaving-mr-comments`·`takeover`·`modernize`가 되었고, `babysit-mr`의 `scripts/mr-wait`는 상류 `pr-wait`에 GitLab 백엔드를 더했습니다. `full-send`·`full-stop`은 사용자 호출 작업 모드이며, 머지는 사람이 쓴 허용 목록의 저장소에서만 합니다. `sol-loop`은 기존 오케스트레이션 리뷰 기준과 합쳐 `review-loop`이 되었고, 위험 등급 스크립트(`review-tier.sh`, `review-escalate.sh`, `review-tiers.tsv`)와 리뷰 기준은 `herdr-orchestrate`에서 `review-loop`으로 옮겨 두 오케스트레이션 스킬이 함께 씁니다. `council`은 계열별 플래그십 셋의 읽기 전용 교차 검토입니다. 특정 리뷰 봇에 묶인 처리는 "저장소에 그 봇을 소비하는 스킬이 있으면 그 스킬에 넘긴다"는 일반 규칙으로 바꿨습니다. 고정 revision·입력 해시·로컬 변경은 `third-party/adopted-skills.json`, 원저작자 고지는 각 스킬의 `LICENSE` 또는 `LICENSE.tstack`에 있습니다. `t3-orchestrate`는 tstack 자료를 쓰지 않은 하네스 소유 스킬입니다.
+
 `git-commit`은 [github/awesome-copilot](https://github.com/github/awesome-copilot/tree/7568a482ce2df38f8965ab5336a3220db796a4ba)의 MIT 스킬을 2026-09-09에 편입했습니다. 본문은 그대로 두고 description만 트리거 조건으로 줄였습니다. 같은 날 `daily-report`, `code-review`, `diagnosing-bugs`, `tdd`, `writing-for-agents`의 description도 줄였습니다. description은 시스템 프롬프트에 항상 실리는 유일한 부분이므로 절차 설명은 본문에 두고, 이웃 스킬과 겹치는 트리거는 한쪽에만 둡니다. 근거는 `docs/FACTS.md` 11절에 있습니다.
 
 2026-09-28에는 [openclaw/openclaw](https://github.com/openclaw/openclaw/tree/80930af448ebabc84174146b56bc106d37fab3b4/.agents/skills/test-audit)의 MIT `test-audit`을 범용 스킬로 편입했습니다. 이 스킬은 기존 테스트의 감사·정리와 테스트 전용 production seam 제거를 소유하며, 대상 프로젝트의 runner·gate·게시 흐름은 그 프로젝트의 지침·CI·매니페스트에서 찾습니다. 새 테스트의 작성 게이트는 트리거가 겹치지 않도록 `tdd`로 옮겼고, 두 스킬이 함께 쓰는 정크 패턴 목록은 `skills/test-audit/patterns.md` 한 곳에 둡니다. `tdd`는 `test-audit`이 설치되지 않아도 동작합니다. 판단 평가는 `skills/test-audit/evals/evals.json`에 있습니다.
@@ -128,7 +137,7 @@ bun test herdr/cron/host-sync.test.mjs
 
 `.omp/APPEND_SYSTEM.md`는 이 레포에서 작업하는 에이전트에게 적용되는 프로젝트 범위 시스템 프롬프트 추가분입니다. OMP는 프로젝트 범위 파일을 사용자 범위보다 우선하므로, 필요한 전역 규칙이 자동 상속된다고 가정하지 않습니다.
 
-이 파일은 사람 질문, 외부 효과, 무인 실행의 권한 경계를 정의합니다. 벤치마크 runner는 임시 fixture 작업공간에서 실행되므로 프로젝트 파일 탐색에 기대지 않고 필요한 system prompt를 명시적으로 전달합니다. 두 장치는 적용 범위가 다릅니다.
+이 파일은 사람 질문, 외부 효과, 무인 실행의 권한 경계를 정의합니다. T3 Code 스레드에는 이 OMP 파일이 적용되지 않습니다. T3에서 실행되는 Claude Code·Codex·Antigravity 세션은 `AGENTS.md`의 안내에 따라 [`docs/agents/hitl.md`](agents/hitl.md)를 사람 개입 규칙으로 읽습니다. Antigravity는 T3 아래에서 저장소 `AGENTS.md`를 로드하지 않으므로, 무인 Antigravity 작업에서는 프롬프트에 적은 명시적 경로가 유일한 연결입니다. 벤치마크 runner는 임시 fixture 작업공간에서 실행되므로 프로젝트 파일 탐색에 기대지 않고 필요한 system prompt를 명시적으로 전달합니다. 두 장치는 적용 범위가 다릅니다.
 
 ## 앞으로 추가할 자산의 위치
 

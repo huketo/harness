@@ -2,16 +2,17 @@
 
 [문서 색인](../index.md) · [설치 안내](installation.md) · [공개 배포 정책](../public-release.md)
 
-> **일반 설치 절차가 아닙니다.** 이 문서는 소유자가 개인 워크스테이션에서 선택적으로 실행하는 흐름과 안전 경계를 설명합니다. 배포본에는 cron 일정이 없고, 외부 쓰기나 원격 게시를 자동으로 활성화하지 않습니다.
+> **일반 설치 절차가 아닙니다.** 이 문서는 소유자가 개인 워크스테이션에서 선택적으로 실행하는 흐름과 안전 경계를 설명합니다. 배포본에는 cron 일정과 T3 예약 작업이 없고, 외부 쓰기나 원격 게시를 자동으로 활성화하지 않습니다.
 
 명령은 저장소 루트에서 실행합니다. 인증된 서비스 조회, 모델 호출, 원격 쓰기, 일정 등록은 각각 별도의 외부 효과입니다. 명령 이름이나 `--dry-run`만 보고 읽기 전용이라고 가정하지 않습니다.
 
 ## 비용 감사
 
-`herdr/cron/cost-audit.mjs`는 로컬 OMP 통계에서 비용·캐시 사용을 분석하고 AGY `automation` 프로필에 이미 생성된 결과의 해석만 맡깁니다. 통계와 설정 변경을 모델에 위임하지 않으며 결과는 무시되는 `var/` 아래에 둡니다.
+`herdr/cron/cost-audit.mjs`는 로컬 OMP 통계와 Claude Code·Codex CLI 세션 로그에서 비용·캐시 사용을 분석하고 AGY `automation` 프로필에 이미 생성된 결과의 해석만 맡깁니다. OMP가 없으면 OMP 통계 동기화를 건너뜁니다. 통계와 설정 변경을 모델에 위임하지 않으며 결과는 무시되는 `var/` 아래에 둡니다. `--no-summary`는 보고서만 만들고 AGY를 부르지 않으므로, 에이전트 턴 안에서 실행할 때 씁니다.
 
 ```bash
 bun herdr/cron/cost-audit.mjs
+bun herdr/cron/cost-audit.mjs --no-summary
 ```
 
 이 명령은 로컬 상태와 모델 접근을 요구할 수 있습니다. 카탈로그 환산 비용과 실제 청구액을 구분하고, 한 시점의 결과를 전체 환경의 절감 보장으로 해석하지 않습니다. 계산 경계는 [비용 감사 문서](../../skills/cost-audit/README.md)와 [가격 근거](../PRICING.md)를 참고합니다.
@@ -55,6 +56,17 @@ bash skills/daily-report/scripts/link_google_calendar.sh
 
 분산된 `herdr/cron/jobs.snapshot.yaml`은 `version: 1`과 빈 `jobs` 목록만 가지므로 예약 실행을 설치하거나 재현하지 않습니다. 실제 일정을 만든다면 공개본 밖의 로컬 설정에서 각 작업의 입력, 비용, 권한, 알림, 실패 처리를 검토합니다.
 
+## T3 예약 작업 가드
+
+T3 예약 작업은 셸 명령이 아니라 에이전트 턴이며 시간 초과·일일 실행 횟수·연속 실패 시 중지 기능이 없습니다. [`t3/scheduled/guard.mjs`](../../t3/scheduled/guard.mjs)는 [`t3/scheduled/jobs.json`](../../t3/scheduled/jobs.json)의 `timeoutSeconds`, `maxRunsPerDay`, `failureLimit`을 적용합니다. 셸 작업(`kind: "shell"`)은 `run`이 자기 프로세스 그룹에서 감독하여 시간이 지나면 그룹 전체를 종료하고, 에이전트 작업(`kind: "agent"`)은 `admit`과 `finish` 사이에서 실행되며 `finish` 없이 기한을 넘긴 실행은 다음 실행 때 `abandoned` 실패로 기록됩니다. 연속 실패로 중지된 작업은 사람이 `${XDG_STATE_HOME:-~/.local/state}/harness-t3-jobs/<작업>/disabled`를 지울 때까지 실행되지 않습니다.
+
+배포한 `jobs.json`은 `version: 1`과 빈 `jobs` 목록만 가지며 T3 작업을 만들지 않습니다. 작업을 정의하면 T3 작업의 프롬프트가 가드를 실행하고 `GUARD_RESULT` 줄만 보고하게 합니다. 무인 실행 규칙은 [T3 사람 개입 규칙](../agents/hitl.md)의 "Unattended runs"이며, T3의 Antigravity 세션은 저장소 `AGENTS.md`를 로드하지 않으므로 프롬프트에 그 파일의 경로를 직접 적습니다. T3 작업을 만들거나 켜고 끄는 일은 예약 작업 변경이므로 매번 별도 결정이 필요합니다. 같은 작업을 herdr-cron과 T3에서 함께 켜면 두 번 실행됩니다.
+
+```bash
+bun t3/scheduled/guard.mjs --help
+bun test t3/scheduled/guard.test.mjs
+```
+
 ## AGY 권한 설정
 
 `agy/settings.snapshot.json`은 개인 설정 선택을 보여 주는 예시이며 복원 입력이 아닙니다. 포함된 `always-proceed` 정책은 승인 대화를 생략하는 개인 선택이므로 새 환경의 보안 기본값으로 권장하지 않습니다. 파일 도구의 allow/deny 설정은 임의 shell 접근을 격리하는 샌드박스가 아닙니다.
@@ -67,7 +79,7 @@ AGY를 Herdr나 비대화형 흐름에서 실행할 때에는 작업공간과 �
 
 - `omp/config.snapshot.yml`과 `agy/settings.snapshot.json`은 공개 가능한 비교 예시만 유지합니다.
 - `third-party/skills.lock.json`과 `herdr/plugins.manifest.json`에는 공개 접근 가능한 의존성과 필요한 핀만 둡니다.
-- `herdr/cron/jobs.snapshot.yaml`은 빈 일정 상태를 유지합니다.
+- `herdr/cron/jobs.snapshot.yaml`과 `t3/scheduled/jobs.json`은 빈 일정 상태를 유지합니다.
 - 자격증명, 절대 개인 경로, trusted workspace, 비공개 URL, 실제 일정, 실행 기록은 스냅샷에서 제외합니다.
 
 스냅샷을 바꾼 뒤에는 diff에서 새 키와 값을 직접 검토합니다. 무시되는 호스트 파일도 강제 추가하면 공개될 수 있으므로 `.gitignore`를 승인 경계로 취급하지 않습니다.

@@ -333,3 +333,23 @@ Haiku 5.5 high는 Luna max와 Intelligence가 같고 Terminal-Bench가 9%p 높�
 - `bench/config.json` 후보에 `anthropic/claude-haiku-5-5:high`·`:xhigh`를 추가하고 `bench/TAXONOMY.md`의 `smol` 라우팅 선언을 바꿨습니다.
 - `skills/cost-audit/analyze.py`와 `README.md`: `model_misroute` 저가 반사실 단가를 `anthropic/claude-haiku-5-5`로 바꾸고 출력 키를 `counterfactual_haiku_usd`·`potential_savings_haiku_usd`로 바꿨습니다. `low_effort_expensive`의 AA 근거도 2026-10-13 값으로 고쳤습니다.
 - 단가와 실효 창은 [PRICING 3-5절](PRICING.md#3-5-2026-10-13-카탈로그-갱신), 사용 안내는 [사용법](guides/usage.md#용도별-모델과-effort)에 있습니다. 실제 모델을 호출하는 벤치 결과는 이 문서에 싣지 않습니다.
+
+## 15. T3 Code와 에이전트 설정 표면 (2026-10-26)
+
+T3 Code v0.1.2 데스크톱 앱(WSL 백엔드), Claude Code 2.1.310, Codex CLI 0.164.0, Antigravity CLI(`agy`) 1.4.7과 공개 T3 Code 소스로 확인한 관측입니다. 실험은 임시 `HOME`·`CODEX_HOME`·`CLAUDE_CONFIG_DIR`에서 했고, 모델 요청은 닫힌 로컬 포트로 보냈으며, 끝난 뒤 지웠습니다. 결정과 권장 값은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유합니다. 버전이 바뀌면 다시 확인해야 합니다.
+
+### 제공자별 로드 경계
+
+- Codex: `codex debug prompt-input "hi"`(모델 호출 없음)의 스킬 목록 루트가 `~/.agents/skills`였고, 작업 디렉터리의 `AGENTS.md`도 들어 있었습니다. T3는 사용자 `CODEX_HOME`의 설정·훅·플러그인·규칙을 공유하고 모델·권한 설정만 턴마다 덮어씁니다(`provider/Drivers/CodexHomeLayout.ts`, `orchestration-v2/Adapters/CodexAdapterV2.ts`).
+- Claude Code: T3가 띄운 `claude` 프로세스의 인자에 `--setting-sources`가 없었고 어댑터도 `settingSources`를 넘기지 않습니다(`orchestration-v2/Adapters/ClaudeAdapterV2.ts`). SDK 기본값은 user·project·local이므로 사용자 훅, 권한 규칙, 플러그인, agent, `CLAUDE.md`가 T3 세션에 적용됩니다.
+- Antigravity: T3는 agy CLI가 아니라 고정된 ACP 서버를 T3 전용 `GEMINI_HOME`에서 실행합니다(`provider/antigravityRelease.ts`). 그 디렉터리의 `config/`에는 `skills → ~/.gemini/config/skills` 링크만 있고, ACP 서버는 `config/skills`, `config/hooks.json`, `config/mcp_config.json`을 읽으며 규칙과 플러그인 항목이 없습니다. Flash 자식에게 고유한 제목을 인용하게 하자 호스트 `~/.gemini/config/rules/AGENTS.md`와 워크트리 `AGENTS.md`는 보이지 않았고 스킬 목록은 보였습니다. 프로필에 `config/rules` 링크를 임시로 둔 뒤에도 규칙은 보이지 않았습니다.
+- 예약 작업: `schedule_task`에는 모델 인자가 없고, 작업은 만든 스레드의 모델 선택과 실행 모드를 저장합니다. 스레드에 묶지 않은 작업은 실행마다 새 스레드와 `origin`의 기본 브랜치에서 만든 새 워크트리를 씁니다. `fixed_time`은 환경 시간대로 계산하고 10분 넘게 늦은 실행은 건너뜁니다. 작업에는 시간 초과, 일일 실행 횟수, 연속 실패 시 중지가 없습니다.
+- T3 Usage 화면은 LiteLLM 단가 문서를 `~/.t3/userdata/usage-model-rates.json`에 내려받고 `~/.claude/projects`와 `~/.codex/sessions`를 스캔합니다.
+
+### 플러그인과 훅
+
+- agy: 임시 `HOME`에서 `agy plugin list --json`은 사본으로 둔 플러그인 디렉터리를 보여 주었지만 저장소를 가리키는 디렉터리 심링크는 보여 주지 않았습니다. `plugin.json`과 `rules/`만 심링크인 실제 디렉터리는 보였습니다. `agy plugin install <dir>`은 같은 이름을 덮어쓰고 `uninstall`은 사본을 지웁니다.
+- Codex 훅: 로컬 마켓플레이스 플러그인과 사용자 `hooks.json`에 같은 `SessionStart` 훅을 두었을 때 두 훅 모두 실행되지 않았습니다. 0.164.0은 `config.toml`의 `[hooks.state."<키>"] trusted_hash`(플러그인은 `trusted_content_hash`도)가 없는 훅을 건너뜁니다. 신뢰 항목을 넣은 별도 실험에서는 두 훅이 실행되었습니다.
+- Codex 실행 정책: `codex execpolicy check`에 기본 규칙 파일과 `codex/harness.rules`를 함께 주자 `glab mr` 아래의 머지 하위 명령은 `prompt`, `glab mr view 5`는 `allow`였습니다. 기본 규칙에는 `prefix_rule(["glab","mr"], allow)`가 있었습니다. Codex는 `rules/`의 모든 `*.rules`를 읽고, 더 엄격한 결정이 우선하며, `approval_policy = "never"`에서 `prompt`를 거부로 바꿉니다.
+- Claude Code 플러그인: 임시 `CLAUDE_CONFIG_DIR`에서 `plugin/build.mjs` 산출물을 디렉터리 마켓플레이스로 등록하고 설치하자 `claude plugin list --json`이 `readFromFolder`로 산출물 경로를 보고했고 agent 1개(`reviewer`)와 PreToolUse 훅 1개가 보였습니다. 버전을 올리지 않고 폴더를 고치면 다음 세션부터 반영됩니다.
+- GitLab MR 감시: T3는 GitLab MR을 `glab` REST로 2분마다 읽고, head 파이프라인 하나를 `Pipeline` 검사로 보며, 시스템 note를 이벤트에서 빼므로 승인은 스레드를 깨우지 않습니다(`packages/source-control-gitlab/src/shared/definition.ts`, `gitLabMergeRequestJson.ts`). 기존 GitLab MR 하나에 연결·감시·해제가 동작했고, 감시가 실제 이벤트로 스레드를 깨우는 것은 관찰하지 않았습니다.

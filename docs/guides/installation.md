@@ -12,6 +12,7 @@ Harness configures an existing coding-agent workstation. It does not install OMP
 | OMP | A stock `@oh-my-pi/pi-coding-agent` installation available as `omp` on `PATH`. Harness does not require a custom OMP build or runtime patch. Review future OMP releases before adopting them; this guide does not promise blanket compatibility. |
 | Bun | **1.3.14**. The installer, extensions, and helper CLIs use Bun; other releases are not maintained compatibility targets. |
 | Python 3 | Required for `omp/config.apply.sh`, benchmarks, and selected skill collectors. |
+| Node.js | Required for the full installation's plugin step (`plugin/install.mjs`) and for the merge-guard hook it installs into Claude Code and AGY. `--skills-only` does not use it. |
 | Existing personal instructions | `~/.claude/CLAUDE.md` must already be a file you maintain. The installer links it into AGY's global rules. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
 | Optional integrations | Install and authenticate Herdr and AGY before using their commands. BrowserSkill and the daily-report drafting workflow have separate prerequisites. |
 
@@ -26,7 +27,7 @@ bash install.sh --help
 bash install.sh --dry-run
 ```
 
-Read [install.sh](../../install.sh) and [config.apply.sh](../../omp/config.apply.sh) before running mutating commands. Inspect the Herdr configuration and AGY plugin rules as part of the proposed links. `--dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without changing them. A missing personal instruction file or ownership conflict can make the plan exit nonzero.
+Read [install.sh](../../install.sh), [config.apply.sh](../../omp/config.apply.sh), and [plugin/install.mjs](../../plugin/install.mjs) before running mutating commands. Inspect the Herdr configuration, the plugin sources under `plugin/`, and the deny rules in `plugin/guardrails.json` as part of the proposed changes. `--dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without changing them. A missing personal instruction file or ownership conflict can make the plan exit nonzero.
 
 The installer is not transactional. It can create links before discovering a later conflict. Resolve each reported path issue deliberately; a failed run does not imply that nothing changed.
 
@@ -81,14 +82,17 @@ harness-run --help
 | `omp/extensions/{profiles,herdr}` | Two links, `harness-profiles` and `harness-herdr`, under `~/.omp/agent/extensions/`. |
 | Retired extension links | Existing `harness-accounts` and `harness-native-compaction` links are removed only when they are owned by this checkout. Foreign or unexpected entries remain conflicts. |
 | `omp/profiles.ts`, `herdr/scripts/harness-run.ts` | `~/.local/bin/omp-profile` and `~/.local/bin/harness-run`. |
-| `agy/config/plugins/harness/` | Plugin link under `~/.gemini/config/plugins/`. Shared skills and existing personal instructions are linked into AGY's global slots. |
+| `plugin/` (through `plugin/install.mjs`) | Builds plugin artifacts under `${XDG_STATE_HOME:-~/.local/state}/harness/plugins/`. When `claude` is on `PATH`, registers the `harness` directory marketplace and installs `harness@harness` at user scope. When `agy` is on `PATH`, installs an AGY plugin copy with `agy plugin install`, replacing an older checkout-owned `~/.gemini/config/plugins/harness` symlink because AGY 1.4.7 skips symlinked plugin directories. Adds the deny rules in `plugin/guardrails.json` to existing `~/.claude/settings.json` and `~/.gemini/antigravity-cli/settings.json`, keeping a one-time `.harness-bak` copy; it never removes a rule. Shared skills and existing personal instructions are linked into AGY's global slots. |
+| `codex/harness.rules` | Link at `~/.codex/rules/harness.rules`. Codex asks before `gh pr merge` and `glab mr merge`, and refuses them under `approval_policy = "never"`. |
 | `--with-config` only | Applies managed values through `omp config set`; it does not copy the example snapshot over live configuration. |
 
 Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, real skill directory, or foreign retired-extension entry is a conflict, not permission to overwrite or remove it. Correct links are left unchanged. Dry-run performs no cleanup. See [ownership rules](../REPO.md).
 
 The retirement cleanup does not delete or rewrite OMP authentication, saved preferences, session transcripts, or backups. The accounts extension's shared preference is no longer applied, and account choice is now manual and session-local through OMP's built-in `/session pin`. Legacy Harness native-compaction replay and portable migration are removed. A transcript can remain on disk without being resumable when it depends on that legacy state.
 
-The installer does **not** restore cron jobs, copy AGY settings, install plugin repositories, provision credentials, publish Git changes, or submit reports. The distributed cron snapshot is intentionally empty (`version: 1`, `jobs: []`). Example snapshots are review aids, not host restore inputs.
+The installer does **not** restore cron jobs, create T3 scheduled tasks, copy AGY settings (it only adds deny rules), install Herdr plugin repositories, write the `full-send` allowlist, provision credentials, publish Git changes, or submit reports. The distributed cron snapshot and `t3/scheduled/jobs.json` are intentionally empty (`version: 1`, `jobs: []`). Example snapshots are review aids, not host restore inputs.
+
+The plugin step prints one line per planned action in the same `would …`, `unchanged …`, and `skipped …` form as the rest of the installer. A Claude marketplace or AGY plugin named `harness` that this checkout did not ship, or a settings file that is not valid JSON, is reported as a conflict and left unchanged. Remove the merge guard with `claude plugin uninstall harness@harness` and `agy plugin uninstall harness`; deny rules added to settings files stay until you remove them, and the `.harness-bak` copy holds the pre-install file.
 
 ## External skills and plugins
 

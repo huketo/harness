@@ -11,12 +11,13 @@ Write for the reader who performs the next action. Keep each rule, fact, command
 - `docs/guides/usage.md` — supported day-to-day user workflows.
 - `docs/guides/operations.md` — optional owner operations and external-effect boundaries.
 - `docs/REPO.md` — source/runtime ownership and repository layout invariants.
+- `docs/AGENT-CONFIG.md` — Claude Code, Codex, and AGY configuration surface, packaging, the merge guard, and guardrail decisions.
 - `docs/FACTS.md` — dated public technical observations and their limits.
 - `docs/PRICING.md` — pricing inputs and cost calculations.
 - `docs/BENCH-SURVEY.md` — benchmark design research.
 - `docs/public-release.md` — enduring public-distribution policy.
 - `CONTRIBUTING.md` — no-contributions, no-support, and independent-fork policy.
-- `AGENTS.md` and `docs/agents/` — compact owner-agent router and topic rules.
+- `AGENTS.md` and `docs/agents/` — compact owner-agent router and topic rules, including `docs/agents/hitl.md` for T3 Code threads.
 
 Put a new page in `docs/index.md`. Prefer extending the page that already owns the topic over creating another category or parallel explanation.
 

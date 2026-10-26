@@ -10,7 +10,7 @@ State the requested observable outcome, in-scope files, affected callers, and ex
 
 Read the implementation, its callers, nearby tests, and the relevant ownership or user guide. Inspect command implementations and `--help` branches instead of guessing flags. Prefer current source behavior over prose; when they differ, fix the owning source or documentation rather than creating a second convention. The step is complete when the current mechanism and all affected call sites are accounted for.
 
-For host configuration and installation work, [`../REPO.md`](../REPO.md) defines which repository file is canonical and which host file is tool-owned. For a human question or unattended execution, [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) is the sole project authority.
+For host configuration and installation work, [`../REPO.md`](../REPO.md) defines which repository file is canonical and which host file is tool-owned. For a human question or unattended execution, the project authority is [`hitl.md`](hitl.md) in a T3 Code thread and [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session.
 
 ## 3. Make the evidence red when behavior changes
 

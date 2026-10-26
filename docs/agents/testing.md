@@ -13,9 +13,22 @@ bun test omp/extensions/profiles/profiles.test.ts
 bun test omp/extensions/herdr/herdr.test.ts
 bun test herdr/scripts/harness-run.test.ts
 bun test herdr/cron/host-sync.test.mjs
+bun test plugin/hooks/merge-guard.test.mjs plugin/build.test.mjs plugin/install.test.mjs
+bun test codex/review.test.ts
+bun test t3/scheduled/guard.test.mjs
 ```
 
-The host-sync test uses temporary local Git repositories and is the focused boundary for `herdr/cron/host-sync.mjs`. Some extension tests resolve packages or authentication storage from an installed OMP CLI; inspect their setup before running and report that prerequisite instead of silently substituting Bun's package cache.
+The host-sync test uses temporary local Git repositories and is the focused boundary for `herdr/cron/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test exercises argument, catalog, and boundary logic without calling `codex`. The T3 guard test uses temporary job files and `XDG_STATE_HOME`.
+
+To check built plugin artifacts against installed CLIs, build into a temporary directory only:
+
+```bash
+out=$(mktemp -d)
+node plugin/build.mjs --out "$out"
+claude plugin validate --strict "$out/claude"
+agy plugin validate "$out/agy" --strict
+rm -rf "$out"
+``` Some extension tests resolve packages or authentication storage from an installed OMP CLI; inspect their setup before running and report that prerequisite instead of silently substituting Bun's package cache.
 
 Use the aggregate Bun boundary only when a change crosses those components:
 
@@ -39,6 +52,13 @@ python3 -m unittest discover -s skills/daily-report/scripts -p test_collect_gitl
 
 This collector test does not prove authentication, upstream availability, draft quality, or manual Daou Office submission. The public repository contains no Daou Office API or automatic-submission test boundary.
 
+The cost-audit analyzer and the MR watcher have synthetic, offline suites; neither reads real session logs nor contacts GitLab or GitHub:
+
+```bash
+python3 -m unittest discover -s skills/cost-audit -p 'test_*.py'
+python3 -m unittest discover -s skills/babysit-mr/scripts -p 'test_*.py'
+```
+
 ## Shell
 
 For an edited shell script, first check the exact file with Bash's parser:
@@ -55,7 +75,8 @@ and refusal of dirty, topic-branch, or divergent checkouts without a live instal
 ```bash
 bash -n update.sh update.test.sh
 bash update.test.sh
-bash skills/herdr-orchestrate/scripts/review-tier.test.sh
+bash skills/review-loop/scripts/review-tier.test.sh
+bash skills/review-loop/scripts/tree-unchanged.test.sh
 ```
 
 Use `shellcheck` only when it is available; it is not a repository-installed mandatory tool. Parser or static-analysis success does not prove link ownership, backup behavior, installed tool versions, or live configuration.
@@ -69,7 +90,7 @@ bash install.sh --dry-run
 bash omp/config.apply.sh --check
 ```
 
-`install.sh --dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without applying them. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. Neither replaces a focused unit or integration test of changed source.
+`install.sh --dry-run` reports planned links, backups, conflicts, and exact-owned retired-link cleanup without applying them. Its plugin step runs `plugin/install.mjs --dry-run`, which reads `claude plugin marketplace list --json` and `claude plugin list --json` when `claude` is on `PATH` but installs nothing. `config.apply.sh --check` reports managed OMP drift and exits nonzero when differences exist. Neither replaces a focused unit or integration test of changed source.
 
 The mutating forms of installation and configuration commands are governed by [`authority.md`](authority.md) and are not routine verification.
 

@@ -1,6 +1,6 @@
 # Authority boundaries
 
-This guide classifies repository operations performed for the owner. It does not redefine how to contact a person: [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) is authoritative for channel resolution, human-only decisions, message content, valid approval responses, and unattended-run behavior.
+This guide classifies repository operations performed for the owner. It does not redefine how to contact a person: [`hitl.md`](hitl.md) in a T3 Code thread and [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session are authoritative for channel resolution, human-only decisions, message content, valid approval responses, and unattended-run behavior.
 
 Explicit task instructions authorize the described work only. Silence, a timeout, ambiguous text, or success on a related operation grants no additional authority.
 
@@ -34,18 +34,30 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 - submitting content, sending a notification, or performing another live external write;
 - changing external project settings, access control, billing, or provider configuration.
 
+## Work modes
+
+A person may select a work mode for one task or thread with the `full-send` or `full-stop` skill; the mode is never a default. Without a selected mode, every rule in this guide applies unchanged.
+
+- `full-stop` authorizes the task's own commits, pushes, rebases, and `--force-with-lease` on the task branch, and the test methods its proof needs. It never merges.
+- `full-send` adds merging that one MR or PR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. Without that allowlist entry it runs as `full-stop` and says so.
+- Neither mode authorizes deleting data, production changes, writes outside the repository, closing an MR, admin bypass, force-pushing another branch, or editing the allowlist.
+
+`skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks merges the mode does not allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
+
+## Settled policy
+
 The root MIT license and no-contributions policy are settled repository policy, not per-task decisions. Changing either still requires an explicit owner instruction. This public project does not use issues, pull requests, support requests, or vulnerability reports as inbound work channels.
 
 ## Host and external boundaries
 
-`bash install.sh` changes links and removes retired `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout; `--with-config` additionally applies managed OMP settings. Foreign or unexpected entries remain conflicts and are preserved. `omp/config.apply.sh` without `--check` changes live configuration. Run mutating forms only under explicit host-change authority. The documented `--dry-run` and `--check` forms inspect machine state without changing it and therefore still require the task to permit host inspection.
+`bash install.sh` changes links, removes retired `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout, and through `plugin/install.mjs` installs the Claude Code and AGY plugins and adds deny rules to their settings; `--with-config` additionally applies managed OMP settings. Foreign or unexpected entries remain conflicts and are preserved. `omp/config.apply.sh` without `--check` changes live configuration. Run mutating forms only under explicit host-change authority. The documented `--dry-run` and `--check` forms inspect machine state without changing it and therefore still require the task to permit host inspection.
 
 Benchmark runs can invoke paid providers. Daily-report collectors can authenticate to GitLab and read private calendar feeds; the final Daou Office entry and submission are human UI actions. Cron commands can alter unattended behavior. Treat each boundary according to its effects rather than inferring safety from a command name or dry run.
 
-The distributed cron snapshot is empty and grants no scheduling authority. Example configuration snapshots do not authorize copying host configuration into the repository or restoring the example onto a host.
+The distributed cron snapshot and `t3/scheduled/jobs.json` are empty and grant no scheduling authority. Creating, enabling, or changing a T3 scheduled task is a schedule change like a cron change. Example configuration snapshots do not authorize copying host configuration into the repository or restoring the example onto a host.
 
 ## Evidence does not expand authority
 
 A review, test, diagnosis, dry run, or generated plan is evidence, not permission to write remotely or widen scope. Ground recommendations with a source location, focused reproduction and output, or primary reference. Name the observation that would overturn a recommendation and distinguish reversible cost from irreversible cost.
 
-When approval is unavailable, finish every independent authorized part, leave repository and runtime state consistent, and report the exact blocked action and evidence. In unattended work, follow `.omp/APPEND_SYSTEM.md`: do not invoke the human channel; place the blocker in run output.
+When approval is unavailable, finish every independent authorized part, leave repository and runtime state consistent, and report the exact blocked action and evidence. In unattended work, follow the runtime's human-in-the-loop owner: do not invoke the human channel; place the blocker in run output.

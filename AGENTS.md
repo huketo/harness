@@ -9,15 +9,18 @@ This file is the compact repository router for coding agents working for the own
 3. Reuse the existing shell, Bun, or Python mechanism instead of adding a second convention.
 4. Verify at the narrowest boundary that proves the requested behavior, then report exact evidence and relevant checks not run.
 
-Before asking a person or handling an unattended run, read [`.omp/APPEND_SYSTEM.md`](.omp/APPEND_SYSTEM.md). It owns this repository's human-in-the-loop channel, approval-response, no-terminal-gate, and unattended-run rules.
+Before asking a person, accepting an approval, or handling an unattended or scheduled run, read the human-in-the-loop owner for your runtime: [`docs/agents/hitl.md`](docs/agents/hitl.md) in a T3 Code thread (the `t3-code` MCP tools are available), or [`.omp/APPEND_SYSTEM.md`](.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session. Each owns its runtime's channel, approval-response, completion-gate, and unattended-run rules.
 
 ## Repository map
 
 - `omp/` — OMP configuration application, model profiles, prompts, and the `profiles` and `herdr` extensions.
 - `herdr/` — Herdr configuration, launch helpers, plugin pins, cost audit, and guarded host-sync sources. The distributed cron snapshot contains no jobs.
+- `plugin/` — one source for the Claude Code and AGY plugins (merge-guard hook, read-only reviewer agent, AGY rules), their builder and installer, and the deny rules merged into agent settings; [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where.
+- `codex/` — the read-only `codex exec` reviewer (`review.ts`) and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
+- `t3/` — the guard for T3 Code scheduled tasks and its job definitions; the distributed `jobs.json` contains no jobs.
 - `skills/` — personal skill sources; preserve each adopted skill's license and provenance.
 - `bench/` — Python benchmark runner, synthetic fixtures, oracles, references, and runner tests.
-- `agy/` — Antigravity CLI integration owned by this repository.
+- `agy/` — an example snapshot of Antigravity CLI settings; the AGY plugin source lives in `plugin/`.
 - `third-party/` — public external pins, provenance records, and patches; it is not a second source tree.
 - `docs/` — user, operational, ownership, evidence, pricing, benchmark, and owner-maintenance documentation.
 - `var/` — ignored runtime output. Treat it as sensitive even though it is inside the checkout.
@@ -30,6 +33,7 @@ Before asking a person or handling an unattended run, read [`.omp/APPEND_SYSTEM.
 - [`docs/agents/authority.md`](docs/agents/authority.md) — local autonomy, external writes, host changes, publication, and irreversible actions.
 - [`docs/agents/writing.md`](docs/agents/writing.md) — document ownership, bilingual consistency, instruction writing, comments, and sensitive evidence.
 - [`docs/agents/testing.md`](docs/agents/testing.md) — focused shell, Bun, and Python verification boundaries and grounded commands.
+- [`docs/agents/hitl.md`](docs/agents/hitl.md) — questions, approvals, delegated children, and unattended runs in T3 Code threads.
 
 User documentation starts at [`docs/index.md`](docs/index.md). Installation, usage, and owner operations belong in `docs/guides/`. Enduring public-distribution rules belong in [`docs/public-release.md`](docs/public-release.md).
 
