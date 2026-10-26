@@ -73,6 +73,10 @@ test("merge commands are recognized through shell composition", () => {
 	expect(mergeCommand("glab --repo x mr merge 3")).toBe("glab");
 	expect(mergeCommand("gh api -X POST graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'")).toBe("gh");
 	expect(mergeCommand("glab api --method POST graphql -f query='mutation { mergeRequestAccept(input: {}) { errors } }'")).toBe("glab");
+	expect(mergeCommand("gh api -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }' graphql")).toBe("gh");
+	expect(mergeCommand("gh api graphql -F query=@mutation.graphql")).toBe("gh");
+	expect(mergeCommand("glab api graphql --input body.json")).toBe("glab");
+	expect(mergeCommand("gh api graphql -f query='query { viewer { login } }'")).toBeNull();
 	expect(mergeCommand("gh pr list --search merge")).toBe("gh");
 });
 
@@ -96,6 +100,8 @@ test("decisions follow the mode table", () => {
 	expect(d("gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"PR_x\"}) { clientMutationId } }'", { mode: "full-send" })).toBe("deny");
 	expect(d("gh api -X POST graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"PR_x\"}) { clientMutationId } }'", { mode: "full-send" })).toBe("deny");
 	expect(d("gh api -X POST graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"PR_x\"}) { clientMutationId } }'", {}, personal, [])).toBe("deny");
+	expect(d("gh api -f query='mutation { mergePullRequest(input: {pullRequestId: \"PR_x\"}) { clientMutationId } }' graphql", { mode: "full-stop" })).toBe("deny");
+	expect(d("gh api graphql -F query=@mutation.graphql", { mode: "full-send" })).toBe("deny");
 	expect(d("gh api graphql -f query='mutation { disablePullRequestAutoMerge(input: {pullRequestId: \"PR_x\"}) { clientMutationId } }'", { mode: "full-stop" })).toBe("pass");
 	expect(d("glab api -X POST projects/1/merge_requests/7/cancel_merge_when_pipeline_succeeds", { mode: "full-stop" })).toBe("pass");
 	expect(d("gh pr merge 1", { mode: "full-send" }, "https://github.com/example-owner-two/x.git")).toBe("deny");

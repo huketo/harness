@@ -24,9 +24,9 @@ const MERGE_PATTERNS = [
 	{ cli: "glab", re: new RegExp(`${START}glab${END}\\s+mr\\s+merge\\b`) },
 	{ cli: "gh", re: new RegExp(`${START}gh${END}\\s+api\\b[^;&|]*/pulls/\\d+/merge\\b`) },
 	{ cli: "glab", re: new RegExp(`${START}glab${END}\\s+api\\b[^;&|]*merge_requests/\\d+/merge\\b`) },
-	// API options may come before the endpoint (`gh api -X POST graphql ...`).
-	{ cli: "gh", re: new RegExp(`${START}gh${END}\\s+api\\b[^;&|]*\\bgraphql\\b[^;&|]*(mergePullRequest|enablePullRequestAutoMerge)`) },
-	{ cli: "glab", re: new RegExp(`${START}glab${END}\\s+api\\b[^;&|]*\\bgraphql\\b[^;&|]*(mergeRequestAccept|mergeRequestSetAutoMerge)`) },
+	// GraphQL in any argument order. A query read from a file or stdin hides its mutation, so it counts as a merge.
+	{ cli: "gh", re: new RegExp(`${START}gh${END}\\s+api\\b(?=[^;&|]*\\bgraphql\\b)(?=[^;&|]*(?:mergePullRequest|enablePullRequestAutoMerge|query=@|--input\\b))`) },
+	{ cli: "glab", re: new RegExp(`${START}glab${END}\\s+api\\b(?=[^;&|]*\\bgraphql\\b)(?=[^;&|]*(?:mergeRequestAccept|mergeRequestSetAutoMerge|query=@|--input\\b))`) },
 ];
 
 // Fallback when the exact patterns miss an unusual spelling: gh or glab plus a standalone merge word counts.
