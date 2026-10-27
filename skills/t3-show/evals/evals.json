@@ -1,0 +1,77 @@
+{
+  "skill_name": "t3-show",
+  "evals": [
+    {
+      "id": 1,
+      "name": "codebase-map",
+      "prompt": "t3-show로 이 레포의 install.sh가 스킬과 플러그인을 어떻게 설치하는지 설명해 주세요.",
+      "expected_output": "install.sh를 실제로 읽고, 단계나 모듈을 고르면 상세 패널에 path:line이 뜨는 인터랙티브 화면을 html_render로 한 번 띄운다.",
+      "files": [],
+      "expectations": [
+        "화면의 모든 노드와 단계가 읽은 파일의 path:line을 가진다.",
+        "html_preview에서 driver로 노드 선택이나 단계 이동을 실행하고 결과 상태를 확인한다.",
+        "html_render에 넘긴 HTML에 driver, localStorage·sessionStorage 사용, 고정 hex 색이 없다."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "algorithm-stepper",
+      "prompt": "Dijkstra 알고리즘이 우선순위 큐로 어떻게 동작하는지 단계별로 넘겨 볼 수 있게 보여 주세요.",
+      "expected_output": "다음·이전·재생 조작과 큐·거리 상태 패널이 있는 stepper를 띄운다. 셸에서 실행한 참조 구현의 결과와 페이지 계산이 일치하는지 자체 검사한다.",
+      "files": [],
+      "expectations": [
+        "셸에서 참조 구현을 실행해 기대 거리값을 얻고 페이지에 넣는다.",
+        "페이지 로드 시 자체 검사가 기대값과 대조하고 결과를 console에 남긴다.",
+        "html_preview driver가 단계 이동을 여러 번 실행하고 스크린샷이 조작 뒤의 상태를 보여 준다.",
+        "페이지 전용 키 처리에 preventDefault를 호출한다."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "gtm-simulation",
+      "prompt": "월 리드 수, 전환율, ARPU, 이탈률, CAC를 바꿔 가며 24개월 MRR과 CAC 회수 기간을 보는 시뮬레이션을 만들어 주세요.",
+      "expected_output": "가정 슬라이더, 수식 표시, 시나리오 비교, 기간별 차트가 있는 화면을 띄운다. 기본값의 결과를 셸 계산과 대조한다.",
+      "files": [],
+      "expectations": [
+        "모든 기본값에 출처나 '가정' 표시가 붙는다.",
+        "셸에서 같은 수식으로 기본값의 24개월 MRR을 계산하고 페이지 값과 일치함을 확인한다.",
+        "driver가 슬라이더 input 이벤트를 발생시키고 바뀐 결과를 기록한다.",
+        "차트 영역의 높이가 고정되어 조작 중에 레이아웃이 출렁이지 않는다."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "data-exploration",
+      "prompt": "이 CSV의 지역별·월별 매출을 필터하고 비교할 수 있게 시각화해서 분석을 도와주세요.",
+      "expected_output": "셸에서 집계한 JSON과 출처·행 수를 넣고, 필터·툴팁이 있는 화면을 띄운다. 화면 합계가 셸 합계와 일치한다.",
+      "files": [],
+      "expectations": [
+        "원본 행 전체가 아니라 셸에서 집계하거나 줄인 데이터를 넣는다.",
+        "출처 경로, 질의, 행 수가 화면에 보인다.",
+        "자체 검사가 화면 합계와 셸 합계를 대조한다."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "image-file-for-elsewhere",
+      "prompt": "이 아키텍처 다이어그램을 블로그에 올릴 PNG로 만들어 주세요.",
+      "expected_output": "html_render를 쓰지 않고, 테마 변수로 바꾸지 않은 원본에서 PNG를 만들어 절대 경로를 준다.",
+      "files": [],
+      "expectations": [
+        "html_render를 호출하지 않는다.",
+        "결과 PNG의 절대 경로를 응답에 적는다."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "routine-small-chart",
+      "prompt": "지난 5일 테스트 통과율 92, 95, 91, 97, 98을 간단한 막대 차트로 보여 주세요.",
+      "expected_output": "조작 없는 작은 차트를 테마 변수로 작성하고 초기 화면만 확인한 뒤 한 번 띄운다. driver나 시뮬레이션 구조를 불필요하게 만들지 않는다.",
+      "files": [],
+      "expectations": [
+        "색은 --chart-N 등 테마 변수만 쓴다.",
+        "html_render를 한 번 호출하고 페이지 내용을 응답에 다시 서술하지 않는다."
+      ]
+    }
+  ]
+}

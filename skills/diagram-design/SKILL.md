@@ -17,6 +17,7 @@ Forty visual types. Semantic patterns describe behavior independently; type refe
 Apply local output contracts before upstream HTML, typography, palette, or export defaults:
 
 - For a mobile request or a diagram embedded in a document, load [`references/mobile.md`](references/mobile.md). Apply its artifact-specific status and adaptation rules; upstream examples are baselines, not evidence of mobile readiness.
+- For a diagram shown inline in a T3 Code thread, also load the `t3-show` skill and follow its `references/diagram-design.md`. The thread theme owns palette tokens, so skip the §0 style-guide gate.
 - For a Harness document deliverable, also load [`references/harness-documents.md`](references/harness-documents.md). The surrounding document owns palette tokens, and that reference overrides conflicting upstream HTML, font, and export defaults.
 
 ### Installed versus upstream tooling

@@ -373,6 +373,7 @@
       "local_changes": [
         "Add early routing to local mobile and Harness document output contracts; those contracts override conflicting upstream HTML, font, palette, and export defaults.",
         "Scope repository-only verifier and linter mentions as optional upstream-checkout tooling; installed skills use the bundled self-check only for its stated general scope and explicit manual checks for uncovered type and registry invariants.",
+        "Route diagrams shown inline in a T3 Code thread to the t3-show skill, where the thread theme owns palette tokens and the first-run style-guide gate is skipped.",
         "Add artifact-specific mobile classification and adaptation guidance for all forty types, with pinned baseline measurements and meaning-preserving reflow or splitting.",
         "Add offline Slate document theme and export contracts for Markdown, HTML, and Word using existing writing-for-humans mechanisms, including background-matched borderless annotation masks.",
         "Add four synthetic Korean Slate examples generated with AGY gemini-3.8-flash-high and a local gallery; mark artifacts verified only after standalone and document-embedded browser checks.",

@@ -9,7 +9,7 @@ Choose the document for the task rather than reading the entire directory. The R
 | Document | Read it for |
 | --- | --- |
 | [Installation](guides/installation.md) | Linux/WSL2 prerequisites, installer side effects, updates, retired-link cleanup, and manual rollback. |
-| [상세 사용법](guides/usage.md) | T3 Code threads, skill loading per provider, orchestration, review loop, council, watched terminal work through `t3-terminal` and Herdr, MR lifecycle and work modes, BrowserSkill on WSL2, and interface improvement/review. |
+| [상세 사용법](guides/usage.md) | T3 Code threads, skill loading per provider, orchestration, review loop, council, watched terminal work through `t3-terminal` and Herdr, interactive in-thread visuals through `t3-show`, MR lifecycle and work modes, BrowserSkill on WSL2, and interface improvement/review. |
 | [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, the T3 scheduled-task guard, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
 | [공개 배포 정책](public-release.md) | License, fresh-history, privacy, dependency, support, and publication invariants. |
 
