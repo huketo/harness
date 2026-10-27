@@ -1,7 +1,7 @@
 // Contract tests for t3/scheduled/guard.mjs. Every case uses a temporary
 // jobs file and XDG_STATE_HOME; nothing reads the real state or runs a job.
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { admit, loadJobs } from "./guard.mjs";
@@ -131,4 +131,30 @@ test("an agent run that never finishes is closed as abandoned after its deadline
 
 test("the tracked jobs file is the empty public snapshot", () => {
 	expect(loadJobs()).toEqual([]);
+});
+
+test("a monthly job is refused outside its days without consuming a run", () => {
+	const monthly = job("monthly", { kind: "agent", daysOfMonth: [1, 2, 3] });
+	const state = join(root, "state");
+	const offDay = Date.parse("2026-11-04T09:00:00+09:00");
+	expect(admit(monthly, { root: state, now: offDay }).status).toBe("off_day");
+	expect(existsSync(join(state, "monthly", "runs.jsonl"))).toBe(false);
+	expect(admit(monthly, { root: state, now: Date.parse("2026-11-03T09:00:00+09:00") }).status).toBe("admitted");
+});
+
+test("a monthly job that already succeeded this month is done until next month", () => {
+	const monthly = job("monthly", { kind: "agent", daysOfMonth: [1, 2, 3], maxRunsPerDay: 5 });
+	const state = join(root, "state");
+	const dir = join(state, "monthly");
+	const first = Date.parse("2026-11-01T09:00:00+09:00");
+	const ledger = (records) => {
+		mkdirSync(dir, { recursive: true });
+		rmSync(join(dir, "lock"), { recursive: true, force: true });
+		writeFileSync(join(dir, "runs.jsonl"), records.map((r) => `${JSON.stringify(r)}\n`).join(""));
+	};
+	ledger([{ run: "a", startedAt: first, status: "noop", endedAt: first + 1 }]);
+	expect(admit(monthly, { root: state, now: first + 86_400_000 }).status).toBe("admitted");
+	ledger([{ run: "b", startedAt: first, status: "ok", endedAt: first + 1 }]);
+	expect(admit(monthly, { root: state, now: first + 86_400_000 }).status).toBe("done");
+	expect(admit(monthly, { root: state, now: Date.parse("2026-12-01T09:00:00+09:00") }).status).toBe("admitted");
 });

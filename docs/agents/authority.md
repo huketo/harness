@@ -1,6 +1,6 @@
 # Authority boundaries
 
-This guide classifies repository operations performed for the owner. It does not redefine how to contact a person: [`hitl.md`](hitl.md) in a T3 Code thread and [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session are authoritative for channel resolution, human-only decisions, message content, valid approval responses, and unattended-run behavior.
+This guide classifies repository operations performed for the owner. It does not redefine how to contact a person: [`hitl.md`](hitl.md) is authoritative for channel resolution, human-only decisions, message content, valid approval responses, and unattended-run behavior.
 
 Explicit task instructions authorize the described work only. Silence, a timeout, ambiguous text, or success on a related operation grants no additional authority.
 
@@ -50,11 +50,11 @@ The root MIT license and no-contributions policy are settled repository policy, 
 
 ## Host and external boundaries
 
-`bash install.sh` changes links, removes retired `harness-accounts` and `harness-native-compaction` links only when they are owned by this checkout, and through `plugin/install.mjs` installs the Claude Code and AGY plugins and adds deny rules to their settings; `--with-config` additionally applies managed OMP settings. Foreign or unexpected entries remain conflicts and are preserved. `omp/config.apply.sh` without `--check` changes live configuration. Run mutating forms only under explicit host-change authority. The documented `--dry-run` and `--check` forms inspect machine state without changing it and therefore still require the task to permit host inspection.
+`bash install.sh` changes skill and rule links, and through `plugin/install.mjs` installs the Claude Code and AGY plugins and adds deny rules to their settings. Foreign or unexpected entries remain conflicts and are preserved. Run it only under explicit host-change authority. The documented `--dry-run` form inspects machine state without changing it and therefore still requires the task to permit host inspection.
 
 Benchmark runs can invoke paid providers. Daily-report collectors can authenticate to GitLab and read private calendar feeds; the final Daou Office entry and submission are human UI actions. Cron commands can alter unattended behavior. Treat each boundary according to its effects rather than inferring safety from a command name or dry run.
 
-The distributed cron snapshot and `t3/scheduled/jobs.json` are empty and grant no scheduling authority. Creating, enabling, or changing a T3 scheduled task is a schedule change like a cron change. Example configuration snapshots do not authorize copying host configuration into the repository or restoring the example onto a host.
+The distributed `t3/scheduled/jobs.json` is empty and grants no scheduling authority. Creating, enabling, or changing a T3 scheduled task is a schedule change. Example configuration snapshots do not authorize copying host configuration into the repository or restoring the example onto a host.
 
 ## Evidence does not expand authority
 

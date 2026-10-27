@@ -10,15 +10,6 @@
       "installedAt": "2026-08-30T09:07:26.785Z",
       "updatedAt": "2026-09-09T01:28:28.970Z"
     },
-    "herdr-hitl": {
-      "source": "huketo/herdr-hitl",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/huketo/herdr-hitl.git",
-      "skillPath": "skills/herdr-hitl/SKILL.md",
-      "skillFolderHash": "51bf044a8b9b8b1c5b7fbeb4f6ddd1c9cf2c6516",
-      "installedAt": "2026-09-09T11:46:12.554Z",
-      "updatedAt": "2026-09-09T11:46:12.554Z"
-    },
     "skill-doctor": {
       "source": "warpdotdev/common-skills",
       "sourceType": "github",
@@ -27,15 +18,6 @@
       "skillFolderHash": "badadf2917be1dc322df39aef20f4cef86e6af35",
       "installedAt": "2026-09-03T06:54:18.069Z",
       "updatedAt": "2026-09-03T06:54:18.069Z"
-    },
-    "herdr-cron": {
-      "source": "huketo/herdr-cron",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/huketo/herdr-cron.git",
-      "skillPath": "skills/herdr-cron/SKILL.md",
-      "skillFolderHash": "93f113992e07e9776358ba249ca6a81e5c71b026",
-      "installedAt": "2026-09-03T09:24:49.192Z",
-      "updatedAt": "2026-09-03T09:24:49.192Z"
     },
     "officecli": {
       "source": "iOfficeAI/OfficeCLI",

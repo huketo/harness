@@ -2,30 +2,26 @@
 
 [English](README.md) · [한국어](README.ko.md)
 
-**공유 스킬, 모델 프로필, 보이는 실행, 실제 과제 평가를 버전 관리하는 개인용 코딩 에이전트 워크스테이션 설정입니다.**
+**공유 스킬, T3 Code 통합, 가드레일, 보호된 자동화를 버전 관리하는 개인용 코딩 에이전트 워크스테이션 설정입니다.**
 
-Harness는 기존 [Oh My Pi](https://github.com/can1357/oh-my-pi)(OMP), [Herdr](https://github.com/herdrdev/herdr), Antigravity CLI(`agy`) 환경을 연결합니다. OMP에는 `profiles`와 `herdr` 확장만 설치합니다. Harness는 독립 에이전트나 호스팅 서비스, 이 도구들의 대체품이 아니라 개인 설정과 확장을 공개하는 쇼케이스입니다. Claude Code, Codex CLI, AGY를 쓰는 [T3 Code](https://github.com/pingdotgg/t3code) 경로가 이 설정과 나란히 동작합니다.
+Harness는 에이전트를 Claude Code, Codex CLI, Antigravity CLI(`agy`) 기반의 스레드로 실행하는 기존 [T3 Code](https://github.com/pingdotgg/t3code) 워크스테이션을 구성합니다. Harness는 독립 에이전트나 호스팅 서비스, 이 도구들의 대체품이 아니라 개인 설정과 확장을 공개하는 쇼케이스입니다. [Herdr](https://github.com/herdrdev/herdr)는 사람이 지켜보는 터미널 작업을 위한 일반 터미널 멀티플렉서로만 남아 있습니다. 은퇴한 Herdr 에이전트 런타임, Oh My Pi, 벤치마크 소스는 [`archived/`](archived/)에 동결해 두었으며, 어떤 설치나 실행도 이 소스를 사용하지 않습니다.
 
-[설치](docs/guides/installation.md) · [문서](docs/index.md) · [사용법](docs/guides/usage.md) · [벤치마크](bench/README.md) · [재사용 정책](CONTRIBUTING.md) · [MIT 라이선스](LICENSE)
+[설치](docs/guides/installation.md) · [문서](docs/index.md) · [사용법](docs/guides/usage.md) · [재사용 정책](CONTRIBUTING.md) · [MIT 라이선스](LICENSE)
 
 ## 추가되는 기능
 
 | 기능 | 제공 내용 |
 | --- | --- |
-| 공유 스킬 | 저장소 소유 지침을 OMP·Claude Code·AGY에 연결합니다. 편입 자료의 원저작자 고지는 유지합니다. |
+| 공유 스킬 | 저장소 소유 지침을 Claude Code·Codex·AGY에 연결합니다. 편입 자료의 원저작자 고지는 유지합니다. |
 | UI 디자인 작업 | 일반 UI 제작·검토, 이미지 기반 웹 구현, UI·브랜드 참조 이미지 생성, 선택적 설계 문서를 네 스킬로 구분합니다. 이미지·문서 생성은 필수 단계가 아닙니다. [사용법](docs/guides/usage.md)을 참고하세요. |
-| 모델 프로필 | `/profile`과 `omp-profile`로 용도별 모델·effort를 선택합니다. `/effort` 변경은 한 세션에만 적용할 수 있습니다. |
-| 세션 계정 pin | OMP 내장 `/session pin`으로 현재 세션의 계정을 직접 선택합니다. Harness는 계정 선택을 여러 세션에 동기화하지 않습니다. |
-| 컨텍스트 압축 | 별도 OMP 빌드나 런타임 패치 없이 여섯 가지 정책 키로 OMP 내장 압축을 관리합니다. |
-| 보이는 실행 | `harness-run`으로 Herdr의 명령이나 독립 에이전트를 실행하고 다시 조회합니다. 기존 task 서브에이전트를 옮기는 기능은 아닙니다. |
-| 실제 과제 평가 | 재생 가능한 fixture, 보호된 채점 자료, 비용 계산, 라우팅 제안을 제공합니다. 보편적인 모델 순위표는 아닙니다. |
-| T3 Code 경로 | `t3-orchestrate`, `review-loop`, `council`이 T3의 오케스트레이션 도구로 작업을 위임합니다. [T3 사람 개입 규칙](docs/agents/hitl.md)이 질문을 스레드로 보내고, `codex/review.ts`가 Codex의 읽기 전용 샌드박스에서 독립 리뷰를 실행하며, `t3/scheduled/guard.mjs`가 예약 작업에 시간 초과와 실행 횟수 제한을 더합니다. |
+| T3 Code 경로 | `t3-orchestrate`, `review-loop`, `council`이 T3의 오케스트레이션 도구로 작업을 위임합니다. `t3-handoff`는 인계 문서를 첫 메시지로 받는 새 스레드에서 작업을 이어 갑니다. [T3 사람 개입 규칙](docs/agents/hitl.md)이 질문을 스레드로 보내고, `codex/review.ts`가 Codex의 읽기 전용 샌드박스에서 독립 리뷰를 실행하며, `t3/scheduled/guard.mjs`가 예약 작업에 시간 초과와 실행 횟수 제한을 더합니다. |
+| 지켜보는 터미널 작업 | `t3-terminal`이 개발 서버, 대화형 프롬프트, REPL, ssh, TUI처럼 사람이 지켜보거나 직접 입력해야 하는 작업을 Herdr의 workspace·tab·pane에 엽니다. 백그라운드 프로세스를 대신하지는 않습니다. |
 | MR 수명주기와 작업 모드 | tstack에서 편입한 GitLab MR·GitHub PR 스킬(`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`)과 사람이 고르는 `full-send`·`full-stop` 모드를 제공합니다. Claude Code·AGY용 `plugin/` 산출물의 머지 가드 훅과 Codex용 `codex/harness.rules`가 모드가 허락하지 않는 머지를 막으며, `full-send`는 사람이 허용 목록에 적은 저장소에서만 머지합니다. [AGENT-CONFIG](docs/AGENT-CONFIG.md)를 참고하세요. |
-| 개인 운영 | OMP·Claude Code·Codex 세션의 비용 감사, 보호된 호스트 동기화, 사람이 검토하는 일일보고 초안 흐름을 제공합니다. 호스팅 서비스가 아닙니다. |
+| 개인 운영 | Claude Code·Codex 세션의 비용 감사, 보호된 호스트 동기화, 사람이 검토하는 일일보고 초안 흐름을 제공합니다. 호스팅 서비스가 아닙니다. |
 
 ## 권장 환경
 
-유지하는 쇼케이스 대상은 **Bash와 GNU 호환 유틸리티를 갖춘 Linux 또는 WSL2, `omp`로 실행할 수 있는 표준 OMP 설치본, Bun 1.3.14**입니다. 설정 검사와 벤치마크에는 Python 3가, 전체 설치의 플러그인 단계에는 Node.js가 필요합니다. 현재 설치기는 기존 `~/.claude/CLAUDE.md`를 요구합니다. 기반 도구의 설치·인증은 별도로 준비합니다. 네이티브 Windows와 macOS는 유지하는 설치 대상이 아닙니다. 앞으로 나올 OMP나 Bun 버전의 호환성은 검토 없이 가정하지 않습니다.
+유지하는 쇼케이스 대상은 **Bash와 GNU 호환 유틸리티를 갖춘 Linux 또는 WSL2와 Bun 1.3.14**입니다. 전체 설치의 플러그인 단계에는 Node.js가 필요하고, Bun은 예약 작업 가드, 호스트 동기화, Codex 리뷰어를 실행하며, Python 3는 비용 감사 분석기와 스킬 수집기를 실행합니다. 현재 설치기는 기존 `~/.claude/CLAUDE.md`를 요구합니다. T3 Code, Claude Code, Codex CLI, AGY의 설치·인증은 별도로 준비합니다. 네이티브 Windows와 macOS는 유지하는 설치 대상이 아닙니다. 앞으로 나올 에이전트 CLI나 Bun 버전의 호환성은 검토 없이 가정하지 않습니다.
 
 ```bash
 git clone https://github.com/huketo/harness.git
@@ -37,70 +33,31 @@ bash install.sh --dry-run
 
 ```bash
 bash install.sh
-bash omp/config.apply.sh --check
 ```
 
-**설치는 워크스테이션을 변경합니다.** 공유 자산을 연결하고, 교체 가능한 기존 설정 파일을 백업하며, Claude Code와 AGY가 `PATH`에 있으면 `harness` 플러그인을 설치하고 두 도구의 설정 파일에 자격증명 읽기 거부 규칙을 더하며, Codex 실행 정책 파일을 연결하고, 이 체크아웃이 소유한 기존 `harness-accounts`와 `harness-native-compaction` 링크만 제거합니다. 다른 곳을 가리키거나 예상과 다른 항목은 충돌로 남기고 제거하지 않습니다. Dry-run은 변경 없이 계획만 보여 줍니다. 설치기는 인증 정보, 저장된 선호 상태, 세션 transcript, 백업을 변경하지 않습니다. 기존 Harness native-compaction 상태의 replay와 portable 이전은 더 이상 제공하지 않으므로, 보존된 기존 세션이 재개된다고 보장할 수 없습니다. 설치 후 이미 로드된 모든 OMP 프로세스를 다시 시작합니다.
-
-설정 검사는 값을 바꾸지 않으며 종료 코드 `1`은 차이가 있다는 뜻입니다. 내용을 확인한 뒤 저장소의 개인용 OMP 기본값을 적용하려면 명시적으로 실행합니다.
-
-```bash
-bash install.sh --with-config
-```
-
-모델 라우팅, fallback, 스킬 탐색, 내장 압축 정책, Auto QA 동의 설정 등이 적용됩니다. 확장 연결만 하려면 필요하지 않습니다. 설치기는 AGY 설정, cron 작업, T3 예약 작업을 복원하지 않습니다.
+**설치는 워크스테이션을 변경합니다.** 공유 자산을 연결하고, 교체 가능한 기존 설정 파일을 백업하며, Claude Code와 AGY가 `PATH`에 있으면 `harness` 플러그인을 설치하고 두 도구의 설정 파일에 자격증명 읽기 거부 규칙을 더하며, Codex 실행 정책 파일을 연결합니다. 다른 곳을 가리키거나 예상과 다른 항목은 충돌로 남기고 제거하지 않습니다. Dry-run은 변경 없이 계획만 보여 줍니다. 현재 스킬을 불러오도록 설치 후 새 에이전트 세션을 엽니다. 이전 버전의 설치기가 `archived/`로 옮긴 구성 요소에 만든 링크는 제거하지 않으므로 [수동 복원 범위](docs/guides/installation.md#updating-and-undoing)를 확인합니다. 설치기는 AGY 설정과 T3 예약 작업을 복원하지 않습니다.
 
 공유 워크스테이션에서는 `bash install.sh --skills-only`로 스킬만 연결하고 도구 설정과 명령은 유지할 수 있습니다. 체크아웃 경로를 고정하고 `bash /path/to/harness/update.sh --skills-only`를 실행하면 깨끗한 `main`을 fast-forward한 뒤 다시 설치합니다. 설치 링크에는 변경이 즉시 반영되므로 먼저 업데이트를 검토합니다. [설치와 갱신 경계](docs/guides/installation.md)를 참고하세요.
 
 ## 일상적인 사용
 
-OMP 안에서:
+에이전트는 T3 Code 스레드로 실행합니다. 스레드에서 `t3-orchestrate`는 독립 작업을 워크트리 자식에게 나누고, `review-loop`와 `council`은 다른 모델 계열의 읽기 전용 리뷰를 실행하며, MR 스킬(`file-mr`, `babysit-mr`, `takeover`, `modernize`)은 GitLab MR과 GitHub PR을 처리합니다. 질문과 승인은 [사람 개입 규칙](docs/agents/hitl.md)에 따라 스레드에서 주고받습니다.
 
-```text
-/session pin
-/profile code
-/effort high
-/compact
-```
+사람이 지켜보거나 직접 입력해야 하는 터미널 작업은 `t3-terminal`로 보냅니다. 자신의 터미널에서 `herdr`를 실행해 그 화면에 붙으면 진행을 확인하거나 직접 입력할 수 있습니다. 짧은 조회·빌드·테스트와 백그라운드 프로세스는 평소 도구로 실행합니다.
 
-- `/session pin`은 OMP 내장 수동 계정 선택기입니다. 선택은 현재 세션에만 적용되며 Harness는 계정 선택을 여러 세션에 동기화하지 않습니다.
-- `/effort high`는 현재 세션·모델만 변경합니다. `--profile`을 붙이면 공용 모델 프로필 상태를 명시적으로 변경합니다.
-- `/compact`는 표준 OMP 압축을 사용합니다. 관리 정책은 `enabled: true`, `methodOrder: remote → handoff → soft`, `keepRecentTokens: 40000`, `thresholdPercent: 75`, `thresholdTokens: -1`, `handoffSaveToDisk: true`로 설정합니다. [내장 압축 흐름](docs/guides/usage.md#내장-자동-압축)을 참고하세요.
-
-터미널에서는 `~/.local/bin`을 `PATH`에 포함한 뒤 실행합니다.
+모델을 호출하지 않고 독립 Codex 리뷰어의 경계를 확인합니다.
 
 ```bash
-omp-profile list
-omp-profile show code
-harness-run --help
+bun --no-install codex/review.ts --cwd <worktree> --inspect-tools
 ```
 
-오래 걸리거나 사람이 관찰·조작할 필요가 있는 실행에 Herdr를 사용합니다. 짧은 조회·빌드·테스트는 평소 도구로 실행합니다. 유한 명령(finite command)은 exit artifact와 로그를 확보한 뒤 자신이 생성한 탭이나 페인의 소유권을 확인하고 자동으로 닫으며, `PAGER=cat` 환경변수를 설정하여 페이저 정지를 방지합니다. 백그라운드 명령(`--detach`)은 명시적인 `--name`이 필수이며 탭이 닫히지 않고 유지됩니다. 완료된 단일-pane 명령 탭은 `harness-run prune --workspace current --dry-run` 또는 `--apply` 명령으로 안전하게 정리할 수 있습니다. 개발 서버 명령이 있는 프로젝트에서는 다음처럼 사용할 수 있습니다.
-
-```bash
-harness-run command --name dev --detach -- bun run dev
-harness-run read dev
-```
-
-`/delegation`으로 현재 세션의 위임 상태를 확인하고, `agy`로 대화형 AGY 우선 위임, `native`로 내장 위임 복귀, `off`로 새 위임 중지, `model`로 AGY 기본 모델 선택을 관리합니다. 모드를 바꿔도 기존 작업자는 유지합니다. 일반 시작값은 native이며 `bun omp/herdr-trial.ts`는 AGY 모드로 시작하는 선택적 launcher입니다. OMP 코어 재빌드나 공용 설정 변경은 필요하지 않습니다. [동작과 제약](docs/guides/usage.md#세션별-위임-모드)을 확인합니다.
-
-Detached 핸들은 준비 완료의 증거가 아닙니다. 출력과 서비스를 확인한 뒤 사용합니다. 독립 에이전트에는 명시적인 브리프가 필요하며, 내장 task 에이전트는 OMP Agent Hub에 남습니다. `harness-herdr` 확장은 OMP 내장 `ask` 도구를 게이트합니다. 호출마다 `herdr-hitl channel`을 먼저 실행하고 채널이 `terminal`일 때만 통과시킵니다. [상세 사용법과 상태 경계](docs/guides/usage.md)를 참고하세요.
-
-## 기본값 변경 전에 평가하기
-
-모델을 호출하지 않고 설정된 벤치마크 조합을 확인합니다.
-
-```bash
-python3 bench/bench.py run --dry-run
-```
-
-실제 실행에는 모델 인증이 필요하며 비용이 발생할 수 있습니다. 결과와 수집한 작업 자료는 커밋하지 않고 무시되는 `var/` 아래에 둡니다. [벤치마크 명령과 해석](bench/README.md), [벤치마크 조사](docs/BENCH-SURVEY.md), [과금 근거](docs/PRICING.md)를 참고하세요. 기록된 측정값은 날짜가 있는 개인 관측이며 성능 보장이 아닙니다.
+[상세 사용법과 상태 경계](docs/guides/usage.md)를 참고하세요. 날짜가 있는 측정값은 [FACTS](docs/FACTS.md)에, 과금 근거는 [PRICING](docs/PRICING.md)에 있으며, 둘 다 관측일 뿐 성능 보장이 아닙니다.
 
 ## 설정과 안전 경계
 
 - **자산별 정본 하나:** 사람이 관리하는 자산은 심링크하고, 도구가 관리하는 상태는 해당 도구에 둡니다. 배포된 스냅샷은 검토용 예시이며 호스트 백업이나 복원 지침이 아닙니다.
 - **자격증명은 로컬에 유지:** API 키, OAuth 상태, 비공개 캘린더 URL, 메신저 토큰, 세션 로그, 보고서 입력은 버전 관리 밖에 둡니다. `.gitignore`는 비밀 탐지기가 아니며 과거 이력을 지우지 않습니다.
-- **외부 영향 검토:** cron이나 T3 예약 작업 활성화, 메시지 전송, 플러그인 업데이트, 원격 쓰기, 머지, Git 게시는 유지관리자가 의도적으로 실행해야 합니다. 머지 가드는 실수로 머지하는 것을 막는 장치이지 권한 체계가 아닙니다. 배포된 스냅샷을 그대로 활성화하지 않습니다.
+- **외부 영향 검토:** T3 예약 작업 활성화, 메시지 전송, 플러그인 업데이트, 원격 쓰기, 머지, Git 게시는 유지관리자가 의도적으로 실행해야 합니다. 머지 가드는 실수로 머지하는 것을 막는 장치이지 권한 체계가 아닙니다. 배포된 스냅샷을 그대로 활성화하지 않습니다.
 - **샌드박스가 아님:** 권한 정책과 파일 도구 deny 규칙은 임의 셸 접근을 격리하지 않습니다. 허용적인 워크스테이션 설정은 개인의 위험 선택이지 보안 기본값이 아닙니다.
 - **링크는 즉시 반영:** 이 체크아웃을 수정하거나 갱신하면 설치된 자산도 바로 바뀝니다. 자동 제거기는 없으며, 링크 제거만으로 되돌릴 수 없는 변경은 [수동 복원 범위](docs/guides/installation.md#updating-and-undoing)에 설명합니다.
 
@@ -108,16 +65,14 @@ python3 bench/bench.py run --dry-run
 
 | 경로 | 역할 |
 | --- | --- |
-| [`omp/`](omp/) | `profiles`·`herdr` 확장, 모델 프로필, 프롬프트, 선언적 설정. |
-| [`herdr/`](herdr/) | 터미널 통합, 보조 명령, 플러그인 핀, 비용 감사, 보호된 호스트 동기화. |
 | [`skills/`](skills/) | 개인 스킬과 원저작자 고지를 유지한 편입 스킬. |
 | [`plugin/`](plugin/) | Claude Code·AGY 플러그인의 단일 정본. 머지 가드, 읽기 전용 리뷰어 agent, AGY 규칙, 빌더, 설치기, 거부 규칙. |
 | [`codex/`](codex/) | 읽기 전용 Codex 리뷰어와 머지 전에 승인을 묻게 하는 Codex 실행 정책. |
-| [`t3/`](t3/) | T3 Code 예약 작업 가드. 배포한 작업 목록은 비어 있습니다. |
+| [`t3/`](t3/) | T3 Code 예약 작업 가드와 보호된 호스트 동기화. 배포한 작업 목록은 비어 있습니다. |
 | [`agy/`](agy/) | AGY 예시 설정 스냅샷. |
-| [`bench/`](bench/) | 벤치마크 러너, 과제, fixture, 기준 자료, oracle. |
 | [`third-party/`](third-party/) | 외부 자산 출처, 잠금 사본, 패치. |
 | [`docs/`](docs/index.md) | 설치, 사용법, 소유권, 근거, 유지관리 지침. |
+| [`archived/`](archived/) | 은퇴한 소스(Herdr 에이전트 런타임, OMP, 벤치마크 러너)의 동결 보관본. 설치·실행·테스트 대상이 아닙니다. |
 | `var/` | 무시되는 로컬 보고서와 생성 상태. `.gitkeep`만 추적합니다. |
 
 ## 라이선스, 재사용, 유지관리

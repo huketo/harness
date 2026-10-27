@@ -21,11 +21,8 @@ import {
 import { parseArgs } from "node:util";
 
 const ALLOWED = new Set([
-	"omp/config.snapshot.yml",
 	"agy/settings.snapshot.json",
-	"herdr/cron/jobs.snapshot.yaml",
 	"third-party/skills.lock.json",
-	"herdr/plugins.manifest.json",
 	"README.md",
 	"docs/FACTS.md",
 	"docs/REPO.md",
@@ -277,11 +274,7 @@ async function inspectChanges(workspace) {
 			return { reason: `invalid_size:${path}` };
 		try {
 			const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-			const parsed = path.endsWith(".json")
-				? JSON.parse(text)
-				: /\.ya?ml$/.test(path)
-					? Bun.YAML.parse(text)
-					: text;
+			const parsed = path.endsWith(".json") ? JSON.parse(text) : text;
 			if (secretIn(text) || secretIn(parsed))
 				return { reason: `possible_secret:${path}` };
 		} catch {

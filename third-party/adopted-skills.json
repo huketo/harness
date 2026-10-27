@@ -40,7 +40,12 @@
           "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
           "license": "MIT, Copyright 2026 Zara Zhang",
           "license_path": "skills/awesome-slides/assets/template-library/LICENSE",
-          "paths": ["templates", "runtime", "index.json", "LICENSE"],
+          "paths": [
+            "templates",
+            "runtime",
+            "index.json",
+            "LICENSE"
+          ],
           "use": "Direct unmodified copy of all 34 complete HTML themes, design guides, metadata and runtime. Generator clones the chosen theme and supplies missing shared deck-stage.js. ORIGIN.json records scope; screenshot gallery remains pinned upstream. Demo content and online fonts require task-specific adaptation."
         },
         {
@@ -54,7 +59,11 @@
           "commit": "a8d8ff717c5a72c1b3a9d98f1c849481f2ddcd00",
           "license": "MIT",
           "license_path": "skills/awesome-slides/references/slidev-official/LICENSE.txt",
-          "paths": ["skills/slidev/SKILL.md", "skills/slidev/references/", "LICENSE"],
+          "paths": [
+            "skills/slidev/SKILL.md",
+            "skills/slidev/references/",
+            "LICENSE"
+          ],
           "use": "Official Slidev agent reference set bundled unmodified under references/slidev-official/ so the skill routes to pinned syntax documentation without installing a second top-level skill. SKILL.md renamed to INDEX.md with its frontmatter removed; README.md excluded. Provenance in references/slidev-official/ORIGIN.json."
         }
       ],
@@ -618,7 +627,10 @@
         "installedAt": "2026-05-29T01:14:27.283Z",
         "updatedAt": "2026-08-06T12:13:15.256Z"
       },
-      "installed_snapshot_sha256": "c97a305f5ca0b6fa21ca82a009ac5a553acd02aab63cf59de939f75ac7797393"
+      "installed_snapshot_sha256": "c97a305f5ca0b6fa21ca82a009ac5a553acd02aab63cf59de939f75ac7797393",
+      "local_changes": [
+        "Route T3 Code threads that want a new thread to the t3-handoff skill; the document rules stay here."
+      ]
     },
     "test-audit": {
       "adopted_on": "2026-09-28",
@@ -775,7 +787,7 @@
             "skills/video",
             "skills/marketing-council"
           ],
-          "reason": "Excluded: B2B sales and lead-generation workflows, channels without a current target surface, image and video generation owned by imagegen, and simulated real-person advisors overlapping herdr-quorum."
+          "reason": "Excluded: B2B sales and lead-generation workflows, channels without a current target surface, image and video generation owned by imagegen, and simulated real-person advisors overlapping council."
         },
         {
           "source": "https://github.com/coreyhaines31/marketingskills",

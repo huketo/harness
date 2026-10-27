@@ -1,4 +1,4 @@
-# Generated audit and benchmark data
+# Generated audit data and runtime output
 var/*
 !var/.gitkeep
 
@@ -14,7 +14,6 @@ var/*
 **/credentials.*
 **/*token*.toml
 **/*token*.json
-herdr/hitl.config.toml
 
 # Private keys and certificates
 *.pem
@@ -32,8 +31,8 @@ id_ed25519*
 *.sqlite
 *.sqlite3
 *.log
-# Synthetic benchmark input, not a collected host log.
-!bench/fixtures/report-draft-ko/input/commits.log
+# Archived synthetic benchmark input, not a collected host log.
+!archived/bench/fixtures/report-draft-ko/input/commits.log
 
 # Python runtime artifacts
 __pycache__/

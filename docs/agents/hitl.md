@@ -2,8 +2,6 @@
 
 This file owns how an agent in a [T3 Code](https://github.com/pingdotgg/t3code) thread asks the person, accepts an approval, finishes, and behaves in an unattended run. It applies to every provider T3 runs (Claude Code, Codex, Antigravity). An agent is in a T3 thread when the `t3-code` MCP tools (`orchestrator_capabilities`, `delegate_task`, `schedule_task`) are available to it.
 
-An agent in a Herdr pane (`HERDR_ENV=1`) or an OMP session follows [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) instead. The two never mix: a T3 thread never runs `herdr-hitl`, and a Herdr pane never calls T3 tools to reach the person.
-
 ## The thread is the channel
 
 The T3 thread is the only channel to the person. T3 Connect can push a thread's pending question, pending approval, and finished turn to a paired phone, so a question asked in the thread reaches the person whether or not they are at the desktop. Presence is never inferred and never declared by the agent.
@@ -45,7 +43,7 @@ A task started with `delegate_task` has no direct person. It never asks the pers
 
 ## Unattended runs
 
-A run started by a T3 scheduled task, by `bench/bench.py`, or by any other scheduler has no reachable person, even though its thread pushes a notification when it ends. In such a run:
+A run started by a T3 scheduled task or by any other scheduler has no reachable person, even though its thread pushes a notification when it ends. In such a run:
 
 - never call a question tool, never request an approval, and never wait for an answer;
 - resolve in-scope, reversible technical matters autonomously, or after a `council` review where its rules allow;

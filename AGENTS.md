@@ -9,20 +9,18 @@ This file is the compact repository router for coding agents working for the own
 3. Reuse the existing shell, Bun, or Python mechanism instead of adding a second convention.
 4. Verify at the narrowest boundary that proves the requested behavior, then report exact evidence and relevant checks not run.
 
-Before asking a person, accepting an approval, or handling an unattended or scheduled run, read the human-in-the-loop owner for your runtime: [`docs/agents/hitl.md`](docs/agents/hitl.md) in a T3 Code thread (the `t3-code` MCP tools are available), or [`.omp/APPEND_SYSTEM.md`](.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session. Each owns its runtime's channel, approval-response, completion-gate, and unattended-run rules.
+Before asking a person, accepting an approval, or handling an unattended or scheduled run, read [`docs/agents/hitl.md`](docs/agents/hitl.md). It owns the channel, approval-response, completion-gate, and unattended-run rules for agents running as T3 Code threads.
 
 ## Repository map
 
-- `omp/` — OMP configuration application, model profiles, prompts, and the `profiles` and `herdr` extensions.
-- `herdr/` — Herdr configuration, launch helpers, plugin pins, cost audit, and guarded host-sync sources. The distributed cron snapshot contains no jobs.
 - `plugin/` — one source for the Claude Code and AGY plugins (merge-guard hook, read-only reviewer agent, AGY rules), their builder and installer, and the deny rules merged into agent settings; [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where.
 - `codex/` — the read-only `codex exec` reviewer (`review.ts`) and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
-- `t3/` — the guard for T3 Code scheduled tasks and its job definitions; the distributed `jobs.json` contains no jobs.
-- `skills/` — personal skill sources; preserve each adopted skill's license and provenance.
-- `bench/` — Python benchmark runner, synthetic fixtures, oracles, references, and runner tests.
+- `t3/` — the guard for T3 Code scheduled tasks, its job definitions, and the guarded host-sync source; the distributed `jobs.json` contains no jobs.
+- `skills/` — personal skill sources, including the T3-facing `t3-orchestrate`, `t3-handoff` (continue work in a new thread), and `t3-terminal` (Herdr as a plain terminal multiplexer for work a person watches); preserve each adopted skill's license and provenance.
 - `agy/` — an example snapshot of Antigravity CLI settings; the AGY plugin source lives in `plugin/`.
 - `third-party/` — public external pins, provenance records, and patches; it is not a second source tree.
-- `docs/` — user, operational, ownership, evidence, pricing, benchmark, and owner-maintenance documentation.
+- `docs/` — user, operational, ownership, evidence, pricing, and owner-maintenance documentation.
+- `archived/` — frozen retired sources (the Herdr agent runtime, OMP, and the benchmark runner). Nothing installs, runs, or tests them; do not add or repair code there.
 - `var/` — ignored runtime output. Treat it as sensitive even though it is inside the checkout.
 
 [`docs/REPO.md`](docs/REPO.md) owns source-versus-runtime boundaries. Keep credentials, private calendar URLs, report bodies, session transcripts, logs, databases, audit inputs, and benchmark run data out of tracked files. Read sensitive host or `var/` data only when the task requires it, and disclose only the minimum redacted evidence.

@@ -55,7 +55,7 @@ test("dry run plans every step and changes nothing", () => {
 	expect(dry.stdout).toContain(`would register Claude marketplace: harness -> ${join(out, "claude")}`);
 	expect(dry.stdout).toContain("would install Claude plugin: harness@harness (user scope)");
 	expect(dry.stdout).toContain("would retire symlinked agy plugin");
-	expect(dry.stdout).toContain("would add 8 permissions.deny rule(s)");
+	expect(dry.stdout).toContain("would add 7 permissions.deny rule(s)");
 	expect(dry.stdout).toContain(`read_file(${home}/.config/gh)`);
 	expect(existsSync(out)).toBe(false);
 	expect(calls().every((c) => c.endsWith("--json"))).toBe(true);

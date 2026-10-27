@@ -14,7 +14,7 @@ security	content	(approv|permission|bypass|protected_branches|merge_access|push_
 security	content	(allowed_|deny_|user_?ids?|(^|[^a-z])(users?|tokens?|hosts?|roles?|members?|chat_id|channel_id)([^a-z]|$))
 logic	path	(^|/)(skill|agents|claude|gemini|role|core|append_system|system)\.md$
 logic	path	(^|/)skills/[^/]+/references/
-logic	path	(^|/)(\.omp|prompts?)/
+logic	path	(^|/)prompts?/
 none	path	\.(md|mdx|rst|adoc|txt)$
 none	path	(^|/)docs?/
 none	path	(^|/)(tests?|__tests__|fixtures?)/

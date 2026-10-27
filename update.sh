@@ -3,24 +3,18 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_ONLY=false
-WITH_CONFIG=false
 DRY_RUN=false
 for arg in "$@"; do
   case "$arg" in
     --skills-only) SKILLS_ONLY=true ;;
-    --with-config) WITH_CONFIG=true ;;
     --dry-run) DRY_RUN=true ;;
     --help|-h)
-      echo "usage: bash update.sh [--dry-run] [--skills-only | --with-config]"
+      echo "usage: bash update.sh [--dry-run] [--skills-only]"
       echo "Fetch and show incoming commits, then fast-forward and reinstall unless --dry-run."
       exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
-if $SKILLS_ONLY && $WITH_CONFIG; then
-  echo "--skills-only cannot be combined with --with-config" >&2
-  exit 2
-fi
 if [[ "$(git -C "$REPO" symbolic-ref --quiet --short HEAD)" != main ]]; then
   echo "update requires main; leave review branches and detached pins unchanged" >&2
   exit 1

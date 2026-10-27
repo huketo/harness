@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 // Guard for T3 scheduled tasks. A T3 scheduled task is an agent turn with no
-// timeout, daily run limit, or auto-disable, which herdr-cron enforces for its
-// jobs. The guard enforces them from jobs.json so the turn only starts, waits
-// for, and reports a supervised run.
+// timeout, daily run limit, or auto-disable. The guard enforces those from
+// jobs.json so the turn only starts, waits for, and reports a supervised run.
 import { spawn } from "node:child_process";
 import {
 	appendFileSync,
@@ -22,7 +21,7 @@ const REPO = resolve(dirname(SELF), "../..");
 const KILL_GRACE_MS = 10_000;
 const TAIL_CHARS = 4000;
 
-export const EXIT = { ok: 0, failed: 1, disabled: 3, limit: 4, busy: 5, running: 75 };
+export const EXIT = { ok: 0, failed: 1, disabled: 3, limit: 4, busy: 5, off_day: 6, done: 7, running: 75 };
 
 export function stateRoot(env = process.env) {
 	const xdg = env.XDG_STATE_HOME;
@@ -131,6 +130,15 @@ export function recordEnd(dir, job, run, status, extra = {}) {
 export function admit(job, { root = stateRoot(), now = Date.now(), pid = null } = {}) {
 	const dir = jobDir(root, job.id);
 	if (existsSync(join(dir, "disabled"))) return { status: "disabled", dir };
+	// T3 has no monthly trigger, so a monthly job fires daily and is admitted only
+	// on its `daysOfMonth` until one run of the month ends ok.
+	if (job.daysOfMonth) {
+		const today = localDay(now, job.timezone);
+		if (!job.daysOfMonth.includes(Number(today.slice(8)))) return { status: "off_day", dir };
+		const month = today.slice(0, 8);
+		if (summarizeRuns(readRuns(dir)).some((r) => r.status === "ok" && localDay(r.startedAt, job.timezone).startsWith(month)))
+			return { status: "done", dir };
+	}
 	const lockDir = join(dir, "lock");
 	const held = existsSync(lockDir) ? readLock(dir) : null;
 	if (existsSync(lockDir)) {
@@ -231,7 +239,8 @@ function usage() {
 		"",
 		"run starts a supervised shell job and waits up to --max-seconds (default 240) for it;",
 		`exit ${EXIT.running} means it is still running: call wait with the printed run id.`,
-		"admit/finish bracket an agent job. Exit codes: 0 ok/noop, 1 failed/timeout, 3 disabled, 4 daily limit, 5 busy.",
+		"admit/finish bracket an agent job. Exit codes: 0 ok/noop, 1 failed/timeout, 3 disabled, 4 daily limit, 5 busy,",
+		"6 off_day and 7 done (a job with daysOfMonth: not one of its days, or already ok this month).",
 		"A disabled job stays disabled until a person deletes <state>/<job>/disabled.",
 	].join("\n");
 }

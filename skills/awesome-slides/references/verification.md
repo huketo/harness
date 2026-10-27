@@ -10,7 +10,7 @@ Use `browser-skill` to start one Agent Window, navigate to a Windows-reachable H
 
 For parallel authoring, workers can build independent sources while one integration owner performs Windows Chrome interaction and visual checks sequentially. Do not let several agents operate the same session or user tab. BrowserSkill screenshots and observations cover the controlled tab; use the deck's supported headless/export mechanism for PDF or PPTX generation rather than assuming BrowserSkill exposes arbitrary CDP APIs.
 
-For automated checks, OMP's built-in browser or a headless browser can run inside WSL without being a WSLg GUI browser. Record the actual host, product, and headed/headless mode. Such evidence does not replace Windows-visible verification when the user specifically requested it.
+For automated checks, a headless browser can run inside WSL without being a WSLg GUI browser. Record the actual host, product, and headed/headless mode. Such evidence does not replace Windows-visible verification when the user specifically requested it.
 
 ## Define the observable contract
 

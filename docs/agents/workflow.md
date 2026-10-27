@@ -10,7 +10,7 @@ State the requested observable outcome, in-scope files, affected callers, and ex
 
 Read the implementation, its callers, nearby tests, and the relevant ownership or user guide. Inspect command implementations and `--help` branches instead of guessing flags. Prefer current source behavior over prose; when they differ, fix the owning source or documentation rather than creating a second convention. The step is complete when the current mechanism and all affected call sites are accounted for.
 
-For host configuration and installation work, [`../REPO.md`](../REPO.md) defines which repository file is canonical and which host file is tool-owned. For a human question or unattended execution, the project authority is [`hitl.md`](hitl.md) in a T3 Code thread and [`.omp/APPEND_SYSTEM.md`](../../.omp/APPEND_SYSTEM.md) in a Herdr pane or OMP session.
+For host configuration and installation work, [`../REPO.md`](../REPO.md) defines which repository file is canonical and which host file is tool-owned. For a human question or unattended execution, the project authority is [`hitl.md`](hitl.md).
 
 ## 3. Make the evidence red when behavior changes
 
@@ -26,7 +26,7 @@ When work is split, define interfaces and file ownership before concurrent edits
 
 ## 5. Verify the actual boundary
 
-Run the focused command from [`testing.md`](testing.md) that exercises the changed mechanism. A source audit, unit test, temporary-repository integration test, live-host check, external-service run, and paid benchmark are different evidence; name the one actually obtained. A zero exit proves only the command that ran, so confirm that the intended test or scenario was selected.
+Run the focused command from [`testing.md`](testing.md) that exercises the changed mechanism. A source audit, unit test, temporary-repository integration test, live-host check, external-service run, and paid model call are different evidence; name the one actually obtained. A zero exit proves only the command that ran, so confirm that the intended test or scenario was selected.
 
 After behavior is proven, remove throwaway probes and update maintained documentation. The step is complete when the requested outcome is observed and the worktree contains no task-created runtime or sensitive artifacts.
 

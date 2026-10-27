@@ -1,4 +1,4 @@
-// Contract regression tests for herdr/cron/host-sync.mjs.
+// Contract regression tests for t3/scheduled/host-sync.mjs.
 //
 // Every fixture is a fresh temporary Git repository (a "bare remote" plus a
 // "main checkout"); nothing here touches the real $HOME, a real remote, or
@@ -38,11 +38,8 @@ import { finalize, prepare } from "./host-sync.mjs";
 // the private clone. Kept here (not imported) because the test asserts the
 // module's *behavior* against this list, not its internal representation.
 const ALLOWLIST = [
-	"omp/config.snapshot.yml",
 	"agy/settings.snapshot.json",
-	"herdr/cron/jobs.snapshot.yaml",
 	"third-party/skills.lock.json",
-	"herdr/plugins.manifest.json",
 	"README.md",
 	"docs/FACTS.md",
 	"docs/REPO.md",
@@ -130,7 +127,7 @@ afterAll(() => {
 	}
 });
 
-describe("herdr/cron/host-sync contract", () => {
+describe("t3/scheduled/host-sync contract", () => {
 	let root;
 
 	beforeEach(() => {
@@ -467,8 +464,8 @@ describe("herdr/cron/host-sync contract", () => {
 		const remoteBefore = remoteSnapshot(remote);
 		const originalBefore = treeSnapshot(original);
 		writeFileSync(
-			join(prepared.workspace, "herdr/plugins.manifest.json"),
-			'{"plugins":[]}',
+			join(prepared.workspace, "third-party/skills.lock.json"),
+			'{"skills":{}}',
 		);
 		editAllowlisted(prepared.workspace);
 		const result = await finalize({
@@ -478,14 +475,14 @@ describe("herdr/cron/host-sync contract", () => {
 		expect(result.status).toBe("verified");
 		expect(result.paths).toEqual([
 			"docs/REPO.md",
-			"herdr/plugins.manifest.json",
+			"third-party/skills.lock.json",
 		]);
 		expect(
 			git(prepared.workspace, [
 				"show",
-				`${result.commit}:herdr/plugins.manifest.json`,
+				`${result.commit}:third-party/skills.lock.json`,
 			]),
-		).toBe('{"plugins":[]}');
+		).toBe('{"skills":{}}');
 		expect(treeSnapshot(original)).toEqual(originalBefore);
 		expect(remoteSnapshot(remote)).toBe(remoteBefore);
 	});
@@ -562,12 +559,12 @@ describe("herdr/cron/host-sync contract", () => {
 		});
 	}
 
-	test("raw YAML comments cannot bypass known-token detection", async () => {
+	test("raw document text cannot bypass known-token detection", async () => {
 		const { remote, prepared } = await prepareFixture();
 		const before = remoteSnapshot(remote);
 		writeFileSync(
-			join(prepared.workspace, "omp/config.snapshot.yml"),
-			"# glpat-synthetic_token_for_test_123456\nsetting: true\n",
+			join(prepared.workspace, "docs/FACTS.md"),
+			"# Facts\n\nglpat-synthetic_token_for_test_123456\n",
 		);
 		const result = await finalize({
 			session: prepared.session,
@@ -575,7 +572,7 @@ describe("herdr/cron/host-sync contract", () => {
 			message: "reject comment token",
 		});
 		expect(result.status).toBe("blocked");
-		expect(result.reason).toBe("possible_secret:omp/config.snapshot.yml");
+		expect(result.reason).toBe("possible_secret:docs/FACTS.md");
 		expect(remoteSnapshot(remote)).toBe(before);
 	});
 

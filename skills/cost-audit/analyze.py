@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit OMP, Claude Code and Codex CLI for avoidable nominal token spend."""
+"""Audit Claude Code and Codex CLI for avoidable nominal token spend."""
 
 from __future__ import annotations
 
@@ -7,12 +7,10 @@ import argparse
 import bisect
 import json
 import math
-import sqlite3
 import statistics
 import sys
 import time
 from collections import defaultdict
-from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,8 +18,6 @@ from typing import Any, Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FACTS_PATH = REPO_ROOT / "docs" / "FACTS.md"
-STATS_PATH = Path.home() / ".omp" / "stats.db"
-MODELS_PATH = Path.home() / ".omp" / "agent" / "models.db"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "var" / "audit"
 
 DEFAULT_CONTEXT_THRESHOLD = 400_000
@@ -129,12 +125,6 @@ def context_tokens(row: Message) -> int:
     )
 
 
-def open_read_only(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
 def resolve_session_filter(raw: str | None) -> tuple[str | None, str | None]:
     if not raw:
         return None, None
@@ -144,127 +134,18 @@ def resolve_session_filter(raw: str | None) -> tuple[str | None, str | None]:
     return "contains", raw
 
 
-def load_messages(
-    connection: sqlite3.Connection,
-    start_ms: int,
-    end_ms: int,
-    folder: str | None,
-    session: str | None,
-) -> list[Message]:
-    inner_conditions: list[str] = []
-    inner_parameters: list[Any] = []
-    if folder:
-        inner_conditions.append("folder LIKE ?")
-        inner_parameters.append(f"%{folder}%")
-    session_mode, session_value = resolve_session_filter(session)
-    if session_mode == "exact":
-        inner_conditions.append("session_file = ?")
-        inner_parameters.append(session_value)
-    elif session_mode == "contains":
-        inner_conditions.append("session_file LIKE ?")
-        inner_parameters.append(f"%{session_value}%")
-    inner_where = " AND ".join(inner_conditions) if inner_conditions else "1 = 1"
-    query = f"""
-        WITH ordered AS (
-            SELECT
-                messages.*,
-                LAG(timestamp) OVER (
-                    PARTITION BY session_file ORDER BY timestamp, id
-                ) AS previous_timestamp
-            FROM messages
-            WHERE {inner_where}
-        )
-        SELECT * FROM ordered
-        WHERE timestamp >= ? AND timestamp <= ?
-        ORDER BY session_file, timestamp, id
-    """
-    parameters = [*inner_parameters, start_ms, end_ms]
-    return [dict(row) for row in connection.execute(query, parameters)]
-
-
-def load_tool_calls(
-    connection: sqlite3.Connection,
-    start_ms: int,
-    end_ms: int,
-    folder: str | None,
-    session: str | None,
-) -> list[dict[str, Any]]:
-    conditions = ["timestamp >= ?", "timestamp <= ?"]
-    parameters: list[Any] = [start_ms, end_ms]
-    if folder:
-        conditions.append("folder LIKE ?")
-        parameters.append(f"%{folder}%")
-    session_mode, session_value = resolve_session_filter(session)
-    if session_mode == "exact":
-        conditions.append("session_file = ?")
-        parameters.append(session_value)
-    elif session_mode == "contains":
-        conditions.append("session_file LIKE ?")
-        parameters.append(f"%{session_value}%")
-    query = f"""
-        SELECT * FROM tool_calls
-        WHERE {' AND '.join(conditions)}
-        ORDER BY session_file, timestamp, id
-    """
-    return [dict(row) for row in connection.execute(query, parameters)]
-
-
-def load_prices(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
-    """Catalog costs keyed by `(provider, model id)`.
-
-    OMP can cache one provider under a versioned id (`openai-codex:0.155.1`)
-    beside an older plain row, and only the versioned row lists the newest
-    models, so rows merge under the id before the first `:`; the most recently
-    updated row wins a model both rows list.
-    """
-    if not path.is_file():
-        raise RuntimeError(f"Model catalog not found at {path}")
-    prices: dict[tuple[str, str], dict[str, Any]] = {}
-    with closing(open_read_only(path)) as connection:
-        for row in connection.execute(
-            "SELECT provider_id, models FROM model_cache ORDER BY updated_at, provider_id"
-        ):
-            try:
-                models = json.loads(row["models"])
-            except (TypeError, json.JSONDecodeError):
-                continue
-            if not isinstance(models, list):
-                continue
-            provider = str(row["provider_id"]).split(":", 1)[0]
-            for model in models:
-                if not isinstance(model, dict) or not isinstance(model.get("cost"), dict):
-                    continue
-                model_id = model.get("id")
-                if isinstance(model_id, str):
-                    prices[(provider, model_id)] = model["cost"]
-    return prices
-
-
 def rates_for_row(
     prices: dict[tuple[str, str], dict[str, Any]], row: Message
 ) -> dict[str, Any] | None:
-    key = str(row.get("source") or row.get("provider", ""))
-    if key == "omp":
-        key = str(row.get("provider", ""))
-    catalog = prices.get((key, str(row.get("model", ""))))
-    if not catalog:
-        return None
-    long_context = catalog.get("longContext")
-    if isinstance(long_context, dict):
-        threshold = integer(long_context.get("inputThreshold"))
-        if threshold and context_tokens(row) > threshold:
-            return long_context
-    return catalog
+    return prices.get((str(row.get("source", "")), str(row.get("model", ""))))
 
 
 def counterfactual_cost(
     prices: dict[tuple[str, str], dict[str, Any]],
     row: Message,
-    provider: str,
     model: str,
 ) -> float | None:
     target = dict(row)
-    target["provider"] = provider
     target["model"] = model
     rates = rates_for_row(prices, target)
     if not rates:
@@ -275,8 +156,6 @@ def counterfactual_cost(
         + integer(row.get("cache_read_tokens")) * number(rates.get("cacheRead"))
         + integer(row.get("cache_write_tokens")) * number(rates.get("cacheWrite"))
     ) / 1_000_000
-
-
 
 
 def load_rates(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
@@ -479,105 +358,6 @@ def load_local_source(
     return messages, tools, compactions, warnings
 
 
-def parse_session_events(
-    messages: list[Message], start_ms: int, end_ms: int
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    rows_by_entry = {
-        (str(row["session_file"]), str(row["entry_id"])): row for row in messages
-    }
-    session_files = sorted({str(row["session_file"]) for row in messages})
-    low_effort_segments: list[dict[str, Any]] = []
-    compactions: list[dict[str, Any]] = []
-    warnings: list[str] = []
-
-    for session_file in session_files:
-        path = Path(session_file)
-        if not path.is_file():
-            warnings.append(f"Session file is missing: {session_file}")
-            continue
-        thinking_level: str | None = None
-        active_segment: dict[str, Any] | None = None
-
-        def finish_segment() -> None:
-            nonlocal active_segment
-            if active_segment is not None:
-                low_effort_segments.append(active_segment)
-                active_segment = None
-
-        try:
-            with path.open("r", encoding="utf-8") as handle:
-                for line_number, line in enumerate(handle, start=1):
-                    try:
-                        entry = json.loads(line)
-                    except json.JSONDecodeError:
-                        warnings.append(
-                            f"Invalid JSON at {session_file}:{line_number}; line skipped"
-                        )
-                        continue
-                    entry_type = entry.get("type")
-                    if entry_type == "thinking_level_change":
-                        finish_segment()
-                        level = entry.get("thinkingLevel")
-                        thinking_level = level.lower() if isinstance(level, str) else None
-                        continue
-                    if entry_type == "model_change":
-                        finish_segment()
-                        continue
-                    if entry_type == "compaction":
-                        timestamp_ms = parse_timestamp_ms(entry.get("timestamp"))
-                        if timestamp_ms is not None and start_ms <= timestamp_ms <= end_ms:
-                            compactions.append(
-                                {
-                                    "session_file": session_file,
-                                    "timestamp_ms": timestamp_ms,
-                                    "timestamp": utc_iso(timestamp_ms),
-                                    "tokens_before": integer(entry.get("tokensBefore")),
-                                    "entry_id": entry.get("id"),
-                                    "line": line_number,
-                                }
-                            )
-                        continue
-                    if entry_type != "message":
-                        continue
-                    nested_message = entry.get("message")
-                    if not isinstance(nested_message, dict) or nested_message.get("role") != "assistant":
-                        continue
-                    row = rows_by_entry.get((session_file, str(entry.get("id"))))
-                    if row is None:
-                        continue
-                    model = str(row.get("model", ""))
-                    qualifies = model.startswith("claude-opus") and thinking_level in LOW_EFFORT_LEVELS
-                    if not qualifies:
-                        finish_segment()
-                        continue
-                    segment_key = (model, thinking_level)
-                    if active_segment is None or active_segment["key"] != segment_key:
-                        finish_segment()
-                        active_segment = {
-                            "key": segment_key,
-                            "session_file": session_file,
-                            "model": model,
-                            "thinking_level": thinking_level,
-                            "start_timestamp": utc_iso(integer(row["timestamp"])),
-                            "end_timestamp": utc_iso(integer(row["timestamp"])),
-                            "request_count": 0,
-                            "total_tokens": 0,
-                            "cost_usd": 0.0,
-                            "entry_ids": [],
-                        }
-                    active_segment["request_count"] += 1
-                    active_segment["total_tokens"] += integer(row.get("total_tokens"))
-                    active_segment["cost_usd"] += number(row.get("cost_total"))
-                    active_segment["end_timestamp"] = utc_iso(integer(row["timestamp"]))
-                    if len(active_segment["entry_ids"]) < 3:
-                        active_segment["entry_ids"].append(row.get("entry_id"))
-            finish_segment()
-        except OSError as error:
-            warnings.append(f"Could not read {session_file}: {error}")
-
-    return low_effort_segments, compactions, warnings
-
-
 def make_result(
     detector_id: str,
     title: str,
@@ -639,7 +419,7 @@ def detect_context_bloat(data: AuditData) -> DetectorResult:
         estimated,
         (
             f"Keep active context below {data.context_threshold:,} tokens by starting focused "
-            "sessions, narrowing tool reads, and reviewing compaction.thresholdTokens."
+            "sessions, narrowing tool reads, and reviewing the harness's auto-compaction threshold."
         ),
         {
             "threshold_tokens": data.context_threshold,
@@ -724,12 +504,13 @@ def detect_cache_rebuild(data: AuditData) -> DetectorResult:
     known_gap_count = len(rebuilds) - unknown_gap_count
     if net > 0:
         recommendation = (
-            "The coarse estimate favors providers.cacheRetention: long; test it against auto "
-            "and compare cache-write spend because the estimate cannot model provider eviction."
+            "The coarse estimate favors 1-hour cache retention; test it against the 5-minute "
+            "default where the harness supports it and compare cache-write spend because the "
+            "estimate cannot model provider eviction."
         )
     else:
         recommendation = (
-            "Keep providers.cacheRetention: auto on this estimate; the projected 1-hour write "
+            "Keep the 5-minute cache retention on this estimate; the projected 1-hour write "
             "premium exceeds rebuild savings. Reduce idle resumes or remeasure before changing it."
         )
     return make_result(
@@ -793,10 +574,10 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
     for session_file, group in grouped.items():
         actual = sum(number(row.get("cost_total")) for row in group)
         haiku_values = [
-            counterfactual_cost(data.prices, row, "anthropic", "claude-haiku-5-5") for row in group
+            counterfactual_cost(data.prices, row, "claude-haiku-5-5") for row in group
         ]
         sol_values = [
-            counterfactual_cost(data.prices, row, "openai-codex", "gpt-6.1-sol") for row in group
+            counterfactual_cost(data.prices, row, "gpt-6.1-sol") for row in group
         ]
         if any(value is None for value in haiku_values + sol_values):
             unpriced += len(group)
@@ -842,8 +623,9 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
         findings,
         upper_bound_savings,
         (
-            "Route lightweight agents through task.agentModelOverrides to @smol "
-            "(modelRoles.smol) and general workers to @mid (modelRoles.mid)."
+            "Route lightweight subagents to a cheaper model in the harness's subagent model "
+            "setting (for Claude Code, the agent definition's model field); keep Opus for work "
+            "that needs it."
         ),
         {
             "request_count": len(rows),
@@ -854,11 +636,10 @@ def detect_model_misroute(data: AuditData) -> DetectorResult:
             "potential_savings_haiku_usd": round(total_actual - total_haiku, 6),
             "potential_savings_sol_usd": round(total_actual - total_sol, 6),
             "unpriced_request_count": unpriced,
-            "pricing_source": "OMP models.db for omp; --rates LiteLLM document for claude/codex",
+            "pricing_source": "--rates LiteLLM document",
             "role_attribution_limitation": (
-                "stats.db identifies subagents but not their smol/mid role. Haiku savings are an "
-                "upper bound; Sol savings are a separate counterfactual. OMP uses its catalog's "
-                "long-context tiers; local JSONL sources use the supplied per-token rates."
+                "Session logs identify subagents but not their role. Haiku savings are an upper "
+                "bound; Sol savings are a separate counterfactual at the supplied per-token rates."
             ),
         },
     )
@@ -900,7 +681,7 @@ def detect_low_effort_expensive(data: AuditData) -> DetectorResult:
         findings,
         total_cost,
         (
-            "Use modelRoles.smol for low-effort work and reserve the Opus role for work that needs "
+            "Route low-effort work to a cheaper model and reserve Opus for work that needs "
             "its default medium effort or more. Artificial Analysis Intelligence Index v4.3.2 "
             "(2026-10-13) puts Opus 5.5 low at 42 for $0.55 per task, below GPT-6.1 Sol medium at 48 "
             "for $0.21; Terminal-Bench 4.0 agrees (31% vs 48%)."
@@ -1072,8 +853,8 @@ def detect_error_and_retry_spend(data: AuditData) -> DetectorResult:
         findings,
         total_cost,
         (
-            "Separate provider overloads from user aborts, then review retry.fallbackChains for "
-            "repeatable provider failures before increasing retry work."
+            "Separate provider overloads from user aborts, then review the harness's retry and "
+            "fallback settings for repeatable provider failures before increasing retry work."
         ),
         {
             "request_count": len(error_rows),
@@ -1161,8 +942,8 @@ def detect_compaction_churn(data: AuditData) -> DetectorResult:
         findings,
         total_cost,
         (
-            "Inspect high-frequency sessions first and tune compaction.thresholdTokens only after "
-            "comparing context-bloat cost with the following rebuild cost."
+            "Inspect high-frequency sessions first and tune the auto-compaction threshold only "
+            "after comparing context-bloat cost with the following rebuild cost."
         ),
         {
             "compaction_count": len(data.compactions),
@@ -1170,7 +951,7 @@ def detect_compaction_churn(data: AuditData) -> DetectorResult:
             "following_rebuild_cost_usd": round(total_cost, 6),
             "peak_compactions_within_60m": peak,
             "limitation": (
-                "Compaction entries record tokensBefore but not post-compaction tokens; savings "
+                "Compaction entries record tokens before compaction but not after; savings "
                 "and compression ratio cannot be calculated."
             ),
         },
@@ -1269,7 +1050,7 @@ def build_baseline(data: AuditData) -> dict[str, Any]:
         lambda: {"requests": 0, "nominal_cost_usd": 0.0}
     )
     for row in data.messages:
-        source = str(row.get("source") or "omp")
+        source = str(row.get("source") or "unknown")
         source_groups[source]["requests"] += 1
         source_groups[source]["nominal_cost_usd"] += number(row.get("cost_total"))
         model = str(row.get("model") or "unknown")
@@ -1488,7 +1269,7 @@ def resolve_output_path(raw: str) -> Path:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("omp", "claude", "codex", "all"), default="all")
+    parser.add_argument("--source", choices=("claude", "codex", "all"), default="all")
     parser.add_argument("--claude-dir", action="append", type=Path, metavar="DIR",
                         help="Claude Code config directory; repeat to include multiple roots")
     parser.add_argument("--codex-dir", type=Path, default=Path.home() / ".codex", metavar="DIR")
@@ -1530,65 +1311,34 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     start_ms = end_ms - args.days * 86_400_000
     messages, tool_calls, compactions, low_effort_segments, parse_warnings = [], [], [], [], []
     prices = {}
-    sources = ("omp", "claude", "codex") if args.source == "all" else (args.source,)
-    if "omp" in sources:
-        if not STATS_PATH.is_file():
-            if args.source == "omp":
-                raise RuntimeError(
-                    f"OMP statistics database not found at {STATS_PATH}. Run 'omp stats --summary' first."
-                )
-            parse_warnings.append("omp: statistics database not found; source skipped")
-        else:
-            try:
-                with closing(open_read_only(STATS_PATH)) as connection:
-                    messages = load_messages(connection, start_ms, end_ms, args.folder, args.session)
-                    if not args.baseline:
-                        tool_calls = load_tool_calls(connection, start_ms, end_ms, args.folder, args.session)
-            except sqlite3.Error as error:
-                raise RuntimeError(f"Could not read OMP statistics at {STATS_PATH}: {error}") from error
-            if not messages and args.source == "omp":
-                raise RuntimeError(
-                    "No OMP request rows matched the selected period and filters. "
-                    "Run 'omp stats --summary' to synchronize statistics, then retry."
-                )
-            if not messages:
-                parse_warnings.append("omp: no request rows matched the selected period and filters")
-            for row in [*messages, *tool_calls]:
-                row["source"] = "omp"
-            if not args.baseline and messages:
-                prices.update(load_prices(MODELS_PATH))
-                low_effort_segments, compactions, warnings = parse_session_events(messages, start_ms, end_ms)
-                parse_warnings.extend(warnings)
-    if any(source != "omp" for source in sources):
-        try:
-            prices.update(load_rates(args.rates.expanduser()))
-        except (OSError, ValueError):
-            parse_warnings.append("Local model rates unavailable or invalid; unpriced nominal costs are stored as zero")
-        claude_dirs = args.claude_dir
-        if claude_dirs is None:
-            claude_dirs = [path for path in (Path.home() / ".claude",) if path.is_dir()]
-        for source in sources:
-            if source == "omp":
-                continue
-            directories = claude_dirs if source == "claude" else [args.codex_dir]
-            rows, calls, events, warnings = load_local_source(
-                source, [path.expanduser() for path in directories], prices,
-                start_ms, end_ms, args.folder, args.session,
-            )
-            messages.extend(rows)
-            if not args.baseline:
-                tool_calls.extend(calls)
-                compactions.extend(events)
-                for row in rows:
-                    if str(row["model"]).startswith("claude-opus") and row.get("effort") in LOW_EFFORT_LEVELS:
-                        low_effort_segments.append({
-                            "session_file": row["session_file"], "model": row["model"],
-                            "thinking_level": row["effort"], "request_count": 1,
-                            "start_timestamp": utc_iso(row["timestamp"]), "end_timestamp": utc_iso(row["timestamp"]),
-                            "total_tokens": row["total_tokens"], "cost_usd": row["cost_total"],
-                            "entry_ids": [row["entry_id"]],
-                        })
-            parse_warnings.extend(warnings)
+    sources = ("claude", "codex") if args.source == "all" else (args.source,)
+    try:
+        prices.update(load_rates(args.rates.expanduser()))
+    except (OSError, ValueError):
+        parse_warnings.append("Local model rates unavailable or invalid; unpriced nominal costs are stored as zero")
+    claude_dirs = args.claude_dir
+    if claude_dirs is None:
+        claude_dirs = [path for path in (Path.home() / ".claude",) if path.is_dir()]
+    for source in sources:
+        directories = claude_dirs if source == "claude" else [args.codex_dir]
+        rows, calls, events, warnings = load_local_source(
+            source, [path.expanduser() for path in directories], prices,
+            start_ms, end_ms, args.folder, args.session,
+        )
+        messages.extend(rows)
+        if not args.baseline:
+            tool_calls.extend(calls)
+            compactions.extend(events)
+            for row in rows:
+                if str(row["model"]).startswith("claude-opus") and row.get("effort") in LOW_EFFORT_LEVELS:
+                    low_effort_segments.append({
+                        "session_file": row["session_file"], "model": row["model"],
+                        "thinking_level": row["effort"], "request_count": 1,
+                        "start_timestamp": utc_iso(row["timestamp"]), "end_timestamp": utc_iso(row["timestamp"]),
+                        "total_tokens": row["total_tokens"], "cost_usd": row["cost_total"],
+                        "entry_ids": [row["entry_id"]],
+                    })
+        parse_warnings.extend(warnings)
     data = AuditData(
         messages=messages,
         tool_calls=tool_calls,

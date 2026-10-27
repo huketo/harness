@@ -1,5 +1,5 @@
 {
 	"version": 1,
-	"_comment": "Public distribution snapshot with no scheduled tasks. A job entry declares id, title, schedule, timezone, target, kind (shell with command, or agent), cwd, timeoutSeconds, maxRunsPerDay, failureLimit, optional noOpMarker, and prompt; t3/scheduled/guard.mjs enforces the limits because a T3 scheduled task has none. Creating, enabling, or changing a T3 task is an owner decision outside installation.",
+	"_comment": "Public distribution snapshot with no scheduled tasks. A job entry declares id, title, schedule, timezone, target, kind (shell with command, or agent), cwd, timeoutSeconds, maxRunsPerDay, failureLimit, optional noOpMarker, optional daysOfMonth, and prompt; t3/scheduled/guard.mjs enforces the limits because a T3 scheduled task has none, and admits a job with daysOfMonth (scheduled daily, since T3 has no monthly trigger) only on those days until one run of the month ends ok. Creating, enabling, or changing a T3 task is an owner decision outside installation.",
 	"jobs": []
 }

@@ -7,7 +7,7 @@ description: T3 Code에서 독립 구현을 여러 워크트리의 자식 에이
 
 이 스레드가 오케스트레이터다. 목표를 슬라이스로 나누고, 슬라이스마다 `delegate_task`로 워크트리 자식을 띄우고, 독립 리뷰어로 검수하고, 통합 브랜치에 합친다. 상태는 파일에 두고 자식의 주장은 믿지 않는다.
 
-시작 전에 `orchestrator_capabilities`를 호출한다. 도구가 없으면 T3 스레드 밖이라고 말하고 멈춘다. Herdr 페인이면 `herdr-orchestrate` 스킬을 쓴다. 대상 선택과 도구 조합은 [references/targets.md](references/targets.md)를 따른다.
+시작 전에 `orchestrator_capabilities`를 호출한다. 도구가 없으면 T3 스레드 밖이라고 말하고 멈춘다. 대상 선택과 도구 조합은 [references/targets.md](references/targets.md)를 따른다.
 
 ## 역할
 

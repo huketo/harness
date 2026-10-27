@@ -5,34 +5,26 @@ REPO="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DEST="$HOME/.agents/skills"
 AGY_CONFIG="$HOME/.gemini/config"
 DRY_RUN=false
-WITH_CONFIG=false
 SKILLS_ONLY=false
 
 usage() {
   cat <<EOF
-usage: $0 [--dry-run] [--with-config | --skills-only]
+usage: $0 [--dry-run] [--skills-only]
 
   --dry-run      show links, backups, and replacements without changing files
-  --with-config  apply omp/config.apply.sh after all links succeed
-  --skills-only link skills only; leave Herdr, OMP, AGY, and commands unchanged
+  --skills-only  link skills only; leave AGY, Codex rules, and plugins unchanged
 EOF
 }
 
 while (( $# > 0 )); do
   case "$1" in
     --dry-run) DRY_RUN=true ;;
-    --with-config) WITH_CONFIG=true ;;
     --skills-only) SKILLS_ONLY=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
-
-if $SKILLS_ONLY && $WITH_CONFIG; then
-  echo "--skills-only cannot be combined with --with-config" >&2
-  exit 2
-fi
 
 points_into_repo() {
   local resolved
@@ -104,73 +96,6 @@ link_skill() {
   else
     ln -s -- "$src" "$target"
     echo "linked skill: $target -> $src"
-  fi
-}
-
-link_dir() {
-  local src="$1"
-  local target="$2"
-  local parent
-  parent="$(dirname "$target")"
-
-  if [[ ! -d "$src" ]]; then
-    echo "error: managed source directory is missing: $src" >&2
-    conflicts+=("$src")
-    return
-  fi
-  ensure_dir "$parent" || return
-
-  if same_link "$target" "$src"; then
-    echo "unchanged asset: $target -> $src"
-    return
-  fi
-
-  if [[ -L "$target" ]]; then
-    if ! points_into_repo "$target"; then
-      echo "skipped asset: $target links outside this repo to $(readlink -f -- "$target" 2>/dev/null || readlink -- "$target")" >&2
-      conflicts+=("$target")
-      return
-    fi
-    if $DRY_RUN; then
-      echo "would refresh asset link: $target -> $src"
-    else
-      ln -sfn -- "$src" "$target"
-      echo "refreshed asset: $target -> $src"
-    fi
-    return
-  fi
-
-  if [[ -e "$target" ]]; then
-    echo "skipped asset: $target exists and is not a symlink" >&2
-    conflicts+=("$target")
-    return
-  fi
-
-  if $DRY_RUN; then
-    echo "would link asset: $target -> $src"
-  else
-    ln -s -- "$src" "$target"
-    echo "linked asset: $target -> $src"
-  fi
-}
-
-retire_link() {
-  local src="$1"
-  local target="$2"
-
-  if same_link "$target" "$src"; then
-    if $DRY_RUN; then
-      echo "would remove retired asset link: $target"
-    else
-      rm -- "$target"
-      echo "removed retired asset link: $target"
-    fi
-    return
-  fi
-
-  if [[ -e "$target" || -L "$target" ]]; then
-    echo "skipped retired asset: $target is not this repo's managed link" >&2
-    conflicts+=("$target")
   fi
 }
 
@@ -327,31 +252,11 @@ if $SKILLS_ONLY; then
   exit 0
 fi
 
-migrate_file "$REPO/herdr/config.toml" "$HOME/.config/herdr/config.toml"
-migrate_file "$REPO/herdr/scripts/usagebar-toggle.sh" "$HOME/.config/herdr/scripts/usagebar-toggle.sh"
-migrate_file "$REPO/herdr/scripts/usagebar-sync-fork.sh" "$HOME/.config/herdr/scripts/usagebar-sync-fork.sh"
-migrate_file "$REPO/herdr/plugins/usagebar.config.toml" "$HOME/.config/herdr/plugins/config/usagebar/config.toml"
-
-# Repository-owned OMP extensions coexist with Herdr's managed integration.
-for extension in profiles herdr; do
-  link_dir "$REPO/omp/extensions/$extension" "$HOME/.omp/agent/extensions/harness-$extension"
-done
-for extension in accounts native-compaction; do
-  retire_link "$REPO/omp/extensions/$extension" "$HOME/.omp/agent/extensions/harness-$extension"
-done
-echo "warning: account routing and native-compaction extensions are retired. Existing authentication, preferences, sessions, and backups are unchanged; legacy native-compaction replay and portable migration are no longer available. Restart running OMP processes." >&2
-migrate_file "$REPO/omp/profiles.ts" "$HOME/.local/bin/omp-profile"
-migrate_file "$REPO/herdr/scripts/harness-run.ts" "$HOME/.local/bin/harness-run"
-# `~/.config/herdr-cron/jobs.yaml` is deliberately absent. `herdr-cron job add`
-# writes it through a temporary file and `os.Rename`, which replaces a symlink
-# with a regular file; that already happened once and left the install refusing
-# to touch the path. The repo keeps `herdr/cron/jobs.snapshot.yaml` instead.
-
-# Antigravity CLI. `hooks.json` under $AGY_CONFIG belongs to herdr's integration
-# installer and `mcp_config.json` to `agy mcp`, so this repo stays out of both.
+# Antigravity CLI. `hooks.json` and `mcp_config.json` under $AGY_CONFIG are
+# tool-owned (`mcp_config.json` by `agy mcp`), so this repo does not manage either.
 # Its plugin is installed by plugin/install.mjs below. The remaining two slots are
 # linked to the assets that already hold the canonical text: the skill tree shared
-# with OMP and Claude Code, and the user's Korean writing instructions.
+# with Claude Code and Codex, and the user's Korean writing instructions.
 link_foreign "$HOME/.agents/skills" "$AGY_CONFIG/skills"
 link_foreign "$HOME/.claude/CLAUDE.md" "$AGY_CONFIG/rules/AGENTS.md"
 
@@ -377,14 +282,4 @@ if (( ${#conflicts[@]} > 0 )); then
   printf '  %s\n' "${conflicts[@]}" >&2
   echo "Everything else was processed. Resolve each ownership conflict and rerun." >&2
   exit 1
-fi
-
-if $WITH_CONFIG; then
-  if $DRY_RUN; then
-    echo "would apply omp settings: $REPO/omp/config.apply.sh"
-  else
-    "$REPO/omp/config.apply.sh"
-  fi
-else
-  echo "omp settings unchanged (pass --with-config to apply them)"
 fi

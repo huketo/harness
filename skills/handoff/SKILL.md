@@ -14,3 +14,5 @@ Do not duplicate content already captured in other artifacts (specs, plans, ADRs
 Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
 
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.
+
+In a T3 Code thread (the `t3-code` MCP tools are available), when the user wants the work continued in a new thread, use the `t3-handoff` skill instead: it writes this document and launches the new thread with it.

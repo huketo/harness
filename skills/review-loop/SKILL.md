@@ -36,7 +36,7 @@ description: 변경 하나를 작성자와 다른 모델 계열의 읽기 전용
 
 - **Claude(이 스레드가 Claude Code일 때)**: 하네스 플러그인의 `harness:reviewer` 하위 agent를 쓴다. 도구가 `Read`, `Grep`, `Glob`뿐이라 쓰기와 명령 실행이 도구 수준에서 막힌다. 모델은 이 스레드의 모델을 따르므로, 다른 Claude 모델을 지정받았으면 아래 `delegate_task` 경로를 쓴다. 회차마다 새 하위 agent를 띄우고 브리프 파일 경로를 준다.
 - **다른 제공자**: T3 안에서는 `orchestrator_capabilities`로 지정 모델을 확인하고 `delegate_task`(`role: "review"`, `isolation: "worktree"`, `mode: "async"`, `target`에 제공자·모델·옵션)로 실행한다. 회차마다 새 `delegate_task`를 부르고 `clientRequestId`를 `<slug>-review-r<n>`처럼 회차마다 다르게 둔다. `childThreadId`는 저장소일 뿐 다음 회차의 대상이 아니다. `t3_thread_send`, `create_threads`, `t3_thread_launch`로 리뷰를 이어 가지 않는다. 워크트리 자식은 부모의 로컬 커밋에서 시작하므로, 커밋하지 않은 변경은 저장한 diff로만 전달된다는 점을 브리프에 적는다. 위임 직전에 `scripts/tree-unchanged.sh snapshot <이 워크트리> > <state>/git-before-r<n>.txt`를 남기고, 결과가 오면 `scripts/tree-unchanged.sh check <자식 워크트리> <시작 SHA> <state>/git-before-r<n>.txt`를 먼저 돌린다. Antigravity 자식에는 `runtimeMode: "full-access"`가 필요하고 하네스 규칙을 받지 못하므로 브리프에 규칙을 직접 적는다(`t3-orchestrate`의 `references/targets.md`).
-- **T3 밖**: Codex 경로는 그대로 쓴다. Herdr 페인에서는 `herdr-orchestrate`의 `omp/review.ts` 제한 reviewer도 쓸 수 있다. 다른 제공자는 그 하네스의 하위 agent로 실행하고, 읽기 전용이 프롬프트 지시뿐이라는 사실을 원장에 적는다.
+- **T3 밖**: Codex 경로는 그대로 쓴다. 다른 제공자는 그 하네스의 하위 agent로 실행하고, 읽기 전용이 프롬프트 지시뿐이라는 사실을 원장에 적는다.
 
 리뷰어는 작성자와 다른 모델 계열이어야 한다. 작성자가 Codex라서 기본값이 같은 계열이 되면 다른 계열의 플래그십을 고르고 그 사실과 이유를 원장에 적는다. 지정된 리뷰어에 닿을 경로가 없으면 막힌 사실을 보고한다. 다른 모델로 몰래 바꾸지 않는다.
 

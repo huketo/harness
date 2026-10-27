@@ -27,9 +27,9 @@ change 'SKILL.md behavior change' logic skills/x/SKILL.md 'Run the tests.\n' 'Sk
 change 'skill reference behavior change' logic skills/x/references/launch.md 'Wait for the agent.\n' 'Do not wait.\n'
 change 'ROLE.md behavior change' logic agents/dev/ROLE.md 'Quote arguments.\n' 'Pass arguments as typed.\n'
 # r1 blocking 2: a value change in an approval setting is security.
-change 'allowed_user_ids value' security herdr/hitl.config.example.toml \
+change 'allowed_user_ids value' security config/notify.config.example.toml \
   '[telegram]\nallowed_user_ids = ["1"]\n' '[telegram]\nallowed_user_ids = ["2"]\n'
-change 'allowed_user_ids element on its own line' security herdr/hitl.toml \
+change 'allowed_user_ids element on its own line' security config/notify.toml \
   'allowed_user_ids = [\n  "1",\n]\n' 'allowed_user_ids = [\n  "2",\n]\n'
 # r1 blocking 3: no config change is none just because keys look preserved.
 change 'json key renamed on one line' logic config.json '{"mode":"safe"}\n' '{"execute":"safe"}\n'
@@ -46,7 +46,7 @@ change 'repo logic rule over a plain agent doc' logic docs/agents/style.md 'Shor
 rm "$tmp/.review-tiers.tsv"; git -C "$tmp" commit -qam 'drop repo rules'
 
 # r2 blocking: no keyword list names every boundary, so the classifier is a floor and a reviewer escalates.
-change 'restrictToolNames true->false (classifier floor)' logic omp/review.ts \
+change 'restrictToolNames true->false (classifier floor)' logic codex/review.ts \
   'function buildRestrictedReviewSessionOptions() {\n  return { restrictToolNames: true };\n}\n' \
   'function buildRestrictedReviewSessionOptions() {\n  return { restrictToolNames: false };\n}\n'
 esc=$(mktemp -d); trap 'rm -rf "$tmp" "$esc"' EXIT
@@ -58,9 +58,9 @@ escalated() { # <name> <expected tier> <review text>: feeds one review to review
   if [ "$got" = "$2" ]; then echo "PASS $1: $got"; else echo "FAIL $1: expected $2, got ${got:-error}"; fail=1; fi
 }
 verdict='VERDICT: CHANGES\n'
-escalated 'tier line after the first finding is ignored' logic "${verdict}S1 [blocker] omp/review.ts:2 claim. Fix: x\nTIER: security\n"
+escalated 'tier line after the first finding is ignored' logic "${verdict}S1 [blocker] codex/review.ts:2 claim. Fix: x\nTIER: security\n"
 escalated 'an unknown tier word is ignored' logic "${verdict}TIER: critical\n"
-escalated 'restrictToolNames: logic (escalated by review)' security "${verdict}TIER: security\nS1 [blocker] omp/review.ts:2 claim. Fix: x\n"
+escalated 'restrictToolNames: logic (escalated by review)' security "${verdict}TIER: security\nS1 [blocker] codex/review.ts:2 claim. Fix: x\n"
 escalated 'a later review stating none does not lower it' security "${verdict}TIER: none\n"
 
 exit $fail

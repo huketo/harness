@@ -68,7 +68,7 @@ The following are starting rules of thumb, not market benchmarks; verify them ag
 
 An action threshold should include materiality, sample sufficiency, comparison period, and exclusions for known events. Define these before interpreting results; keep them stable through an evaluation window.
 
-Scheduling is a separate requested action. When installed, use the `herdr-cron` skill; otherwise use the host's scheduler or a manual cadence. Keep the loop definition independent of the scheduling mechanism.
+Scheduling is a separate requested action. In a T3 Code thread, use T3 Code's scheduled tasks (`schedule_task`); otherwise use the host's scheduler or a manual cadence. Keep the loop definition independent of the scheduling mechanism.
 
 For a scheduling request, prepare a configuration specifying timezone, cadence, maximum runtime, overlap behavior, inputs, artifact location, state storage, error output, and disable procedure. Account for delayed jobs and missed windows; choose skip or catch-up behavior explicitly.
 

@@ -1,11 +1,9 @@
 """Synthetic local-log contracts; no host sessions or catalogs are read."""
 import json
 import shutil
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from contextlib import closing
 from unittest.mock import patch
 
 import analyze
@@ -42,7 +40,7 @@ class LocalSourcesTest(unittest.TestCase):
             '--rates', str(self.rates), *extra])
 
     def run_report(self, source, *extra):
-        with patch.object(analyze, 'STATS_PATH', self.root / 'absent.db'), patch.object(analyze.time, 'time', return_value=NOW):
+        with patch.object(analyze.time, 'time', return_value=NOW):
             return analyze.run(self.args(source, *extra))
 
     def test_claude_deduplicates_requests_and_tracks_subagents(self):
@@ -88,7 +86,6 @@ class LocalSourcesTest(unittest.TestCase):
         report = self.run_report('all', '--baseline')
         self.assertEqual(analyze.parse_args([]).source, 'all')
         self.assertEqual(report['baseline']['request_count'], 2)
-        self.assertTrue(any('omp' in w for w in report['parse_warnings']))
         self.assertTrue(any('codex' in w for w in report['parse_warnings']))
         self.assertEqual(set(report['baseline']['source_spend']), {'claude'})
 
@@ -125,20 +122,6 @@ class LocalSourcesTest(unittest.TestCase):
         report = self.run_report('claude', '--claude-dir', str(other), '--baseline')
         self.assertEqual(report['baseline']['request_count'], 2)
         self.assertTrue(any('invalid JSON' in w for w in report['parse_warnings']))
-
-    def test_omp_baseline_keeps_observed_cost_and_missing_database_error(self):
-        with self.assertRaisesRegex(RuntimeError, "OMP statistics database not found.*omp stats --summary"):
-            self.run_report('omp', '--baseline')
-        db = self.root / 'stats.db'
-        with closing(sqlite3.connect(db)) as connection:
-            connection.execute('CREATE TABLE messages (id INTEGER, session_file TEXT, entry_id TEXT, timestamp INTEGER, folder TEXT, model TEXT, provider TEXT, agent_type TEXT, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, total_tokens INTEGER, cost_input REAL, cost_output REAL, cost_cache_read REAL, cost_cache_write REAL, cost_total REAL)')
-            connection.execute("INSERT INTO messages VALUES (1, 'synthetic.jsonl', 'one', 1792922400000, '/synthetic/project', 'gpt-6.1-sol', 'openai-codex', 'main', 10, 10, 0, 0, 20, 1, 2, 0, 0, 3)")
-            connection.commit()
-        with patch.object(analyze, 'STATS_PATH', db), patch.object(analyze.time, 'time', return_value=NOW):
-            report = analyze.run(self.args('all', '--baseline'))
-        self.assertEqual(report['baseline']['source_spend']['omp']['nominal_cost_usd'], 3)
-        self.assertAlmostEqual(report['baseline']['source_spend']['codex']['nominal_cost_usd'], .00243)
-        self.assertEqual(report['baseline']['request_count'], 5)
 
 
 if __name__ == '__main__':

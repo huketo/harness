@@ -11,7 +11,6 @@
         "Read(~/.claude/.credentials.json)",
         "Read(~/.config/gh/**)",
         "Read(~/.config/glab-cli/**)",
-        "Read(~/.config/herdr-hitl/config.toml)",
         "Read(~/.gemini/antigravity-cli/antigravity-oauth-token)",
         "Read(~/.t3/userdata/providers/**)"
       ]

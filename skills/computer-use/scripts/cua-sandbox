@@ -25,7 +25,7 @@ from pathlib import Path
 from cua import Image, Sandbox
 from cua_sandbox.runtime import docker as docker_runtime
 
-DEFAULT_NAME = "omp-desktop"
+DEFAULT_NAME = "agent-desktop"
 SHOT_DIR = Path(os.environ.get("CUA_SANDBOX_OUT", Path(tempfile.gettempdir()) / "cua-sandbox"))
 
 

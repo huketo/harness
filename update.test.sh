@@ -19,12 +19,12 @@ git -C "$TMP/author" commit -qm initial
 git -C "$TMP/author" push -q origin main
 git clone -q "$TMP/origin.git" "$TMP/installed"
 # Skills-only works without personal instructions and leaves config untouched.
-mkdir -p "$HOME/.config/herdr"
-printf 'keep\n' > "$HOME/.config/herdr/config.toml"
+mkdir -p "$HOME/.codex/rules"
+printf 'keep\n' > "$HOME/.codex/rules/default.rules"
 bash "$TMP/installed/install.sh" --skills-only
 [[ -L "$HOME/.agents/skills/example" && -L "$HOME/.claude/skills/example" ]]
-[[ "$(cat "$HOME/.config/herdr/config.toml")" == keep ]]
-[[ ! -e "$HOME/.omp" && ! -e "$HOME/.gemini" && ! -e "$HOME/.local/bin" ]]
+[[ "$(cat "$HOME/.codex/rules/default.rules")" == keep ]]
+[[ ! -e "$HOME/.codex/rules/harness.rules" && ! -e "$HOME/.gemini" ]]
 # Fast-forward + reinstall discovers a newly added skill.
 mkdir -p "$TMP/author/skills/added"
 printf '%s\n' '---' 'name: added' '---' > "$TMP/author/skills/added/SKILL.md"
@@ -48,7 +48,7 @@ mkdir "$HOME/.agents/skills/added"
 if bash "$TMP/installed/install.sh" --skills-only; then exit 1; fi
 [[ -d "$HOME/.agents/skills/added" && ! -L "$HOME/.agents/skills/added" ]]
 [[ ! -e "$HOME/.claude/skills/added" && ! -L "$HOME/.claude/skills/added" ]]
-# Invalid options, dirty work and topic branches never update the checkout.
+# Unknown or retired options, dirty work and topic branches never update the checkout.
 if bash "$TMP/installed/update.sh" --skills-only --with-config; then exit 1; fi
 printf 'dirty\n' > "$TMP/installed/untracked"
 if bash "$TMP/installed/update.sh" --skills-only; then exit 1; fi

@@ -2,7 +2,7 @@
 
 [문서 색인](index.md) · [English README](../README.md) · [한국어 README](../README.ko.md)
 
-이 문서는 Claude Code 2.1.310, Codex CLI 0.164.0, Antigravity CLI(`agy`) 1.4.7의 설정·커스터마이즈 표면 가운데 Harness가 무엇을 어떤 형태로 배포하는지 정하고, 각 항목이 [T3 Code](https://github.com/pingdotgg/t3code) 안에서도 적용되는지 적습니다. 조사일은 2026-10-26이며, 근거는 공식 문서·변경 이력·설치된 바이너리와 그 `--help`, 공개 T3 Code 소스입니다. 문서와 바이너리가 다르면 바이너리를 따랐습니다. 관측 경위는 [FACTS 15절](FACTS.md#15-t3-code와-에이전트-설정-표면-2026-10-26)에 있습니다.
+이 문서는 Claude Code 2.1.310, Codex CLI 0.164.0, Antigravity CLI(`agy`) 1.4.7의 설정·커스터마이즈 표면 가운데 Harness가 무엇을 어떤 형태로 배포하는지 정하고, 각 항목이 [T3 Code](https://github.com/pingdotgg/t3code) 안에서도 적용되는지 적습니다. 조사일은 2026-10-26이며, 근거는 공식 문서·변경 이력·설치된 바이너리와 그 `--help`, 공개 T3 Code 소스입니다. 문서와 바이너리가 다르면 바이너리를 따랐습니다. 관측 경위는 [FACTS 6절](FACTS.md#6-t3-code와-에이전트-설정-표면-2026-10-26)에 있습니다.
 
 ## 1. 배포 형태의 결정
 
@@ -48,7 +48,7 @@
 
 | 에이전트 | 설정 | 권장 | 근거 | T3 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| Claude Code | `permissions.deny`의 자격 증명 읽기 | `Read(~/.ssh/**)`, `Read(~/.aws/**)`, `Read(~/.claude/.credentials.json)`, `Read(~/.config/gh/**)`, `Read(~/.config/glab-cli/**)`, herdr-hitl 설정, agy OAuth 토큰, `Read(~/.t3/userdata/providers/**)` | deny는 `bypassPermissions`에서도 막습니다 | 예 | 적용 |
+| Claude Code | `permissions.deny`의 자격 증명 읽기 | `Read(~/.ssh/**)`, `Read(~/.aws/**)`, `Read(~/.claude/.credentials.json)`, `Read(~/.config/gh/**)`, `Read(~/.config/glab-cli/**)`, agy OAuth 토큰, `Read(~/.t3/userdata/providers/**)` | deny는 `bypassPermissions`에서도 막습니다 | 예 | 적용 |
 | Claude Code | PreToolUse 머지 가드 | 플러그인 훅, `onFailure: "block"` | 종료 코드 1, 시간 초과, 충돌은 기본적으로 통과(fail open)합니다 | 예 | 적용 |
 | Claude Code | 읽기 전용 리뷰어 | `tools: Read, Grep, Glob` | 부모가 bypass·auto이면 하위 agent의 `permissionMode`가 무시됩니다 | 예 | 적용 |
 | Claude Code | 머지 `ask` 규칙 | 쓰지 않음 | ask 규칙은 bypass에서도 사람에게 묻기 때문에 무인 `full-send`가 멈춥니다. 훅이 모드를 판단합니다 | 예 | 결정 |

@@ -12,7 +12,7 @@ Produce marketing work that is true to the product as it ships. Every deliverabl
 
 Name the deliverable, its audience, the channel or surface, the market, and the language. Use the audience's language for the deliverable and the user's language for discussion with the user.
 
-Drafting is the default scope. Publishing, posting, sending, scheduling, submitting to directories, contacting people (creators, press, partners), spending on ads, and changing live tracking, sites, or production data are external effects: prepare the draft, checklist, or spec, and execute only with explicit authorization that names the action. A request that names the action still leaves the account, recipients, final content, and timing for the owner to confirm. Deliver the drafts first, then request that confirmation, so the work is usable whether or not approval arrives; when the `herdr-hitl` skill is installed, use it for the request. A scheduled or otherwise unattended run stages its output and records blockers instead of asking or executing.
+Drafting is the default scope. Publishing, posting, sending, scheduling, submitting to directories, contacting people (creators, press, partners), spending on ads, and changing live tracking, sites, or production data are external effects: prepare the draft, checklist, or spec, and execute only with explicit authorization that names the action. A request that names the action still leaves the account, recipients, final content, and timing for the owner to confirm. Deliver the drafts first, then request that confirmation, so the work is usable whether or not approval arrives; in a T3 Code thread, make the request in the thread as its human-in-the-loop rules direct. A scheduled or otherwise unattended run stages its output and records blockers instead of asking or executing.
 
 ## 2. Load the product truth
 
@@ -76,8 +76,8 @@ These skills own neighboring outputs. Use them when installed; otherwise stop at
 | Diagrams of funnels, loops, or journeys | `diagram-design` |
 | Open-ended investigation beyond the product's own sources | `research` |
 | Reports and long-form documents for internal readers | `writing-for-humans` |
-| Scheduling a recurring run | `herdr-cron` |
-| A contested, costly strategic choice | `herdr-quorum` |
+| Scheduling a recurring run | T3 Code scheduled tasks (`schedule_task`) |
+| A contested, costly strategic choice | `council` |
 
 ## 6. Deliver
 
