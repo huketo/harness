@@ -20,7 +20,7 @@
 | `t3/scheduled/host-sync.mjs`, `host-sync.test.mjs` | 허용 목록 기반 동기화 guard와 임시 Git 저장소 회귀 테스트 |
 | `t3/scheduled/guard.mjs`, `guard.test.mjs`, `jobs.json` | T3 예약 작업에 없는 시간 초과·일일 실행 횟수·연속 실패 중지·월간 실행일을 강제하는 가드와 회귀 테스트. `jobs.json`은 빈 공개 배포 상태 |
 | `plugin/` | Claude Code·AGY 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, AGY 규칙), 산출물 빌더 `build.mjs`, 설치 계획기 `install.mjs`, 설정에 합칠 거부 규칙 `guardrails.json`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
-| `codex/` | 읽기 전용 Codex 리뷰어 `review.ts`와 테스트, `~/.codex/rules/harness.rules`로 연결하는 실행 정책(머지 명령은 사람의 승인) |
+| `codex/` | T3 밖에서 쓰는 읽기 전용 Codex 리뷰어 `review.ts`와 테스트, `~/.codex/rules/harness.rules`로 연결하는 실행 정책(머지 명령은 사람의 승인) |
 | `skills/` | 이 레포가 소유하는 개인 스킬과 고지를 유지한 편입 스킬 |
 | `skills/daily-report/` | GitLab/iCal 근거 수집과 초안 작성 지침. Daou Office 제출은 사용자 UI 작업 |
 | `agy/` | Antigravity CLI 설정의 공개 예시 스냅샷(`settings.snapshot.json`) |

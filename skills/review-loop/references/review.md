@@ -26,9 +26,9 @@
 
 읽기 전용은 프롬프트가 아니라 실행기의 권한으로 보장하고, 그럴 수 없으면 사후에 증명한다.
 
-- Codex 리뷰어: `codex/review.ts`. OS 샌드박스가 읽기 전용이고 네트워크·MCP·하위 agent가 꺼져 있다. 시작 전 `--inspect-tools`가 모델 호출 없이 이 경계를 확인하고, 경계가 넓어져 있으면 모델 호출 전에 거부한다.
 - Claude 리뷰어: 하네스 플러그인의 `harness:reviewer` 하위 agent. `tools`가 읽기·검색 도구만 허용하므로 도구 수준에서 읽기 전용이다. Claude Code는 부모가 `bypassPermissions`·`auto`일 때 하위 agent의 `permissionMode`를 무시하므로, 경계는 모드가 아니라 도구 목록이다.
-- 그 밖의 제공자: T3에 읽기 전용 실행 모드가 없으므로 `delegate_task`를 `isolation: "worktree"`로 실행하고, 위임 직전의 `scripts/tree-unchanged.sh snapshot`과 끝난 뒤의 `check`로 자식 워크트리와 공유 git 제어 파일(`config`, 훅, `info/`)이 그대로인지 확인한다. 자식 워크트리는 저장소의 `.git`을 공유하므로, 설정이나 훅을 바꾸면 이후 git 명령에서 코드가 실행될 수 있기 때문이다. 실패하면 그 회차의 판정을 쓰지 않고 리뷰 실패로 센다. 이 확인은 로컬 체크아웃만 증명하며 원격 쓰기(푸시, 댓글)가 없었다는 증거가 아니다. 브리프의 금지 문장과 결과 대조로 보완한다.
+- T3 안의 Codex와 그 밖의 제공자: T3에 읽기 전용 실행 모드가 없으므로 `delegate_task`를 `isolation: "worktree"`로 실행하고, 위임 직전의 `scripts/tree-unchanged.sh snapshot`과 끝난 뒤의 `check`로 자식 워크트리와 공유 git 제어 파일(`config`, 훅, `info/`)이 그대로인지 확인한다. 자식 워크트리는 저장소의 `.git`을 공유하므로, 설정이나 훅을 바꾸면 이후 git 명령에서 코드가 실행될 수 있기 때문이다. 실패하면 그 회차의 판정을 쓰지 않고 리뷰 실패로 센다. 이 확인은 로컬 체크아웃만 증명하며 원격 쓰기(푸시, 댓글)가 없었다는 증거가 아니다. 브리프의 금지 문장과 결과 대조로 보완한다.
+- T3 밖의 Codex 리뷰어: `codex/review.ts`. OS 샌드박스가 읽기 전용이고 네트워크·MCP·하위 agent가 꺼져 있다. 시작 전 `--inspect-tools`가 모델 호출 없이 이 경계를 확인하고, 경계가 넓어져 있으면 모델 호출 전에 거부한다.
 
 리뷰 결과는 stdout이나 작업 결과로 돌아오고 오케스트레이터가 상태 디렉터리에 저장한다. 실패한 프로세스, 시간 초과, 빈 출력은 승인이 아니다.
 
@@ -74,7 +74,7 @@
 
 ## 리뷰어 브리프
 
-자식은 대화 기록을 받지 않으므로 브리프가 아는 전부다. 상태 디렉터리의 `review-brief-<n>.md`로 저장하고, Codex에는 `--brief "Read <절대 경로> and carry it out exactly."`로, `delegate_task`에는 본문 전체를 `task`로 보낸다.
+자식은 대화 기록을 받지 않으므로 브리프가 아는 전부다. 상태 디렉터리의 `review-brief-<n>.md`로 저장하고, `delegate_task`에는 본문 전체를 `task`로, T3 밖의 `codex/review.ts`에는 `--brief "Read <절대 경로> and carry it out exactly."`로 보낸다.
 
 ```markdown
 # <slug> review round <n>

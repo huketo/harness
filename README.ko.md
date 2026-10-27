@@ -14,7 +14,7 @@ Harness는 에이전트를 Claude Code, Codex CLI, Antigravity CLI(`agy`) 기반
 | --- | --- |
 | 공유 스킬 | 저장소 소유 지침을 Claude Code·Codex·AGY에 연결합니다. 편입 자료의 원저작자 고지는 유지합니다. |
 | UI 디자인 작업 | 일반 UI 제작·검토, 이미지 기반 웹 구현, UI·브랜드 참조 이미지 생성, 선택적 설계 문서를 네 스킬로 구분합니다. 이미지·문서 생성은 필수 단계가 아닙니다. [사용법](docs/guides/usage.md)을 참고하세요. |
-| T3 Code 경로 | `t3-orchestrate`, `review-loop`, `council`이 T3의 오케스트레이션 도구로 작업을 위임합니다. `t3-handoff`는 인계 문서를 첫 메시지로 받는 새 스레드에서 작업을 이어 갑니다. [T3 사람 개입 규칙](docs/agents/hitl.md)이 질문을 스레드로 보내고, `codex/review.ts`가 Codex의 읽기 전용 샌드박스에서 독립 리뷰를 실행하며, `t3/scheduled/guard.mjs`가 예약 작업에 시간 초과와 실행 횟수 제한을 더합니다. |
+| T3 Code 경로 | `t3-orchestrate`, `review-loop`, `council`이 T3의 오케스트레이션 도구로 작업을 위임합니다. `t3-handoff`는 인계 문서를 첫 메시지로 받는 새 스레드에서 작업을 이어 갑니다. [T3 사람 개입 규칙](docs/agents/hitl.md)이 질문을 스레드로 보내고, `codex/review.ts`가 T3 밖에서 Codex의 읽기 전용 샌드박스로 독립 리뷰를 실행하고(T3 안의 Codex 리뷰어는 `delegate_task` 자식으로 실행됩니다), `t3/scheduled/guard.mjs`가 예약 작업에 시간 초과와 실행 횟수 제한을 더합니다. |
 | 지켜보는 터미널 작업 | `t3-terminal`이 개발 서버, 대화형 프롬프트, REPL, ssh, TUI처럼 사람이 지켜보거나 직접 입력해야 하는 작업을 Herdr의 workspace·tab·pane에 엽니다. 백그라운드 프로세스를 대신하지는 않습니다. |
 | MR 수명주기와 작업 모드 | tstack에서 편입한 GitLab MR·GitHub PR 스킬(`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`)과 사람이 고르는 `full-send`·`full-stop` 모드를 제공합니다. Claude Code·AGY용 `plugin/` 산출물의 머지 가드 훅과 Codex용 `codex/harness.rules`가 모드가 허락하지 않는 머지를 막으며, `full-send`는 사람이 허용 목록에 적은 저장소에서만 머지합니다. [AGENT-CONFIG](docs/AGENT-CONFIG.md)를 참고하세요. |
 | 개인 운영 | Claude Code·Codex 세션의 비용 감사, 보호된 호스트 동기화, 사람이 검토하는 일일보고 초안 흐름을 제공합니다. 호스팅 서비스가 아닙니다. |
@@ -45,7 +45,7 @@ bash install.sh
 
 사람이 지켜보거나 직접 입력해야 하는 터미널 작업은 `t3-terminal`로 보냅니다. 자신의 터미널에서 `herdr`를 실행해 그 화면에 붙으면 진행을 확인하거나 직접 입력할 수 있습니다. 짧은 조회·빌드·테스트와 백그라운드 프로세스는 평소 도구로 실행합니다.
 
-모델을 호출하지 않고 독립 Codex 리뷰어의 경계를 확인합니다.
+모델을 호출하지 않고 T3 밖에서 쓰는 Codex 리뷰어의 경계를 확인합니다.
 
 ```bash
 bun --no-install codex/review.ts --cwd <worktree> --inspect-tools

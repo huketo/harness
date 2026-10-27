@@ -883,7 +883,7 @@
       ],
       "local_changes": [
         "Merge sol-loop into the harness review policy formerly in herdr-orchestrate: the tier classifier, escalation script, and criteria move to review-loop and set the budget (none 0, logic 3, security 5) instead of a fixed rule; herdr-orchestrate and t3-orchestrate share them.",
-        "Default reviewer is Codex Sol resolved at run time by codex/review.ts; other providers run through delegate_task in a worktree with a tree-unchanged.sh snapshot check, or harness:reviewer from a Claude thread.",
+        "Default reviewer is Codex Sol; inside T3 it and other providers run through delegate_task in a worktree with a tree-unchanged.sh snapshot check (never a background shell process), harness:reviewer serves a Claude thread, and codex/review.ts resolves Sol at run time outside T3.",
         "Keep sol-loop's brief, VERDICT reply format, blocker/should/nit severities, ledger, scope-creep guard, and push rule; add TIER escalation and the harness criteria (intent, conventionality, AI slop, correctness)."
       ],
       "excluded_sources": []

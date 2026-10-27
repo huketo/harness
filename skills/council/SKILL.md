@@ -14,13 +14,13 @@ description: 서로 다른 모델 계열의 플래그십 셋에게 같은 변경
 | 계열 | 고르는 방법 | 실행 경로 |
 | --- | --- | --- |
 | Claude | `claudeAgent`의 최신 Opus, `effort: "high"` | `delegate_task`, 워크트리 격리 |
-| OpenAI | `codex/review.ts`가 고르는 현재 Sol, `--effort high` | `codex/review.ts` (읽기 전용 샌드박스) |
+| OpenAI | `codex`에서 `-sol`로 끝나는 모델, `reasoningEffort: "high"` | `delegate_task`, 워크트리 격리 |
 | Gemini | `antigravity`의 최신 플래그십 high 변형 | `delegate_task`, 워크트리 격리, `runtimeMode: "full-access"` |
 
 - 사람이 지시나 `AGENTS.md`·`CLAUDE.md`에서 위원(제공자 인스턴스와 모델)을 정하면 그대로 쓴다.
 - 계열은 실행기가 아니라 모델로 센다. `claudeAgent`와 다른 계정의 Claude 인스턴스는 같은 Claude 계열이므로 한 자리다.
 - 위원에 닿을 수 없으면(카탈로그에 없음, 인증 실패, 부모가 Full access가 아니라 Antigravity를 띄울 수 없음) 그 사실을 바로 보고한다. 다른 모델로 몰래 바꾸지 않는다. 두 계열 이상이 남으면 사람에게 알린 상태로 계속하고 표에 `unavailable`로 남긴다. 한 계열만 남으면 멈춘다.
-- T3 밖에서는 Codex 경로를 그대로 쓰고, 나머지는 그 하네스의 하위 agent로 실행한다. 이때 읽기 전용은 프롬프트 지시뿐이라는 사실을 기록한다.
+- T3 밖에서는 Codex 위원을 `review-loop`의 T3 밖 Codex 명령(`codex/review.ts`, `--effort high`)으로 실행하고, 나머지는 그 하네스의 하위 agent로 실행한다. 이때 읽기 전용은 프롬프트 지시뿐이라는 사실을 기록한다.
 
 ## 2. 대상과 브리프
 
@@ -30,8 +30,8 @@ description: 서로 다른 모델 계열의 플래그십 셋에게 같은 변경
 
 ## 3. 회차
 
-1. 세 위원을 한 응답에서 나란히 시작한다. `delegate_task`는 `role: "review"`, `mode: "async"`, `isolation: "worktree"`, `clientRequestId: "<slug>-council-<계열>-r<n>"`이고 회차마다 새로 부른다. `t3_thread_send`로 이어 보내지 않는다. Codex 위원은 `review-loop`의 Codex 명령으로 실행한다.
-2. 턴을 끝내고 완료 알림을 기다린다. 위임 직전에 `review-loop`의 `scripts/tree-unchanged.sh snapshot`으로 공유 git 상태를 남기고, 결과가 오면 `delegate_task` 위원의 워크트리를 `tree-unchanged.sh check <워크트리> <시작 SHA> <스냅숏>`으로 확인한다. 실패하거나, 응답이 양식을 따르지 않거나, 시간이 초과되면 그 위원의 이번 회차는 `no score`다. 점수를 추측하지 않는다.
+1. 세 위원을 한 응답에서 나란히 시작한다. `delegate_task`는 `role: "review"`, `mode: "async"`, `isolation: "worktree"`, `clientRequestId: "<slug>-council-<계열>-r<n>"`이고 회차마다 새로 부른다. `t3_thread_send`로 이어 보내지 않는다. 위원을 셸 백그라운드 프로세스로 돌리지 않는다.
+2. 턴을 끝내고 완료 알림을 기다린다. 위임 직전에 `review-loop`의 `scripts/tree-unchanged.sh snapshot`으로 공유 git 상태를 남기고, 결과가 오면 각 위원의 워크트리를 `tree-unchanged.sh check <워크트리> <시작 SHA> <스냅숏>`으로 확인한다. 실패하거나, 응답이 양식을 따르지 않거나, 시간이 초과되면 그 위원의 이번 회차는 `no score`다. 점수를 추측하지 않는다.
 3. 응답을 `member-<계열>-r<n>.md`로 저장한다.
 
 ## 4. 판정과 수정

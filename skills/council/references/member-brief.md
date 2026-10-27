@@ -1,6 +1,6 @@
 # 위원 브리프 양식
 
-위원은 대화 기록, 하네스 규칙, 저장소의 `AGENTS.md`를 받는다고 가정하지 않는다. 특히 T3의 Antigravity는 별도 `GEMINI_HOME`에서 실행되어 사용자 규칙과 플러그인을 읽지 않는다. 그래서 필요한 규칙을 아래 "Rules" 절에 모두 적고, 모든 경로를 절대 경로로 준다. 세 위원에게 같은 본문을 보낸다. Codex 위원에게는 이 본문을 상태 디렉터리에 저장하고 `--brief "Read <절대 경로> and carry it out exactly."`로 넘긴다.
+위원은 대화 기록, 하네스 규칙, 저장소의 `AGENTS.md`를 받는다고 가정하지 않는다. 특히 T3의 Antigravity는 별도 `GEMINI_HOME`에서 실행되어 사용자 규칙과 플러그인을 읽지 않는다. 그래서 필요한 규칙을 아래 "Rules" 절에 모두 적고, 모든 경로를 절대 경로로 준다. 세 위원에게 같은 본문을 `delegate_task`의 `task`로 보낸다. T3 밖의 Codex 위원에게는 이 본문을 상태 디렉터리에 저장하고 `--brief "Read <절대 경로> and carry it out exactly."`로 넘긴다.
 
 코드 대상이면 "Criteria"에 `review-loop`의 `references/review.md`에 있는 A~D절과 심각도 정의를 그대로 붙인다. 설계·계획 대상이면 같은 심각도 정의와 함께 "의도한 결과를 내는가, 더 단순한 대안이 있는가, 되돌리기 비용과 실패 방식은 무엇인가, 근거가 확인 가능한가"를 붙인다.
 

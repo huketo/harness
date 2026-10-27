@@ -14,7 +14,7 @@ Harness configures an existing [T3 Code](https://github.com/pingdotgg/t3code) wo
 | --- | --- |
 | Shared skills | Repository-owned instructions linked into Claude Code, Codex, and AGY, with retained notices for adopted material. |
 | UI design workflows | Four focused skills for interface design/review, image-to-web implementation, UI/brand reference-image generation, and optional design-system documentation; no mandatory image or document pipeline. See [usage](docs/guides/usage.md). |
-| T3 Code path | `t3-orchestrate`, `review-loop`, and `council` delegate through T3's orchestration tools; `t3-handoff` continues the work in a new thread from a handoff document; [T3 human-in-the-loop rules](docs/agents/hitl.md) route questions through the thread; `codex/review.ts` runs an independent review in Codex's read-only sandbox; `t3/scheduled/guard.mjs` adds timeouts and run limits to scheduled tasks. |
+| T3 Code path | `t3-orchestrate`, `review-loop`, and `council` delegate through T3's orchestration tools; `t3-handoff` continues the work in a new thread from a handoff document; [T3 human-in-the-loop rules](docs/agents/hitl.md) route questions through the thread; `codex/review.ts` runs an independent review in Codex's read-only sandbox outside T3 (inside T3 the Codex reviewer is a `delegate_task` child); `t3/scheduled/guard.mjs` adds timeouts and run limits to scheduled tasks. |
 | Watched terminal work | `t3-terminal` opens Herdr workspaces, tabs, and panes for dev servers, interactive prompts, REPLs, ssh, and TUIs that a person must watch or step into. It is not a substitute for background processes. |
 | MR lifecycle and work modes | GitLab MR and GitHub PR skills adapted from tstack (`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`) and the user-selected `full-send`/`full-stop` modes. A merge-guard hook in the `plugin/` artifacts for Claude Code and AGY, and `codex/harness.rules` for Codex, block merges the mode does not allow; `full-send` merges only in repositories you list in an allowlist. See [AGENT-CONFIG](docs/AGENT-CONFIG.md). |
 | Personal operations | Cost audits over Claude Code and Codex sessions, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
@@ -49,7 +49,7 @@ Agents run as T3 Code threads. In a thread, `t3-orchestrate` splits independent 
 
 Send terminal work a person must watch or step into through `t3-terminal`; attach with `herdr` in your own terminal to watch it or type. Run short reads, builds, tests, and background processes with normal tools.
 
-Check the independent Codex reviewer's boundary without calling a model:
+Check the boundary of the Codex reviewer used outside T3 without calling a model:
 
 ```bash
 bun --no-install codex/review.ts --cwd <worktree> --inspect-tools

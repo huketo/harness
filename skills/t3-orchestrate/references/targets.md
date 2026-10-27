@@ -59,7 +59,7 @@ delegate_task(
 
 ## 제한 리뷰어
 
-T3에는 읽기 전용 실행 모드가 없다. 리뷰어 선택, `codex/review.ts` 실행 명령, 다른 제공자의 워크트리 위임과 사후 `tree-unchanged.sh` 확인은 `review-loop` 스킬과 그 `references/review.md`의 "실행 권한"이 소유한다. `codex/review.ts`는 바깥에서 `timeout`을 두고 돌리며, 시간 초과는 리뷰 실패로 센다. `--model`을 생략하면 `codex debug models`에서 현재 Sol을 고르고, 지정하면 정확한 slug만 받는다.
+T3에는 읽기 전용 실행 모드가 없다. 리뷰어 선택, 워크트리 위임과 사후 `tree-unchanged.sh` 확인은 `review-loop` 스킬과 그 `references/review.md`의 "실행 권한"이 소유한다. 기본 Codex 리뷰어도 T3 안에서는 `delegate_task` 자식으로 띄우며, `codex/review.ts`는 T3 밖에서만 쓴다.
 
 ## 다른 T3 도구
 

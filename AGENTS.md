@@ -14,7 +14,7 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 ## Repository map
 
 - `plugin/` — one source for the Claude Code and AGY plugins (merge-guard hook, read-only reviewer agent, AGY rules), their builder and installer, and the deny rules merged into agent settings; [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where.
-- `codex/` — the read-only `codex exec` reviewer (`review.ts`) and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
+- `codex/` — the read-only `codex exec` reviewer (`review.ts`) used outside T3, and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
 - `t3/` — the guard for T3 Code scheduled tasks, its job definitions, and the guarded host-sync source; the distributed `jobs.json` contains no jobs.
 - `skills/` — personal skill sources, including the T3-facing `t3-orchestrate`, `t3-handoff` (continue work in a new thread), and `t3-terminal` (Herdr as a plain terminal multiplexer for work a person watches); preserve each adopted skill's license and provenance.
 - `agy/` — an example snapshot of Antigravity CLI settings; the AGY plugin source lives in `plugin/`.

@@ -24,7 +24,7 @@ T3는 agy CLI가 아니라 별도 ACP 서버를 T3 전용 설정 디렉터리에
 
 T3 스레드에서 독립 구현을 여러 워크트리로 나눌 때는 `t3-orchestrate`, 변경 하나를 다른 계열의 리뷰어로 반복 검토할 때는 `review-loop`, 설계나 변경을 세 계열의 플래그십으로 교차 검토하고 모두 만족할 때까지 고칠 때는 `council`을 사용합니다. 세 스킬은 `delegate_task`의 워크트리 자식을 쓰고, 용도별 제공자·모델 대응은 `skills/t3-orchestrate/references/targets.md`가 정합니다. Antigravity는 Auto 모드가 없으므로 자식에게 Full access를 명시해야 하며, 이것은 부모 스레드가 Full access일 때만 가능합니다.
 
-기본 독립 리뷰어는 읽기 전용 Codex 리뷰어 `codex/review.ts`입니다. `--model`을 생략하면 `codex debug models`에서 현재 Sol 모델을 고르고, 읽기 전용 샌드박스와 네트워크·MCP·하위 agent 차단을 모델 호출 전에 확인합니다. Claude Code 스레드에서는 하네스 플러그인의 `harness:reviewer` 하위 agent(`Read`, `Grep`, `Glob`만 사용)를 쓸 수 있습니다.
+기본 독립 리뷰어는 Codex의 현재 Sol 모델입니다. T3 안에서는 다른 리뷰어와 같이 `delegate_task`의 워크트리 자식으로 실행되므로 스레드 목록에서 진행을 추적할 수 있고, 끝난 뒤 `tree-unchanged.sh`로 워크트리가 그대로인지 확인합니다. T3 밖에서는 읽기 전용 Codex 리뷰어 `codex/review.ts`를 씁니다. `--model`을 생략하면 `codex debug models`에서 현재 Sol 모델을 고르고, 읽기 전용 샌드박스와 네트워크·MCP·하위 agent 차단을 모델 호출 전에 확인합니다. Claude Code 스레드에서는 하네스 플러그인의 `harness:reviewer` 하위 agent(`Read`, `Grep`, `Glob`만 사용)를 쓸 수 있습니다.
 
 ```bash
 bun --no-install codex/review.ts --cwd <worktree> --inspect-tools
