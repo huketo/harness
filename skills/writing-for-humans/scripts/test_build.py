@@ -21,6 +21,7 @@ SVG = """<svg viewBox="0 0 344 140" role="img" aria-labelledby="t-title t-desc" 
 
 DOC = """---
 genre: guide
+status: draft
 title: "테스트 문서"
 date: 2026-09-09
 author: 검사자
@@ -58,6 +59,9 @@ class ResolveTest(unittest.TestCase):
         t, s, _ = build.resolve(GENRES / "report.md", "ink", "print")
         self.assertEqual((t, s), ("ink", "print"))
 
+    def test_every_genre_has_doctype(self):
+        self.assertEqual(set(build.DOCTYPES), set(build.GENRE_DEFAULTS))
+
     def test_unknown_genre_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "x.md"
@@ -90,6 +94,17 @@ class PandocTest(unittest.TestCase):
         self.assertNotIn("[!WARNING]", html)
         self.assertNotIn("<script", html)
         self.assertNotIn('src="http', html)
+
+    def test_html_cover_names_doctype_and_status(self):
+        self.assertEqual(build.main([str(self.src), "--to", "html"]), 0)
+        html = (self.root / "doc.html").read_text(encoding="utf-8")
+        self.assertIn('<p class="eyebrow"><span>안내서</span><span>초안</span></p>', html)
+        self.assertIn('<section id="전제-조건" class="level2">', html)  # 요약 카드와 절 번호가 기대는 구조
+
+    def test_html_unknown_status_shown_as_written(self):
+        self.src.write_text(DOC.replace("status: draft", 'status: "보류 <b>x</b>"'), encoding="utf-8")
+        self.assertEqual(build.main([str(self.src), "--to", "html"]), 0)
+        self.assertIn("<span>보류 &lt;b&gt;x&lt;/b&gt;</span>", (self.root / "doc.html").read_text(encoding="utf-8"))
 
     def test_html_theme_override(self):
         self.assertEqual(build.main([str(self.src), "--to", "html", "--theme", "ink", "--style", "print"]), 0)

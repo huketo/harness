@@ -12,6 +12,7 @@ pandoc 3 이상이 필요하다. 없으면 FORMATS.md의 수동 절차를 따른
 from __future__ import annotations
 
 import argparse
+from html import escape
 import re
 import shutil
 import subprocess
@@ -33,6 +34,17 @@ GENRE_DEFAULTS = {
     "minutes": ("slate", "compact"),
     "post": ("editorial", "reading"),
 }
+# 표지 띠 맨 위에 "문서 종류 · 상태"로 표시한다. 목록에 없는 status 값은 적힌 그대로 표시한다.
+DOCTYPES = {
+    "report": "보고서",
+    "postmortem": "장애 보고",
+    "design": "설계 문서",
+    "guide": "안내서",
+    "brief": "결재 요청",
+    "minutes": "회의록",
+    "post": "기술 포스트",
+}
+STATUS_LABELS = {"draft": "초안", "review": "검토 중", "final": "확정", "approved": "승인"}
 TOC_MIN_SECTIONS = 6
 FRONT_RE = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
@@ -69,7 +81,12 @@ def resolve(source: Path, theme: str | None, style: str | None) -> tuple[str, st
 def pandoc_cmd(source: Path, to: str, out: Path, theme: str, style: str, meta: dict[str, str]) -> list[str]:
     cmd = ["pandoc", str(source.name), "--from", "markdown", "--standalone", "--lua-filter", str(FILTER), "-o", str(out)]
     if to == "html":
-        cmd += ["--to", "html5", "--template", str(SHELL), "--no-highlight", "-V", f"theme={theme}", "-V", f"style={style}"]
+        # --section-divs: 요약 카드(첫 절)와 절 번호 규칙이 section.level2를 기준으로 한다.
+        cmd += ["--to", "html5", "--template", str(SHELL), "--no-highlight", "--section-divs", "-V", f"theme={theme}", "-V", f"style={style}"]
+        cmd += ["-V", f"doctype={DOCTYPES[meta.get('genre', 'report')]}"]
+        if meta.get("status"):
+            # -V 값은 템플릿에 이스케이프 없이 들어가므로 직접 이스케이프한다.
+            cmd += ["-V", f"statuslabel={escape(STATUS_LABELS.get(meta['status'], meta['status']))}"]
         if int(meta["_sections"]) >= TOC_MIN_SECTIONS:
             cmd += ["--toc", "--toc-depth=2"]
     elif to == "docx":

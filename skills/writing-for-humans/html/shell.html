@@ -16,36 +16,42 @@
         --body-size: 16px;
         --body-leading: 1.7;
       }
-      /* slate: 조사·검증 보고서, 설계 문서, 회의록. 중립 청회색 */
+      /* 테마마다: 본문 색(--bg ~ --evidence-rule), 표지 띠(--band*), 표지 아래 선(--hi), 요약 카드(--tint) */
+      /* slate: 조사·검증 보고서, 설계 문서, 회의록. 남색 */
       .theme-slate {
-        --bg: #ffffff; --panel: #f6f8fa; --ink: #16191d; --muted: #5b6470; --line: #d7dce3;
-        --accent: #1f4d7a; --warn: #8a5a00; --note-bg: #fffaf0; --evidence-rule: #5b6470;
+        --bg: #ffffff; --panel: #f4f6f9; --ink: #14181f; --muted: #525b68; --line: #dde2e8;
+        --accent: #0b3a66; --warn: #7a4b00; --note-bg: #fbf7ee; --evidence-rule: #525b68;
+        --band: #0b2540; --band-ink: #ffffff; --band-muted: #b4c3d4; --band-line: #2c4a6b; --hi: #c8901a; --tint: #eef3f9;
       }
-      /* ember: 장애 보고. 사건 문서임을 첫눈에 구분하는 갈색 계열, 위험색(적색)은 쓰지 않는다 */
+      /* ember: 장애 보고. 갈색, 위험색(적색)은 쓰지 않는다 */
       .theme-ember {
         --bg: #ffffff; --panel: #faf6f2; --ink: #1c1917; --muted: #6b5f57; --line: #e3d9d0;
-        --accent: #9a3412; --warn: #8a5a00; --note-bg: #fff4ec; --evidence-rule: #6b5f57;
+        --accent: #9a3412; --warn: #7a4b00; --note-bg: #fff4ec; --evidence-rule: #6b5f57;
+        --band: #3a1708; --band-ink: #ffffff; --band-muted: #e0c4b4; --band-line: #5c3220; --hi: #d98a1c; --tint: #f8efe8;
       }
-      /* moss: 안내서·runbook. 절차 문서의 녹색 */
+      /* moss: 안내서·runbook. 녹색 */
       .theme-moss {
         --bg: #ffffff; --panel: #f4f8f4; --ink: #161d17; --muted: #586657; --line: #d3ddd3;
-        --accent: #1e6b3a; --warn: #8a5a00; --note-bg: #f6fbf4; --evidence-rule: #586657;
+        --accent: #1e6b3a; --warn: #7a4b00; --note-bg: #f6fbf4; --evidence-rule: #586657;
+        --band: #0f2e1b; --band-ink: #ffffff; --band-muted: #b5cdbc; --band-line: #2d4c37; --hi: #c8901a; --tint: #edf5ef;
       }
       /* ink: 결재·공지·1페이지 요약. 무채색, 명조 제목 */
       .theme-ink {
         --bg: #ffffff; --panel: #f5f5f5; --ink: #111111; --muted: #555c66; --line: #d4d4d4;
         --accent: #1f2937; --warn: #7a4b00; --note-bg: #fafafa; --evidence-rule: #555c66;
+        --band: #141414; --band-ink: #ffffff; --band-muted: #c4c4c4; --band-line: #3a3a3a; --hi: #9ca3af; --tint: #f2f2f2;
         --heading-font: var(--serif);
       }
-      /* editorial: 기술 블로그 포스트. 따뜻한 종이색, 명조 제목, 긴 글 읽기 폭 */
+      /* editorial: 기술 블로그 포스트. 종이색, 명조 제목, 긴 글 읽기 폭 */
       .theme-editorial {
         --bg: #fdfbf7; --panel: #f5f0e8; --ink: #1f1b16; --muted: #6a6157; --line: #e2d9cc;
         --accent: #a2461f; --warn: #7a4b00; --note-bg: #fbf3e6; --evidence-rule: #6a6157;
+        --band: #2b231b; --band-ink: #ffffff; --band-muted: #d6c8b6; --band-line: #4a3d30; --hi: #c8901a; --tint: #f5efe6;
         --heading-font: var(--serif); --measure: 680px; --body-size: 17px; --body-leading: 1.8;
       }
 
       /* ---- 스타일: 읽기 환경 ---- */
-      .style-compact { --measure: 960px; --body-size: 15px; --body-leading: 1.6; }
+      .style-compact { --measure: 960px; --body-size: 16px; --body-leading: 1.6; }
       .style-print { --measure: 720px; --font: var(--serif); --heading-font: var(--serif); --body-size: 16px; }
 
       * { box-sizing: border-box; }
@@ -60,124 +66,147 @@
         overflow-wrap: anywhere;
         -webkit-text-size-adjust: 100%;
       }
-      main {
-        max-width: var(--measure);
-        margin: 0 auto;
-        padding: clamp(20px, 4vw, 40px) clamp(14px, 4vw, 20px) 72px;
-      }
-      h1, h2, h3 { font-family: var(--heading-font); }
-      h1 {
-        font-size: clamp(22px, 5vw, 28px);
-        line-height: 1.35;
-        margin: 0 0 12px;
-        text-wrap: balance;
-      }
-      h2 {
-        font-size: clamp(18px, 3.4vw, 20px);
-        margin: clamp(28px, 5vw, 44px) 0 12px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid var(--line);
-      }
-      h3 { font-size: 16px; margin: 24px 0 8px; }
+      .wrap { max-width: calc(var(--measure) + 2 * clamp(16px, 4vw, 28px)); margin: 0 auto; padding: 0 clamp(16px, 4vw, 28px); }
+      h1, h2, h3 { font-family: var(--heading-font); text-wrap: balance; }
       h2, h3 { scroll-margin-top: 16px; }
       p, ul, ol { margin: 0 0 14px; }
       ul, ol { padding-left: 22px; }
       li { margin: 4px 0; }
       a { color: var(--accent); }
-      .lead { font-size: 1.1em; color: var(--muted); }
-      dl.meta {
-        display: grid;
-        grid-template-columns: max-content 1fr;
-        gap: 4px 16px;
-        margin: 0 0 8px;
-        padding: 14px 16px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        font-size: 15px;
+
+      /* ---- 표지 띠 ---- */
+      .cover { background: var(--band); color: var(--band-ink); border-bottom: 5px solid var(--hi); }
+      .cover .wrap { padding-top: clamp(28px, 6vw, 56px); padding-bottom: clamp(24px, 5vw, 44px); }
+      .cover a { color: var(--band-ink); }
+      .cover code { background: rgb(255 255 255 / 0.12); border-color: var(--band-line); color: inherit; }
+      .eyebrow { margin: 0 0 14px; font-family: var(--font); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; color: var(--band-muted); }
+      .eyebrow span + span::before { content: "·"; margin: 0 8px; }
+      .cover h1 { margin: 0 0 16px; font-size: clamp(26px, 6vw, 38px); line-height: 1.3; letter-spacing: -0.02em; }
+      .cover .lead { margin: 0 0 24px; font-size: clamp(16px, 2.6vw, 18px); line-height: 1.65; color: var(--band-ink); opacity: 0.9; }
+      .cover dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 28px; margin: 0; padding-top: 18px; border-top: 1px solid var(--band-line); font-family: var(--font); font-size: 15px; }
+      .cover dl:not(:has(dt)) { display: none; }
+      .cover dt { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--band-muted); }
+      .cover dd { margin: 2px 0 0; }
+
+      /* ---- 본문 ---- */
+      main.wrap { padding-top: clamp(28px, 5vw, 40px); padding-bottom: 80px; counter-reset: h2; }
+      /* 첫 ## 앞 문단(brief의 요청·권고, guide·post의 약속)은 머리글 문단으로 키운다 */
+      main.wrap > p { font-size: 1.125em; line-height: 1.65; }
+      nav.toc { margin: 0 0 32px; padding: 0 0 8px; border-bottom: 1px solid var(--line); font-family: var(--font); font-size: 15px; }
+      nav.toc::before { content: "목차"; display: block; font-weight: 800; font-size: 13px; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 8px; }
+      nav.toc > ul { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+      nav.toc > ul > li { counter-increment: toc; margin: 0; padding: 6px 0; border-top: 1px solid var(--line); }
+      nav.toc > ul > li > a::before { content: counter(toc, decimal-leading-zero); display: inline-block; width: 2.4em; font-weight: 800; color: var(--accent); }
+      nav.toc ul ul { display: none; }
+      nav.toc a { color: var(--ink); text-decoration: none; }
+      h2 { counter-increment: h2; font-size: clamp(22px, 4.4vw, 28px); line-height: 1.3; letter-spacing: -0.015em; margin: 64px 0 18px; }
+      h2::before {
+        content: counter(h2, decimal-leading-zero); display: block; width: 52px; margin-bottom: 10px; padding-top: 10px;
+        border-top: 4px solid var(--accent); font-family: var(--font); font-size: 15px; font-weight: 800; letter-spacing: 0.06em; color: var(--accent);
       }
-      dl.meta dt { color: var(--muted); }
-      dl.meta dd { margin: 0; }
-      nav.toc { margin: 16px 0 0; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font-size: 15px; }
-      nav.toc ul { margin: 0; padding-left: 20px; }
-      .table-wrap { margin: 0 0 16px; overflow-x: auto; overscroll-behavior-x: contain; }
-      table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: 15px; }
-      th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
-      th { background: var(--panel); font-weight: 600; }
+      h3 { font-size: 18px; margin: 32px 0 10px; color: var(--accent); }
+
+      /* 요약 카드: 첫 ## 앞에 문단이 없을 때만 첫 절을 카드로 만든다 */
+      main.wrap:not(:has(> p)) > section.level2:first-of-type {
+        margin-top: 8px; padding: clamp(18px, 4vw, 28px) clamp(18px, 4vw, 32px) 6px; background: var(--tint); border-radius: 6px;
+      }
+      main.wrap:not(:has(> p)) > section.level2:first-of-type > h2 { margin-top: 0; }
+      main.wrap:not(:has(> p)) > section.level2:first-of-type :is(code, pre, td):not(th *) { background: var(--bg); }
+
+      /* ---- 표 ---- */
+      .table-wrap { margin: 0 0 20px; overflow-x: auto; overscroll-behavior-x: contain; }
+      table { width: 100%; border-collapse: collapse; font-family: var(--font); font-size: 15px; line-height: 1.6; }
+      col { width: auto !important; }
+      th, td { padding: 8px 10px; text-align: left; vertical-align: top; overflow-wrap: break-word; }
+      th { background: var(--accent); color: #ffffff; font-weight: 700; }
+      th :is(a, strong, em) { color: inherit; }
+      th code { background: transparent; border-color: rgb(255 255 255 / 0.5); color: inherit; }
+      td { border-bottom: 1px solid var(--line); }
+      tbody tr:nth-child(even) td { background: var(--panel); }
       td[style*="text-align: right"], th[style*="text-align: right"], td.num, th.num {
         font-variant-numeric: tabular-nums; white-space: nowrap;
       }
+
+      /* ---- 코드, 인용, 알림, 그림, 출처 ---- */
       code { font-family: var(--mono); font-size: 0.86em; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
       pre {
-        margin: 0 0 16px; padding: 12px 14px;
-        background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
-        overflow-x: auto; overscroll-behavior-x: contain; font-size: 13px;
+        margin: 0 0 16px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+        overflow-x: auto; overscroll-behavior-x: contain; font-size: 14px; line-height: 1.55;
       }
       pre code { background: none; border: 0; padding: 0; font-size: inherit; white-space: pre; }
+      /* 근거 인용: 회색 선. 알림과 구분한다 */
       blockquote { margin: 0 0 16px; padding: 10px 14px; border-left: 3px solid var(--evidence-rule); background: var(--panel); }
-      blockquote p:last-child { margin-bottom: 0; }
       blockquote cite { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; font-style: normal; }
-      .note { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 3px; background: var(--note-bg); }
-      .note p:last-child { margin-bottom: 0; }
-      .note > p:first-child > strong:first-child { color: var(--warn); }
-      figure.diagram { margin: 0 0 20px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; }
-      figure.diagram figcaption { margin-top: 10px; color: var(--muted); font-size: 14px; }
-      figure:not(.diagram) { margin: 0 0 20px; }
-      figure:not(.diagram) img { max-width: 100%; height: auto; outline: 1px solid rgb(0 0 0 / 0.1); }
-      figure:not(.diagram) figcaption { margin-top: 8px; color: var(--muted); font-size: 14px; }
-      ol.sources, .sources ol { font-size: 15px; }
+      /* 알림: 참고·팁은 강조색, 중요·주의·경고는 경고색 */
+      .note { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 4px; background: var(--tint); }
+      .note > p:first-child > strong:first-child { color: var(--accent); }
+      .note:is(.note-important, .note-warning, .note-caution) { border-left-color: var(--hi); background: var(--note-bg); }
+      .note:is(.note-important, .note-warning, .note-caution) > p:first-child > strong:first-child { color: var(--warn); }
+      .theme-ink .note:is(.note-important, .note-warning, .note-caution) { border-left-color: var(--warn); }
+      .note p:last-child, blockquote p:last-child { margin-bottom: 0; }
+      figure { margin: 0 0 20px; }
+      figure.diagram { padding: 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+      figure svg, figure img { display: block; max-width: 100%; height: auto; }
+      figure:not(.diagram) img { outline: 1px solid rgb(0 0 0 / 0.1); }
+      figcaption { margin-top: 10px; color: var(--muted); font-size: 14px; }
+      .sources :is(ol, ul) { padding-left: 1.6em; font-size: 15px; }
       .sources li { margin-bottom: 8px; }
       .sources li > span, .sources li > em { display: block; color: var(--muted); font-style: normal; }
       hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
 
       /* ---- 반응형 ---- */
       @media (max-width: 560px) {
-        dl.meta { grid-template-columns: 1fr; gap: 0; padding: 12px 14px; }
-        dl.meta dt { margin-top: 8px; font-size: 14px; }
-        dl.meta dt:first-of-type { margin-top: 0; }
         figure.diagram { padding: 10px; }
       }
 
-      /* ---- 인쇄: 모든 스타일 공통. print 스타일은 화면에서도 이 값을 미리 보여준다 ---- */
-      @page { size: A4; margin: 18mm 16mm 20mm; }
+      /* ---- 인쇄: 모든 스타일 공통. 표지 띠는 쪽 여백 안에 둔다 ---- */
+      @page { size: A4; margin: 18mm 16mm 20mm; @bottom-center { content: counter(page) " / " counter(pages); font-size: 9pt; color: #555555; } }
       @media print {
-        body { font-size: 11pt; line-height: 1.6; }
-        main { max-width: none; padding: 0; }
-        h2 { break-after: avoid; }
-        figure, .table-wrap, table, pre, blockquote, .note { break-inside: avoid; }
-        pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-        pre code { white-space: inherit; }
+        * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        body { font-size: 10.5pt; line-height: 1.6; }
+        .wrap { max-width: none; }
+        .cover .wrap { padding: 9mm 8mm 7mm; }
+        .cover h1 { font-size: 20pt; margin-bottom: 10px; }
+        .cover .lead, main.wrap > p { font-size: 11.5pt; }
+        main.wrap { padding: 8mm 0 0; }
+        h2 { font-size: 15pt; margin: 26px 0 10px; }
+        h2::before { font-size: 9pt; margin-bottom: 6px; padding-top: 6px; }
+        h3 { font-size: 12pt; margin: 18px 0 6px; }
+        h2, h3 { break-inside: avoid; break-after: avoid; }
+        table, .sources :is(ol, ul), .cover dl { font-size: 9.5pt; }
+        thead { display: table-header-group; }
+        tr, figure, pre, blockquote, .note { break-inside: avoid; }
         .table-wrap { overflow: visible; }
-        table { min-width: 0; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 9pt; }
+        pre code { white-space: inherit; }
         a { color: var(--ink); }
-        a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 9pt; overflow-wrap: anywhere; }
+        a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 8.5pt; overflow-wrap: anywhere; }
         nav.toc { display: none; }
       }
       .style-print pre { white-space: pre-wrap; overflow-wrap: anywhere; }
       .style-print pre code { white-space: inherit; }
       .style-print a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 0.85em; overflow-wrap: anywhere; }
+      /* 표 머리행 안의 링크 URL은 머리행 글자색을 따른다 (인쇄·style-print 공통).
+         :is(.style-print, body)는 클래스 하나만큼 우선순위를 올려 위의 a[href^="http"]::after 색을 이긴다 */
+      :is(.style-print, body) th a[href^="http"]::after { color: inherit; }
     </style>
   </head>
   <body class="theme-$if(theme)$$theme$$else$slate$endif$ style-$if(style)$$style$$else$reading$endif$">
-    <main>
-      <h1>$title$</h1>
-$if(subtitle)$
-      <p class="lead">$subtitle$</p>
-$endif$
-$if(date)$
-      <dl class="meta">
-        <dt>작성일</dt><dd>$date$</dd>
-$if(author)$
-        <dt>작성자</dt><dd>$for(author)$$author$$sep$, $endfor$</dd>
-$endif$
-$if(subject)$
-        <dt>대상</dt><dd>$subject$</dd>
-$endif$
-$if(scope)$
-        <dt>범위</dt><dd>$scope$</dd>
-$endif$
-      </dl>
-$endif$
+    <header class="cover">
+      <div class="wrap">
+$if(doctype)$        <p class="eyebrow"><span>$doctype$</span>$if(statuslabel)$<span>$statuslabel$</span>$endif$</p>
+$endif$        <h1>$title$</h1>
+$if(subtitle)$        <p class="lead">$subtitle$</p>
+$elseif(description)$        <p class="lead">$description$</p>
+$endif$        <dl>
+$if(date)$          <div><dt>작성일</dt><dd>$date$</dd></div>
+$endif$$if(author)$          <div><dt>작성자</dt><dd>$for(author)$$author$$sep$, $endfor$</dd></div>
+$endif$$if(subject)$          <div><dt>대상</dt><dd>$subject$</dd></div>
+$endif$$if(scope)$          <div><dt>범위</dt><dd>$for(scope)$$scope$$sep$, $endfor$</dd></div>
+$endif$        </dl>
+      </div>
+    </header>
+    <main class="wrap">
 $if(toc)$
       <nav class="toc" aria-label="목차">
 $table-of-contents$
