@@ -354,7 +354,10 @@
       "source": "cathrynlavery/diagram-design",
       "ownership": "harness-owned; excluded from skills CLI updates",
       "license": "MIT",
-      "license_path": "skills/diagram-design/LICENSE",
+      "license_paths": [
+        "skills/diagram-design/LICENSE",
+        "skills/diagram-design/LICENSE.stack-diagram"
+      ],
       "previous_registration": null,
       "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
       "upstreams": [
@@ -368,6 +371,23 @@
           "snapshot_sha256": "03ccd82e461c5185f451177799a88b196bd276a1d7edb6a535a451eb6cfb662c",
           "license": "MIT",
           "license_path": "LICENSE"
+        },
+        {
+          "source": "https://github.com/caru-ini/stack-diagram",
+          "commit": "75dbd3e3c6fe28844322e6064d3a947b870a6c61",
+          "paths": [
+            "skills/stack-diagram/LICENSE",
+            "skills/stack-diagram/SKILL.md",
+            "skills/stack-diagram/assets/template.html",
+            "skills/stack-diagram/references/geometry.md",
+            "skills/stack-diagram/references/tsx.md",
+            "skills/stack-diagram/scripts/build.py",
+            "skills/stack-diagram/scripts/fetch_icons.py",
+            "skills/stack-diagram/scripts/render_png.py"
+          ],
+          "snapshot_sha256": "f4c9973e77f6a729371afd7baac02b698ce7cd13f4589663ffd49dea33837d13",
+          "license": "MIT",
+          "license_path": "skills/stack-diagram/LICENSE"
         }
       ],
       "local_changes": [
@@ -377,7 +397,12 @@
         "Add artifact-specific mobile classification and adaptation guidance for all forty types, with pinned baseline measurements and meaning-preserving reflow or splitting.",
         "Add offline Slate document theme and export contracts for Markdown, HTML, and Word using existing writing-for-humans mechanisms, including background-matched borderless annotation masks.",
         "Add four synthetic Korean Slate examples generated with AGY gemini-3.8-flash-high and a local gallery; mark artifacts verified only after standalone and document-embedded browser checks.",
-        "Retain the complete upstream skill, references, scripts, templates, examples, semantic patterns, import/export workflows, brand onboarding, and forty visual types."
+        "Retain the complete upstream skill, references, scripts, templates, examples, semantic patterns, import/export workflows, brand onboarding, and forty visual types.",
+        "2026-11-02: Absorb caru-ini/stack-diagram: add opt-in logo mode (scripts/logos.py fetches official marks from svgl, devicon, gilbarbara/logos, or AWS's package, rejects unsafe SVG, inlines data URIs, credits sources; references/primitive-logos.md, assets/template-logos.html). Logos are fetched at build time and never committed; Lucide is replaced by the existing monochrome set.",
+        "2026-11-02: Add scripts/render_check.py, a Playwright render-and-look step in the §9 gate that reports text overlap, canvas clipping, undecodable images, and a missing Noto Sans KR web font, and renders both themes.",
+        "2026-11-02: Add icon-node geometry re-derived for the 4px grid, stack-description intake rules, and an optional label halo (type-architecture.md, SKILL.md §6).",
+        "2026-11-02: Add the dual-theme contract (references/theme-dual.md, assets/template-dual.html) with CSS-variable markers instead of context-stroke, the AWS drawing convention (references/vendor-aws.md), and React/TSX export (references/export-tsx.md).",
+        "2026-11-02: Not adopted from stack-diagram: JetBrains Mono, bundled woff2 fonts, the graph-paper background, the HTML-div node layout, and the attribution link."
       ],
       "excluded_sources": []
     },

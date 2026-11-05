@@ -52,6 +52,15 @@ python3 -m unittest discover -s skills/cost-audit -p 'test_*.py'
 python3 -m unittest discover -s skills/babysit-mr/scripts -p 'test_*.py'
 ```
 
+For the `diagram-design` logo helper (offline) and render check (needs Playwright with Chromium; `uv run --with playwright` avoids a system install):
+
+```bash
+python3 -m unittest discover -s skills/diagram-design/scripts -p test_logos.py -v
+uv run --with playwright python3 -m unittest discover -s skills/diagram-design/scripts -p test_render_check.py -v
+```
+
+These prove the safety verdicts, inlining, and the render checks against fixtures; they do not fetch live logos. A live fetch (`scripts/logos.py fetch`) is network evidence and is reported separately.
+
 ## Shell
 
 For an edited shell script, first check the exact file with Bash's parser:

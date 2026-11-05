@@ -1,6 +1,6 @@
 ---
 name: diagram-design
-description: Create branded architecture, IT current-state, flowchart, sequence, state machine, ER/data model, timeline, swimlane, quadrant, radar/spider, polar chart (polar/radial lollipop), loop/flywheel, nested, tree, org chart, layer stack, Venn, pyramid/funnel, treemap, bar, waterfall, line, Gantt and scatter charts, high-level, process, medallion, data flow, DP integration, DP security matrix, Sankey, fishbone, Wardley map, kanban, user journey, deployment, dependency graph, UML class, story map, or database schema diagrams as standalone HTML/SVG/PNG. Redraw .drawio/.drawio.png/.drawio.svg, Mermaid .mmd, or Excalidraw .excalidraw sources at a chosen size/detail; onboard brand tokens from a website; add semantic patterns, callouts, accessible motion, or sketchy/hand-drawn styling.
+description: Create branded architecture, IT current-state, flowchart, sequence, state machine, ER/data model, timeline, swimlane, quadrant, radar/spider, polar chart (polar/radial lollipop), loop/flywheel, nested, tree, org chart, layer stack, Venn, pyramid/funnel, treemap, bar, waterfall, line, Gantt and scatter charts, high-level, process, medallion, data flow, DP integration, DP security matrix, Sankey, fishbone, Wardley map, kanban, user journey, deployment, dependency graph, UML class, story map, or database schema diagrams as standalone HTML/SVG/PNG. Redraw .drawio/.drawio.png/.drawio.svg, Mermaid .mmd, or Excalidraw .excalidraw sources at a chosen size/detail; onboard brand tokens from a website; add semantic patterns, callouts, accessible motion, or sketchy/hand-drawn styling; put official brand logos (including AWS's own icons and drawing conventions) on stack diagrams, render light and dark from one file, verify by rendering, or export a React/TSX component.
 license: MIT
 metadata:
   version: "2.6"
@@ -16,13 +16,15 @@ Forty visual types. Semantic patterns describe behavior independently; type refe
 
 Apply local output contracts before upstream HTML, typography, palette, or export defaults:
 
-- For a mobile request or a diagram embedded in a document, load [`references/mobile.md`](references/mobile.md). Apply its artifact-specific status and adaptation rules; upstream examples are baselines, not evidence of mobile readiness.
+- For a mobile request, load [`references/mobile.md`](references/mobile.md). Apply its artifact-specific status and adaptation rules; upstream examples are baselines, not evidence of mobile readiness. Embedding a diagram in a document is not a mobile request: document diagrams are desktop-first by default (see `references/harness-documents.md`).
 - For a diagram shown inline in a T3 Code thread, also load the `t3-show` skill and follow its `references/diagram-design.md`. The thread theme owns palette tokens, so skip the §0 style-guide gate.
 - For a Harness document deliverable, also load [`references/harness-documents.md`](references/harness-documents.md). The surrounding document owns palette tokens, and that reference overrides conflicting upstream HTML, font, and export defaults.
+- When nodes are named products or the user asks for logos, load [`references/primitive-logos.md`](references/primitive-logos.md) (opt-in logo mode). When the workload runs on AWS for an AWS audience, also load [`references/vendor-aws.md`](references/vendor-aws.md); it overrides the legend, coral, and zone defaults for that diagram.
+- When one file must render in light and dark, load [`references/theme-dual.md`](references/theme-dual.md).
 
 ### Installed versus upstream tooling
 
-The adopted upstream command surface bundles `scripts/self_check.py` and the three `*_extract.py` import digesters. Every other `scripts/verify-*.py`, `scripts/test-verify-*.py`, or `scripts/lint-*.py` mention in copied type, reference, or example prose names optional tooling available only from an upstream maintainer checkout; it is not a required installed-skill command. In an installed skill, use `self_check.py` only for its stated accessible-SVG, single-file safety, and motion-basics scope, then apply the cited type or registry invariants manually. It does not validate type-specific geometry or block-registry structure.
+The adopted upstream command surface bundles `scripts/self_check.py` and the three `*_extract.py` import digesters. Harness adds `scripts/render_check.py` (render and inspect, §9) and `scripts/logos.py` (logo mode). Every other `scripts/verify-*.py`, `scripts/test-verify-*.py`, or `scripts/lint-*.py` mention in copied type, reference, or example prose names optional tooling available only from an upstream maintainer checkout; it is not a required installed-skill command. In an installed skill, use `self_check.py` only for its stated accessible-SVG, single-file safety, and motion-basics scope, then apply the cited type or registry invariants manually. It does not validate type-specific geometry or block-registry structure.
 
 ---
 
@@ -232,6 +234,7 @@ Universal building blocks. Type-specialized primitives (lifeline, activation bar
 - Icon set (laptop, server, DB, K8s, Docker, AWS, …) → [primitive-icons.md](references/primitive-icons.md). Browse the gallery at [`assets/icons.html`](assets/icons.html).
 - Terminal / CLI-window variant → [primitive-terminal.md](references/primitive-terminal.md)
 - Optional explanatory motion → [animation.md](references/animation.md)
+- Official brand logos on tiles (opt-in) → [primitive-logos.md](references/primitive-logos.md); icon-node geometry in [type-architecture.md § Icon nodes](references/type-architecture.md#icon-nodes)
 
 ### Background
 
@@ -342,6 +345,7 @@ Rules:
 - **Mandatory 6–10px gap** between the bottom of the mask rect and the arrow stroke. The connector must remain visible — a label that hides its own arrow is a hard fail.
 - Never `writing-mode` vertical.
 - For vertical segments, place the label to the side (not on the line) with the same 6–10px horizontal gap.
+- Optional second defence: a paper-colored halo on the label text (`paint-order="stroke" stroke="<backdrop>" stroke-width="3" stroke-linejoin="round"`) keeps it legible if a line ends up close. It never replaces the mask or the gap.
 
 ### Legend — horizontal strip at the bottom
 
@@ -505,6 +509,7 @@ Run before producing any diagram.
 - [ ] `viewBox` expanded for the legend strip (~60px)?
 - [ ] Every font size, coord, width, height, gap divisible by 4?
 - [ ] From the installed skill directory, did `python3 scripts/self_check.py <file>` pass? (Accessible-SVG contract, single-file safety, motion basics.)
+- [ ] **Did I render it and look?** Run `python3 scripts/render_check.py <file>` (or `uv run --with playwright python3 scripts/render_check.py <file>` when Playwright is not installed), resolve every FINDING, then open each PNG it wrote (both themes for a dual-theme file) and check connectors, labels, and logos by eye. A finding is a hypothesis to confirm on the PNG. If Playwright and Chromium are unavailable, say the visual check was not run.
 - [ ] If animated, does the complete static/no-JS frame work, does reduced motion hide/disable playback, and is the controller copied verbatim from `assets/template-motion.html`? From a repository checkout, also run `python3 <repo-root>/scripts/verify-motion.py path/to/generated.html` plus the skin linter; from an installed skill, manually check print and static-query states on top of the self-check.
 
 **Typography:**
@@ -528,6 +533,8 @@ Every diagram ships in three variants (see `assets/`):
 | **Minimal dark** | `assets/template-dark.html`, `example-<type>-dark.html` | Dark mode sites, slides, high-contrast posts. |
 | **Full editorial** | `assets/template-full.html`, `example-<type>-full.html` | Long-form posts where the diagram is the hero. |
 | **Consultant special** (quadrant only) | `example-quadrant-consultant.html` | BCG/McKinsey-style 2×2 scenario matrix. See [type-quadrant.md](references/type-quadrant.md#consultant-special-2x2-scenario-matrix). |
+| **Dual theme** (opt-in) | `assets/template-dual.html` | One file for light and dark: docs sites, README `<picture>` pairs. See [theme-dual.md](references/theme-dual.md). |
+| **Logo stack** (opt-in) | `assets/template-logos.html` | Named products with official logos, on the dual-theme contract. See [primitive-logos.md](references/primitive-logos.md). |
 
 **Sketchy variant** (optional, applied to any of the above) — see [primitive-sketchy.md](references/primitive-sketchy.md). SVG turbulence filter wobbles strokes for a hand-drawn feel. Good for essays, not for technical docs.
 
@@ -541,7 +548,8 @@ Every diagram ships in three variants (see `assets/`):
 2. If behavior is load-bearing, choose a semantic pattern; then load the matching type reference linked in the visual-type guide.
 3. Replace the eyebrow, h1, and SVG body. Replace `[diagram-slug]` with the file slug and fill `<title>` / `<desc>`.
 4. If motion is requested, load `animation.md`; otherwise keep mode `none` and no script.
-5. Run the §9 taste gate.
+5. In logo mode, inline the logos with `scripts/logos.py inline`.
+6. Run the §9 taste gate, including the render-and-look step; fix and re-render until clean.
 
 ---
 
@@ -578,7 +586,7 @@ The size preset sets the `viewBox` **and** the type ramp; `faithful` is the only
 Always produce a single self-contained `.html` file:
 
 - Embedded CSS (no external except Google Fonts)
-- Inline SVG (no external images)
+- Inline SVG (no external images; logo mode embeds logos as `data:image/…` URIs, never remote URLs)
 - Static by default; minimal inline JavaScript only for explicit animation controls/state
 
 Renders correctly in any modern browser. Motion-enabled output must render its complete meaning without JavaScript; under `prefers-reduced-motion: reduce` it shows the complete static frame and hides/disables playback controls.
@@ -597,5 +605,7 @@ Every diagram is an accessible figure by default:
 ### Exporting to PNG / SVG
 
 When the user asks to export, save, rasterize, or convert a generated diagram to `.png` or `.svg`, load [`references/export.md`](references/export.md) and follow the procedure there. Both formats deliver the diagram only (the `<svg>` node) — editorial wrappers like cards and headers are dropped by design. Export is **manual** — never produce export files unprompted.
+
+For a React component (`.tsx`), load [`references/export-tsx.md`](references/export-tsx.md); it is manual too.
 
 For an imported diagram, pixel dimensions come from the `viewBox` × scale factor, so its size decision belongs to §11, not to export. For any diagram that needs an exact frame (an OG card or a slide image), see [`export.md` § Sizing the export](references/export.md).

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!-- Dual-theme template: one file renders light and dark. Contract in references/theme-dual.md.
+     Leave data-theme off to follow the reader's prefers-color-scheme; set it to "light" or
+     "dark" to pin one theme. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --page-paper: #f5f5f5; --page-ink: #2d3142; --page-muted: #4f5d75; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --page-paper: #2d3142; --page-ink: #f5f5f5; --page-muted: #bfc0c0; color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --page-paper: #2d3142; --page-ink: #f5f5f5; --page-muted: #bfc0c0; color-scheme: dark; }
+
+    body {
+      font-family: 'Geist', 'Noto Sans KR', system-ui, sans-serif;
+      background: var(--page-paper);
+      color: var(--page-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--page-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: 'Instrument Serif', 'Noto Serif KR', serif;
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">[Type] · Diagram Design</p>
+    <h1>[Diagram title]</h1>
+
+    <!-- Replace [diagram-slug] with a unique slug for this diagram before export. -->
+    <svg class="dd" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="[diagram-slug]-title [diagram-slug]-desc">
+      <title id="[diagram-slug]-title">[Diagram title]</title>
+      <desc id="[diagram-slug]-desc">[One sentence describing what the diagram shows]</desc>
+      <style>
+        /* Semantic tokens: copy from references/style-guide.md (light and dark columns). */
+        svg.dd {
+          --paper: #f5f5f5; --paper-2: #ececec; --ink: #2d3142; --muted: #4f5d75; --soft: #7a8399;
+          --rule: rgba(45,49,66,0.12); --rule-solid: #bfc0c0; --zone: #f1f1f1;
+          --accent: #eb6c36; --accent-tint: rgba(235,108,54,0.08); --link: #2e5aa8; --tile: #ffffff;
+          --sans: 'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+          --mono: 'Geist Mono', ui-monospace, monospace;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) {
+            --paper: #2d3142; --paper-2: #393e53; --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+            --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25); --zone: #333747;
+            --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10); --link: #6a95d8;
+          }
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) .lt { display: none; }
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) .dk { display: inline; }
+        }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]), svg.dd[data-theme="dark"] {
+          --paper: #2d3142; --paper-2: #393e53; --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+          --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25); --zone: #333747;
+          --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10); --link: #6a95d8;
+        }
+        /* Light/dark asset pair (e.g. a logo with a _dark variant): show one per theme.
+           A diagram's own data-theme wins over the page's and the reader's preference. */
+        svg.dd .dk { display: none; }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]) .lt, svg.dd[data-theme="dark"] .lt { display: none; }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]) .dk, svg.dd[data-theme="dark"] .dk { display: inline; }
+
+        .bg { fill: var(--paper); }
+        .mk { fill: var(--muted); } .mk-accent { fill: var(--accent); } .mk-link { fill: var(--link); }
+        .e { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+        .e.accent { stroke: var(--accent); } .e.link { stroke: var(--link); }
+        .e.dash { stroke-dasharray: 5 4; stroke-width: 1; }
+        .zone { fill: var(--zone); stroke: var(--rule); stroke-width: 0.8; }
+        .node { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+        .node.focal { fill: var(--accent-tint); stroke: var(--accent); }
+        .name { fill: var(--ink); font: 600 12px var(--sans); }
+        .sub { fill: var(--soft); font: 400 9px var(--mono); }
+        .eyebrow-label { fill: var(--soft); font: 500 7px var(--mono); letter-spacing: 0.14em; }
+        /* Edge label: keep the opaque mask rect (SKILL.md §6); the halo is a second defence. */
+        .el { fill: var(--soft); font: 500 8px var(--mono); letter-spacing: 0.06em;
+              paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+        .el.a { fill: var(--accent); } .el.l { fill: var(--link); }
+        /* Zone fill is opaque (paper + 2% ink light, + 3% paper dark) so a mask inside a
+           zone can match it exactly: .mask on paper, .mask.z inside a zone. */
+        .mask { fill: var(--paper); stroke: none; } .mask.z { fill: var(--zone); }
+        .rule-line { stroke: var(--rule); stroke-width: 0.8; }
+      </style>
+      <defs>
+        <marker id="[diagram-slug]-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="mk" points="0 0, 8 3, 0 6"/></marker>
+        <marker id="[diagram-slug]-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="mk-accent" points="0 0, 8 3, 0 6"/></marker>
+        <marker id="[diagram-slug]-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="mk-link" points="0 0, 8 3, 0 6"/></marker>
+      </defs>
+
+      <rect class="bg" width="100%" height="100%"/>
+
+      <!-- Zones first, then arrows, then nodes. Every color comes from a class above;
+           a hex value in a fill or stroke attribute would not follow the theme. -->
+
+    </svg>
+  </div>
+</body>
+</html>

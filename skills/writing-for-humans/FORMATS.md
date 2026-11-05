@@ -49,7 +49,7 @@ front matter의 `genre:`가 기본 테마·스타일과 표지 띠 맨 위의 �
 - 제목 `#`, 목록 `-`, 인용 `>` 뒤에는 공백 하나. 목록과 코드 블록 앞뒤에는 빈 줄.
 - 열 6개를 넘는 표는 나눈다. 코드 줄은 80자 이내.
 
-검수: 렌더된 결과(원격 저장소 파일 페이지)를 1280px과 360px에서 본다. 표 가로 스크롤 외에 잘리는 요소가 없고, 그림 안 글자가 360px에서 읽힌다. 본문에 `**`·`*`·`_`가 문자 그대로 남지 않았다(원본에서 `[^\w\s가-힣]\*\*[가-힣]`와 `_[가-힣]` 검색). 모든 링크를 실제로 연다. `{{`가 남아 있지 않다.
+검수: 렌더된 결과(원격 저장소 파일 페이지)를 1280px과 360px에서 본다. 표 가로 스크롤 외에 잘리는 요소가 없고, 그림은 [삽입 뒤 검수](../diagram-design/references/harness-documents.md#삽입-뒤-검수)의 기준을 통과한다. 본문에 `**`·`*`·`_`가 문자 그대로 남지 않았다(원본에서 `[^\w\s가-힣]\*\*[가-힣]`와 `_[가-힣]` 검색). 모든 링크를 실제로 연다. `{{`가 남아 있지 않다.
 
 ## HTML
 
@@ -74,7 +74,7 @@ build.py는 절을 `<section class="level2">`로 감싸는 `--section-divs`로 �
 1. **외부 요청 0건** — `performance.getEntriesByType('resource').map(r => r.name)`이 빈 배열이다.
 2. **스크립트 0건** — `document.scripts.length`가 0이다.
 3. **링크** — `[...document.querySelectorAll('a[href]')].filter(a => !a.getAttribute('href').startsWith('#')).map(a => a.href)`로 모아 각 URL을 실제로 연다. `공개` 문서에 `file:`·상대 경로·사내 호스트·로그인 필요 URL이 있으면 본문 인용으로 바꾼다.
-4. **그림** — `diagram-design`의 self-check와 [모바일 검수](../diagram-design/references/mobile.md)를 통과한 그림을 넣고, 삽입된 페이지에서 다시 확인한다. 독립 HTML의 통과는 figure 여백이 추가된 문서의 통과를 뜻하지 않는다.
+4. **그림** — `diagram-design`의 self-check와 [삽입 뒤 검수](../diagram-design/references/harness-documents.md#삽입-뒤-검수)를 통과한 그림을 넣고, 삽입된 페이지에서 다시 확인한다. 모바일 독자를 요청받았으면 [모바일 검수](../diagram-design/references/mobile.md)도 통과해야 한다. 독립 HTML의 통과는 figure 여백이 추가된 문서의 통과를 뜻하지 않는다.
 5. **반응형** — 1280px에서 표·코드·그림이 잘리지 않는다. 360px에서 가로 스크롤이 생기는 요소가 `.table-wrap`, `<pre>`뿐이다: `[...document.querySelectorAll('body *:not(svg *)')].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.getAttribute('class') || el.tagName)`. 두 폭 모두 전체 스크린샷으로 확인한다.
 6. **print 스타일이나 인쇄 목적이면** 인쇄 미디어로 한 번 더 렌더해 코드가 줄바꿈되고 페이지 밖으로 나가지 않는지 본다.
 

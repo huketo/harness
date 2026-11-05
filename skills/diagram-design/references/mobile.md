@@ -1,6 +1,6 @@
 # Mobile classification and adaptation
 
-Use this reference for mobile requests and document-embedded diagrams. It overrides conflicting upstream canvas, minimum-width, grid, and typography defaults—not the diagram's semantics. For document palettes, fonts, offline exports, and Word, use [harness-documents.md](harness-documents.md); do not create a second document theme here.
+Use this reference only when the request names mobile readers or a mobile deliverable. A diagram embedded in a document is desktop-first by default and follows [harness-documents.md](harness-documents.md) without this reference; never reflow a desktop diagram into a narrow mobile layout unasked. When this reference applies, it overrides conflicting upstream canvas, minimum-width, grid, and typography defaults—not the diagram's semantics. For document palettes, fonts, offline exports, and Word, use [harness-documents.md](harness-documents.md); do not create a second document theme here.
 
 ## Contract and status
 

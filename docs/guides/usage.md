@@ -136,8 +136,14 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 - “diagram-design으로 검토 대기열의 병목을 설명해 주세요. 360px 모바일 문서에 들어갑니다.”
 - “이 Mermaid를 다시 설계해 주세요. 원본 관계를 보존하고 모바일용 개요와 상세를 나누세요.”
 - “writing-for-humans의 설계 문서에 맞춰 그림을 만들고 HTML과 Word로 패키징해 주세요.”
+- “Next.js와 Hono를 Vercel에 올리고 Neon, Clerk, Stripe를 쓰는 구성을 공식 로고로 그려 주세요. 라이트와 다크를 한 파일로 주세요.”
+- “AWS 표기 규약대로 CloudFront, ALB, Fargate, RDS 구성을 그리고 React 컴포넌트로도 주세요.”
 
-[모바일 분류](../../skills/diagram-design/references/mobile.md)는 유형이 아니라 측정한 개별 산출물에 적용됩니다. 상류 예제나 유형 이름만으로 모바일 지원을 주장하지 않습니다. 모바일이 필요한 그림은 실제 문서에 삽입한 상태로 360px과 1280px에서 검수합니다. 재배치하거나 나눌 때에는 관계, 축, 시간, 포함 의미를 보존하며, 폭만 줄이거나 글자를 숨겨 통과시키지 않습니다.
+스택을 설명하는 그림은 [로고 모드](../../skills/diagram-design/references/primitive-logos.md)로 svgl, devicon, gilbarbara/logos, AWS 공식 아이콘 패키지에서 공식 로고를 가져옵니다. 로고는 색을 바꾸지 않고 `data:` URI로만 넣으며, 스크립트나 외부 참조가 있는 SVG는 받지 않습니다. 로고 파일과 로고가 들어간 결과물은 저장소에 커밋하지 않습니다. AWS 구성은 [AWS 표기 규약](../../skills/diagram-design/references/vendor-aws.md)을 따르고, 한 파일로 두 테마를 내보내는 방식은 [이중 테마 규약](../../skills/diagram-design/references/theme-dual.md)에 있습니다. 이 부분은 [caru-ini/stack-diagram](https://github.com/caru-ini/stack-diagram)(MIT)에서 가져와 4px 격자와 편집 디자인 규칙에 맞게 고친 것입니다.
+
+에이전트는 그림을 넘기기 전에 `scripts/render_check.py`로 렌더링한 PNG를 직접 보고 확인합니다. 이 스크립트는 글자 겹침, 캔버스 밖으로 잘린 글자, 깨진 로고, Noto Sans KR 미로딩을 자동으로 보고합니다. Playwright가 설치되어 있지 않으면 `uv run --with playwright`로 시스템 Python을 바꾸지 않고 실행합니다.
+
+문서에 넣는 그림은 기본적으로 데스크톱 본문 폭에 맞춰 가로로 그리고, 휴대폰에서는 비율을 유지한 채 축소됩니다. 모바일용 재배치는 모바일 독자를 요청했을 때만 적용합니다. [모바일 분류](../../skills/diagram-design/references/mobile.md)는 유형이 아니라 측정한 개별 산출물에 적용됩니다. 상류 예제나 유형 이름만으로 모바일 지원을 주장하지 않습니다. 모바일이 필요한 그림은 실제 문서에 삽입한 상태로 360px과 1280px에서 검수합니다. 재배치하거나 나눌 때에는 관계, 축, 시간, 포함 의미를 보존하며, 폭만 줄이거나 글자를 숨겨 통과시키지 않습니다.
 
 [문서 적용 규칙](../../skills/diagram-design/references/harness-documents.md)은 `writing-for-humans`의 장르, 색, 서체를 그림에 적용합니다. 본문 Markdown과 그림 HTML이 원본이며, 문서용 SVG와 Word용 PNG는 그림 HTML에서 내보내는 파생 산출물입니다. Markdown과 HTML에는 SVG를 사용하고 Word에는 PNG를 사용합니다. 완성한 HTML은 외부 폰트 요청과 스크립트가 없어야 하며, 그림은 독립 출력뿐 아니라 실제 HTML 또는 Word 문서에서도 확인합니다.
 

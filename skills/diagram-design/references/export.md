@@ -54,6 +54,8 @@ If the user explicitly asks for "a screenshot of the whole page including the ca
    svg = re.sub(r'(fill|stroke)="transparent"', r'\1="none"', svg)
    ```
 
+   A dual-theme source (`<svg class="dd">`, see [theme-dual.md](theme-dual.md)) carries its colors in a `<style>` block as CSS custom properties, which this pass does not touch and strict importers do not resolve. Export it as SVG only for browser destinations, and tell the user to take the PNG for PowerPoint or other strict SVG 1.1 consumers.
+
    The `\s*` around each channel tolerates a spaced `rgba(45, 49, 66, 0.03)` as well as the compact `rgba(45,49,66,0.03)` the templates normally use; `\d*\.?\d+` accepts an alpha value with or without a leading zero (both `0.03` and `.03` appear in shipped tokens). Matching is scoped to the `fill="..."` / `stroke="..."` presentation attribute, not the bare `rgba(` string, so nothing else is touched — the shipped templates and examples only ever express color through these two attributes on SVG elements, never a `style="..."` attribute or a `<style>` block. (A brand's onboarded palette in `style-guide.md` could in principle add a third notation such as `hsl()`; none exists in any shipped token today, so this pass doesn't handle it — extend the regex if one is ever introduced.)
 5. Prepend `<?xml version="1.0" encoding="UTF-8"?>\n` so the file is well-formed XML.
 6. Write to `<basename>.svg` next to the source (e.g. `example-architecture.html` → `example-architecture.svg`). Honour an explicit output path if the user provides one.

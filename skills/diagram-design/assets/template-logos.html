@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- Logo-mode draft (references/primitive-logos.md) on the dual-theme contract
+     (references/theme-dual.md). %%LOGO_<name>%% tokens are filled by
+     `python3 scripts/logos.py inline <this> <logodir> <out>`; logos are never committed.
+     Icon-node geometry: references/type-architecture.md § Icon nodes. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --page-paper: #f5f5f5; --page-ink: #2d3142; --page-muted: #4f5d75; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --page-paper: #2d3142; --page-ink: #f5f5f5; --page-muted: #bfc0c0; color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --page-paper: #2d3142; --page-ink: #f5f5f5; --page-muted: #bfc0c0; color-scheme: dark; }
+
+    body {
+      font-family: 'Geist', 'Noto Sans KR', system-ui, sans-serif;
+      background: var(--page-paper);
+      color: var(--page-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--page-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: 'Instrument Serif', 'Noto Serif KR', serif;
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+    footer { margin-top: 1rem; font: 400 0.7rem 'Geist Mono', ui-monospace, monospace; color: var(--page-muted); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Diagram Design</p>
+    <h1>Web app on Vercel</h1>
+
+    <svg class="dd" viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="stack-logos-title stack-logos-desc">
+      <title id="stack-logos-title">Web app on Vercel</title>
+      <desc id="stack-logos-desc">A user reaches a Next.js app that calls a Hono API on Vercel; Hono queries Neon Postgres, checks sessions with Clerk and starts checkout with Stripe, and GitHub Actions deploys the app.</desc>
+      <style>
+        /* Semantic tokens: copy from references/style-guide.md (light and dark columns). */
+        svg.dd {
+          --paper: #f5f5f5; --paper-2: #ececec; --ink: #2d3142; --muted: #4f5d75; --soft: #7a8399;
+          --rule: rgba(45,49,66,0.12); --rule-solid: #bfc0c0; --zone: #f1f1f1;
+          --accent: #eb6c36; --accent-tint: rgba(235,108,54,0.08); --link: #2e5aa8; --tile: #ffffff;
+          --sans: 'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+          --mono: 'Geist Mono', ui-monospace, monospace;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) {
+            --paper: #2d3142; --paper-2: #393e53; --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+            --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25); --zone: #333747;
+            --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10); --link: #6a95d8;
+          }
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) .lt { display: none; }
+          :root:not([data-theme="light"]) svg.dd:not([data-theme="light"]) .dk { display: inline; }
+        }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]), svg.dd[data-theme="dark"] {
+          --paper: #2d3142; --paper-2: #393e53; --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+          --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25); --zone: #333747;
+          --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10); --link: #6a95d8;
+        }
+        /* Light/dark asset pair (e.g. a logo with a _dark variant): show one per theme.
+           A diagram's own data-theme wins over the page's and the reader's preference. */
+        svg.dd .dk { display: none; }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]) .lt, svg.dd[data-theme="dark"] .lt { display: none; }
+        :root[data-theme="dark"] svg.dd:not([data-theme="light"]) .dk, svg.dd[data-theme="dark"] .dk { display: inline; }
+
+        .bg { fill: var(--paper); }
+        .mk { fill: var(--muted); } .mk-accent { fill: var(--accent); } .mk-link { fill: var(--link); }
+        .e { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+        .e.accent { stroke: var(--accent); } .e.link { stroke: var(--link); }
+        .e.dash { stroke-dasharray: 5 4; stroke-width: 1; }
+        .zone { fill: var(--zone); stroke: var(--rule); stroke-width: 0.8; }
+        .node { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+        .node.focal { fill: var(--accent-tint); stroke: var(--accent); }
+        .name { fill: var(--ink); font: 600 12px var(--sans); }
+        .sub { fill: var(--soft); font: 400 9px var(--mono); }
+        .eyebrow-label { fill: var(--soft); font: 500 7px var(--mono); letter-spacing: 0.14em; }
+        /* Edge label: keep the opaque mask rect (SKILL.md §6); the halo is a second defence. */
+        .el { fill: var(--soft); font: 500 8px var(--mono); letter-spacing: 0.06em;
+              paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+        .el.a { fill: var(--accent); } .el.l { fill: var(--link); }
+        /* Zone fill is opaque (paper + 2% ink light, + 3% paper dark) so a mask inside a
+           zone can match it exactly: .mask on paper, .mask.z inside a zone. */
+        .mask { fill: var(--paper); stroke: none; } .mask.z { fill: var(--zone); }
+        .rule-line { stroke: var(--rule); stroke-width: 0.8; }
+        /* Icon nodes: logos keep their own colors on a white tile in both themes. */
+        .tile { fill: var(--tile); stroke: var(--rule-solid); stroke-width: 1; }
+        .tile.focal { stroke: var(--accent); stroke-width: 1.5; }
+        .tile.dark { fill: #2d3142; }
+        .tile.bare { fill: none; stroke: none; }
+        /* A monochrome glyph sits on the always-white tile, so its ink does not follow the theme. */
+        .glyph { fill: none; stroke: #4f5d75; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+        .group-label { fill: var(--ink); font: 600 12px var(--sans); }
+        .legend-label { fill: var(--muted); font: 400 12px var(--sans); }
+      </style>
+      <defs>
+        <marker id="stack-logos-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="mk" points="0 0, 8 3, 0 6"/></marker>
+        <marker id="stack-logos-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="mk-accent" points="0 0, 8 3, 0 6"/></marker>
+      </defs>
+
+      <rect class="bg" width="100%" height="100%"/>
+
+      <!-- 1. Zones. Group = leftmost cx-88 .. rightmost cx+88; top = tile top-48; bottom = tile top+120. -->
+      <rect class="zone" x="256" y="72" width="336" height="168" rx="8"/>
+      <image class="lt" href="%%LOGO_vercel%%" x="268" y="84" width="16" height="16"/>
+      <image class="dk" href="%%LOGO_vercel_dark%%" x="268" y="84" width="16" height="16"/>
+      <text class="group-label" x="292" y="97">Vercel</text>
+
+      <!-- 2. Edges. Horizontal: tile side to tile side at tile mid-height (top+24).
+           Vertical: node-box bottom (top+96+4) to tile top (-4), never through the name text. -->
+      <path class="e accent" d="M140 144 H316" marker-end="url(#stack-logos-arrow-accent)"/>
+      <path class="e accent" d="M372 144 H476" marker-end="url(#stack-logos-arrow-accent)"/>
+      <path class="e accent" d="M532 136 H732" marker-end="url(#stack-logos-arrow-accent)"/>
+      <path class="e" d="M532 152 H656 Q664 152 664 160 V308" marker-end="url(#stack-logos-arrow)"/>
+      <path class="e" d="M504 220 V308" marker-end="url(#stack-logos-arrow)"/>
+      <path class="e dash" d="M140 336 H336 Q344 336 344 328 V220" marker-end="url(#stack-logos-arrow)"/>
+
+      <!-- 3. Edge labels: opaque mask 6px+ clear of the stroke, plus the .el halo. -->
+      <rect class="mask" x="208" y="124" width="40" height="12"/>
+      <text class="el a" x="228" y="133" text-anchor="middle">HTTPS</text>
+      <rect class="mask z" x="408" y="124" width="32" height="12"/>
+      <text class="el a" x="424" y="133" text-anchor="middle">RPC</text>
+      <rect class="mask" x="616" y="108" width="32" height="12"/>
+      <text class="el a" x="632" y="117" text-anchor="middle">SQL</text>
+      <rect class="mask" x="672" y="252" width="56" height="12"/>
+      <text class="el" x="676" y="261">CHECKOUT</text>
+      <rect class="mask" x="512" y="252" width="52" height="12"/>
+      <text class="el" x="516" y="261">SESSION</text>
+      <rect class="mask" x="216" y="316" width="48" height="12"/>
+      <text class="el" x="240" y="325" text-anchor="middle">DEPLOY</text>
+
+      <!-- 4. Icon nodes: box 128x96 centred on cx; tile 48x48 at (cx-24, top); logo 32x32 at
+           (cx-16, top+8); name baseline top+68; sublabel baseline top+84. -->
+      <rect class="tile" x="88" y="120" width="48" height="48" rx="8"/>
+      <!-- Not a brand: the monochrome primitive-icons glyph, 24x24 at (cx-12, top+12), tinted by the theme. -->
+      <g class="glyph" transform="translate(100 132)"><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></g>
+      <text class="name halo" x="112" y="188" text-anchor="middle">User</text>
+      <text class="sub halo" x="112" y="204" text-anchor="middle">browser</text>
+
+      <rect class="tile" x="320" y="120" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_nextjs%%" x="328" y="128" width="32" height="32"/>
+      <text class="name halo" x="344" y="188" text-anchor="middle">Next.js</text>
+      <text class="sub halo" x="344" y="204" text-anchor="middle">app router</text>
+
+      <rect class="tile" x="480" y="120" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_hono%%" x="488" y="128" width="32" height="32"/>
+      <text class="name halo" x="504" y="188" text-anchor="middle">Hono</text>
+      <text class="sub halo" x="504" y="204" text-anchor="middle">api</text>
+
+      <rect class="tile" x="736" y="120" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_neon%%" x="744" y="128" width="32" height="32"/>
+      <text class="name halo" x="760" y="188" text-anchor="middle">Neon</text>
+      <text class="sub halo" x="760" y="204" text-anchor="middle">postgres</text>
+
+      <rect class="tile" x="88" y="312" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_githubactions%%" x="96" y="320" width="32" height="32"/>
+      <text class="name halo" x="112" y="380" text-anchor="middle">GitHub Actions</text>
+      <text class="sub halo" x="112" y="396" text-anchor="middle">ci / deploy</text>
+
+      <rect class="tile" x="480" y="312" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_clerk%%" x="488" y="320" width="32" height="32"/>
+      <text class="name halo" x="504" y="380" text-anchor="middle">Clerk</text>
+      <text class="sub halo" x="504" y="396" text-anchor="middle">auth</text>
+
+      <rect class="tile" x="640" y="312" width="48" height="48" rx="8"/>
+      <image href="%%LOGO_stripe%%" x="648" y="320" width="32" height="32"/>
+      <text class="name halo" x="664" y="380" text-anchor="middle">Stripe</text>
+      <text class="sub halo" x="664" y="396" text-anchor="middle">payments</text>
+
+      <!-- 5. Legend strip. -->
+      <line class="rule-line" x1="32" y1="448" x2="968" y2="448"/>
+      <text class="eyebrow-label" x="32" y="476">LEGEND</text>
+      <path class="e accent" d="M112 472 H144" marker-end="url(#stack-logos-arrow-accent)"/>
+      <text class="legend-label" x="156" y="476">Primary request</text>
+      <path class="e" d="M296 472 H328" marker-end="url(#stack-logos-arrow)"/>
+      <text class="legend-label" x="340" y="476">Internal call</text>
+      <path class="e dash" d="M464 472 H496" marker-end="url(#stack-logos-arrow)"/>
+      <text class="legend-label" x="508" y="476">Deploy</text>
+    </svg>
+    <footer>%%LOGO_CREDITS%%</footer>
+  </div>
+</body>
+</html>
