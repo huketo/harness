@@ -275,3 +275,31 @@ test("end to end: full-send merges only when the hook finds the repository on th
 	expect(JSON.parse(without.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
 	mode(dir, "clear");
 });
+
+test("every host a merge command names must be the host of the repository it merges", () => {
+	const allowed = "https://gitlab.example/team/allowed.git";
+	const personal = "git@github.com:example-owner/x.git";
+	const send = { mode: "full-send" };
+	const g = { grant: "!7", grant_expires: String(NOW + 60) };
+	const d = (command, state = send, origin = allowed) => decide({ command, state, origin, now: NOW, allow: ALLOW }).action;
+	// The allowlisted repository, named by path, URL, or the origin itself.
+	expect(d("glab api -X PUT projects/team%2Fallowed/merge_requests/7/merge")).toBe("allow");
+	expect(d("glab api -X PUT https://gitlab.example/api/v4/projects/team%2Fallowed/merge_requests/7/merge")).toBe("allow");
+	expect(d("glab mr merge 7 -R gitlab.example/team/allowed")).toBe("allow");
+	// The same path on another host, an absolute endpoint, or a lookalike domain.
+	expect(d("glab api -X PUT https://other.example/api/v4/projects/team%2Fallowed/merge_requests/7/merge")).toBe("deny");
+	expect(d("glab api -X PUT https://gitlab.example.evil.example/api/v4/projects/team%2Fallowed/merge_requests/7/merge")).toBe("deny");
+	expect(d("glab api -X PUT https://other.example/api/v4/projects/team%2Fallowed/merge_requests/7/merge", g)).toBe("deny");
+	expect(d("gh api -X PUT https://ghe.example/api/v3/repos/example-owner/x/pulls/7/merge", send, personal)).toBe("deny");
+	// Environment that points glab at another host.
+	expect(d("GITLAB_URL=https://other.example glab mr merge 7")).toBe("deny");
+	expect(d("GITLAB_API_HOST=other.example glab mr merge 7")).toBe("deny");
+	// A percent-encoded numeric project id is still an unresolvable id.
+	expect(targetRepo("glab api -X PUT projects/%31%32/merge_requests/7/merge")).toBe("?");
+	expect(d("glab api -X PUT projects/%31%32/merge_requests/7/merge", g)).toBe("deny");
+	// URLs inside a merge message or PR body are prose, not targets.
+	expect(d('glab mr merge 7 -m "see https://other.example/x"')).toBe("allow");
+	expect(d('gh pr merge 7 --body "see https://other.example/x"', send, personal)).toBe("allow");
+	// gh's -m is --merge and takes no value, so the word after it is still a target.
+	expect(d("gh pr merge -m https://ghe.example/example-owner/x/pull/7", send, personal)).toBe("deny");
+});

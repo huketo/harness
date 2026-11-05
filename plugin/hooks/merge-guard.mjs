@@ -159,8 +159,10 @@ export function targetRepo(command) {
 	for (const m of command.matchAll(/(?:^|\s)(?:-R|--repo)(?:\s+|=)?(\S+)/g)) refs.add(repoKey(m[1]));
 	for (const m of command.matchAll(/https?:\/\/([^\s"']+?)\/(?:-\/merge_requests|pull)\/\d+/g)) refs.add(repoKey(m[1]));
 	for (const m of command.matchAll(/\brepos\/([^/\s]+\/[^/\s]+)\/pulls\//g)) refs.add(repoKey(m[1]));
-	for (const m of command.matchAll(/\bprojects\/([^/\s]+)\/merge_requests\//g))
-		refs.add(/^\d+$/.test(m[1]) ? "?" : decodedKey(m[1]));
+	for (const m of command.matchAll(/\bprojects\/([^/\s]+)\/merge_requests\//g)) {
+		const key = decodedKey(m[1]);
+		refs.add(/^\d+$/.test(key) ? "?" : key);
+	}
 	// A flag gives owner/name and a URL gives host/owner/name; both naming github.com/<same> is one repository.
 	const bare = new Set([...refs].map((ref) => ref.replace(/^github\.com\//, "")));
 	if (bare.size === 0) return null;
@@ -224,8 +226,32 @@ function ambiguous(command) {
 	// Environment that redirects gh or glab to another repository or host counts as ambiguous too.
 	return (
 		mergeCount(command) > 1 ||
-		/(?:^|[\s;&|])(?:export\s+)?(?:GH_REPO|GH_HOST|GITLAB_HOST|GITLAB_URI|GL_HOST)=|(?:^|[\s;&|])cd\s|git\s+-C\s|(?:^|\s)["']?--hostname\b/.test(command)
+		/(?:^|[\s;&|])(?:export\s+)?(?:GH_REPO|GH_HOST|GITLAB_HOST|GITLAB_URI|GITLAB_URL|GITLAB_API_HOST|GL_HOST)=|(?:^|[\s;&|])cd\s|git\s+-C\s|(?:^|\s)["']?--hostname\b/.test(command)
 	);
+}
+
+// Flags whose value is prose (a merge message or PR body), per CLI. gh's -m is --merge and takes no value.
+const PROSE_FLAGS = { gh: "-b|--body|-t|--subject", glab: "-m|--message|--squash-message" };
+
+/**
+ * Hosts a command names explicitly: URL and scp-style hosts anywhere outside prose flag values, and the dotted
+ * first segment of a -R/--repo ref with three or more segments. Any other ref resolves on the CLI's configured host.
+ */
+export function namedHosts(text, cli) {
+	// An unbalanced quote leaves the rest scanned, which only denies more.
+	const prose = new RegExp(`(?:^|\\s)(?:${PROSE_FLAGS[cli] ?? "(?!)"})(?:\\s+|=)(?:"(?:[^"\\\\]|\\\\.)*"|'[^']*'|[^\\s"']+)`, "g");
+	const command = text.replace(prose, " ");
+	const hosts = new Set();
+	for (const m of command.matchAll(/[a-z][a-z+.-]*:\/\/(?:[^@/\s"']+@)?([^/:\s"']+)/gi)) hosts.add(m[1].toLowerCase());
+	for (const m of command.matchAll(/(?:^|[\s="'])[^@\s"'/:]+@([^:\s"'/]+):/g)) hosts.add(m[1].toLowerCase());
+	for (const m of command.matchAll(/(?:^|\s)(?:-R|--repo)(?:\s+|=)?["']?([^\s"'/:]+)\/[^\s"'/]+\/[^\s"']/g))
+		if (m[1].includes(".")) hosts.add(m[1].toLowerCase());
+	return hosts;
+}
+
+/** Whether every host the command names is `host`; a command that names no host passes. */
+function onlyHost(command, cli, host) {
+	return [...namedHosts(command, cli)].every((named) => named === host);
 }
 
 /**
@@ -252,6 +278,8 @@ export function decide({ command, state, origin, now, allow = [] }) {
 		if (MERGE_PATTERNS.slice(4).some(({ re }) => re.test(command)))
 			return deny("a GraphQL merge does not name its repository; use the CLI or REST merge");
 		const key = mergeRepo(repo, origin, cli);
+		// A path-only ref resolves against the origin, so an endpoint URL on another host must not inherit it.
+		if (key && !onlyHost(command, cli, key.split("/")[0])) return deny(`the command names a host other than ${key.split("/")[0]}`);
 		if (allowedRepo(key, allow)) return { action: "allow", reason: `full-send in allowlisted ${key}` };
 		return deny(`full-send merges only repositories on the allowlist, and ${key ?? "this target"} is not on it`);
 	}
@@ -259,6 +287,8 @@ export function decide({ command, state, origin, now, allow = [] }) {
 	if (state.grant && Number.isFinite(expires) && expires > now) {
 		const granted = /(\d+)\D*$/.exec(state.grant)?.[1];
 		if (repo && !sameRepo(repo, origin)) return deny("a one-shot grant covers only this worktree's repository");
+		if (!onlyHost(command, cli, origin ? repoKey(origin).split("/")[0] : null))
+			return deny("a one-shot grant covers only this worktree's repository, and the command names another host");
 		if (!granted || mergeTarget(command) !== granted)
 			return deny(`the one-shot grant names ${state.grant}; name that MR or PR number in the merge command`);
 		return { action: "allow", reason: `one-shot grant for ${state.grant}`, consumeGrant: true };
