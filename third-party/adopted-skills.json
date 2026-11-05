@@ -56,7 +56,7 @@
         },
         {
           "source": "https://github.com/slidevjs/slidev",
-          "commit": "a8d8ff717c5a72c1b3a9d98f1c849481f2ddcd00",
+          "commit": "30a0a54c8739b4b395d9b336a6304cc8ebcc3947",
           "license": "MIT",
           "license_path": "skills/awesome-slides/references/slidev-official/LICENSE.txt",
           "paths": [
