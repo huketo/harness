@@ -1,0 +1,30 @@
+/* 노트로그 디자인 토큰 */
+:root {
+  --font-sans: "Pretendard", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --color-bg: #ffffff;
+  --color-surface: #f6f5f2;
+  --color-ink: #1f1e1b;
+  --color-muted: #66625a;
+  --color-line: #e4e1da;
+  --color-brand: #2f6b4f;
+  --color-brand-ink: #ffffff;
+  --radius-s: 6px;
+  --radius-m: 12px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #151513;
+    --color-surface: #1e1d1a;
+    --color-ink: #efede8;
+    --color-muted: #a7a297;
+    --color-line: #34322d;
+    --color-brand: #6fb38f;
+    --color-brand-ink: #10140f;
+  }
+}

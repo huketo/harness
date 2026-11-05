@@ -1,0 +1,31 @@
+/* 사내 업무 도구 공통 토큰 (예약, 비품, 출장 신청이 함께 쓴다) */
+:root {
+  --font-sans: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --ink: #16191d;
+  --ink-muted: #5d6570;
+  --line: #dfe3e8;
+  --brand: #4b3fd1;
+  --brand-ink: #ffffff;
+  --ok: #157a4c;
+  --warn: #9a5b00;
+  --busy: #b42318;
+  --radius: 10px;
+  --space: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101215;
+    --surface: #181b20;
+    --ink: #e8eaed;
+    --ink-muted: #9aa3ad;
+    --line: #2b3038;
+    --brand: #9b93ff;
+    --brand-ink: #0f0d2b;
+    --ok: #5cc995;
+    --warn: #f0b552;
+    --busy: #ff8a80;
+  }
+}

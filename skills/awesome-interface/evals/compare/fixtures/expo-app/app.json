@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "plan-picker",
+    "slug": "plan-picker",
+    "scheme": "planpicker",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"]
+  }
+}

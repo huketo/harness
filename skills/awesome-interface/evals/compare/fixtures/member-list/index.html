@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Members preview</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="preview">
+  <section class="panel" aria-labelledby="members-title">
+    <div id="member-list"></div>
+  </section>
+</main>
+<script src="demo-data.js"></script>
+<script src="member-list.js"></script>
+<script>
+  renderMemberList(document.getElementById('member-list'), window.DEMO_WORKSPACE);
+</script>
+</body>
+</html>

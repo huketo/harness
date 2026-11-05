@@ -1,6 +1,6 @@
 ---
 name: awesome-interface
-description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, native-platform animation APIs, API interface design, or backend-only code review."
+description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures, mobile-web behavior. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, native-platform animation APIs, API interface design, or backend-only code review."
 license: MIT
 ---
 
@@ -45,8 +45,9 @@ The links below are the authoritative rules. Read the relevant document before a
 | [Typography](references/typography.md) | Font loading, scale, spacing, wrapping, truncation, numeric alignment, language, or bidirectional rendering is involved. |
 | [Colors](references/colors.md) | Generating or converting palettes, semantic tokens, themes, gamut, gradients, or measuring rendered contrast. Preserve established notation unless migration is requested. |
 | [UI polish and motion](references/ui.md) | Surfaces, borders, shadows, optical alignment, icons, imagery, transitions, or interaction feedback are involved. For web drag, swipe, momentum or snap behavior, also read the conditional [gesture reference](references/gestures.md). |
+| [Mobile web](references/mobile-web.md) | Conditional: a web app or PWA targets phone browsers, or a defect appears only on touch devices (viewport height, sticky hover, input zoom, tap feedback, overscroll, safe areas, browser chrome color). |
 
-A full review covers accessibility → layout → writing → typography → colors → UI. A focused review reports its narrower coverage and cannot approve the uninspected interface. A rule has one owner; report one root cause with secondary effects rather than duplicate findings.
+A full review covers accessibility → layout → writing → typography → colors → UI, plus mobile web when the product targets phone browsers. A focused review reports its narrower coverage and cannot approve the uninspected interface. A rule has one owner; report one root cause with secondary effects rather than duplicate findings.
 
 ## 4. Make the smallest effective change
 
@@ -59,5 +60,7 @@ For creation, apply the relevant domain guidance during implementation rather th
 Exercise the relevant existing preview or runtime. Inspect rendered states when layout, motion, contrast, focus, or interaction determines the result. For changed interactive web UI, check keyboard operation and the supported narrow-width state; include empty/loading/error and reduced-motion states where the change reaches them. Separate 320px reflow from 200% zoom rather than claiming one proves both.
 
 Use available browser/runtime tools rather than prescribing a specific automation package. When the runtime is unavailable, do the reachable source checks and identify the unverified states. Source inspection cannot prove visual correctness; a screenshot cannot prove keyboard behavior. Do not invent passing measurements or runtime output.
+
+Size the answer to the question. A naming, choice or short explanation question gets a direct answer at the length the user asked for, without unrequested implementation, requirements or tool lists. State versions, release dates, download counts or maintenance status only when checked in this session against a source you name, such as the lockfile, registry or release page; otherwise omit them or mark them unverified.
 
 For implementation, report the outcome, changed locations, exact checks and results, and any remaining limitation. For reviews, use the linked report format and its evidence-based verdict. Do not add permanent tests for incidental styling; use existing relevant checks and a disposable smoke fixture unless a lasting regression boundary is warranted.

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 탐색</title>
+<link rel="stylesheet" href="drawer.css">
+</head>
+<body>
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer" aria-label="프로젝트 메뉴">
+  <div class="drawer-head">
+    <strong>프로젝트</strong>
+    <span class="drag-hint" id="drag-hint"></span>
+    <button class="close" id="close" type="button" aria-label="메뉴 닫기">✕</button>
+  </div>
+  <ul class="nav" id="nav"></ul>
+</aside>
+<main class="content" id="content">
+  <header class="bar">
+    <button class="menu" id="open" type="button" aria-expanded="false" aria-controls="drawer">메뉴</button>
+    <h1>2분기 출시 준비</h1>
+  </header>
+  <section class="cards">
+    <article class="card"><h2>진행 중</h2><p>디자인 검토 12건, 개발 30건</p></article>
+    <article class="card"><h2>이번 주 마감</h2><p>QA 체크리스트, 출시 공지 초안</p></article>
+    <article class="card"><h2>최근 변경</h2><p>결제 화면 문구 수정, 알림 설정 개편</p></article>
+  </section>
+</main>
+<script src="drawer.js"></script>
+</body>
+</html>

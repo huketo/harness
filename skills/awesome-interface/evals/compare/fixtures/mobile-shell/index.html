@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>장보기 메모</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>장보기 메모</h1>
+    <button class="icon-btn" type="button" aria-label="목록 공유">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20"><path d="M10 3v10M6 7l4-4 4 4M4 12v4h12v-4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
+  </header>
+
+  <nav class="chips" aria-label="분류">
+    <button class="chip is-active" type="button">전체</button>
+    <button class="chip" type="button">채소</button>
+    <button class="chip" type="button">유제품</button>
+    <button class="chip" type="button">간식</button>
+    <button class="chip" type="button">생활용품</button>
+    <button class="chip" type="button">냉동식품</button>
+  </nav>
+
+  <main class="list" id="list"></main>
+
+  <form class="composer" id="composer">
+    <label class="visually-hidden" for="item">추가할 항목</label>
+    <input id="item" name="item" type="text" placeholder="사야 할 것 추가" autocomplete="off">
+    <button class="add" type="submit">추가</button>
+  </form>
+
+  <nav class="tabbar" aria-label="주요 메뉴">
+    <button class="tab is-active" type="button">목록</button>
+    <button class="tab" type="button">기록</button>
+    <button class="tab" type="button">설정</button>
+  </nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

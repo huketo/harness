@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>워크스페이스 설정</title>
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <h1>워크스페이스 설정</h1>
+    <label class="search">
+      <span class="visually-hidden">설정 검색</span>
+      <input id="filter" type="search" placeholder="설정 검색 (단축키 /)">
+    </label>
+  </header>
+
+  <section class="group">
+    <h2>알림</h2>
+    <div class="row">
+      <div><strong>멘션 알림</strong><p>누군가 나를 언급하면 알려 줍니다.</p></div>
+      <button class="switch" role="switch" aria-checked="true" type="button" aria-label="멘션 알림"><span class="thumb"></span></button>
+    </div>
+    <div class="row">
+      <div><strong>주간 요약 메일</strong><p>월요일 아침에 지난주 활동을 보냅니다.</p></div>
+      <button class="switch" role="switch" aria-checked="false" type="button" aria-label="주간 요약 메일"><span class="thumb"></span></button>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2>
+      <button class="disclosure" type="button" aria-expanded="false" aria-controls="advanced">고급 설정</button>
+    </h2>
+    <div id="advanced" hidden>
+      <div class="row"><div><strong>API 접근</strong><p>개인 토큰으로 API를 호출할 수 있습니다.</p></div></div>
+      <div class="row"><div><strong>감사 로그 보관</strong><p>365일 동안 보관합니다.</p></div></div>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2>연결된 도메인</h2>
+    <ul class="domains" id="domains">
+      <li><span>acme.example.com</span><button class="remove" type="button">삭제</button></li>
+      <li><span>docs.acme.example.com</span><button class="remove" type="button">삭제</button></li>
+      <li><span>status.acme.example.com</span><button class="remove" type="button">삭제</button></li>
+    </ul>
+  </section>
+
+  <section class="group">
+    <h2>사용량</h2>
+    <table class="usage">
+      <thead><tr><th>항목</th><th>이번 달</th><th>한도</th></tr></thead>
+      <tbody>
+        <tr><td>API 호출</td><td>182,340</td><td>500,000</td></tr>
+        <tr><td>저장 공간</td><td>42.1 GB</td><td>100 GB</td></tr>
+        <tr><td>멤버</td><td>38</td><td>50</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="actions">
+    <span class="save-state" id="save-state" role="status"></span>
+    <button class="save" id="save" type="button">변경 사항 저장</button>
+  </footer>
+</main>
+<script src="settings.js"></script>
+</body>
+</html>

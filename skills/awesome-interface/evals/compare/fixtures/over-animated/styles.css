@@ -1,0 +1,83 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 16px;
+  font: 14px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  color: #1c1f24; background: #f4f5f7;
+}
+button { font: inherit; cursor: pointer; }
+.top { display: flex; justify-content: space-between; align-items: center; }
+.top h1 { margin: 0; font-size: 20px; }
+.search-btn, .close, .save {
+  min-height: 40px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid #d4d8de; background: #fff;
+}
+.save { background: #2557d6; color: #fff; border-color: #2557d6; }
+
+/* 진입 효과 */
+.reveal { opacity: 0; animation: fadeUp 0.8s ease forwards; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+.stat {
+  background: #fff; border-radius: 12px; padding: 14px;
+  opacity: 0; transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.stat.is-visible { opacity: 1; transform: none; }
+.stat h2 { margin: 0; font-size: 13px; color: #5f6670; font-weight: 500; }
+.stat .num { margin: 4px 0 0; font-size: 24px; font-weight: 700; }
+.lift { transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.3s ease; }
+.lift:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 16px 32px rgba(0,0,0,0.12); }
+
+.tabs { position: relative; display: flex; gap: 4px; border-bottom: 1px solid #dde1e6; }
+.tabs button { border: 0; background: none; padding: 10px 12px; color: #5f6670; }
+.tabs button[aria-selected="true"] { color: #1c1f24; font-weight: 600; }
+.tab-ink {
+  position: absolute; bottom: -1px; height: 2px; background: #2557d6;
+  transition: left 0.5s cubic-bezier(0.68, -0.6, 0.32, 1.6), width 0.5s cubic-bezier(0.68, -0.6, 0.32, 1.6);
+}
+
+.orders { width: 100%; border-collapse: collapse; background: #fff; margin-top: 8px; }
+.orders th, .orders td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eef0f3; }
+.orders td:nth-child(3) { font-variant-numeric: tabular-nums; }
+.orders tbody tr { animation: rowIn 0.5s ease both; cursor: pointer; }
+.orders tbody tr:hover { background: #f7f9fc; transform: scale(1.01); transition: transform 0.25s ease; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: none; }
+}
+
+.panel {
+  position: fixed; inset: 0 0 0 auto; width: min(380px, 100%);
+  background: #fff; box-shadow: -16px 0 40px rgba(0,0,0,0.15);
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.panel.is-open { transform: none; }
+.panel-inner { padding: 20px; display: grid; gap: 12px; }
+
+/* 디자인 결정(2025-08 사용성 테스트): 배송 처리 후 체크 표시가 그려지는 모션은
+   처리 완료를 알아차리는 데 도움이 되어 유지하기로 했다. */
+.saved { display: inline-flex; gap: 6px; align-items: center; color: #1a7f37; }
+.saved[hidden] { display: none; }
+.saved .tick { stroke-dasharray: 20; stroke-dashoffset: 20; animation: draw 0.3s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+.palette { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: grid; place-items: start center; padding-top: 12vh; }
+.palette[hidden] { display: none; }
+.palette-box {
+  width: min(520px, 92vw); background: #fff; border-radius: 12px; padding: 8px;
+  animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.palette-box input { width: 100%; height: 44px; border: 0; font: inherit; font-size: 16px; padding: 0 12px; }
+@keyframes pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 0);
+  background: #1c1f24; color: #fff; padding: 10px 16px; border-radius: 10px;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.toast.is-shown { opacity: 1; }

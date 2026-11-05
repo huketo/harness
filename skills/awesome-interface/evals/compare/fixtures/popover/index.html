@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>문서 편집기</title>
+<link rel="stylesheet" href="popover.css">
+</head>
+<body>
+<header class="toolbar">
+  <h1>주간 회의록</h1>
+  <div class="actions">
+    <div class="anchor">
+      <button class="btn" id="share-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="share-menu">공유</button>
+      <div class="popover popover-down" id="share-menu" role="menu" hidden>
+        <button role="menuitem" type="button">링크 복사</button>
+        <button role="menuitem" type="button">팀에 공유</button>
+        <button role="menuitem" type="button">PDF로 내보내기</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="doc">
+  <p>참석: 기획 2명, 디자인 1명, 개발 3명</p>
+  <p>1. 결제 화면 개편 일정은 다음 주 수요일로 확정했다.</p>
+  <p>2. 알림 설정의 저장 실패 문구를 바꾸기로 했다.</p>
+  <p>3. 다음 회의에서 접근성 점검 결과를 공유한다.</p>
+</main>
+
+<footer class="statusbar">
+  <span>자동 저장됨</span>
+  <div class="anchor">
+    <button class="btn" id="more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">더보기</button>
+    <div class="popover popover-up" id="more-menu" role="menu" hidden>
+      <button role="menuitem" type="button">버전 기록</button>
+      <button role="menuitem" type="button">사본 만들기</button>
+      <button role="menuitem" type="button">휴지통으로 이동</button>
+    </div>
+  </div>
+</footer>
+<script src="popover.js"></script>
+</body>
+</html>

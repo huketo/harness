@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스킬 비교 결과</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5d6673; --line: #d9dee5;
+  --pass: #1a7f37; --fail: #c62828; --null: #8a6d00; --accent: #2557d6; --code: #f0f2f5;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111418; --panel: #1a1e24; --text: #e6e9ee; --muted: #9aa4b2; --line: #2c333d;
+    --pass: #4cc26b; --fail: #ff6b6b; --null: #e0b84a; --accent: #7aa2ff; --code: #13171c; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+header { padding: 16px 20px 8px; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 8px; }
+h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+.meta { color: var(--muted); font-size: 12px; }
+.bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 8px; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+main { padding: 12px 20px 40px; }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(340px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.col { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.col-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.arm { font-weight: 700; font-family: ui-monospace, monospace; }
+.rank { font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.rank.first { border-color: var(--accent); color: var(--accent); }
+.scores { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
+ul.items { list-style: none; padding: 0; margin: 0; }
+ul.items li { padding: 4px 0; border-top: 1px solid var(--line); font-size: 13px; }
+ul.items li:first-child { border-top: 0; }
+.mark { font-weight: 700; margin-right: 4px; }
+.pass { color: var(--pass); } .fail { color: var(--fail); } .null { color: var(--null); }
+.sub { color: var(--muted); font-size: 12px; display: block; }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto;
+  max-height: 420px; font: 12px/1.45 ui-monospace, "SFMono-Regular", Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.shot { width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; background: #fff; }
+.empty { color: var(--muted); font-style: italic; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+details > summary { cursor: pointer; color: var(--muted); font-size: 13px; margin: 6px 0; }
+.prompt { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">스킬 비교 결과</h1>
+  <div class="meta" id="meta"></div>
+</header>
+<div class="bar" role="toolbar" aria-label="보기 설정">
+  <label>case <select id="case"></select></label>
+  <label>run <select id="run"></select></label>
+  <span role="group" aria-label="색 구성" style="display:flex;gap:4px">
+    <button type="button" data-scheme="light">라이트</button>
+    <button type="button" data-scheme="dark">다크</button>
+  </span>
+  <label>화면 너비 <select id="width"></select></label>
+</div>
+<main>
+  <section class="panel">
+    <details>
+      <summary>arm별 요약 (iteration 전체)</summary>
+      <div class="table-wrap" id="summary"></div>
+    </details>
+  </section>
+  <section class="panel" id="case-info"></section>
+  <div class="columns" id="columns"></div>
+</main>
+<script id="data" type="application/json">/*__DATA__*/</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById("data").textContent);
+  const $ = (id) => document.getElementById(id);
+  const state = { caseIndex: 0, run: 1, scheme: "light", width: null };
+
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") node.className = v; else node.setAttribute(k, v);
+    }
+    for (const child of children.flat()) {
+      if (child === null || child === undefined || child === false) continue;
+      node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+    }
+    return node;
+  }
+  const fmt = (n, d = 2) => (n === null || n === undefined ? "–" : Number(n).toFixed(d));
+  const pct = (r) => (r.rate === null ? "–" : `${Math.round(r.rate * 100)}% (${r.passed}/${r.total})`);
+  const mark = (pass) => pass === true ? el("span", { class: "mark pass" }, "통과")
+    : pass === false ? el("span", { class: "mark fail" }, "실패") : el("span", { class: "mark null" }, "판정 불가");
+
+  function renderHeader() {
+    const b = data.benchmark;
+    $("title").textContent = `스킬 비교 결과: ${b.suite} iteration ${b.iteration}`;
+    document.title = $("title").textContent;
+    const sources = Object.entries(b.meta.sources).map(([k, s]) => `${k} ${s.commit.slice(0, 10)}`).join(", ");
+    $("meta").textContent = [
+      `평가 모델 ${b.meta.model}${b.meta.effort ? ` (${b.meta.effort})` : ""}`,
+      `run ${b.meta.runs}회`,
+      `판정 모델 ${b.judgeModels.join(", ") || "없음"}`,
+      `harness ${b.meta.harnessCommit.slice(0, 10)}`,
+      sources && `소스 ${sources}`,
+    ].filter(Boolean).join(" · ");
+    const head = ["arm", "case", "판정 case", "기대 통과율", "rubric 평균", "검사 통과율", "1위", "평균 순위", "평균 시간(초)", "총비용(USD)", "실패", "시간 초과"];
+    $("summary").append(el("table", {},
+      el("thead", {}, el("tr", {}, head.map((h) => el("th", { scope: "col" }, h)))),
+      el("tbody", {}, b.perArm.map((a) => el("tr", {},
+        el("td", { class: "arm" }, a.arm), el("td", {}, a.cases), el("td", {}, a.judgedCases),
+        el("td", {}, pct(a.expectations)), el("td", {}, fmt(a.rubricMean)), el("td", {}, pct(a.checks)),
+        el("td", {}, a.firstPlaces), el("td", {}, fmt(a.meanRank)), el("td", {}, fmt(a.meanSecs, 1)),
+        el("td", {}, a.costUsd === null ? "" : fmt(a.costUsd)), el("td", {}, a.failed), el("td", {}, a.timedOut))))));
+  }
+
+  function currentCase() { return data.cases[state.caseIndex]; }
+
+  function syncControls() {
+    const c = currentCase();
+    const runs = [...new Set(c.arms.flatMap((a) => a.runs.map((r) => r.k)))].sort((x, y) => x - y);
+    if (!runs.includes(state.run)) state.run = runs[0] ?? 1;
+    $("run").replaceChildren(...runs.map((k) => el("option", { value: k, selected: k === state.run }, `run-${k}`)));
+    const widths = [...new Set(c.arms.flatMap((a) => a.runs.flatMap((r) => r.grading.screens.map((s) => s.width))))].sort((x, y) => x - y);
+    if (!widths.includes(state.width)) state.width = widths[0] ?? null;
+    $("width").replaceChildren(...(widths.length ? widths.map((w) => el("option", { value: w, selected: w === state.width }, `${w}px`))
+      : [el("option", { value: "" }, "화면 없음")]));
+    $("width").disabled = !widths.length;
+    for (const button of document.querySelectorAll("[data-scheme]"))
+      button.setAttribute("aria-pressed", String(button.dataset.scheme === state.scheme));
+  }
+
+  function renderCaseInfo() {
+    const c = currentCase();
+    const j = c.judgement;
+    const labels = j ? Object.entries(j.labels).map(([l, a]) => `${l}=${a}`).join(", ") : null;
+    $("case-info").replaceChildren(
+      el("h2", {}, `${c.id}: ${c.title}`),
+      el("details", {}, el("summary", {}, "요청 프롬프트"), el("div", { class: "prompt" }, c.prompt)),
+      j ? el("div", {},
+            el("h3", {}, "판정 근거"),
+            el("p", {}, j.rationale),
+            el("span", { class: "sub" }, `판정 모델 ${j.judgeModel} · 블라인드 라벨 ${labels} · 순위 ${j.ranking.join(" > ")}`))
+        : el("p", { class: "empty" }, c.judgeError ? "판정 없음: 판정자 응답이 스키마에 맞지 않았습니다 (judge.error.json 참고)." : "판정 없음"),
+    );
+  }
+
+  function column(c, arm) {
+    const j = c.judgement;
+    const per = j && j.perArm[arm.key];
+    const run = arm.runs.find((r) => r.k === state.run);
+    const rank = j ? j.ranking.indexOf(arm.key) + 1 : 0;
+    const head = el("div", { class: "col-head" },
+      el("span", { class: "arm" }, arm.key),
+      rank > 0 ? el("span", { class: rank === 1 ? "rank first" : "rank" }, `${rank}위 / ${j.ranking.length}`)
+        : el("span", { class: "rank" }, "판정 없음"));
+    const parts = [head];
+    if (per) {
+      const passed = per.expectations.filter((e) => e.pass).length;
+      const avg = per.rubric.reduce((s, r) => s + r.score, 0) / (per.rubric.length || 1);
+      parts.push(el("div", { class: "scores" }, `기대 ${passed}/${per.expectations.length} 통과 · rubric 평균 ${avg.toFixed(2)}`));
+      parts.push(el("p", {}, per.summary));
+      parts.push(el("h3", {}, "rubric"), el("ul", { class: "items" }, per.rubric.map((r) =>
+        el("li", {}, el("strong", {}, `${r.score}/5 `), r.criterion, el("span", { class: "sub" }, r.reason)))));
+      parts.push(el("h3", {}, "기대 사항"), el("ul", { class: "items" }, per.expectations.map((e) =>
+        el("li", {}, mark(e.pass), e.text, el("span", { class: "sub" }, e.evidence)))));
+    } else {
+      parts.push(el("p", { class: "empty" }, "이 arm에 대한 판정이 없습니다."));
+    }
+    if (!run) {
+      parts.push(el("p", { class: "empty" }, `run-${state.run} 결과가 없습니다.`));
+      return el("div", { class: "col" }, parts);
+    }
+    const m = run.meta;
+    parts.push(el("h3", {}, "실행"), el("div", { class: "sub" }, m
+      ? `${fmt(m.secs, 1)}초 · 종료 코드 ${m.rc ?? "없음"}${m.timedOut ? " · 시간 초과" : ""}${m.usage ? ` · 출력 토큰 ${m.usage.outputTokens}` : ""}${m.costUsd !== null ? ` · $${fmt(m.costUsd)}` : ""}`
+      : "실행 실패 (meta.json 없음)"));
+    parts.push(el("h3", {}, "기계 검사"), run.grading.checks.length
+      ? el("ul", { class: "items" }, run.grading.checks.map((ch) =>
+          el("li", {}, mark(ch.pass), el("code", {}, ch.id), ` (${ch.type})`, el("span", { class: "sub" }, ch.detail))))
+      : el("p", { class: "empty" }, "검사가 없습니다."));
+    const screen = run.grading.screens.find((s) => s.width === state.width && s.scheme === state.scheme);
+    parts.push(el("h3", {}, "화면"));
+    if (screen) {
+      const src = `${c.id}/${arm.key}/run-${run.k}/${screen.path}`;
+      parts.push(el("a", { href: src, target: "_blank", rel: "noopener" },
+        el("img", { class: "shot", src, alt: `${arm.key} ${screen.width}px ${screen.scheme === "dark" ? "다크" : "라이트"} 화면`, loading: "lazy" })));
+      parts.push(el("span", { class: "sub" }, `가로 넘침 ${screen.overflowPx}px · 콘솔 오류 ${screen.consoleErrors.length}개`));
+    } else {
+      parts.push(el("p", { class: "empty" }, "이 너비와 색 구성의 화면이 없습니다."));
+    }
+    parts.push(el("details", { open: "" }, el("summary", {}, "최종 응답 (final.md)"),
+      run.final === null ? el("p", { class: "empty" }, "없음") : el("pre", {}, run.final)));
+    parts.push(el("details", {}, el("summary", {}, "변경 사항 (diff.patch)"),
+      run.diff ? el("pre", {}, run.diff) : el("p", { class: "empty" }, "변경 없음")));
+    return el("div", { class: "col" }, parts);
+  }
+
+  function render() {
+    syncControls();
+    renderCaseInfo();
+    const c = currentCase();
+    const order = c.judgement ? [...c.arms].sort((a, b) => {
+      const ra = c.judgement.ranking.indexOf(a.key), rb = c.judgement.ranking.indexOf(b.key);
+      return (ra < 0 ? 1e9 : ra) - (rb < 0 ? 1e9 : rb);
+    }) : c.arms;
+    $("columns").replaceChildren(...order.map((arm) => column(c, arm)));
+  }
+
+  renderHeader();
+  if (!data.cases.length) {
+    $("case-info").replaceChildren(el("p", { class: "empty" }, "채점된 case가 없습니다."));
+    return;
+  }
+  $("case").append(...data.cases.map((c, i) => el("option", { value: i }, `${c.id}${c.judgement ? "" : " (판정 없음)"}`)));
+  $("case").addEventListener("change", (e) => { state.caseIndex = Number(e.target.value); render(); });
+  $("run").addEventListener("change", (e) => { state.run = Number(e.target.value); render(); });
+  $("width").addEventListener("change", (e) => { state.width = Number(e.target.value); render(); });
+  for (const button of document.querySelectorAll("[data-scheme]"))
+    button.addEventListener("click", () => { state.scheme = button.dataset.scheme; render(); });
+  render();
+})();
+</script>
+</body>
+</html>

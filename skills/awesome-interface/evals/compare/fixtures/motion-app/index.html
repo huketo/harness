@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팀 일정</title>
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+<header class="top">
+  <h1>팀 일정</h1>
+  <div class="menu-wrap">
+    <button class="btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="menu">보기 옵션</button>
+    <ul class="dropdown" id="menu" hidden>
+      <li><button type="button">주간</button></li>
+      <li><button type="button">월간</button></li>
+      <li><button type="button">목록</button></li>
+    </ul>
+  </div>
+</header>
+
+<section class="onboarding">
+  <div class="onboarding-art" aria-hidden="true"></div>
+  <p>처음 오셨네요. 일정을 추가해 팀과 공유해 보세요.</p>
+</section>
+
+<div class="tabs" role="tablist" aria-label="일정 범위">
+  <button role="tab" aria-selected="true" type="button">오늘</button>
+  <button role="tab" aria-selected="false" type="button">이번 주</button>
+  <button role="tab" aria-selected="false" type="button">다음 주</button>
+  <span class="tab-indicator" aria-hidden="true"></span>
+</div>
+
+<ul class="events" id="events"></ul>
+
+<button class="btn btn-primary" id="new-btn" type="button">새 일정</button>
+
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title">새 일정</h2>
+    <label>제목 <input type="text" id="title"></label>
+    <div class="modal-actions">
+      <button class="btn" id="cancel" type="button">취소</button>
+      <button class="btn btn-primary" id="create" type="button">만들기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="js/menu.js"></script>
+<script src="js/tabs.js"></script>
+<script src="js/modal.js"></script>
+</body>
+</html>

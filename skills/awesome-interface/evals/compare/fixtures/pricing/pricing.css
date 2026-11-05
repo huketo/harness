@@ -1,0 +1,28 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.55 var(--font-sans); color: var(--color-ink); background: var(--color-bg); }
+.pricing { max-width: 64rem; margin: 0 auto; padding: var(--space-8) var(--space-4); }
+.pricing-head { text-align: center; margin-bottom: var(--space-8); }
+.pricing-head h1 { margin: 0 0 var(--space-2); font-size: 28px; }
+.pricing-head p { margin: 0; color: var(--color-muted); }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); }
+.plan {
+  display: flex; flex-direction: column;
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.plan h2 { margin: 0; font-size: 18px; }
+.price { margin: var(--space-2) 0 0; color: var(--color-muted); }
+.price strong { font-size: 28px; color: var(--color-ink); }
+.desc { margin: var(--space-1) 0 var(--space-4); color: var(--color-muted); }
+.plan ul { margin: 0 0 var(--space-6); padding-left: 1.1em; }
+.plan li + li { margin-top: var(--space-1); }
+.cta {
+  margin-top: auto;
+  display: block; text-align: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--color-brand); color: var(--color-brand-ink);
+  text-decoration: none; font-weight: 600;
+}

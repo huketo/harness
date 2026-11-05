@@ -74,8 +74,8 @@ Use correct `lang` and `dir` boundaries for shaping, hyphenation and bidirection
 ## Rendering details
 
 - Prefer font underline metrics (`text-underline-position: from-font`, `text-decoration-thickness: from-font`) when they work for the face; tune offset and `text-decoration-skip-ink` if descenders collide. Link identification requirements belong to accessibility.
-- Keep useful text selectable. Restrict `user-select: none` to an observed conflict with dragging or gestures rather than applying it to application chrome.
-- Small input text can trigger focus zoom in iOS Safari. Prefer a genuinely readable mobile input size, commonly at least `16px`, and verify on that browser. Do not disable user zoom or shrink a nominal 16px field with a transform to evade the behavior.
+- Keep useful text selectable. Restrict `user-select: none` to non-editable controls with an observed conflict: dragging or gestures, or a long press on a touch device selecting a button, tab or chip label. Do not apply it to content or wholesale to application chrome.
+- Small input text can trigger focus zoom in iOS Safari. Prefer a genuinely readable mobile input size, commonly at least `16px`, and verify on that browser. When the desktop design deliberately uses smaller input text, scope the larger size to coarse pointers, such as `@media (pointer: coarse)`, instead of changing desktop. Do not disable user zoom or shrink a nominal 16px field with a transform to evade the behavior.
 - Font smoothing controls are platform-specific aesthetic options, not universal quality fixes. Preserve the project choice; if changing it is in scope, compare the target platform and light/dark rendering. A Linux screenshot does not prove a macOS improvement.
 - Treat `text-box` trimming and decorative text effects as progressive enhancements. Verify browser support, diacritics and fallback leading before relying on them for alignment.
 

@@ -1,0 +1,1000 @@
+{
+  "suite": "awesome-interface-compare",
+  "version": 1,
+  "sources": {
+    "emil": {
+      "repo": "https://github.com/emilkowalski/skills",
+      "commit": "f1090bec277140d02ed202440185ad9d02ac1490"
+    }
+  },
+  "arms": {
+    "none": {
+      "skills": [],
+      "note": "스킬 없음 기준선"
+    },
+    "ai": {
+      "skills": [
+        {
+          "source": "local",
+          "path": "skills/awesome-interface"
+        }
+      ],
+      "note": "awesome-interface (이 저장소)"
+    },
+    "emil-animate": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/animate"
+        }
+      ],
+      "note": "emilkowalski/skills의 animate"
+    },
+    "emil-animate-expo": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/animate-expo"
+        }
+      ],
+      "note": "emilkowalski/skills의 animate-expo"
+    },
+    "emil-animation-performance": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/animation-performance"
+        }
+      ],
+      "note": "emilkowalski/skills의 animation-performance"
+    },
+    "emil-animation-vocabulary": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/animation-vocabulary"
+        }
+      ],
+      "note": "emilkowalski/skills의 animation-vocabulary"
+    },
+    "emil-apple-design": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/apple-design"
+        }
+      ],
+      "note": "emilkowalski/skills의 apple-design"
+    },
+    "emil-ask-sonner": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/ask-sonner"
+        }
+      ],
+      "note": "emilkowalski/skills의 ask-sonner"
+    },
+    "emil-break-ui": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/break-ui"
+        }
+      ],
+      "note": "emilkowalski/skills의 break-ui"
+    },
+    "emil-emil-design-eng": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/emil-design-eng"
+        }
+      ],
+      "note": "emilkowalski/skills의 emil-design-eng"
+    },
+    "emil-find-animation-opportunities": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/find-animation-opportunities"
+        }
+      ],
+      "note": "emilkowalski/skills의 find-animation-opportunities"
+    },
+    "emil-improve-animations": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/improve-animations"
+        }
+      ],
+      "note": "emilkowalski/skills의 improve-animations"
+    },
+    "emil-mobile-native": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/mobile-native"
+        }
+      ],
+      "note": "emilkowalski/skills의 mobile-native"
+    },
+    "emil-pick-ui-library": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/pick-ui-library"
+        }
+      ],
+      "note": "emilkowalski/skills의 pick-ui-library"
+    },
+    "emil-prototype": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/prototype"
+        }
+      ],
+      "note": "emilkowalski/skills의 prototype"
+    },
+    "emil-remove-animations": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/remove-animations"
+        }
+      ],
+      "note": "emilkowalski/skills의 remove-animations"
+    },
+    "emil-review-animations": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/review-animations"
+        }
+      ],
+      "note": "emilkowalski/skills의 review-animations"
+    },
+    "emil-write-swift": {
+      "skills": [
+        {
+          "source": "emil",
+          "path": "skills/write-swift"
+        }
+      ],
+      "note": "emilkowalski/skills의 write-swift"
+    }
+  },
+  "cases": [
+    {
+      "id": "stress-member-list",
+      "title": "회원 목록 최악 데이터 시험 (수정 금지)",
+      "covers": [
+        "break-ui",
+        "ai:stress-test"
+      ],
+      "prompt": "회원 목록 컴포넌트(member-list.js, styles.css)가 데모 데이터로는 멀쩡해 보이는데, 실제 데이터가 들어오면 어디가 깨질지 최악의 경우로 시험해 보고 깨진 곳을 알려 주세요. 데이터 형식은 schema.js에 있습니다. 컴포넌트 파일과 demo-data.js, schema.js는 고치지 마세요. 시험용 데이터나 미리보기 파일은 새로 만들어도 됩니다.",
+      "fixture": "member-list",
+      "arms": [
+        "none",
+        "ai",
+        "emil-break-ui"
+      ],
+      "expectations": [
+        "좁은 폭(320px 안팎)에서 공백 없는 긴 이메일이나 긴 이름이 행 밖으로 넘치거나 옆 요소를 밀어내는 문제를 보고한다.",
+        "스키마가 허용하는 누락 값으로 생기는 깨짐을 하나 이상 보고한다: 이름이 없는 회원에서 initials 계산이 예외를 던져 목록 전체가 그려지지 않음, title이 없을 때 \"undefined\" 표시, avatar가 없을 때 깨진 이미지, lastActiveAt이 null일 때 \"20000 days ago\" 같은 1970년 기준 경과 일수.",
+        "이름 같은 데이터가 innerHTML로 그대로 삽입되어 HTML로 해석되는(이스케이프되지 않는) 문제를 보고한다.",
+        "\"1 members\" 같은 단수·복수 오류나 회원이 0명일 때 빈 상태가 없는 문제를 보고한다.",
+        "컴포넌트 파일, demo-data.js, schema.js를 고치지 않고, 시험용 데이터는 별도 파일이나 별도 경로로 넣는다.",
+        "실제로 렌더링해 확인한 문제와 코드만 보고 추정한 문제를 구분하고, 하지 않은 확인을 했다고 주장하지 않는다."
+      ],
+      "rubric": [
+        "발견한 깨짐의 실제성과 중요도: 사용자가 실제로 만날 법한 데이터로 재현되는가",
+        "발견의 폭: 텍스트 길이, 누락 필드, 숫자와 복수형, 시간, 이미지, 터치·키보드 상호작용, 빈 목록과 많은 항목",
+        "각 깨짐에 대한 수정 제안의 구체성과 타당성",
+        "보고의 명확성과 근거: 재현 데이터, 폭, 관찰 결과"
+      ],
+      "checks": [
+        {
+          "id": "component-untouched",
+          "type": "unchanged",
+          "paths": [
+            "member-list.js",
+            "styles.css",
+            "demo-data.js",
+            "schema.js"
+          ]
+        }
+      ],
+      "timeoutSec": 1200
+    },
+    {
+      "id": "mobile-shell",
+      "title": "휴대폰에서 웹 같은 앱 셸 고치기",
+      "covers": [
+        "mobile-native"
+      ],
+      "prompt": "장보기 메모 웹앱(index.html)을 휴대폰 홈 화면에 추가해서 쓰는데, 앱이 아니라 웹사이트처럼 느껴집니다. 아래 탭바가 주소창 때문에 가려졌다 나타났다 하고, 버튼을 누르고 나면 눌린 색이 계속 남아 있어요. 휴대폰에서 설치한 앱처럼 느껴지도록 고쳐 주세요. 색과 배치 같은 디자인은 그대로 두세요.",
+      "fixture": "mobile-shell",
+      "arms": [
+        "none",
+        "ai",
+        "emil-mobile-native"
+      ],
+      "expectations": [
+        "앱 높이를 100vh 대신 동적 뷰포트 단위 등으로 바꿔, 주소창이 나타나고 사라져도 탭바가 화면 밖으로 밀리지 않게 한다.",
+        "터치 기기에서 눌린 뒤 hover 스타일이 남지 않도록 hover 스타일을 hover 가능한 포인터에만 적용한다.",
+        "입력창을 누를 때 화면이 확대되는 문제(13px 입력 글자)를 글자 크기를 16px 이상으로 올리는 등, 사용자의 확대 기능을 막지 않는 방법으로 해결한다.",
+        "사용자가 말하지 않은 휴대폰 문제 중 둘 이상을 찾아 고치거나 근거와 함께 보고한다: 탭 하이라이트 깜빡임, 노치·홈 인디케이터 영역의 safe area, 다크 모드와 맞지 않는 상태 표시줄 색(theme-color), 당겨서 새로고침이나 스크롤 연쇄, 길게 누를 때 버튼 글자 선택.",
+        "색과 배치를 바꾸지 않고, 실제 휴대폰에서 확인하지 않은 동작은 확인하지 않았다고 밝힌다."
+      ],
+      "rubric": [
+        "휴대폰에서 웹 티가 나는 문제를 얼마나 빠짐없이 찾았는가",
+        "수정의 정확성: 부작용 없이 증상을 없애고 데스크톱 동작을 해치지 않는가",
+        "수정의 최소성과 디자인 보존",
+        "검증 범위와 한계를 정직하게 밝혔는가"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        },
+        {
+          "id": "zoom-not-disabled",
+          "type": "absent",
+          "files": "*.html",
+          "pattern": "user-scalable\\s*=\\s*(no|0)|maximum-scale\\s*=\\s*1(\\.0*)?(?![.\\d])"
+        }
+      ]
+    },
+    {
+      "id": "jank-drawer",
+      "title": "버벅이는 서랍 메뉴 진단과 수정",
+      "covers": [
+        "animation-performance",
+        "ai:ui"
+      ],
+      "prompt": "프로젝트 서랍 메뉴(index.html)가 열고 닫힐 때도, 머리 부분을 끌어서 닫을 때도 버벅입니다. 목록에 프로젝트가 많을수록 더 심해요. 왜 버벅이는지 원인을 찾아서 고쳐 주세요. 메뉴 버튼으로 열기, 닫기 버튼·배경·Esc로 닫기, 끌어서 닫기 동작은 그대로 유지해야 합니다.",
+      "fixture": "jank-drawer",
+      "arms": [
+        "none",
+        "ai",
+        "emil-animation-performance"
+      ],
+      "expectations": [
+        "서랍과 본문이 width·left·margin-left 같은 레이아웃 속성 대신 transform(필요하면 opacity)으로 움직이도록 바꾼다.",
+        "`transition: all`을 실제로 움직이는 속성만 지정한 전환으로 바꾼다.",
+        "끌기 중 pointermove마다 240개 목록을 innerHTML로 다시 그리는 문제를 원인으로 짚고, 끌기 중에는 서랍의 위치만 갱신하도록 고친다.",
+        "끌기 거리를 문서 루트의 CSS 변수로 전달해 모든 자손의 스타일을 다시 계산하게 하는 구조를 원인으로 짚고, 서랍 요소에 직접 transform을 쓰는 등으로 고친다.",
+        "큰 반경의 backdrop-filter blur 전환이나 box-shadow 전환 같은 그리기 비용을 원인 후보로 다루거나 줄인다.",
+        "열기, 닫기(버튼·배경·Esc), 끌어서 닫기가 수정 후에도 동작한다."
+      ],
+      "rubric": [
+        "진단의 정확성: 실제 원인을 찾고 원인마다 근거를 댔는가",
+        "수정의 효과와 정확성: 프레임 비용을 실제로 줄이고 동작을 보존하는가",
+        "수정의 최소성: 관련 없는 재설계나 라이브러리 추가가 없는가",
+        "보고의 명확성: 측정한 것과 추정한 것을 구분했는가"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "over-animated",
+      "title": "애니메이션이 과한 대시보드 줄이기",
+      "covers": [
+        "remove-animations"
+      ],
+      "prompt": "주문 대시보드(index.html)가 전체적으로 느리게 느껴집니다. 애니메이션이 너무 많아서 그런 것 같아요. 필요 없는 애니메이션은 없애거나 줄여 주세요. 새 애니메이션을 추가하지는 말고, 무엇을 바꿨는지 알려 주세요.",
+      "fixture": "over-animated",
+      "arms": [
+        "none",
+        "ai",
+        "emil-remove-animations"
+      ],
+      "expectations": [
+        "자주 보거나 정보 확인을 늦추는 모션을 없애거나 크게 줄인다: 키보드(/)로 여는 검색 팔레트의 튀어나오는 등장, 필터를 바꿀 때마다 반복되는 행 순차 등장, 업무 숫자의 카운트업, 표 행 hover 확대 중 셋 이상.",
+        "애니메이션을 없앤 뒤에도 처음에 opacity 0으로 시작하던 요소(제목, 통계 카드)가 화면에 보인다.",
+        "상세 패널을 닫으면 패널이 숨겨지고, 검색 팔레트를 열면 입력창에 바로 포커스가 간다. 애니메이션 길이에 맞춘 setTimeout이나 transitionend에 기대던 동작이 제거 후에도 깨지거나 늦어지지 않는다.",
+        "주석에 기록된 디자인 결정(배송 처리 체크 표시 모션)을 존중해 유지하거나, 바꾼다면 그 이유를 밝힌다.",
+        "새 애니메이션을 추가하지 않고, 없앤 것과 남긴 것을 이유와 함께 보고한다."
+      ],
+      "rubric": [
+        "제거·축소 판단의 타당성: 빈도, 목적, 키보드 동작, 정보 표시를 고려했는가",
+        "회귀 방지: 보이지 않게 남는 요소, 애니메이션을 기다리던 코드, 포커스 타이밍",
+        "정리의 완결성: 쓰이지 않는 keyframes, 지연 값, 고아 코드",
+        "보고의 명확성: 없앤 것과 남긴 것, 각각의 이유"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "popover-motion",
+      "title": "팝오버 열림·닫힘 모션 추가",
+      "covers": [
+        "animate",
+        "emil-design-eng"
+      ],
+      "prompt": "문서 편집기의 공유 메뉴와 더보기 메뉴(index.html)가 열리고 닫힐 때 툭 나타나고 툭 사라져서 어색합니다. 열림과 닫힘에 자연스러운 모션을 넣어 주세요. 라이브러리는 추가하지 말고, 키보드 조작은 지금처럼 동작해야 합니다.",
+      "fixture": "popover",
+      "arms": [
+        "none",
+        "ai",
+        "emil-animate",
+        "emil-emil-design-eng"
+      ],
+      "expectations": [
+        "메뉴가 자기를 연 버튼 쪽에서 나오도록 위치에 맞는 기준점을 쓴다: 위쪽 공유 메뉴는 버튼 아래 오른쪽에서, 아래쪽 더보기 메뉴는 버튼 위 오른쪽에서 열린다.",
+        "열림 모션이 짧고(대략 300ms 이하) 감속 곡선을 쓰며, scale(0)에서 시작하지 않는다.",
+        "닫힘에도 모션이 있고, 닫히는 도중 다시 열거나 빠르게 여닫아도 메뉴가 사라지거나 엉킨 상태로 남지 않는다.",
+        "움직임 감소 설정에서 이동과 확대를 줄이거나 없앤다.",
+        "키보드 조작(열 때 첫 항목 포커스, 화살표 이동, Esc 후 버튼으로 포커스 복귀)이 그대로 동작하고, 닫힌 메뉴의 항목에 포커스가 가지 않는다."
+      ],
+      "rubric": [
+        "모션의 품질: 기준점, 곡선, 길이, 열림과 닫힘의 관계",
+        "중단 가능성과 상태 일관성: 빠른 반복, 닫히는 중 다시 열기",
+        "접근성 보존: 키보드, 포커스, 움직임 감소",
+        "구현의 최소성과 명료성"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-motion-patch",
+      "title": "토스트 모션 패치 검토 (수정 금지)",
+      "covers": [
+        "review-animations",
+        "ai:change-review"
+      ],
+      "prompt": "토스트 모션을 바꾼 change.patch를 검토해 주세요. toast.css와 toast.js가 지금 코드이고, 패치는 이 두 파일에 적용될 변경입니다. 검토만 하고 파일은 수정하지 마세요. 이대로 머지해도 되는지도 판단해 주세요.",
+      "fixture": "motion-patch",
+      "arms": [
+        "none",
+        "ai",
+        "emil-review-animations"
+      ],
+      "expectations": [
+        "등장 모션이 scale(0)에서 시작하고 ease-in·500ms로 느려진 점을 패치가 만든 회귀로 지적한다.",
+        "prefers-reduced-motion 대응을 삭제한 것을 회귀로 지적한다.",
+        "다음 중 하나 이상을 지적한다: 쌓임 위치를 transform 대신 bottom으로 바꾸고 `transition: all`로 레이아웃 속성을 애니메이션하게 된 점, transitionend 대신 고정 500ms setTimeout에 기대는 점.",
+        "패치가 새로 만든 문제(예: 오류 토스트에 추가한 무한 흔들림 애니메이션. 선택자 우선순위 때문에 열린 동안에는 등장 애니메이션에 덮이고 닫히는 동안 흔들린다)와 패치 전부터 있던 문제(예: 토스트 컨테이너의 aria-live 부재)를 구분하고, 기존 문제를 패치의 판정 근거로 삼지 않는다.",
+        "파일을 수정하지 않고, 머지 가능 여부를 근거와 함께 판정한다."
+      ],
+      "rubric": [
+        "지적의 실제성과 정확성: 틀린 지적이 없는가",
+        "회귀의 심각도 판단과 우선순위",
+        "수정 제안의 구체성",
+        "패치 범위 구분: 도입된 문제와 기존 문제, 좋은 변경의 인정"
+      ],
+      "checks": [
+        {
+          "id": "fixture-untouched",
+          "type": "unchanged",
+          "paths": [
+            "change.patch",
+            "toast.css",
+            "toast.js"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motion-audit",
+      "title": "앱 전체 모션 감사와 개선 계획 (코드 수정 금지)",
+      "covers": [
+        "improve-animations"
+      ],
+      "prompt": "팀 일정 앱(index.html, styles/, js/)의 애니메이션 전체를 점검해서, 무엇부터 고칠지 우선순위를 매긴 개선 계획을 만들어 주세요. 이번에는 코드를 고치지 말고 계획만 주세요. 계획은 다른 개발자가 이 대화를 보지 않고도 그대로 따라 구현할 수 있을 만큼 구체적이어야 합니다.",
+      "fixture": "motion-app",
+      "arms": [
+        "none",
+        "ai",
+        "emil-improve-animations"
+      ],
+      "expectations": [
+        "모달의 scale(0) 등장과 공통 곡선 변수 --ease가 ease-in이라는 점을 문제로 지적한다.",
+        "다음 중 둘 이상을 지적한다: 탭을 바꿀 때마다 반복되는 긴 순차 등장(24개 × 120ms), 탭 표시줄의 left·width 애니메이션, 토스트의 bottom 애니메이션, 버튼의 `transition: all`과 터치 기기에서도 걸리는 hover 이동, 600ms 드롭다운 등장.",
+        "앱 전체에 움직임 감소 대응이 없다는 점을 지적한다.",
+        "주석에 의도된 결정으로 기록된 첫 방문 안내 그림의 4초 모션을 결함으로 몰지 않거나, 다룬다면 기록된 결정임을 밝힌다.",
+        "우선순위가 사용자 영향 기준으로 매겨져 있고, 각 계획 항목이 파일 위치와 구체적인 값(곡선, 길이, 바꿀 속성)을 담고 있다.",
+        "소스 파일을 고치지 않는다."
+      ],
+      "rubric": [
+        "감사의 정확성과 범위",
+        "우선순위의 타당성",
+        "계획의 실행 가능성: 구체성과 자기 완결성",
+        "기존 결정 존중과 과잉 지적 여부"
+      ],
+      "checks": [
+        {
+          "id": "source-untouched",
+          "type": "unchanged",
+          "paths": [
+            "index.html",
+            "styles/base.css",
+            "styles/components.css",
+            "js/menu.js",
+            "js/tabs.js",
+            "js/modal.js"
+          ]
+        }
+      ],
+      "timeoutSec": 1200
+    },
+    {
+      "id": "motion-opportunities",
+      "title": "정적인 설정 화면에서 모션 넣을 곳 제안 (수정 금지)",
+      "covers": [
+        "find-animation-opportunities"
+      ],
+      "prompt": "워크스페이스 설정 화면(index.html)이 너무 딱딱하게 느껴집니다. 어디에 모션을 넣으면 좋을지 제안만 해 주세요. 코드는 고치지 마세요.",
+      "fixture": "settings-static",
+      "arms": [
+        "none",
+        "ai",
+        "emil-find-animation-opportunities"
+      ],
+      "expectations": [
+        "다음 중 둘 이상을 근거 있는 후보로 제안한다: 스위치 손잡이의 순간 이동, 고급 설정 펼침의 높이 점프, 도메인 삭제 시 목록이 튀는 문제, 저장 상태 피드백.",
+        "단축키(/)로 여는 검색, 검색 결과 필터링, 사용량 표 숫자처럼 자주 쓰거나 정보 확인이 목적인 곳에는 모션을 넣지 않도록 권하거나 제외 이유를 밝힌다.",
+        "각 제안에 움직일 속성과 길이·곡선 같은 구체적인 값을 담고, 움직임 감소 설정에서의 처리를 언급한다.",
+        "제안 수가 화면 크기에 비해 과하지 않고 우선순위가 있다.",
+        "파일을 수정하지 않는다."
+      ],
+      "rubric": [
+        "제안의 타당성: 목적과 빈도에 맞는가",
+        "제외 판단: 모션을 넣지 말아야 할 곳을 가려냈는가",
+        "제안의 구체성: 바로 구현할 수 있는 값과 위치",
+        "간결성과 우선순위"
+      ],
+      "checks": [
+        {
+          "id": "fixture-untouched",
+          "type": "unchanged",
+          "paths": [
+            "index.html",
+            "settings.css",
+            "settings.js"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "drag-sheet",
+      "title": "끌어서 닫는 바텀 시트의 손맛",
+      "covers": [
+        "apple-design",
+        "ai:gestures"
+      ],
+      "prompt": "필터 바텀 시트(index.html)를 손잡이를 아래로 끌어서 닫을 수 있게 만들었는데, 빠르게 휙 내려도 잘 안 닫히고, 닫히는 도중에 다시 잡으면 시트가 순간 이동합니다. 손으로 다루는 느낌이 자연스럽도록 고쳐 주세요. 닫기 버튼과 적용 버튼으로 닫는 동작은 그대로 두세요.",
+      "fixture": "drag-sheet",
+      "arms": [
+        "none",
+        "ai",
+        "emil-apple-design"
+      ],
+      "expectations": [
+        "놓는 순간의 속도를 최근 이동 기록으로 방향(부호)을 살려 계산해, 아래로 빠르게 튕기면 짧게 끌어도 닫히고 위로 빠르게 움직인 것은 닫힘으로 취급하지 않는다.",
+        "닫히는 중에 다시 잡으면 화면에 보이는 현재 위치에서 끌기가 이어지고, 이전 닫힘의 완료 콜백이 다시 잡은 시트를 숨기지 않는다.",
+        "터치에서 끌기가 페이지 스크롤이나 pointercancel로 끊기지 않도록 포인터 캡처나 touch-action 등을 처리하고, 끌기가 취소되면 시트를 안정된 상태로 되돌린다.",
+        "위로 지나치게 끌면 저항을 주거나 막아서 시트가 화면 아래쪽에서 떨어지지 않는다.",
+        "닫기·적용 버튼으로 닫는 동작과 키보드 사용이 유지되고, 실제 터치 기기에서 확인하지 않은 느낌은 확인하지 않았다고 밝힌다."
+      ],
+      "rubric": [
+        "제스처 판단의 정확성: 속도, 방향, 거리 임계값",
+        "중단과 다시 잡기의 처리",
+        "견고성: 포인터 캡처, 취소, 오래된 콜백",
+        "코드의 명료성과 최소성"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motion-name",
+      "title": "묘사한 모션 효과의 이름 찾기",
+      "covers": [
+        "animation-vocabulary"
+      ],
+      "prompt": "애니메이션 이름을 몰라서 개발을 맡기기가 어렵습니다. 세 가지 효과가 있어요. 첫째, 목록에서 항목 하나를 지우면 아래 항목들이 위로 스르륵 올라와 빈자리를 채웁니다. 둘째, 카드 목록에서 카드를 누르면 그 카드가 커지면서 그대로 상세 화면이 됩니다. 셋째, 가격이 바뀔 때 숫자 자릿수가 위아래로 굴러가며 바뀝니다. 각각 뭐라고 부르는지 알려 주시고, 개발을 맡길 AI에게 줄 요청 문장도 효과마다 한두 문장으로 써 주세요.",
+      "fixture": null,
+      "arms": [
+        "none",
+        "ai",
+        "emil-animation-vocabulary"
+      ],
+      "expectations": [
+        "첫째 효과를 레이아웃 애니메이션(FLIP 등) 계열의 이름으로 부른다.",
+        "둘째 효과를 공유 요소 전환(shared element transition, container transform 등) 계열의 이름으로 부른다.",
+        "셋째 효과를 숫자 티커·롤링 숫자(odometer) 계열의 이름으로 부른다.",
+        "효과마다 무엇이, 언제, 어떻게 움직이는지 담은 구체적인 요청 문장을 준다.",
+        "질문의 크기에 비해 지나치게 긴 설명이나 요청하지 않은 구현 코드를 덧붙이지 않는다."
+      ],
+      "rubric": [
+        "용어의 정확성과 가까운 용어의 구분",
+        "요청 문장의 실용성",
+        "간결성"
+      ],
+      "checks": [],
+      "timeoutSec": 300
+    },
+    {
+      "id": "library-pick",
+      "title": "React 앱의 라이브러리 고르기 (설치 금지)",
+      "covers": [
+        "pick-ui-library"
+      ],
+      "prompt": "React 앱(package.json 참고)에 세 가지를 넣으려고 합니다. 휴대폰 인증번호 6자리 입력칸, ⌘K로 여는 명령 메뉴, 수천 건짜리 거래 내역 목록입니다. 각각 어떤 라이브러리를 쓰면 좋을지 하나씩 골라 주고 이유를 짧게 알려 주세요. 아직 설치하거나 코드를 고치지는 마세요.",
+      "fixture": "react-deps",
+      "arms": [
+        "none",
+        "ai",
+        "emil-pick-ui-library"
+      ],
+      "expectations": [
+        "세 작업마다 라이브러리를 하나씩 분명히 고르고, 선택지 나열로 끝내지 않는다.",
+        "package.json에 이미 있는 react-window를 확인하고, 거래 내역 목록에 그대로 쓰라고 하거나 바꾸라고 한다면 바꿀 이유와 비용을 밝힌다.",
+        "인증번호 입력은 붙여넣기, OS 자동 완성(autocomplete=\"one-time-code\"), 접근성 같은 실제 요구를 기준으로 고른다.",
+        "기존 의존성(@radix-ui/react-dialog, Tailwind, React 19)과의 조화를 고려한다.",
+        "확인하지 않은 최신 버전, 다운로드 수, 유지보수 상태를 사실처럼 단정하지 않는다.",
+        "파일을 고치거나 패키지를 설치하지 않는다."
+      ],
+      "rubric": [
+        "추천의 적합성",
+        "기존 프로젝트 맥락의 반영",
+        "근거의 정확성",
+        "간결성"
+      ],
+      "checks": [
+        {
+          "id": "fixture-untouched",
+          "type": "unchanged",
+          "paths": [
+            "package.json"
+          ]
+        }
+      ],
+      "timeoutSec": 600
+    },
+    {
+      "id": "pricing-variants",
+      "title": "가격 카드 디자인 세 안과 비교 전환기",
+      "covers": [
+        "prototype",
+        "ai:variants"
+      ],
+      "prompt": "요금제 화면(index.html)의 가격 카드 디자인을 세 가지 방향으로 새로 만들어서, index.html을 열면 화면에서 바로 바꿔 가며 비교할 수 있게 해 주세요. 지금 디자인도 비교 대상 중 하나로 남겨 두세요. 요금제 이름, 가격, 기능 목록 같은 내용은 바꾸지 마세요.",
+      "fixture": "pricing",
+      "arms": [
+        "none",
+        "ai",
+        "emil-prototype"
+      ],
+      "expectations": [
+        "index.html에서 원래 디자인과 새 디자인 세 가지를 바로 전환해 비교할 수 있고, 전환기가 키보드로도 조작된다.",
+        "세 안이 색만 바꾼 변형이 아니라 레이아웃, 정보 밀도, 강조 방식처럼 이름 붙일 수 있는 축에서 뚜렷하게 다르다.",
+        "모든 안이 같은 요금제 이름, 가격, 기능 목록을 유지하고, 없는 혜택이나 추천 문구, 할인 표기를 지어내지 않는다.",
+        "모든 안이 tokens.css의 색과 글꼴을 쓰고, 다크 모드와 320px 폭에서 깨지지 않는다.",
+        "최종 응답에서 각 안의 방향과 차이를 짧게 설명하고, 하나를 고른 뒤 어떻게 정리할지 안내한다."
+      ],
+      "rubric": [
+        "안 사이의 차이와 각 안의 완성도",
+        "시각 품질: 위계, 간격, 대비",
+        "비교 경험: 전환기의 사용성",
+        "내용 보존과 제품 일관성"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        },
+        {
+          "id": "no-placeholder",
+          "type": "absent",
+          "files": "**/*",
+          "pattern": "lorem ipsum",
+          "flags": "i"
+        }
+      ],
+      "timeoutSec": 1500
+    },
+    {
+      "id": "sonner-darkmode",
+      "title": "Sonner 토스트의 다크 모드와 모달 뒤 문제",
+      "covers": [
+        "ask-sonner"
+      ],
+      "prompt": "Next.js 앱에서 Sonner 토스트가 다크 모드로 바꿔도 계속 밝게 나오고, 설정 모달이 열려 있을 때는 토스트가 모달 뒤에 깔려서 보이지 않습니다. 고쳐 주세요. 새 패키지는 설치하지 마세요.",
+      "fixture": "sonner-app",
+      "arms": [
+        "none",
+        "ai",
+        "emil-ask-sonner"
+      ],
+      "expectations": [
+        "앱에 Toaster가 하나만 남고, 모달이나 isolate·transform이 걸린 요소 바깥(루트 레이아웃 등)에 놓인다.",
+        "토스트 테마가 next-themes에서 사용자가 직접 고른 테마(resolvedTheme 등)를 따른다. 운영체제 설정만 따르는 theme=\"system\"만으로는 앱의 수동 전환을 따르지 못한다는 점을 처리한다.",
+        "모달 안에서 저장한 뒤 모달을 닫아도 진행 중이던 토스트가 사라지지 않는다.",
+        "z-index를 임의로 크게 올리는 것만으로 덮지 않고, 원인(쌓임 맥락, 중복 Toaster)을 고친다.",
+        "새 패키지를 설치하지 않고, 실행해 보지 않은 동작을 확인했다고 주장하지 않는다."
+      ],
+      "rubric": [
+        "원인 진단의 정확성",
+        "수정의 정확성과 완결성",
+        "수정의 최소성",
+        "설명의 명확성"
+      ],
+      "checks": []
+    },
+    {
+      "id": "expo-press-sheet",
+      "title": "Expo 카드 누름 피드백과 시트 모션",
+      "covers": [
+        "animate-expo"
+      ],
+      "prompt": "Expo 앱의 요금제 화면에서 카드를 눌러도 반응이 없는 것 같고, 필터 시트는 끌 때 끊기고 아래로 휙 내려도 잘 닫히지 않습니다. 카드의 누름 피드백과 시트의 모션을 손봐 주세요. 이미 설치된 패키지만 쓰세요.",
+      "fixture": "expo-app",
+      "arms": [
+        "none",
+        "ai",
+        "emil-animate-expo"
+      ],
+      "expectations": [
+        "카드를 누르는 순간(손을 떼기 전) 눈에 보이는 피드백(약한 축소나 불투명도 변화 등)을 준다. 구현 방식은 묻지 않는다.",
+        "시트를 끄는 동안 손가락을 끊김 없이 따라오고, 끄는 동안 프레임마다 React 상태를 갱신하지 않는다. 구현 라이브러리는 이미 설치된 것 안에서 자유롭게 고른다.",
+        "시트를 height·top 대신 translateY로 움직이고, 거리뿐 아니라 놓는 속도로도 닫힘을 판단한다.",
+        "제스처에 필요한 설정(GestureHandlerRootView 등)을 갖추고, 움직임 감소 설정을 존중한다.",
+        "웹 전용 지침(CSS transition, hover, 브라우저 메타 태그)을 끌어오지 않고, 기기나 시뮬레이터에서 확인하지 않은 느낌을 확인했다고 주장하지 않는다."
+      ],
+      "rubric": [
+        "플랫폼에 맞는 구현: UI 스레드, 제스처 처리",
+        "모션 품질: 누름, 놓기, 속도 반영",
+        "코드의 정확성: API 사용과 타입",
+        "최소성과 범위 준수"
+      ],
+      "checks": []
+    },
+    {
+      "id": "swift-race",
+      "title": "Swift 6 데이터 경합과 MainActor 문제",
+      "covers": [
+        "write-swift"
+      ],
+      "prompt": "Swift 6으로 올렸더니 FeedStore 쪽에서 데이터 경합 오류가 나고, 가끔 같은 이미지를 두 번 받거나 화면 갱신이 메인 스레드 밖에서 일어난다는 경고가 뜹니다. 고쳐 주세요. 화면 구성과 디자인은 바꾸지 마세요.",
+      "fixture": "swift-feed",
+      "arms": [
+        "none",
+        "ai",
+        "emil-write-swift"
+      ],
+      "expectations": [
+        "화면이 읽는 상태(posts, images, isLoading, errorMessage)를 MainActor에 격리해, 화면 상태 변경이 메인 스레드에서만 일어나게 한다.",
+        "동기화 없는 공유 캐시를 @unchecked Sendable로 덮어 둔 문제를 찾아 actor나 실제 동기화로 바꾼다.",
+        "같은 URL을 동시에 요청한 두 호출이 다운로드를 두 번 시작하지 않게 막는다(예: 진행 중인 작업을 공유). await 뒤에 캐시를 다시 확인하는 것만으로는 두 번째 다운로드가 이미 시작된 뒤이므로 이 기대를 충족하지 못한다.",
+        "변경 가능한 Post 클래스를 다른 작업으로 넘기며 수정하는 문제(like)를 값 타입 전환이나 격리로 해결하거나 보고한다.",
+        "FeedView의 화면 구성과 스타일을 바꾸지 않는다. refreshable이 실제 새로고침을 기다리도록 바꾸는 것은 허용한다.",
+        "Swift 툴체인으로 빌드하지 못했다면 컴파일이나 테스트가 성공했다고 주장하지 않는다."
+      ],
+      "rubric": [
+        "동시성 수정의 정확성",
+        "관용적인 최신 Swift와 최소성",
+        "원인 설명의 정확성",
+        "범위 준수"
+      ],
+      "checks": []
+    },
+    {
+      "id": "card-polish",
+      "title": "경매 상품 카드 다듬기",
+      "covers": [
+        "emil-design-eng",
+        "ai:ui",
+        "ai:typography"
+      ],
+      "prompt": "경매 상품 카드(index.html)가 어딘가 엉성해 보입니다. 기능과 정보 구성은 그대로 두고 카드를 다듬어 주세요.",
+      "fixture": "product-card",
+      "arms": [
+        "none",
+        "ai",
+        "emil-emil-design-eng"
+      ],
+      "expectations": [
+        "실시간으로 바뀌는 입찰가의 폭이 바뀔 때 흔들리지 않게 하고, 금액에 천 단위 구분 기호를 넣는다.",
+        "\"1 bids\", \"1 watchers\" 같은 단수·복수 오류와 \"0 minutes ago\", 수천 시간 전 같은 상대 시간 표기를 고친다.",
+        "판매자 아바타가 찌그러지지 않고, 비율이 서로 다른 상품 사진 때문에 카드 높이가 들쭉날쭉하지 않다.",
+        "테두리와 진한 그림자가 겹친 탁한 카드 표면과 대비가 낮은 회색 보조 글자를 개선한다.",
+        "버튼의 `transition: all`과 과한 hover 확대를 정리하고, 눌렀을 때의 피드백을 둔다.",
+        "정보 구성(제목, 입찰가, 입찰 수, 관심 수, 갱신 시각, 판매자, 입찰 버튼)을 유지한다."
+      ],
+      "rubric": [
+        "시각 품질: 위계, 간격, 대비, 표면",
+        "세부 품질: 숫자, 복수형, 시간, 이미지",
+        "수정의 최소성과 정보 보존",
+        "상호작용 피드백"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "new-screen",
+      "title": "짧은 설명으로 새 화면 만들기",
+      "covers": [
+        "ai:art-direction",
+        "emil-design-eng"
+      ],
+      "prompt": "사내 회의실 예약 도구에 '오늘의 회의실' 화면을 index.html에 새로 만들어 주세요. 기존 도구의 색과 글꼴은 tokens.css에 있습니다. 직원이 출근해서 지금 비어 있는 회의실을 빨리 찾고 바로 예약하는 화면입니다. 회의실 8개마다 현재 상태(사용 중, 비어 있음, 곧 시작), 다음 예약, 빠른 예약 버튼이 필요합니다. 데이터는 예시로 채워 주세요.",
+      "fixture": "room-booking",
+      "arms": [
+        "none",
+        "ai",
+        "emil-emil-design-eng"
+      ],
+      "expectations": [
+        "지금 비어 있는 회의실을 한눈에 찾을 수 있게 상태에 따라 정렬·묶음·강조하는 등 과제에 맞는 위계를 세운다.",
+        "상태를 색만으로 구분하지 않고 글자나 아이콘으로도 구분한다.",
+        "tokens.css의 색과 글꼴 변수를 쓰고, 다크 모드와 320px 폭에서 깨지지 않는다.",
+        "회의실 이름, 수용 인원, 시간 같은 예시 데이터가 그럴듯하고, 빠른 예약 버튼이 어느 회의실의 어떤 시간을 예약하는지 분명하다.",
+        "외부 네트워크 자원(CDN, 웹 폰트)을 쓰지 않는다."
+      ],
+      "rubric": [
+        "시각 품질: 위계, 간격, 대비, 정렬",
+        "과제 적합성: 빈 회의실을 빨리 찾고 바로 예약할 수 있는가",
+        "접근성과 반응형",
+        "제품 일관성: 토큰 사용과 사내 도구에 맞는 밀도"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        },
+        {
+          "id": "uses-tokens",
+          "type": "present",
+          "files": "**/*",
+          "pattern": "var\\(\\s*--(bg|surface|ink|ink-muted|line|brand|brand-ink|ok|warn|busy|font-sans|radius|space)\\s*[,)]"
+        },
+        {
+          "id": "no-placeholder",
+          "type": "absent",
+          "files": "**/*",
+          "pattern": "lorem ipsum",
+          "flags": "i"
+        }
+      ],
+      "timeoutSec": 1200
+    },
+    {
+      "id": "settings-review",
+      "title": "알림 설정 화면 전체 검토 (수정 금지)",
+      "covers": [
+        "ai:review",
+        "emil-design-eng"
+      ],
+      "prompt": "알림 설정 화면(index.html)을 전반적으로 검토해 주세요. 검토만 하고 파일은 수정하지 마세요. 실제로 확인한 것과 확인하지 못한 것을 나눠서 알려 주세요.",
+      "fixture": "settings-review",
+      "arms": [
+        "none",
+        "ai",
+        "emil-emil-design-eng"
+      ],
+      "expectations": [
+        "닫기 아이콘 버튼에 접근 가능한 이름이 없다는 점을 위치와 함께 지적한다.",
+        "저장하기 전부터 role=\"alert\"로 보이는 '오류가 발생했습니다.' 문구가 원인과 해결 방법이 없는 막연한 오류라는 점을 지적한다.",
+        "닫기 버튼이 실제로 닫지 않고 상태 문구만 바꾸는 동작이나, 저장을 누르면 항상 실패 문구가 나오는 동작처럼 상호작용 문제를 하나 이상 지적한다.",
+        "버튼의 `transition: all`·ease-in, 저장 버튼의 hover 확대처럼 다듬기 수준의 문제를 근거와 함께 다룬다.",
+        "파일을 수정하지 않고, 렌더링이나 키보드로 확인한 것과 소스만 보고 판단한 것을 구분한다."
+      ],
+      "rubric": [
+        "지적의 실제성과 중요도",
+        "검토 범위: 접근성, 레이아웃, 문구, 글꼴, 색, 다듬기",
+        "근거와 위치의 명확성",
+        "우선순위와 판정의 타당성"
+      ],
+      "checks": [
+        {
+          "id": "fixture-untouched",
+          "type": "unchanged",
+          "paths": [
+            "index.html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consent-copy-ko",
+      "title": "위치 권한 요청 화면의 한국어 문구만 수정",
+      "covers": [
+        "ai:writing"
+      ],
+      "prompt": "위치 권한 요청 화면(index.html)의 문구를 다듬어 주세요. 버튼 동작·배치·스타일은 바꾸지 말고 문구만 수정해 주세요. 확인된 사실: 허용 버튼은 위치 권한을 요청하고, 거절해도 지역을 직접 검색해 매장을 찾을 수 있습니다.",
+      "fixture": "consent",
+      "arms": [
+        "none",
+        "ai"
+      ],
+      "expectations": [
+        "id, class, 버튼 type, 요소 순서를 유지하고, 마크업 변경은 쿠폰 문구 안으로 한정한다.",
+        "해요체나 합니다체 중 하나로 종결어미를 통일하고 영어 배지를 번역한다.",
+        "할인 혜택을 놓친다는 위협과 근거 없는 '안심' 주장을 없애고, 확인된 대안(지역 직접 검색)을 알리며, 두 버튼을 결과 중심의 중립적인 이름으로 바꾼다.",
+        "쿠폰의 금액, 최소 주문 금액, 사용 매장, 기한, 1인 1회 제한을 짧은 문장이나 항목으로 나누고, 3,000원·15,000원처럼 천 단위 구분 기호를 쓰며, 새로운 조건을 지어내지 않는다."
+      ],
+      "rubric": [
+        "문구의 명확성과 사실 정확성",
+        "어조와 존중: 조작적 표현의 제거",
+        "범위 준수",
+        "한국어 문장 품질"
+      ],
+      "checks": [
+        {
+          "id": "render",
+          "type": "render",
+          "entry": "index.html",
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "schemes": [
+            "light",
+            "dark"
+          ],
+          "assert": [
+            "no-horizontal-overflow",
+            "no-console-errors"
+          ]
+        },
+        {
+          "id": "scope",
+          "type": "only-changed",
+          "allow": [
+            "index.html"
+          ]
+        },
+        {
+          "id": "allow-button-kept",
+          "type": "present",
+          "files": "index.html",
+          "pattern": "<button\\b[^>]*\\bid=\"allow\""
+        },
+        {
+          "id": "deny-button-kept",
+          "type": "present",
+          "files": "index.html",
+          "pattern": "<button\\b[^>]*\\bid=\"deny\""
+        }
+      ],
+      "timeoutSec": 600
+    }
+  ]
+}

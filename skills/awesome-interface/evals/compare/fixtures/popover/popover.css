@@ -1,0 +1,45 @@
+:root {
+  --bg: #ffffff; --ink: #1d2025; --muted: #6a717a; --line: #e2e5ea; --surface: #f5f6f8;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #16181c; --ink: #e9ebee; --muted: #9da4ad; --line: #2c3036; --surface: #1f2227; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  min-height: 100vh; display: flex; flex-direction: column;
+  font: 15px/1.6 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+.toolbar, .statusbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; border-color: var(--line); border-style: solid; border-width: 0;
+}
+.toolbar { border-bottom-width: 1px; }
+.statusbar { border-top-width: 1px; color: var(--muted); font-size: 13px; margin-top: auto; }
+.toolbar h1 { margin: 0; font-size: 17px; }
+.doc { padding: 16px; max-width: 42rem; }
+.anchor { position: relative; }
+.btn {
+  min-height: 40px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: inherit; font: inherit; cursor: pointer;
+}
+.btn[aria-expanded="true"] { background: var(--surface); }
+.popover {
+  position: absolute; right: 0; z-index: 10;
+  min-width: 180px; padding: 6px;
+  display: grid;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+.popover[hidden] { display: none; }
+.popover-down { top: calc(100% + 6px); }
+.popover-up { bottom: calc(100% + 6px); }
+.popover [role="menuitem"] {
+  min-height: 36px; padding: 0 10px; text-align: left;
+  border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.popover [role="menuitem"]:hover,
+.popover [role="menuitem"]:focus-visible { background: var(--surface); outline: none; }

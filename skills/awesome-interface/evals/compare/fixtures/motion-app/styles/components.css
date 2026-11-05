@@ -1,0 +1,66 @@
+/* Dropdown */
+.menu-wrap { position: relative; }
+.dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  list-style: none; margin: 0; padding: 6px; min-width: 140px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  animation: dropdown-in 0.6s var(--ease);
+}
+.dropdown button { width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; font: inherit; }
+@keyframes dropdown-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+
+/* Onboarding art.
+   의도된 결정: 첫 방문 안내 그림은 브랜드 팀 요청으로 4초에 걸쳐 천천히 떠오른다.
+   첫 방문에 한 번만 보이므로 느린 속도를 유지한다. */
+.onboarding { display: flex; gap: 12px; align-items: center; margin: 16px 0; padding: 12px; background: #f3f5fb; border-radius: 12px; }
+.onboarding p { margin: 0; }
+.onboarding-art {
+  width: 48px; height: 48px; border-radius: 12px; flex: none;
+  background: linear-gradient(135deg, #9fb3ff, #3156d3);
+  animation: float-in 4s ease-out both;
+}
+@keyframes float-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Tabs */
+.tabs { position: relative; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs [role="tab"] { border: 0; background: none; padding: 10px 12px; font: inherit; color: var(--muted); cursor: pointer; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.tab-indicator {
+  position: absolute; bottom: -1px; left: 0; height: 2px; width: 0;
+  background: var(--accent);
+  transition: left 0.4s var(--ease), width 0.4s var(--ease);
+}
+
+/* Event list */
+.events { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.events li {
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+  animation: item-in 0.5s ease both;
+}
+@keyframes item-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; padding: 16px; }
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  width: min(420px, 100%); background: var(--bg); border-radius: 14px; padding: 20px;
+  animation: modal-in 0.5s var(--ease);
+}
+.modal label { display: grid; gap: 6px; margin: 12px 0; }
+.modal input { height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@keyframes modal-in { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+
+/* Toast */
+.toast {
+  position: fixed; left: 50%; bottom: 24px;
+  padding: 10px 16px; border-radius: 10px; background: #1b1e23; color: #fff;
+  transform: translateX(-50%); opacity: 0;
+}
+.toast.is-shown { animation: toast-life 3s ease forwards; }
+@keyframes toast-life {
+  0% { opacity: 0; bottom: 0; }
+  10%, 90% { opacity: 1; bottom: 24px; }
+  100% { opacity: 0; bottom: 0; }
+}

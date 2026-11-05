@@ -1,0 +1,60 @@
+--- a/toast.css
++++ b/toast.css
+@@ -16,20 +16,27 @@
+   color: #fff;
+   font: 14px/1.4 system-ui, sans-serif;
+   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+-  opacity: 0;
+-  transform: translateY(calc(var(--offset, 0px) + 8px));
+-  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
++  transform-origin: center;
++  transition: all 500ms ease-in;
+ }
+ .toast[data-state="open"] {
+-  opacity: 1;
+-  transform: translateY(var(--offset, 0px));
++  animation: toast-in 500ms ease-in both;
+ }
+ .toast[data-state="closing"] {
+   opacity: 0;
+-  transform: translateY(calc(var(--offset, 0px) + 8px));
++  transform: scale(0);
++  pointer-events: none;
++}
++@keyframes toast-in {
++  from { opacity: 0; transform: scale(0); }
++  to { opacity: 1; transform: scale(1); }
++}
++.toast-error {
++  background: #8f1d1d;
++  animation: toast-shake 400ms ease-in-out infinite;
+ }
+-.toast-error { background: #8f1d1d; }
+-
+-@media (prefers-reduced-motion: reduce) {
+-  .toast { transition: opacity 150ms linear; transform: translateY(var(--offset, 0px)); }
++@keyframes toast-shake {
++  0%, 100% { translate: 0; }
++  25% { translate: -4px; }
++  75% { translate: 4px; }
+ }
+--- a/toast.js
++++ b/toast.js
+@@ -9,7 +9,7 @@
+ function layout() {
+   let offset = 0;
+   for (let i = live.length - 1; i >= 0; i--) {
+-    live[i].style.setProperty('--offset', `${-offset}px`);
++    live[i].style.bottom = `${offset}px`;
+     offset += live[i].offsetHeight + GAP;
+   }
+ }
+@@ -19,7 +19,7 @@
+   el.dataset.state = 'closing';
+   live.splice(live.indexOf(el), 1);
+   layout();
+-  el.addEventListener('transitionend', () => el.remove(), { once: true });
++  setTimeout(() => el.remove(), 500);
+ }
+ 
+ export function toast(message, { type = 'info', duration = 4000 } = {}) {

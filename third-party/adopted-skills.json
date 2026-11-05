@@ -141,6 +141,20 @@
           "use": "Selectively adapt web motion decisions, anchored entrances, gesture continuity and verification; exclude general styling, mobile-web baselines, native APIs, library-selection and audit/prototype workflows."
         },
         {
+          "source": "https://github.com/emilkowalski/skills",
+          "commit": "f1090bec277140d02ed202440185ad9d02ac1490",
+          "paths": [
+            "LICENSE",
+            "skills/break-ui/CATALOG.md",
+            "skills/break-ui/SKILL.md",
+            "skills/mobile-native/SKILL.md"
+          ],
+          "snapshot_sha256": "7126058c451431346a6fcf36d858055e7ee13ec9d0a5f97c674008f7484cf79b",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author the worst-case data catalog and schema-backed, report-with-fix stance into references/worst-case-data.md and stress-test.md, and the mobile-web symptom table into the conditional references/mobile-web.md; exclude the data toggle UI, initial responses, React Native and the fixed baseline snippet."
+        },
+        {
           "source": "https://github.com/Leonxlnx/taste-skill",
           "commit": "ccbc15639c97057cbfcf32ecebc38ef716e4bb37",
           "paths": [
@@ -175,7 +189,8 @@
         "Clarify signed recent release velocity, pointer cancellation versus normal capture release, re-grab continuity and reduced-motion state geometry; retain upstream MIT notice and keep native APIs outside this branch.",
         "Selectively adapt taste-skill and redesign-skill into conditional art-direction and preservation-first redesign references; omit theme/output entry points and arbitrary aesthetic bans.",
         "2026-10-21: Re-author selected ux-writing principles from toss/apps-in-toss-harness into references/writing.md: claim density and repetition, choices stated without pressure, one language per screen and a Korean copy section; retain the BSD-3-Clause notice in LICENSE.toss-apps-in-toss-harness.",
-        "2026-10-21: Replace the Korean copy section of references/writing.md with Korean, English and Japanese interface notes; Japanese notes re-author yomiyasu and SmartHR conventions (recorded under writing-for-humans for yomiyasu)."
+        "2026-10-21: Replace the Korean copy section of references/writing.md with Korean, English and Japanese interface notes; Japanese notes re-author yomiyasu and SmartHR conventions (recorded under writing-for-humans for yomiyasu).",
+        "2026-11-04: From the first awesome-interface comparison run, keep stress fixtures as reproducible evidence outside production paths and propose a fix per break; add worst-case data and conditional mobile-web references; make exiting surfaces unfocusable, keep over-dragged edge sheets attached, exclude shortcut and high-frequency surfaces from motion, address layout jumps on reveal, size answers to the question and avoid unverified version or maintenance claims."
       ],
       "excluded_sources": [
         {

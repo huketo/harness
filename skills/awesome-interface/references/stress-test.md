@@ -1,6 +1,6 @@
 # Stress testing
 
-Execute only when the user explicitly asks to stress-test a component or flow. This mode renders edge states in a disposable local fixture; it is not a source review, redesign or permission to fix production code.
+Execute only when the user explicitly asks to stress-test a component or flow. This mode renders edge states in an isolated local fixture; it is not a source review, redesign or permission to fix production code.
 
 ## Bound the experiment
 
@@ -9,6 +9,8 @@ Identify the requested component, its props/slots, states, context and possible 
 Use the real component and the project’s existing story, preview or scratch-page mechanism. Preserve its fonts, tokens, global styles and framework/server-client boundaries. A lookalike component or altered theme cannot prove the original works. The fixture may supply labels, container constraints, synthetic props and local event handlers, not restyle the subject to make it pass.
 
 ## Select reachable scenarios
+
+Choose content values from [worst-case data](worst-case-data.md): realistic or schema-backed, never random filler. Include values the schema allows but the demo data omits, such as missing optional fields, markup-like text and counts of zero and one. Feed them through the same boundary as the demo data (fixture, props or API stub), not by editing the component's markup or styles.
 
 Keep an axis when the component can actually receive it; record irrelevant axes and why. Combine axes selectively where interaction is plausible, rather than building an exhaustive Cartesian product.
 
@@ -38,8 +40,10 @@ Launch the local preview with the available supervised process mechanism and con
 | --- | --- | --- | --- |
 | The actual input/state/width | Reproduction steps | Concrete break or no observed break | Capture/region and source location if established |
 
-Report broken scenarios first, then covered scenarios, exclusions and unverified checks. “Text escapes the right edge” is evidence; “spacing feels tight” is taste. This mode issues no ship verdict. If fixes were also requested, apply the owning guidance and re-render the failing cases plus their relevant baseline.
+Report broken scenarios first, then covered scenarios, exclusions and unverified checks. For each break, name the cause and propose a fix direction in its owning domain, such as escaping inserted text, a fallback for a missing field or `overflow-wrap` on an unbreakable string; mark choices that are design decisions, such as truncating versus wrapping. “Text escapes the right edge” is evidence; “spacing feels tight” is taste. This mode issues no ship verdict. If fixes were also requested, apply the owning guidance and re-render the failing cases plus their relevant baseline.
 
-## Cleanup is part of completion
+## Keep the evidence, not the side effects
 
-Remove disposable routes and fixture data; stop only preview processes and browser resources created for this run. Preserve unrelated user work and captures cited as evidence, placing those captures with the report outside production paths before cleanup. Keep an executable fixture only when the user explicitly requested a persistent deliverable, state its location/lifecycle and keep it outside production entry points. Report cleanup performed and any resource that could not be removed. A temporary stress page must not silently become shipped UI.
+Leave the fixture and its worst-case data in place as the reproducible evidence: in the project's existing story, preview or scratch location, or a separate directory outside production paths, never imported by a production entry point or route. Report its location, how to open it and how to remove it. Remove it instead when the user asks for no leftover files, or when the only available location would ship with the product.
+
+Stop the preview processes and browser resources started for this run. Preserve unrelated user work, and keep captures cited as evidence with the report. Report any resource that could not be stopped. A stress page must not silently become shipped UI.

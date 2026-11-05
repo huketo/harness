@@ -83,7 +83,7 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 
 | 진입점 | 소유 범위 |
 | --- | --- |
-| [`awesome-interface`](../../skills/awesome-interface/SKILL.md) | 일반 UI 제작·개선·검토. 새 화면의 시각 방향과 기존 제품을 보존하는 리디자인 절차를 포함하며, 접근성·배치·문구·타이포그래피·색상·시각적 완성도·웹 모션과 제스처의 공통 규칙을 소유합니다. 작은 수정은 관련 영역만 읽습니다. |
+| [`awesome-interface`](../../skills/awesome-interface/SKILL.md) | 일반 UI 제작·개선·검토. 새 화면의 시각 방향과 기존 제품을 보존하는 리디자인 절차를 포함하며, 접근성·배치·문구·타이포그래피·색상·시각적 완성도·웹 모션과 제스처·모바일 웹 대응의 공통 규칙을 소유합니다. 작은 수정은 관련 영역만 읽습니다. |
 | [`image-to-code`](../../skills/image-to-code/SKILL.md) | 제공·선택·생성된 이미지에서 웹 UI를 구현합니다. 사용 가능한 참조는 재생성하지 않고, 필요한 이미지가 없을 때만 `imagegen`을 사용합니다. 네이티브 앱 구현은 범위 밖입니다. |
 | [`imagegen`](../../skills/imagegen/SKILL.md) | 웹 섹션·모바일 앱 화면·독립 로고·브랜드 콘셉트 보드의 실제 이미지 생성과 시각 확인. 내부 참조는 `frontend/common`, `frontend/web`, `frontend/mobile`, `logo`, `brandkit`이며 별도 등록 스킬이 아닙니다. |
 | [`design-md`](../../skills/design-md/SKILL.md) | 명시적으로 요청한 설계 문서의 추출·작성·갱신. 기존 문서 소유 경로를 우선하며 현재 구현·승인된 의도·제안·미확인을 구분합니다. Stitch는 선택적 어댑터입니다. |
@@ -112,6 +112,8 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 설치는 기존 `install.sh`의 스킬 링크 경로를 사용합니다. 이미 설치된 `better-*`, `interface-review`, `break`, `variant`, `explain-interface`를 교체할 때에는 먼저 수정본과 참조를 탐색 경로 밖에 백업하고 설치 관리자의 등록 여부를 확인합니다. 등록된 항목은 관리자의 제거 명령을 사용하고, 미등록 사본은 백업 후 탐색 경로에서 옮깁니다. 새 스킬과 이전 사본을 함께 활성화하지 않습니다. 설치 직후 기존 대화의 목록은 그대로일 수 있으므로 새 세션에서 확인합니다.
 
 검증용 합성 입력과 기대 동작은 각 스킬의 `evals/evals.json`에 있습니다: [UI](../../skills/awesome-interface/evals/evals.json), [이미지 기반 구현](../../skills/image-to-code/evals/evals.json), [이미지 생성](../../skills/imagegen/evals/evals.json), [설계 문서](../../skills/design-md/evals/evals.json). `files`가 있는 사례는 fixture를 같은 상대 경로로 배치한 격리 작업공간에서 실행합니다. 계획 전용 사례는 지시·단계·보존 경계를 검증하며 실제 생성이나 구현의 성공을 증명하지 않습니다. 실제 모델 응답과 캡처는 버전 관리하지 않습니다.
+
+`awesome-interface`를 스킬 없음과 `emilkowalski/skills`의 스킬 16개에 견주어 같은 과제로 비교하는 스위트는 [`evals/compare/`](../../skills/awesome-interface/evals/compare/)에 있습니다. 실행·채점·반복 비교 방법은 [`scripts/skill-eval/README.md`](../../scripts/skill-eval/README.md)를 따릅니다. 실행기는 평가받는 에이전트와 판정자로 유료 모델을 호출합니다.
 
 ## 마케팅
 

@@ -1,0 +1,41 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.5 Helvetica, Arial, sans-serif;
+  color: #222;
+  background: #fafafa;
+}
+.page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.page h1 { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; margin: 0 0 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
+.card {
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.card .photo { width: 100%; display: block; }
+.card .body { padding: 14px 16px 16px; }
+.card .title { font-size: 17px; font-weight: 700; margin: 0; }
+.card .bid { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; }
+.card .bid strong { font-size: 22px; }
+.card .bid span { font-size: 12px; color: #999; }
+.card .meta { display: flex; justify-content: space-between; color: #999; font-size: 12px; margin-top: 8px; }
+.seller { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
+.seller img { width: 28px; height: 28px; border-radius: 50%; }
+.card button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 20px;
+  background: #ff5a1f;
+  color: #fff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.4s;
+}
+.card button:hover { background: #e14c13; transform: scale(1.05); }

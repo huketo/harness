@@ -82,7 +82,7 @@ bun test t3/scheduled/host-sync.test.mjs
 
 직접 통제가 필요한 스킬을 편입할 때에는 상류 라이선스를 먼저 확인하고 원저작자 고지를 유지합니다. 관리형 사본과 편입 정본을 동시에 활성화하지 않습니다. 출처, 선택한 버전, 보존한 라이선스는 `third-party/adopted-skills.json`과 구성요소 옆의 고지에 기록합니다.
 
-이후 수정은 `skills/`의 정본에서 수행합니다. `mattpocock/skills`에서 선택한 14개는 정본으로 유지하고, `third-party/adopted-skills.json`의 제거 목록에 있는 나머지 13개는 설치·배포 대상에서 제외합니다. 실제 평가 출력, 임시 작업공간, 모델 응답은 `var/`에 두며 배포하지 않습니다.
+이후 수정은 `skills/`의 정본에서 수행합니다. `mattpocock/skills`에서 선택한 14개는 정본으로 유지하고, `third-party/adopted-skills.json`의 제거 목록에 있는 나머지 13개는 설치·배포 대상에서 제외합니다. 실제 평가 출력, 임시 작업공간, 모델 응답은 `var/`에 두며 배포하지 않습니다. 스킬 비교 실행기 `scripts/skill-eval/`의 실행 산출물, 내려받은 upstream 스킬 clone, 채점 결과도 `var/skill-eval/`에 두고 버전 관리하지 않습니다.
 
 2026-11-04에는 편입본을 상류 `mattpocock/skills` 4ae2317과 비교하고, 사용자가 수락한 변경만 옮겼습니다. 옮긴 변경은 `wizard`의 `template.sh` 버그 수정, `diagnosing-bugs`의 비밀값 가리기와 강제 실패 확인, `code-review`의 표준 문서 탐색, `tdd`의 테스트 경계별 탐지 범위 메모, `grilling`의 질문 구성 규칙, `handoff`의 임시 디렉터리 순서와 경로 보고입니다. 용어집 규약도 상류와 같이 `CONTEXT.md`·`CONTEXT-MAP.md`에서 `GLOSSARY.md`·`GLOSSARY-MAP.md`로 바꾸었으며, 예전 이름만 있는 저장소에서는 그 파일을 같은 문서로 읽습니다. 제거했던 `setup-matt-pocock-skills`의 역할은 하네스 전용 `repo-init`이 맡습니다. 이 스킬은 사용자가 직접 호출할 때만 실행되며, 하네스 스킬이 읽는 `AGENTS.md`, `docs/agents/`, 이슈 트래커 문서, 용어집, ADR 위치를 대상 저장소에 만듭니다. 상류는 2026-09-24에 `resolving-merge-conflicts`를 삭제했지만, 하네스는 이 스킬을 계속 유지합니다. 스킬별 상류 커밋과 입력 해시는 `third-party/adopted-skills.json`에 기록되어 있습니다.
 
@@ -91,6 +91,8 @@ bun test t3/scheduled/host-sync.test.mjs
 2026-09-15에는 [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)의 MIT 자료를 선별 편입했습니다. `awesome-interface`에는 시각 방향·보존형 리디자인 참조만 추가하고, `image-to-code`·`imagegen`·`design-md`를 별도 진입점으로 둡니다. 이미지 생성의 웹·모바일·브랜드 분기는 일반 참조 문서이며 추가 등록하지 않습니다. theme/output/stitch 이름의 스킬이나 필수 생성 파이프라인은 도입하지 않습니다. 각 항목의 고정 revision과 입력 해시는 `third-party/adopted-skills.json`이 소유하고, 기존 UI 라이선스와 새 `LICENSE.taste-skill` 고지를 함께 유지합니다. 새 스킬은 각 디렉터리의 `LICENSE`를 사용합니다.
 
 2026-09-16에는 [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/85e8e2363b713506e1d5b6e07a0eb2da66be1bc3)의 MIT 자료 중 웹 모션·애니메이션·제스처 지침만 `awesome-interface`에 선별 편입했습니다. 일반 모션은 `references/ui.md`, 드래그·스와이프·관성·스냅은 필요할 때만 읽는 `references/gestures.md`가 다룹니다. React·Motion·Base UI를 필수로 삼지 않으며 기존 의존성과 컴포넌트 API를 우선합니다. 별도 스킬, 모바일 웹 초기 설정, 네이티브 API, 감사·프로토타입 절차는 추가하지 않았습니다. 입력 revision·해시는 `third-party/adopted-skills.json`, 원저작자의 MIT 고지는 `LICENSE.emilkowalski`에 보존합니다.
+
+2026-11-04에는 첫 비교 평가(`skills/awesome-interface/evals/compare/`)에서 `awesome-interface`가 1위를 놓친 사례의 판정 근거를 반영했습니다. 같은 [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/f1090bec277140d02ed202440185ad9d02ac1490)의 `break-ui` 최악 데이터 목록을 `references/worst-case-data.md`로, `mobile-native` 증상 표를 필요할 때만 읽는 `references/mobile-web.md`로 다시 썼습니다. 그래서 2026-09-16에 제외했던 모바일 웹 대응도 이제 조건부 참조로 포함합니다. 스트레스 시험은 시험 자료를 운영 경로 밖에 재현 근거로 남기고, 깨진 곳마다 수정 방향을 제안합니다. 데이터 전환 UI, 고정 초기 설정 코드, React Native 지침은 가져오지 않았습니다. 입력 revision·해시는 `third-party/adopted-skills.json`, 원저작자 고지는 기존 `LICENSE.emilkowalski`에 있습니다.
 
 2026-10-21에는 [toss/apps-in-toss-harness](https://github.com/toss/apps-in-toss-harness/tree/255b636812d8b3a9b048d0a700644b9cbd8532c4)의 BSD-3-Clause `ux-writing` 원칙 일부를 `awesome-interface`의 `references/writing.md`에 다시 써서 넣었습니다. 압박 없는 선택 안내, 문장당 주장 하나와 조건 항목 분리, 화면당 언어 하나, 문구를 줄일 때의 사실 대조를 다룹니다. 별도 스킬, `/ait:` 명령, `design` G6 연계, docs MCP 조회, 적용 전 필수 승인 단계, 상류 before/after 예시는 가져오지 않았습니다. 입력 revision·해시는 `third-party/adopted-skills.json`, 원저작자 고지는 `LICENSE.toss-apps-in-toss-harness`에 보존합니다.
 

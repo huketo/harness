@@ -1,0 +1,8 @@
+{
+  "name": "장보기 메모",
+  "short_name": "장보기",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
