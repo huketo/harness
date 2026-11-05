@@ -9,7 +9,13 @@ A discipline for hard bugs. Skip phases only when explicitly justified.
 
 The user's report is ground truth — a symptom, error message, or log they hand you starts the investigation; it needs no independent reconfirmation before you begin. What Phase 1 builds is not proof the report is true, but a repeatable way to isolate the cause and later prove the fix.
 
-When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+When exploring the codebase, read the domain glossary (if it exists) to get a clear mental model of the relevant modules: `GLOSSARY.md` at the repo root, or the per-context `GLOSSARY.md` that a root `GLOSSARY-MAP.md` points to. If neither exists but the older `CONTEXT.md`/`CONTEXT-MAP.md` does, read that as the same document. Check ADRs under `docs/adr/` in the area you're touching.
+
+## Redact
+
+This skill has you show commands, outputs and captured artifacts. **Redact every secret first** — write `<REDACTED>` in its place. Build loops against env vars, so the credential stays in the environment rather than in what you show. Captured artifacts carry auth headers: quote only the lines that carry the signal.
+
+If the redacted output is not enough to diagnose the bug, say so and ask the user.
 
 ## Phase 1 — Build a feedback loop
 
@@ -47,11 +53,11 @@ For an intermittent browser test, put the test's own synchronisation and isolati
 
 ### When you genuinely cannot build a loop
 
-State the missing observation and what was tried. Continue safe inspection and artifact analysis; ask only for evidence or access unavailable through the current tools. Keep proposed causes explicitly hypothetical and do not claim a speculative edit is a verified repair.
+State the missing observation and what was tried. Continue safe inspection and artifact analysis; ask only for evidence or access unavailable through the current tools, and request any captured artifact (HAR file, log dump, payload) in redacted form. Keep proposed causes explicitly hypothetical and do not claim a speculative edit is a verified repair.
 
 ### Completion criterion — a tight loop that goes red
 
-Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** — a script path, a test invocation, a curl — that you have **already run at least once** (paste the invocation and its output), and that is:
+Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** — a script path, a test invocation, a curl — that you have **already run at least once** (show the invocation and its output, redacted), and that is:
 
 - [ ] **Red-capable** — it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring" — it must be able to _catch this specific bug_.
 - [ ] **Controlled or quantified** — a reproducible input/schedule, or a declared finite sample with failures, attempts and conditions recorded.
@@ -117,7 +123,7 @@ A correct seam is one where the test exercises the **real bug pattern** as it oc
 If a correct seam exists:
 
 1. Turn the minimised repro into a failing test at that seam.
-2. Watch it fail.
+2. Watch it fail. If you forced the red by mutating code or a fixture, `diff` against a pristine copy to prove the mutation landed before you trust it.
 3. Apply the fix.
 4. Watch it pass.
 5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.

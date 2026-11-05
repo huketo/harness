@@ -1,0 +1,5 @@
+interface:
+  display_name: "Repo Init"
+  short_description: "Scaffold the repository docs the harness skills read"
+policy:
+  allow_implicit_invocation: false

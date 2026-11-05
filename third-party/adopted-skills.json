@@ -475,7 +475,8 @@
         "skills/diagnosing-bugs/LICENSE.lauren-poteto-rules"
       ],
       "local_changes": [
-        "2026-09-28: Add the verified-route checklist item and mechanical-check prevention question re-authored from lauren-poteto-rules principles 3 and 5; preserve the notice in LICENSE.lauren-poteto-rules."
+        "2026-09-28: Add the verified-route checklist item and mechanical-check prevention question re-authored from lauren-poteto-rules principles 3 and 5; preserve the notice in LICENSE.lauren-poteto-rules.",
+        "2026-11-04: Port the upstream Redact section (efce423, bda79a3) and redacted-artifact wording, the hitl-loop capture comment, and the forced-mutation diff check (f3fc563); read GLOSSARY.md/GLOSSARY-MAP.md with a legacy CONTEXT.md fallback (d80fa0f)."
       ]
     },
     "code-review": {
@@ -489,7 +490,10 @@
         "installedAt": "2026-07-09T01:30:03.676Z",
         "updatedAt": "2026-08-06T12:13:15.236Z"
       },
-      "installed_snapshot_sha256": "f930f131777d21df5c9c1caa18c9f890b2f6513cf5c33b801f223c65003de5bd"
+      "installed_snapshot_sha256": "f930f131777d21df5c9c1caa18c9f890b2f6513cf5c33b801f223c65003de5bd",
+      "local_changes": [
+        "2026-11-04: Port the standards-file search sentence from upstream 3da8c01 (not its foreground-subagent or setup sentences); fetch issues through docs/agents/issue-tracker.md when it exists."
+      ]
     },
     "codebase-design": {
       "previous_registration": {
@@ -502,7 +506,10 @@
         "installedAt": "2026-07-09T01:30:03.685Z",
         "updatedAt": "2026-08-06T12:13:15.251Z"
       },
-      "installed_snapshot_sha256": "c46b49303a81c7fc8934d0f4fbc44382cdecb73942d85d8d7db3523407fff8fa"
+      "installed_snapshot_sha256": "c46b49303a81c7fc8934d0f4fbc44382cdecb73942d85d8d7db3523407fff8fa",
+      "local_changes": [
+        "2026-11-04: Name GLOSSARY.md vocabulary in DESIGN-IT-TWICE.md (upstream d80fa0f) with a legacy CONTEXT.md fallback."
+      ]
     },
     "domain-modeling": {
       "previous_registration": {
@@ -515,7 +522,10 @@
         "installedAt": "2026-07-09T01:30:03.686Z",
         "updatedAt": "2026-08-06T12:13:15.252Z"
       },
-      "installed_snapshot_sha256": "40afc20cd49261811d7fe377fff53c1804f5e27644b42adb65469c7fc305a3a2"
+      "installed_snapshot_sha256": "40afc20cd49261811d7fe377fff53c1804f5e27644b42adb65469c7fc305a3a2",
+      "local_changes": [
+        "2026-11-04: Rename the CONTEXT.md/CONTEXT-MAP.md convention and CONTEXT-FORMAT.md to GLOSSARY.md/GLOSSARY-MAP.md/GLOSSARY-FORMAT.md (upstream d80fa0f); read legacy names as the same document and propose git mv on write."
+      ]
     },
     "improve-codebase-architecture": {
       "previous_registration": {
@@ -528,7 +538,10 @@
         "installedAt": "2026-05-06T05:31:26.973Z",
         "updatedAt": "2026-08-06T12:13:15.258Z"
       },
-      "installed_snapshot_sha256": "d3682058df92c259b47c36503baa02345d5811758621b5dc03081d5ba0f7b69b"
+      "installed_snapshot_sha256": "d3682058df92c259b47c36503baa02345d5811758621b5dc03081d5ba0f7b69b",
+      "local_changes": [
+        "2026-11-04: Read GLOSSARY.md or the matching one in GLOSSARY-MAP.md (upstream d80fa0f) with a legacy CONTEXT.md fallback."
+      ]
     },
     "prototype": {
       "previous_registration": {
@@ -580,7 +593,10 @@
         "installedAt": "2026-07-09T01:30:03.688Z",
         "updatedAt": "2026-08-06T12:13:15.255Z"
       },
-      "installed_snapshot_sha256": "f82bb664166568b1d7e0323ea13b45b5df4a096bb6b25de7a946e0e58de0529d"
+      "installed_snapshot_sha256": "f82bb664166568b1d7e0323ea13b45b5df4a096bb6b25de7a946e0e58de0529d",
+      "local_changes": [
+        "2026-11-04: Port upstream 95249b0: word each question so yes accepts the recommendation (not the 85f83d3 separator format)."
+      ]
     },
     "wizard": {
       "previous_registration": {
@@ -593,7 +609,10 @@
         "installedAt": "2026-08-06T12:13:15.267Z",
         "updatedAt": "2026-08-06T12:13:15.267Z"
       },
-      "installed_snapshot_sha256": "bacaeb2db5caadbb715d411bd2c00a6995ad817f19121ff0bc6b8aaffff0e8c6"
+      "installed_snapshot_sha256": "bacaeb2db5caadbb715d411bd2c00a6995ad817f19121ff0bc6b8aaffff0e8c6",
+      "local_changes": [
+        "2026-11-04: Port upstream template.sh fixes 868c4cf and 49dd158 (Readline ask, single-quoted .env values and double-quoted decode, symlink- and mode-preserving write_env that also sets $KEY, EOF failure in ask/ask_secret, opener-missing warning, run_wizard wrapper, tput clear fallback, unused RED removed); keep the harness comment style and TOTAL_MINUTES."
+      ]
     },
     "writing-for-agents": {
       "previous_registration": {
@@ -642,7 +661,10 @@
         "installedAt": "2026-08-06T12:13:15.265Z",
         "updatedAt": "2026-08-06T12:13:15.265Z"
       },
-      "installed_snapshot_sha256": "837d45437a1b4e7fef6aa2b8eca93b8d284391fc9b1df421c55e4fd7de06ee03"
+      "installed_snapshot_sha256": "837d45437a1b4e7fef6aa2b8eca93b8d284391fc9b1df421c55e4fd7de06ee03",
+      "local_changes": [
+        "2026-11-04: Use GLOSSARY.md and follow GLOSSARY-MAP.md when several exist (upstream d80fa0f, d6cd26f), in Korean, with a legacy CONTEXT.md fallback."
+      ]
     },
     "handoff": {
       "previous_registration": {
@@ -657,7 +679,8 @@
       },
       "installed_snapshot_sha256": "c97a305f5ca0b6fa21ca82a009ac5a553acd02aab63cf59de939f75ac7797393",
       "local_changes": [
-        "Route T3 Code threads that want a new thread to the t3-handoff skill; the document rules stay here."
+        "Route T3 Code threads that want a new thread to the t3-handoff skill; the document rules stay here.",
+        "2026-11-04: Port the upstream temp-dir order from 0f5e033 and keep the absolute-path report from 4f4e943."
       ]
     },
     "test-audit": {
@@ -1070,6 +1093,34 @@
       ],
       "local_changes": [
         "Translate to Korean; record MR state through glab or gh; pin force-with-lease to the observed head."
+      ],
+      "excluded_sources": []
+    },
+    "repo-init": {
+      "adopted_on": "2026-11-04",
+      "source": "https://github.com/mattpocock/skills",
+      "ownership": "harness-owned original; adapts a removed upstream skill",
+      "license": "MIT",
+      "license_path": "skills/repo-init/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/mattpocock/skills",
+          "commit": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+          "paths": [
+            "LICENSE",
+            "skills/engineering/setup-matt-pocock-skills"
+          ],
+          "snapshot_sha256": "d945a3cea03260f5ce63412798e5506d5958956aaeae0892befd40e9a187fdc7",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Replace setup-matt-pocock-skills (removed 2026-09-09) with a harness-specific initializer: explore, confirm each section with the recommended answer first, then write the AGENTS.md router, CLAUDE.md, docs/agents/{workflow,authority,writing,testing,hitl,issue-tracker}.md, GLOSSARY.md or GLOSSARY-MAP.md, and docs/adr/.",
+        "Adapt the upstream issue-tracker seeds (GitHub, GitLab, local) and procedure shape; drop triage labels, wayfinder and remote setup; generalize the remaining templates from this repository's own agent guides.",
+        "Add three judgment evals with fixtures (empty GitHub repo, GitLab repo with CLAUDE.md and legacy CONTEXT.md, partially documented monorepo)."
       ],
       "excluded_sources": []
     }

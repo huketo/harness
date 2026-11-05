@@ -1,0 +1,5 @@
+{
+  "name": "@shopfront/billing",
+  "private": true,
+  "scripts": { "test": "vitest run" }
+}

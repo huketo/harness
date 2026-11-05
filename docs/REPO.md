@@ -84,6 +84,8 @@ bun test t3/scheduled/host-sync.test.mjs
 
 이후 수정은 `skills/`의 정본에서 수행합니다. `mattpocock/skills`에서 선택한 14개는 정본으로 유지하고, `third-party/adopted-skills.json`의 제거 목록에 있는 나머지 13개는 설치·배포 대상에서 제외합니다. 실제 평가 출력, 임시 작업공간, 모델 응답은 `var/`에 두며 배포하지 않습니다.
 
+2026-11-04에는 편입본을 상류 `mattpocock/skills` 4ae2317과 비교하고, 사용자가 수락한 변경만 옮겼습니다. 옮긴 변경은 `wizard`의 `template.sh` 버그 수정, `diagnosing-bugs`의 비밀값 가리기와 강제 실패 확인, `code-review`의 표준 문서 탐색, `tdd`의 테스트 경계별 탐지 범위 메모, `grilling`의 질문 구성 규칙, `handoff`의 임시 디렉터리 순서와 경로 보고입니다. 용어집 규약도 상류와 같이 `CONTEXT.md`·`CONTEXT-MAP.md`에서 `GLOSSARY.md`·`GLOSSARY-MAP.md`로 바꾸었으며, 예전 이름만 있는 저장소에서는 그 파일을 같은 문서로 읽습니다. 제거했던 `setup-matt-pocock-skills`의 역할은 하네스 전용 `repo-init`이 맡습니다. 이 스킬은 사용자가 직접 호출할 때만 실행되며, 하네스 스킬이 읽는 `AGENTS.md`, `docs/agents/`, 이슈 트래커 문서, 용어집, ADR 위치를 대상 저장소에 만듭니다. 상류는 2026-09-24에 `resolving-merge-conflicts`를 삭제했지만, 하네스는 이 스킬을 계속 유지합니다. 스킬별 상류 커밋과 입력 해시는 `third-party/adopted-skills.json`에 기록되어 있습니다.
+
 `awesome-interface`는 Jakub Krehel의 MIT 스킬을 재구성한 단일 진입점입니다. 여섯 전문 영역과 리뷰·변경 리뷰·스트레스·대안·설명 절차는 내부 참조 문서로 유지합니다. `third-party/adopted-skills.json`의 최상위 출처·날짜는 최초 편입 묶음의 기록이며, 이 스킬은 개별 항목의 출처·revision·입력 해시·로컬 변경 기록을 사용합니다. 라이선스가 확인되지 않은 `oklch-skill`의 고유 콘텐츠는 포함하지 않았습니다.
 
 2026-09-15에는 [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)의 MIT 자료를 선별 편입했습니다. `awesome-interface`에는 시각 방향·보존형 리디자인 참조만 추가하고, `image-to-code`·`imagegen`·`design-md`를 별도 진입점으로 둡니다. 이미지 생성의 웹·모바일·브랜드 분기는 일반 참조 문서이며 추가 등록하지 않습니다. theme/output/stitch 이름의 스킬이나 필수 생성 파이프라인은 도입하지 않습니다. 각 항목의 고정 revision과 입력 해시는 `third-party/adopted-skills.json`이 소유하고, 기존 UI 라이선스와 새 `LICENSE.taste-skill` 고지를 함께 유지합니다. 새 스킬은 각 디렉터리의 `LICENSE`를 사용합니다.

@@ -1,0 +1,5 @@
+{
+  "name": "@shopfront/orders",
+  "private": true,
+  "scripts": { "test": "vitest run" }
+}

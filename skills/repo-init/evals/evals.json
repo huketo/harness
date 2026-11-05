@@ -1,0 +1,72 @@
+{
+  "skill_name": "repo-init",
+  "evals": [
+    {
+      "id": 1,
+      "name": "empty-github-remote",
+      "prompt": "(평가 준비: 빈 디렉터리에서 `git init`과 `git remote add origin https://github.com/acme/widget.git`만 실행한 상태로 시작합니다. 스킬이 묻는 질문에는 권장 답을 고릅니다.) 새로 만든 저장소입니다. /repo-init",
+      "expected_output": "Findings name GitHub from the remote and no language evidence; asks the language with English recommended, does not ask the domain layout; after approval writes the standard set with no unfilled placeholders, an empty-but-honest testing.md, and no remote, push, issue, or commit.",
+      "files": [],
+      "expectations": [
+        "발견 사항에서 원격 호스트 github.com을 근거로 이슈 트래커의 권장 답을 GitHub(`gh`)로 둔다.",
+        "문서 산문이 없어 주 언어를 판단할 수 없다고 밝히고, 권장 답을 첫 선택지로 둔 질문으로 문서 언어를 묻는다.",
+        "모노레포 신호가 없으므로 도메인 배치를 묻지 않고 단일 컨텍스트(루트 `GLOSSARY.md`)로 정한다.",
+        "초안을 보여 주고 승인을 받기 전에는 대상 파일을 하나도 쓰지 않는다.",
+        "쓴 결과에 `AGENTS.md`, `@AGENTS.md` 한 줄인 `CLAUDE.md`, `docs/agents/`의 여섯 파일, `GLOSSARY.md`, `docs/adr/README.md`가 있고, 어느 파일에도 `{{`가 남아 있지 않다.",
+        "`testing.md`에 명령을 지어내지 않고, 정의된 검사 명령이 없다는 사실과 찾아본 파일을 적는다.",
+        "원격 추가, 푸시, 이슈·라벨 생성, 커밋을 실행하지 않고, 사람이 실행할 명령은 완료 보고에서 안내만 한다."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "gitlab-claude-legacy-context",
+      "prompt": "(평가 준비: fixtures/gitlab-claude의 파일을 빈 디렉터리에 복사하고 `git init`, `git add -A`, `git commit -m init`, `git remote add origin git@gitlab.example.com:billing/invoice-api.git`을 실행한 상태로 시작합니다. 스킬이 묻는 질문에는 권장 답을 고릅니다.) 이 저장소에도 하네스 문서를 갖춰 주세요. /repo-init",
+      "expected_output": "GitLab tracker recommended from the self-hosted remote; Korean chosen from README without asking; CLAUDE.md kept with @AGENTS.md prepended and a new AGENTS.md; git mv CONTEXT.md GLOSSARY.md proposed instead of a second glossary; testing.md lists only package.json scripts with path:line; db:migrate classified as a live effect.",
+      "files": [
+        "fixtures/gitlab-claude/CLAUDE.md",
+        "fixtures/gitlab-claude/CONTEXT.md",
+        "fixtures/gitlab-claude/README.md",
+        "fixtures/gitlab-claude/package.json",
+        "fixtures/gitlab-claude/src/invoice.ts"
+      ],
+      "expectations": [
+        "원격 호스트 gitlab.example.com을 근거로 GitLab(`glab`)을 권장 답으로 두고, `issue-tracker.md`에 `billing/invoice-api`와 그 호스트를 적는다.",
+        "`README.md`가 한국어이므로 문서 언어를 묻지 않고 한국어로 정하며 그 근거를 제시한다. 명령, 경로, 식별자는 번역하지 않는다.",
+        "기존 `CLAUDE.md`의 내용을 보존한 채 첫 줄에 `@AGENTS.md`를 더하는 방식으로 제안하고, `AGENTS.md`는 새로 만든다.",
+        "`git mv CONTEXT.md GLOSSARY.md`를 제안하고, `CONTEXT.md` 옆에 새 `GLOSSARY.md`를 따로 만들지 않으며 기존 용어(Invoice, Settlement)를 보존한다.",
+        "`testing.md`에는 `package.json`의 `test`, `lint`, `build`만 `path:line`과 함께 적고, 근거가 없는 목적(예: typecheck)은 찾아본 파일과 함께 비워 둔 자리로 남긴다.",
+        "`db:migrate`(`prisma migrate deploy`)를 실제 효과가 있는 명령으로 분류해 `testing.md`의 live effects와 `authority.md`의 separate decision 목록에 적는다.",
+        "원격 변경, 푸시, 이슈·라벨 생성, 커밋을 실행하지 않는다."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "partial-docs-monorepo",
+      "prompt": "(평가 준비: fixtures/partial-docs의 파일을 빈 디렉터리에 복사하고 `git init`, `git add -A`, `git commit -m init`, `git remote add origin https://github.com/acme/shopfront.git`을 실행한 상태로 시작합니다. 스킬이 묻는 질문에는 권장 답을 고릅니다.) 에이전트 문서가 일부만 있는 저장소입니다. /repo-init",
+      "expected_output": "Existing AGENTS.md, workflow.md, and testing.md are extended in place with only missing sections; CLAUDE.md, authority.md, writing.md, hitl.md, and a GitHub issue-tracker.md are created; GLOSSARY-MAP.md recommended with orders and billing as contexts and the tsconfig package excluded; testing.md gains commands from package.json and CI with path:line.",
+      "files": [
+        "fixtures/partial-docs/.github/workflows/ci.yml",
+        "fixtures/partial-docs/AGENTS.md",
+        "fixtures/partial-docs/README.md",
+        "fixtures/partial-docs/docs/agents/testing.md",
+        "fixtures/partial-docs/docs/agents/workflow.md",
+        "fixtures/partial-docs/package.json",
+        "fixtures/partial-docs/packages/billing/package.json",
+        "fixtures/partial-docs/packages/billing/src/invoice.ts",
+        "fixtures/partial-docs/packages/orders/package.json",
+        "fixtures/partial-docs/packages/orders/src/order.ts",
+        "fixtures/partial-docs/packages/tsconfig/base.json",
+        "fixtures/partial-docs/packages/tsconfig/package.json",
+        "fixtures/partial-docs/pnpm-workspace.yaml"
+      ],
+      "expectations": [
+        "기존 `AGENTS.md`를 덮어쓰지 않고 빠진 절(hitl 포인터, 주제 안내 목록, 도메인 언어)만 더하자고 제안하며, `CLAUDE.md`는 `@AGENTS.md` 한 줄로 새로 만든다.",
+        "기존 `docs/agents/workflow.md`와 `testing.md`를 덮어쓰지 않고, 이미 다루는 주제는 되풀이하지 않은 채 빠진 절만 제자리에 더하자고 제안하며 들어갈 위치를 밝힌다.",
+        "없는 `authority.md`, `writing.md`, `hitl.md`와 GitHub용 `issue-tracker.md`를 새로 만든다.",
+        "`pnpm-workspace.yaml`을 다중 컨텍스트 신호로 보고 `GLOSSARY-MAP.md`를 권장 답으로 두며, `orders`와 `billing`을 컨텍스트 후보로 보여 주고 공유 설정 패키지 `tsconfig`는 후보에서 뺀다.",
+        "`testing.md`에 `package.json`과 `.github/workflows/ci.yml`에서 찾은 `test`, `lint`, `typecheck` 명령을 `path:line`과 함께 더하고, 기존의 `pnpm -r test` 문장은 그대로 둔다.",
+        "원격 변경, 푸시, 이슈·라벨 생성, 커밋을 실행하지 않는다."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "@shopfront/tsconfig",
+  "private": true,
+  "files": ["base.json"]
+}

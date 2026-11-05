@@ -31,14 +31,14 @@ Resolve any fixed point and capture the selected diff plus relevant untracked co
 Look for the originating spec, in this order:
 
 1. **The user's own request in this conversation.** If they told you directly what to build or fix, that request *is* the spec — quote it verbatim for the Spec sub-agent rather than searching for a document that doesn't exist.
-2. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch with whatever tracker access is already available (`gh issue view`, `glab issue view`, an MCP issue resource, a tracker workflow the repo documents under `docs/agents/`). If none is configured, ask the user for the issue link or text.
+2. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — when `docs/agents/issue-tracker.md` exists, fetch them with the workflow it documents; otherwise use whatever tracker access is already available (`gh issue view`, `glab issue view`, an MCP issue resource). If none is configured, ask the user for the issue link or text.
 3. A path the user passed as an argument.
 4. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 5. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 
 ### 3. Identify the standards sources
 
-Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
+Search the repo for every file that documents how code should be written. When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list.
 
 On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
