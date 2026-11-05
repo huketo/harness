@@ -50,11 +50,11 @@ T3 사이드바의 스레드 제목이 상태판이다. 제목이 실행·슬라
 | --- | --- | --- |
 | 실행 슬러그 `<run>` | 케밥, 8자 이내 | `authref` |
 | 슬라이스 슬러그 `<slice>` | 케밥, 14자 이내 | `token-store` |
-| 브랜치 | `orch/<run>/<slice>`, 통합은 이 스레드의 브랜치 | `orch/authref/token-store` |
+| 브랜치 | `orch/<run>-<slice>`, 통합은 이 스레드의 브랜치 | `orch/authref-token-store` |
 | 위임 제목 `title` | `<run>/<slice>`, 리뷰 위임은 `<run>/<slice>/review`, 스카우트는 `<run>/scout-<주제>` | `authref/token-store` |
 | `clientRequestId` | `<run>-<slice>-<역할 w·r·s><회차>` | `authref-token-store-w1` |
 
-통합 브랜치는 이 스레드가 바인딩된 워크트리의 브랜치다. 사용자의 원래 체크아웃은 건드리지 않는다. 이 스레드가 기본 체크아웃에서 열려 있으면 먼저 사람에게 워크트리 스레드로 옮기자고 제안한다.
+통합 브랜치는 이 스레드가 바인딩된 워크트리의 브랜치다. 슬라이스 브랜치를 `/`가 아니라 `-`로 잇는 이유는, 통합 브랜치가 `orch/<run>`이면 git이 그 아래에 `orch/<run>/<slice>`를 만들지 못하기 때문이다(`cannot lock ref`). 사용자의 원래 체크아웃은 건드리지 않는다. 이 스레드가 기본 체크아웃에서 열려 있으면 먼저 사람에게 워크트리 스레드로 옮기자고 제안한다.
 
 ### 4. 브리프와 실행
 
