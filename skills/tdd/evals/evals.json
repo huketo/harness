@@ -83,6 +83,58 @@
         "접근 가능한 이름이 없는 canvas의 getByTestId는 허용되는 예외로 유지한다.",
         "순서 자체가 계약인 정렬 시험의 위치 단정은 허용하고, 위치로 대상을 찾는 것과 구분한다."
       ]
+    },
+    {
+      "id": 7,
+      "name": "browser-burn-in",
+      "prompt": "새 Playwright 시험을 작성했습니다. 필터를 고른 뒤 expect(page).toHaveURL(...)로 주소를 확인하고, 이어서 expect(queries.at(-1)).toBe('limit=20&status=resolved')로 page.route가 기록한 요청을 단정합니다. 다른 시험은 페이지가 뜨자마자 검색어를 입력하고 Enter를 누릅니다. 로컬에서 기본 worker 수로 세 번 통과했습니다. 담당자는 이 정도면 병합해도 되고, 더 확인하려면 CPU를 6배 느리게 해서 한 번 돌리면 된다고 합니다. 지금은 실행·편집하지 말고 시험에 대한 판단과 병합 전 확인 계획을 제시하세요.",
+      "expected_output": "Names the orderings each test relies on; polls the probe; declares a no-retry burn-in at one worker plus a response-delay run; explains why CPU throttling alone is not enough.",
+      "files": [],
+      "expectations": [
+        "각 시험이 의존하는 선후 관계(요청 전송 후 probe 읽기, 초기 effect 후 입력)를 나열하고 각각을 강제할 경계를 제시한다.",
+        "일회성 probe 읽기를 expect.poll이나 사전 등록한 대기로 바꾸게 한다.",
+        "재시도 0, 사전에 정한 반복 횟수, workers=1의 무교란 번인을 요구하고 기본 병렬 실행만으로 충분하다고 보지 않는다.",
+        "응답 지연 실행을 함께 요구하고, CPU 제한만으로는 시작 시점 경합을 가릴 수 있음을 지적한다.",
+        "실패를 모두 보존하고 입력 유실은 제품 결함 가설부터 확인하며, 유한한 통과를 무결함 증명으로 다루지 않는다."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "vitest-order-gate",
+      "prompt": "Vitest 4.1 통합 시험을 새로 작성했습니다. 같은 Draft에 게시 요청 두 개를 Promise.all로 보내고, 한쪽은 성공, 다른 쪽은 재시도 가능 오류라고 단정합니다. 파일 전체를 for 루프로 30번 돌렸더니 모두 통과했습니다. 담당자는 반복이 부족하면 vitest run --repeats=100을 쓰자고 하고, 시험은 그대로 두자고 합니다. CI는 Bun, 로컬은 Node에서 실행합니다. 지금은 실행·편집하지 말고 판단과 확인 계획을 제시하세요.",
+      "expected_output": "Treats Promise.all as an unenforced ordering and adds a gate; rejects the unverified flag; plans target-alone, shuffled and per-runtime fresh-process runs plus a targeted delay.",
+      "files": [],
+      "expectations": [
+        "Promise.all로 시작한 두 요청을 약속되지 않은 선후 관계로 보고, 첫 요청의 진입 신호나 직렬화 지점의 게이트로 순서를 고정하게 한다.",
+        "파일 전체 반복 통과를 이 경합의 증거로 인정하지 않는다.",
+        "대상 시험 단독 실행, 서로 다른 seed의 순서 무작위 실행, CI와 로컬의 런타임별 실행을 새 프로세스 반복으로 계획한다.",
+        "선후 관계 지점에 일시적 지연을 넣어 확인하고 그 지연을 나중에 제거하게 한다.",
+        "--repeats를 설치된 러너에서 확인되지 않은 옵션으로 다루고, repeats가 시험 옵션임을 확인하거나 미확인으로 표시한다."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "flake-pattern-promotion",
+      "prompt": "이번 달에만 서로 다른 두 시험에서 afterEach가 await 뒤에 let 변수로 잡아 둔 client를 닫다가, 다음 케이스가 다시 대입한 client까지 닫는 flake를 고쳤습니다. 팀원은 이번에도 해당 시험만 고치고 넘어가자고 합니다. 지금은 실행·편집하지 말고 수정 범위와 재발 방지 방법을 제시하세요.",
+      "expected_output": "Repairs the handle capture and promotes the repeated pattern into a repository-owned lint or fixture whose message names the repair, proven on bad and valid cases.",
+      "files": [],
+      "expectations": [
+        "첫 await 전에 핸들을 지역 변수로 고정하는 수정을 제시한다.",
+        "두 번 반복된 패턴을 산문 규칙이 아니라 그 저장소의 린트, fixture 또는 helper로 승격한다.",
+        "오류 문구에 고치는 방법을 적게 한다.",
+        "새 검사가 나쁜 사례를 거부하고 올바른 사례를 통과시키는지 실행해 확인하게 한다."
+      ]
+    },
+    {
+      "id": 10,
+      "name": "routine-sync-test",
+      "prompt": "금액을 쉼표가 들어간 문자열로 바꾸는 순수 함수 formatPrice에 음수 처리 동작을 TDD로 추가하려 합니다. 기존 단위 테스트 파일이 있고 비동기 호출, 시계, 전역 상태는 없습니다. 담당자가 번인을 몇 회 돌려야 하는지 묻습니다. 지금은 실행·편집하지 말고 절차를 제시하세요.",
+      "expected_output": "Keeps the ordinary red-green cycle and adds no burn-in for a synchronous pure function.",
+      "files": [],
+      "expectations": [
+        "기존 테스트 파일에 사례를 추가하는 일반 red-green-refactor 절차를 제시한다.",
+        "비동기 경계가 없으므로 번인과 교란을 요구하지 않는다고 답한다."
+      ]
     }
   ]
 }

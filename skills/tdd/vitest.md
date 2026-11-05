@@ -44,6 +44,16 @@ Use the project's non-watch test command with a file filter; inspect execution c
 
 Verify every proposed flag against the installed runner's `--help` or version-matched API. If that lookup is unavailable, label the command unverified and omit guessed options. `--sequence.seed` requires shuffle to affect ordering; repeating the same seed is not varying the order.
 
-Record the seed. Preserve any `--fileParallelism=false` required by external fixtures. Use several explicit seeds or fresh process runs only when diagnosing that risk. Vitest's retry is not Playwright's repeat-each; use a finite command runner for repetitions and preserve every exit status. A passing seed does not prove order independence.
+Record the seed. Preserve any `--fileParallelism=false` required by external fixtures. Use several explicit seeds or fresh process runs when diagnosing that risk or burning in a new test. Vitest's retry is not Playwright's repeat-each; use a finite command runner for repetitions and preserve every exit status. A passing seed does not prove order independence.
+
+## Burn in a new test
+
+Repeating the whole file can stay green on a real race: one stayed at 0/30 whole-file while the target alone failed 21/30. Run a finite loop of fresh processes for each condition, 10 runs by default:
+
+1. The target alone: `-t "<test name>"`.
+2. The whole file with a distinct `--sequence.shuffle --sequence.seed=<n>` per run: 10 of 30.
+3. Each runtime the project ships or CI uses. A race invisible on Node failed 8 of 20 on Bun.
+
+Run the targeted delay from [flake.md](flake.md) before these. Generic load cost four times the wall time and caught nothing the target-alone run missed. Vitest 4.1 has no `--repeats` CLI flag: `repeats` is a test option, and the fresh-process loop also preserves each exit status.
 
 Sources: [parallelism](https://vitest.dev/guide/parallelism), [Vi API](https://vitest.dev/api/vi), [expect.poll](https://vitest.dev/api/expect#poll), [test context](https://vitest.dev/guide/test-context), [sequence](https://vitest.dev/config/sequence).

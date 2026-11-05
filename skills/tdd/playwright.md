@@ -34,6 +34,29 @@ Browser `page.route` does not intercept server-side application fetches. Use the
 
 Fix the environment an assertion depends on. Use the repository's configured `reducedMotion`, `timezoneId` and `locale` defaults, and state any value an assertion relies on with `test.use()` in the spec; when the repository defines none, propose the defaults there. Prove an emulation option took effect by reading it in the page (`matchMedia("(prefers-reduced-motion: reduce)").matches`, `Intl.DateTimeFormat().resolvedOptions().timeZone`, `navigator.language`), not from a passing run: an option the installed Playwright does not accept is ignored without an error. Where the top-level `reducedMotion` option has no effect, set it as `contextOptions: { reducedMotion }` or call `page.emulateMedia({ reducedMotion })`. For static dates and relative-time text, pin time with [`page.clock.setFixedTime`](https://playwright.dev/docs/clock); `install` lets time keep flowing from its start value, so use `install` followed by `pauseAt`, `runFor` or `fastForward` only when the test drives timers. `timezoneId` and `locale` emulate only the browser; set `TZ` where the test runner or a server formats the asserted text. Take screenshots with `animations: "disabled"` and reduced motion.
 
+## Burn in a new test
+
+Run the target twice with the same count, once unperturbed and once with every response delayed:
+
+```text
+<spec-file> -g <title> --workers=1 --retries=0 --repeat-each=20
+```
+
+Keep `--workers=1`. For input that outran the page's startup, ten workers failed 3-4% of runs where one worker failed 33-76%. The delay covers the reverse, a test that read before the page had acted (0% unperturbed, 100% delayed). Add it as a temporary auto fixture in the project's test fixture and remove it afterwards:
+
+```ts
+shake: [async ({ page }, use) => {
+  const sleep = () => new Promise((resolve) => setTimeout(resolve, 100));
+  const route = page.route.bind(page);
+  page.route = (url, handler, options) =>
+    route(url, async (r, q) => { await sleep(); return handler(r, q); }, options);
+  await route("**/*", async (r) => { await sleep(); await r.fallback(); });
+  await use();
+}, { auto: true }],
+```
+
+Routes registered later run first, so a spec's fulfilled double skips an unwrapped delay. CPU throttling and OS load hid every startup race measured (0/100), and the delay caught what they caught, so they stay out of the required pair.
+
 ## Diagnose without hiding the first failure
 
 Preserve the configured browser projects and flake gate. A focused diagnostic command can append supported options:

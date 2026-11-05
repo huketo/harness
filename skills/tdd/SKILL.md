@@ -9,7 +9,7 @@ Produce a test that detects the intended defect, a minimal change that passes it
 
 ## 1. Contract
 
-Read the affected code, neighboring tests, runner configuration and applicable repository instructions. Use domain terminology and existing fixtures. List the requested behaviors; for each, name the observable result and smallest boundary that can detect a plausible defect. This list is analysis, not a batch of speculative test implementations.
+Read the affected code, neighboring tests, runner configuration and applicable repository instructions. Use domain terminology and existing fixtures. List the requested behaviors; for each, name the observable result and smallest boundary that can detect a plausible defect. Give each proposed boundary a one-line note on what a test there catches and what it misses. This list is analysis, not a batch of speculative test implementations.
 
 Each contract has one primary test owner at the strongest boundary that can reach it. Before adding a test, name why existing coverage misses its defect; a second layer needs a distinct risk the owner cannot reach, such as a transport or lifecycle failure. Extend a table case or shared fixture instead of adding a near-duplicate. A test that needs a production seam no production caller uses (an export, flag, wrapper or injection hook) belongs at the real boundary instead. Where the `test-audit` skill is installed, check each new test against its junk-pattern checklist (`patterns.md`).
 
@@ -19,7 +19,9 @@ Read [tests.md](tests.md) before choosing assertions or reviewing coverage, and 
 
 Choose assertions by the contract, not a blanket ban: durable storage may require direct SQL; exactly-once charging requires observing the external fake/provider's charge ledger or calls. A local order row cannot prove a provider was not charged twice.
 
-**Done:** each requested behavior has an observation, a test location, a focused command and the reason existing coverage misses it; the required broader gates and infrastructure prerequisites are identified. Documentation-only changes need document validation, not invented behavioral tests.
+A test that crosses an async boundary (browser, request, timer, queue, worker, second connection or process) states the orderings it relies on; read [flake.md](flake.md) before writing one.
+
+**Done:** each requested behavior has an observation, a test location, a focused command and the reason existing coverage misses it; each async test lists its orderings and the gate that enforces each; the required broader gates and infrastructure prerequisites are identified. Documentation-only changes need document validation, not invented behavioral tests.
 
 ## 2. Isolation
 
@@ -33,7 +35,7 @@ Use the repository's provisioning path and explicit per-command environment. Est
 
 Implement one test from the behavior list and run it before changing production behavior. Confirm it fails because the intended result is absent or wrong. A discovery, import, setup or infrastructure failure is not behavioral red; fix the prerequisite and rerun. For a new API, a missing symbol is an intermediate signal: reach an executable assertion before claiming the behavior is tested.
 
-For an existing intermittent failure, preserve the reported signature and first-failure artifacts; do not rerun merely to confirm the report. Build the smallest controlled reproduction that distinguishes hypotheses. Prefer explicit gates, a controlled clock, deterministic scheduling or a seeded input to timing guesses. A passing retry establishes non-determinism, not whether the defect is in product code, a test or infrastructure. When reproduction remains unavailable, report the exact unexercised path and missing evidence; do not label a speculative change a fix.
+For an existing intermittent failure, preserve the reported signature and first-failure artifacts; do not rerun merely to confirm the report. Test the product-bug hypothesis first. Build the smallest controlled reproduction that distinguishes hypotheses. Prefer explicit gates, a controlled clock, deterministic scheduling or a seeded input to timing guesses. A passing retry establishes non-determinism, not whether the defect is in product code, a test or infrastructure. When reproduction remains unavailable, report the exact unexercised path and missing evidence; do not label a speculative change a fix.
 
 **Done:** an executed command and its failing assertion demonstrate the intended defect. Record the runner/config, seed or schedule, and failure output; avoid copying credentials into evidence.
 
@@ -51,11 +53,11 @@ After green, refactor the touched code and test when it improves the next change
 
 Run the affected file and relevant suite with the repository's normal configuration. Check that the intended tests actually executed: exit zero with zero tests, all skipped, a mocked path instead of the claimed integration, or a different server build is not proof.
 
-For a flake repair, rerun the controlled trigger and the original failing scope with retries disabled where supported. Choose a finite repetition count and the relevant variation (file order, seed, fresh process, owned parallel workers or delayed dependency) before the run. Keep every failure; do not rerun until green. Finite clean runs are bounded evidence, never proof of zero flakiness. Run broader required gates once the edits settle; broaden further only for a changed risk or new failure.
+Burn in every new or changed test that crosses an async boundary, following [flake.md](flake.md). For a flake repair, rerun the controlled trigger and the original failing scope with retries disabled where supported. Choose a finite repetition count and the relevant variation (file order, seed, fresh process, owned parallel workers or delayed dependency) before the run. Keep every failure; do not rerun until green. Finite clean runs are bounded evidence, never proof of zero flakiness. Run broader required gates once the edits settle; broaden further only for a changed risk or new failure.
 
 Report the behavior covered, red/green command results, actual execution counts, runner/config and seed, first-attempt failures versus retry passes, and unrun gates with reasons. Label a manually injected mutant or simulated schedule as such. Quarantine is a separately authorized, tracked coverage loss with an owner, expiry and exit criterion; preserve the normal failure gate by default.
 
-**Done:** all requested behaviors and required gates are accounted for, original failure evidence has a corresponding verification or explicit blocker, and temporary probes and owned resources are cleaned up. Distinguish a local pass from CI evidence for the exact delivered revision.
+**Done:** all requested behaviors and required gates are accounted for, each async test has a recorded burn-in, original failure evidence has a corresponding verification or explicit blocker, and temporary probes and owned resources are cleaned up. Distinguish a local pass from CI evidence for the exact delivered revision.
 
 ## Sources
 
@@ -63,3 +65,4 @@ Report the behavior covered, red/green command results, actual execution counts,
 - [Martin Fowler, TDD](https://martinfowler.com/bliki/TestDrivenDevelopment.html): refactoring belongs in the cycle.
 - [Fowler, Eradicating Non-Determinism](https://martinfowler.com/articles/nonDeterminism.html): isolation, asynchronous behavior, remote services, time and resource leaks.
 - [Google, Flaky Tests at Google](https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html): retries and quarantine can mask real races.
+- [Luo et al., An Empirical Analysis of Flaky Tests](https://huang.isis.vanderbilt.edu/cs8395/paper/flakytest.pdf): most flaky tests are flaky when first written, and most async waits involve a single ordering.

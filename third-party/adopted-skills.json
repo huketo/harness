@@ -412,7 +412,9 @@
         "skills/tdd/LICENSE.openclaw"
       ],
       "local_changes": [
-        "2026-09-28: Add the one-owner, existing-coverage and test-only-seam authoring gate adapted from openclaw test-audit; defer the junk-pattern checklist to the test-audit skill when installed."
+        "2026-09-28: Add the one-owner, existing-coverage and test-only-seam authoring gate adapted from openclaw test-audit; defer the junk-pattern checklist to the test-audit skill when installed.",
+        "2026-11-01: Add flake.md and runner burn-in sections: named orderings, targeted delay, measured runner conditions, non-determinism patterns and the promotion rule.",
+        "2026-11-04: Port upstream 3f59913 as a one-line catches/misses note for each proposed test boundary in the Contract step."
       ]
     },
     "diagnosing-bugs": {

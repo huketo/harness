@@ -16,4 +16,6 @@ The shared checklist for authoring and auditing. A new test matching one fails i
 - **Unreachable negatives** — a rejection that passes for an unrelated reason, such as another guard denying first or a branch production never reaches.
 - **Overpromising names** — a name or fixture claiming more than the input exercises.
 
+Non-determinism has its own list: where the `tdd` skill is installed, check async tests against its [flake patterns](../tdd/flake.md#patterns).
+
 A test that breaks under a behavior-preserving refactor is asserting implementation; rewrite it at the owning boundary before it lands.
