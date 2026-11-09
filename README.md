@@ -18,7 +18,7 @@ Harness configures an existing [T3 Code](https://github.com/pingdotgg/t3code) wo
 | Watched terminal work | `t3-terminal` opens Herdr workspaces, tabs, and panes for dev servers, interactive prompts, REPLs, ssh, and TUIs that a person must watch or step into. It is not a substitute for background processes. |
 | Interactive visuals | `t3-show` builds explorable views inside the thread with `html_render`: codebase maps, algorithm steppers, assumption-driven simulations such as GTM metrics, and data exploration. Each page is grounded in code read or numbers computed in the shell, self-checks against them, and is driven through its interactions in `html_preview` before it is shown. |
 | MR lifecycle and work modes | GitLab MR and GitHub PR skills adapted from tstack (`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`) and the user-selected `full-send`/`full-stop` modes. A merge-guard hook in the `hstack` plugin for Claude Code and AGY, and `codex/harness.rules` for Codex, block merges the mode does not allow; `full-send` merges only in repositories you list in an allowlist. See [AGENT-CONFIG](docs/AGENT-CONFIG.md). |
-| Personal operations | Cost audits over Claude Code and Codex sessions, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
+| Personal operations | Cost audits over Claude Code and Codex sessions, and guarded host synchronization. These are not hosted services. |
 
 ## Recommended environment
 

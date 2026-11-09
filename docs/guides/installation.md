@@ -14,7 +14,7 @@ Harness configures an existing coding-agent workstation. It does not install T3 
 | Python 3 | Required for the cost-audit analyzer and selected skill collectors. |
 | Existing personal instructions | Optional. When `<Claude config dir>/CLAUDE.md` exists, the installer links it into AGY's global rules; otherwise that step is skipped. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
 | Claude Code config directory | `CLAUDE_CONFIG_DIR` when it is set, otherwise `~/.claude`. Skills, settings, and the credentials deny follow it. |
-| Optional integrations | Install [Herdr](https://github.com/herdrdev/herdr) before using `t3-terminal`; the skill drives it as a plain terminal multiplexer, and the installer does not configure it. BrowserSkill and the daily-report drafting workflow have separate prerequisites. |
+| Optional integrations | Install [Herdr](https://github.com/herdrdev/herdr) before using `t3-terminal`; the skill drives it as a plain terminal multiplexer, and the installer does not configure it. BrowserSkill has separate prerequisites. |
 
 See [recorded compatibility evidence](../FACTS.md). This is a recommended personal setup, not a compatibility or support commitment.
 

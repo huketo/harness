@@ -28,7 +28,6 @@
 | `docs/adr/` | 되돌리기 어려운 구조 결정 기록 |
 | `codex/` | T3 밖에서 쓰는 읽기 전용 Codex 리뷰어 `review.ts`와 테스트, `~/.codex/rules/harness.rules`로 연결하는 실행 정책(머지 명령은 사람의 승인) |
 | `skills/` | 이 레포가 소유하는 개인 스킬과 고지를 유지한 편입 스킬 |
-| `skills/daily-report/` | GitLab/iCal 근거 수집과 초안 작성 지침. Daou Office 제출은 사용자 UI 작업 |
 | `agy/` | Antigravity CLI 설정의 공개 예시 스냅샷(`settings.snapshot.json`) |
 | `third-party/` | 공개 관리형 자산의 핀·패치와 직접 편입한 자산의 출처 |
 | `archived/` | 은퇴한 Herdr 에이전트 런타임 통합, OMP 설정·확장, 벤치마크 러너의 동결 보관본. 아무것도 설치하거나 실행하지 않으며 새 기능을 여기에 추가하지 않음 |
@@ -80,7 +79,7 @@ mise exec -- node --test t3/scheduled/host-sync.test.mjs
 
 이 레포의 `skills/`가 사용자가 직접 만들고 통제하는 스킬을 소유합니다. 정본은 `skills/<스킬-이름>/SKILL.md`이며, `mise run install`이 `~/.agents/skills/<스킬-이름>`과 Claude Code 설정 디렉터리의 `skills/<스킬-이름>`에 심링크를 만듭니다.
 
-현재 스킬 목록은 `skills/`에서 확인합니다. `t3-orchestrate`, `t3-handoff`, `t3-terminal`, `t3-show`는 CLI 자체가 아니라 T3와 터미널·시각화 도구를 엮어 쓰는 작업 방식이므로 이 레포가 소유합니다. 은퇴한 오케스트레이션 스킬은 [`archived/skills/`](../archived/skills/)에 보관하며 설치하지 않습니다. 특정 프로젝트의 비공개 용어, endpoint, 고정 보고 양식, 사내 저장소를 전제로 하지 않습니다. 공개 `daily-report` 스킬은 `glab`을 통한 GitLab 수집과 iCal/`khal` 일정 수집, 근거 있는 초안, 사용자의 수동 Daou Office UI 입력까지만 설명합니다.
+현재 스킬 목록은 `skills/`에서 확인합니다. `t3-orchestrate`, `t3-handoff`, `t3-terminal`, `t3-show`는 CLI 자체가 아니라 T3와 터미널·시각화 도구를 엮어 쓰는 작업 방식이므로 이 레포가 소유합니다. 은퇴한 오케스트레이션 스킬은 [`archived/skills/`](../archived/skills/)에 보관하며 설치하지 않습니다. 특정 프로젝트의 비공개 용어, endpoint, 고정 보고 양식, 사내 저장소를 전제로 하지 않습니다.
 
 외부 도구에 종속된 스킬은 해당 공개 프로젝트와 설치 관리자가 소유합니다. `browser-skill`은 Tencent의 `bsk install-skill`이 설치하고 갱신하며 이 저장소에 사본을 두지 않습니다. `third-party/skills.lock.json`은 공개 의존성의 비교 핀만 보존하며, 설치 디렉터리 사본을 두 번째 정본으로 만들지 않습니다.
 

@@ -11,7 +11,7 @@ Choose the document for the task rather than reading the entire directory. The R
 | [Installation](guides/installation.md) | Linux/WSL2 and mise prerequisites, `mise run install` side effects, updates, retired-link cleanup, and manual rollback. |
 | [Plugin release](guides/plugin-release.md) | When a change needs a changeset, how a release is cut, and how a new `hstack` plugin version reaches Claude Code. |
 | [상세 사용법](guides/usage.md) | T3 Code threads, skill loading per provider, orchestration, review loop, council, watched terminal work through `t3-terminal` and Herdr, interactive in-thread visuals through `t3-show`, MR lifecycle and work modes, BrowserSkill on WSL2, and interface improvement/review. |
-| [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, the T3 scheduled-task guard, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
+| [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, the T3 scheduled-task guard, and snapshot boundaries. Not a general installation recipe. |
 | [공개 배포 정책](public-release.md) | License, fresh-history, privacy, dependency, support, and publication invariants. |
 
 ## Maintenance / 유지관리와 Agent 지침
@@ -41,8 +41,6 @@ These reference paths remain stable because skills and host-sync policy link to 
 ## Component documentation / 구성요소별 문서
 
 - [Cost-audit guide](../skills/cost-audit/README.md) — detector semantics, CLI, and measurement limits.
-- [Daily-report skill](../skills/daily-report/SKILL.md) — GitLab/calendar collection, grounded drafting, user review, and manual Daou Office UI entry.
-- [Calendar setup](../skills/daily-report/references/calendar-setup.md) — private-feed handling and host prerequisites.
 - [Adopted skill provenance](../third-party/adopted-skills.json) — origin and retained notices for repository-owned copies.
 - [External skill snapshot](../third-party/skills.lock.json) — public manager-owned dependencies and pinned references.
 - [Archived sources](../archived/) — frozen retired Herdr agent-runtime, OMP, and benchmark sources; nothing installs or runs them.
