@@ -23,10 +23,8 @@ export interface GenerateOptions {
 	repo: string;
 	home: string;
 	claudeDir: string;
-	/** Path of the rulesync CLI entry point (a Node script). */
+	/** Path of the rulesync executable. */
 	rulesync: string;
-	/** Node binary that runs rulesync; defaults to the one running this script. */
-	node?: string;
 }
 
 export interface FilePlan {
@@ -184,10 +182,12 @@ export function generate(opts: GenerateOptions): GeneratePlan {
 		mkdirSync(stage, { recursive: true });
 		const before = new Map(walk(stage).map((f) => [f, readFileSync(f, "utf8")]));
 
-		const env: NodeJS.ProcessEnv = { ...process.env, HOME: stage };
+		// The executable may be a symlink to the CLI script or a shell shim (mise installs either); both start Node
+		// through `env node`, so the Node running this script goes first on PATH.
+		const env: NodeJS.ProcessEnv = { ...process.env, HOME: stage, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ""}` };
 		delete env.CLAUDE_CONFIG_DIR;
 		const targets = agents.map((a) => a.target).join(",");
-		const run = spawnSync(opts.node ?? process.execPath, [rulesync, "generate", "--global", "-t", targets, "-f", "permissions", "--input-roots", input], {
+		const run = spawnSync(rulesync, ["generate", "--global", "-t", targets, "-f", "permissions", "--input-roots", input], {
 			cwd: work,
 			env,
 			encoding: "utf8",
@@ -252,10 +252,10 @@ export function applyPlan(plan: GeneratePlan, stamp = new Date().toISOString().r
 	});
 }
 
-/** The rulesync CLI entry point that mise installed for this checkout, or null. */
+/** The rulesync executable that mise installed for this checkout, or null. */
 export function findRulesync(repo: string): string | null {
 	if (process.env.HSTACK_RULESYNC) return process.env.HSTACK_RULESYNC;
 	const which = spawnSync("mise", ["which", "rulesync"], { cwd: repo, encoding: "utf8" });
 	if (which.status !== 0 || !which.stdout.trim()) return null;
-	return realpathSync(which.stdout.trim());
+	return which.stdout.trim();
 }
