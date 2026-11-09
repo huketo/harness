@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * skill-eval grader. Reads an iteration directory written by run.ts and adds
  * per-run machine checks and screens (`grading.json`, `screens/`), one blind
@@ -6,19 +6,19 @@
  * `benchmark.json`, `benchmark.md`, and `viewer.html`. Layout and types:
  * `lib/schema.ts`.
  *
- *   bun scripts/skill-eval/grade.ts --iteration-dir <dir> [--case <id,...>]
+ *   node scripts/skill-eval/grade.ts --iteration-dir <dir> [--case <id,...>]
  *       [--no-judge] [--judge-model <m>] [--force]
  */
 
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { aggregate, renderMarkdown, type Benchmark, type CaseData } from "./lib/grade/benchmark";
-import { gradeRun } from "./lib/grade/checks";
-import { codexJudge, DEFAULT_JUDGE_MODEL, judgeCase, type JudgeInvoker } from "./lib/grade/judge";
-import { loadIteration, readJson, readText, runMeta, writeJson } from "./lib/grade/layout";
-import { playwrightRenderer, type Renderer } from "./lib/grade/render";
-import { renderViewer, viewerCase, type ViewerCase } from "./lib/grade/viewer";
-import type { CaseJudgement, RunGrading } from "./lib/schema";
+import { aggregate, renderMarkdown, type Benchmark, type CaseData } from "./lib/grade/benchmark.ts";
+import { gradeRun } from "./lib/grade/checks.ts";
+import { codexJudge, DEFAULT_JUDGE_MODEL, judgeCase, type JudgeInvoker } from "./lib/grade/judge.ts";
+import { loadIteration, readJson, readText, runMeta, writeJson } from "./lib/grade/layout.ts";
+import { playwrightRenderer, type Renderer } from "./lib/grade/render.ts";
+import { renderViewer, viewerCase, type ViewerCase } from "./lib/grade/viewer.ts";
+import type { CaseJudgement, RunGrading } from "./lib/schema.ts";
 
 export interface GradeOptions {
 	iterationDir: string;
@@ -44,7 +44,7 @@ export interface GradeSummary {
 
 function usage(): string {
 	return [
-		"Usage: bun scripts/skill-eval/grade.ts --iteration-dir <dir> [--case <id,...>] [--no-judge] [--judge-model <m>] [--force]",
+		"Usage: node scripts/skill-eval/grade.ts --iteration-dir <dir> [--case <id,...>] [--no-judge] [--judge-model <m>] [--force]",
 		"",
 		"  --iteration-dir DIR  var/skill-eval/<suite>/iteration-<n>; the suite is read from DIR/suite.json",
 		"  --case IDS           grade only these comma-separated case ids",

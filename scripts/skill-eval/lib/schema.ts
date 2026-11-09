@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * skill-eval contract: the suite file, the run output layout, and the grading
  * output. The runner (run.ts), the grader (grade.ts), and suite authors all
@@ -289,7 +289,7 @@ export function loadSuite(suiteFile: string): Suite {
 if (import.meta.main) {
 	const file = process.argv[2];
 	if (!file) {
-		console.error("usage: bun scripts/skill-eval/lib/schema.ts <suite.json>");
+		console.error("usage: node scripts/skill-eval/lib/schema.ts <suite.json>");
 		process.exit(2);
 	}
 	const errors = validateSuite(loadSuite(file), file);

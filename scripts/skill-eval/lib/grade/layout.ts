@@ -5,8 +5,8 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
-import type { Case, IterationMeta, RunMeta, Suite } from "../schema";
-import { loadSuite, validateSuite } from "../schema";
+import type { Case, IterationMeta, RunMeta, Suite } from "../schema.ts";
+import { loadSuite, validateSuite } from "../schema.ts";
 
 export interface RunRef {
 	k: number;

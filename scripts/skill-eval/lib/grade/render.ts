@@ -1,4 +1,7 @@
+import { spawn } from "node:child_process";
 import { join } from "node:path";
+import { collectText, exitStatus } from "../process.ts";
+import { which } from "../which.ts";
 
 export interface RenderRequest {
 	workspace: string;
@@ -25,15 +28,15 @@ export type RenderOutcome =
 
 export type Renderer = (request: RenderRequest) => Promise<RenderOutcome>;
 
-export const RENDER_SCRIPT = join(import.meta.dir, "render.py");
+export const RENDER_SCRIPT = join(import.meta.dirname, "render.py");
 
 /** Renders with `uv run --with playwright python3 render.py`, the repository's Playwright convention. */
 export const playwrightRenderer: Renderer = async (request) => {
-	const uv = Bun.which("uv");
+	const uv = which("uv");
 	if (!uv) return { ok: false, error: "uv is not installed" };
-	const child = Bun.spawn(
+	const child = spawn(
+		uv,
 		[
-			uv,
 			"run",
 			"--no-project",
 			"--quiet",
@@ -52,12 +55,12 @@ export const playwrightRenderer: Renderer = async (request) => {
 			"--out",
 			request.outDir,
 		],
-		{ stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+		{ stdio: ["ignore", "pipe", "pipe"] },
 	);
 	const [stdout, stderr, code] = await Promise.all([
-		new Response(child.stdout).text(),
-		new Response(child.stderr).text(),
-		child.exited,
+		collectText(child.stdout),
+		collectText(child.stderr),
+		exitStatus(child),
 	]);
 	const line = stdout.trim().split("\n").at(-1) ?? "";
 	try {

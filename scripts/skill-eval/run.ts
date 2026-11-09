@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * skill-eval runner: executes each suite case per arm in an isolated headless
  * `claude -p` session and writes the run outputs defined in lib/schema.ts.

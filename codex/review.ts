@@ -1,9 +1,13 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { accessSync, constants as fsConstants, existsSync, statSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { createServer } from "node:net";
+import type { AddressInfo, Socket } from "node:net";
+import { constants as osConstants, tmpdir } from "node:os";
+import { delimiter, join, resolve } from "node:path";
 
 /**
  * Model family used when --model is omitted. The exact slug is resolved from
@@ -98,9 +102,9 @@ function valueAfter(argv: string[], index: number): string {
 
 function usage(): string {
 	return [
-		"Usage: bun --no-install codex/review.ts [options] --brief TEXT",
-		"       bun --no-install codex/review.ts [options] -- TEXT",
-		"       bun --no-install codex/review.ts [options] --inspect-tools",
+		"Usage: node codex/review.ts [options] --brief TEXT",
+		"       node codex/review.ts [options] -- TEXT",
+		"       node codex/review.ts [options] --inspect-tools",
 		"",
 		`  --model ID       Exact slug from \`codex debug models\` (default: the listed "-${DEFAULT_FAMILY}" model with the best priority)`,
 		`  --effort LEVEL   Reasoning effort the model supports (default: ${DEFAULT_EFFORT})`,
@@ -320,8 +324,44 @@ export function assertRestrictedReviewBoundary(
 	}
 }
 
+/** First executable regular file named `command` on PATH, or null. */
+export function findExecutable(command: string): string | null {
+	for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+		if (!dir) continue;
+		const candidate = resolve(dir, command);
+		try {
+			accessSync(candidate, fsConstants.X_OK);
+			if (statSync(candidate).isFile()) return candidate;
+		} catch {}
+	}
+	return null;
+}
+
+/** Exit code of a closed child; a signal maps to 128 + its number. */
+function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number {
+	if (code !== null) return code;
+	return 128 + (signal ? osConstants.signals[signal] : 0);
+}
+
+function waitForExit(child: ChildProcess): Promise<number> {
+	return new Promise((resolveExit, rejectExit) => {
+		child.once("error", rejectExit);
+		child.once("close", (code, signal) => resolveExit(exitCodeOf(code, signal)));
+	});
+}
+
+function collect(stream: NodeJS.ReadableStream | null): Promise<string> {
+	return new Promise((resolveText, rejectText) => {
+		if (!stream) return resolveText("");
+		const chunks: Buffer[] = [];
+		stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+		stream.once("error", rejectText);
+		stream.once("end", () => resolveText(Buffer.concat(chunks).toString("utf8")));
+	});
+}
+
 function codexExecutable(): string {
-	const codex = Bun.which("codex");
+	const codex = findExecutable("codex");
 	if (!codex)
 		fail("The restricted reviewer requires an installed codex executable");
 	return codex;
@@ -332,17 +372,15 @@ async function runCodex(
 	args: string[],
 	options: { cwd: string; env?: Record<string, string | undefined> },
 ): Promise<CodexResult> {
-	const child = Bun.spawn([codex, ...args], {
+	const child = spawn(codex, args, {
 		cwd: options.cwd,
 		env: options.env ?? process.env,
-		stdin: "ignore",
-		stdout: "pipe",
-		stderr: "pipe",
+		stdio: ["ignore", "pipe", "pipe"],
 	});
 	const [stdout, stderr, exitCode] = await Promise.all([
-		new Response(child.stdout).text(),
-		new Response(child.stderr).text(),
-		child.exited,
+		collect(child.stdout),
+		collect(child.stderr),
+		waitForExit(child),
 	]);
 	return { stdout, stderr, exitCode };
 }
@@ -415,34 +453,34 @@ async function probeNetwork(
 	env: Record<string, string | undefined>,
 ): Promise<ProbeResult> {
 	let accepted = 0;
-	const server = Bun.listen({
-		hostname: "127.0.0.1",
-		port: 0,
-		socket: {
-			open(socket) {
-				accepted++;
-				socket.end();
-			},
-			data() {},
-		},
+	const sockets = new Set<Socket>();
+	const server = createServer((socket) => {
+		accepted++;
+		sockets.add(socket);
+		socket.on("error", () => {});
+		socket.on("close", () => sockets.delete(socket));
+		socket.end();
 	});
+	await new Promise<void>((resolveListen, rejectListen) => {
+		server.once("error", rejectListen);
+		server.listen(0, "127.0.0.1", () => resolveListen());
+	});
+	const port = (server.address() as AddressInfo).port;
 	try {
+		// Node hands the child an AF_UNIX socket as stdout, and inside the sandbox
+		// console.log on it prints nothing; a synchronous write to fd 1 arrives.
 		const script = [
 			'const net = require("node:net");',
-			'console.log("started");',
-			`setTimeout(() => { console.log("timeout"); process.exit(4); }, ${PROBE_TIMEOUT_MS});`,
-			`const socket = net.connect(${server.port}, "127.0.0.1");`,
-			'socket.on("connect", () => { console.log("connected"); socket.end(); process.exit(0); });',
-			'socket.on("error", (error) => { console.log("error", error.code); process.exit(3); });',
+			'const say = (...words) => require("node:fs").writeSync(1, words.join(" ") + "\\n");',
+			'say("started");',
+			`setTimeout(() => { say("timeout"); process.exit(4); }, ${PROBE_TIMEOUT_MS});`,
+			`const socket = net.connect(${port}, "127.0.0.1");`,
+			'socket.on("connect", () => { say("connected"); socket.end(); process.exit(0); });',
+			'socket.on("error", (error) => { say("error", error.code); process.exit(3); });',
 		].join("\n");
 		const result = await runCodex(
 			codex,
-			sandboxArgs(cwd, config, [
-				process.execPath,
-				"--no-install",
-				"-e",
-				script,
-			]),
+			sandboxArgs(cwd, config, [process.execPath, "-e", script]),
 			{ cwd, env },
 		);
 		if (!result.stdout.includes("started"))
@@ -453,7 +491,8 @@ async function probeNetwork(
 			? "allowed"
 			: "denied";
 	} finally {
-		server.stop(true);
+		server.close();
+		for (const socket of sockets) socket.destroy();
 	}
 }
 
@@ -545,32 +584,32 @@ async function reviewOnce(
 	const outputDir = await mkdtemp(join(tmpdir(), "harness-codex-review-out-"));
 	try {
 		const outputFile = join(outputDir, "last-message.txt");
-		const child = Bun.spawn(
-			[
-				codex,
-				...buildCodexExecArgs({
-					cwd: request.cwd,
-					model: request.model,
-					effort: request.effort,
-					outputFile,
-				}),
-			],
+		const child = spawn(
+			codex,
+			buildCodexExecArgs({
+				cwd: request.cwd,
+				model: request.model,
+				effort: request.effort,
+				outputFile,
+			}),
 			{
 				cwd: request.cwd,
-				stdin: new Blob([`Review brief:\n${request.brief.trim()}\n`]),
-				stdout: "ignore",
-				// codex exec streams progress here; show it only on failure.
-				stderr: "pipe",
+				// stdout is ignored; codex exec streams progress on stderr, shown only on failure.
+				stdio: ["pipe", "ignore", "pipe"],
 			},
 		);
-		const stderr = new Response(child.stderr).text();
+		const exited = waitForExit(child);
+		// A child that exits without reading the brief must not crash the launcher.
+		child.stdin?.on("error", () => {});
+		child.stdin?.end(`Review brief:\n${request.brief.trim()}\n`);
+		const stderr = collect(child.stderr);
 		// Stop the reviewer turn with the launcher rather than finishing it unseen.
 		const stop = () => child.kill("SIGTERM");
 		const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
 		for (const signal of signals) process.on(signal, stop);
 		let exitCode: number;
 		try {
-			exitCode = await child.exited;
+			exitCode = await exited;
 		} finally {
 			for (const signal of signals) process.off(signal, stop);
 		}

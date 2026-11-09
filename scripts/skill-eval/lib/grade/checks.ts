@@ -5,9 +5,10 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { Case, Changes, Check, CheckResult, RunGrading, ScreenResult } from "../schema";
-import { decodeText, entryStem, listFiles, readJson, readText, runMeta } from "./layout";
-import type { Renderer } from "./render";
+import type { Case, Changes, Check, CheckResult, RunGrading, ScreenResult } from "../schema.ts";
+import { globMatcher } from "./glob.ts";
+import { decodeText, entryStem, listFiles, readJson, readText, runMeta } from "./layout.ts";
+import type { Renderer } from "./render.ts";
 
 type CheckOf<T extends Check["type"]> = Extract<Check, { type: T }>;
 
@@ -66,8 +67,8 @@ function fileCheck(check: Check, run: RunFiles): CheckResult {
 					? result(check, false, `not added or modified: ${list(not)}`)
 					: result(check, true, `${check.paths.length} file(s) added or modified`);
 			}
-			const globs = check.allow.map((g) => new Bun.Glob(g));
-			const outside = [...touched].sort().filter((p) => !globs.some((g) => g.match(p)));
+			const globs = check.allow.map(globMatcher);
+			const outside = [...touched].sort().filter((p) => !globs.some((match) => match(p)));
 			return outside.length
 				? result(check, false, `changed outside ${list(check.allow)}: ${list(outside)}`)
 				: result(check, true, `${touched.size} changed file(s), all within ${list(check.allow)}`);
@@ -75,8 +76,8 @@ function fileCheck(check: Check, run: RunFiles): CheckResult {
 		case "present":
 		case "absent": {
 			if (!existsSync(run.workspace)) return result(check, null, "workspace/ missing");
-			const glob = new Bun.Glob(check.files);
-			const files = run.files().filter((p) => glob.match(p));
+			const match = globMatcher(check.files);
+			const files = run.files().filter((p) => match(p));
 			const regex = new RegExp(check.pattern, check.flags);
 			const hits: string[] = [];
 			const binary: string[] = [];

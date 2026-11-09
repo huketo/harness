@@ -1,0 +1,23 @@
+{
+  "name": "hstack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent harness for Claude Code, Codex, and Antigravity CLI: shared skills, a merge guard, and credential guardrails.",
+  "license": "MIT",
+  "repository": "github:huketo/harness",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "changeset": "changeset",
+    "version-packages": "changeset version && node plugin/build.mjs --host claude",
+    "tag-release": "changeset git-tag"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}

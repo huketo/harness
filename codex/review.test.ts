@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import {
 	chmod,
@@ -10,19 +11,21 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { test } from "node:test";
 import {
 	assertRestrictedReviewBoundary,
 	buildCodexExecArgs,
 	DISABLED_FEATURES,
+	findExecutable,
 	parseFeatureStates,
 	parseReviewArgs,
 	resolveDefaultModel,
-	type ReviewBoundarySnapshot,
 	validateModelSelection,
-} from "./review";
+} from "./review.ts";
+import type { ReviewBoundarySnapshot } from "./review.ts";
 
-const REVIEW_ENTRY = join(import.meta.dir, "review.ts");
-const REAL_CODEX = Bun.which("codex");
+const REVIEW_ENTRY = join(import.meta.dirname, "review.ts");
+const REAL_CODEX = findExecutable("codex");
 
 const restricted: ReviewBoundarySnapshot = {
 	codexVersion: "codex-cli 0.164.0",
@@ -68,8 +71,8 @@ if (args[0] === "mcp" && process.env.FAKE_MCP_JSON) {
 	process.stdout.write(process.env.FAKE_MCP_JSON);
 	process.exit(0);
 }
-const child = Bun.spawnSync([process.env.REAL_CODEX, ...args], { stdio: ["inherit", "inherit", "inherit"] });
-process.exit(child.exitCode ?? 1);
+const child = require("node:child_process").spawnSync(process.env.REAL_CODEX, args, { stdio: "inherit" });
+process.exit(child.status ?? 1);
 `;
 
 type LogEntry = { args: string[] } | { stdin: string };
@@ -104,9 +107,10 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 			GIT_CONFIG_GLOBAL: "/dev/null",
 			GIT_CONFIG_NOSYSTEM: "1",
 		};
-		Bun.spawnSync(["git", "init", "-q", repo], { env: { ...process.env, ...isolated } });
-		const child = Bun.spawn(
-			[process.execPath, "--no-install", REVIEW_ENTRY, "--cwd", repo, ...args],
+		spawnSync("git", ["init", "-q", repo], { env: { ...process.env, ...isolated } });
+		const child = spawn(
+			process.execPath,
+			[REVIEW_ENTRY, "--cwd", repo, ...args],
 			{
 				env: {
 					...process.env,
@@ -117,14 +121,23 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 					FAKE_MODELS_JSON: FAKE_MODELS,
 					...env,
 				},
-				stdout: "pipe",
-				stderr: "pipe",
+				stdio: ["ignore", "pipe", "pipe"],
 			},
 		);
+		const text = (stream: NodeJS.ReadableStream) =>
+			new Promise<string>((done, failed) => {
+				const chunks: Buffer[] = [];
+				stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+				stream.once("error", failed);
+				stream.once("end", () => done(Buffer.concat(chunks).toString("utf8")));
+			});
 		const [stdout, stderr, exitCode] = await Promise.all([
-			new Response(child.stdout).text(),
-			new Response(child.stderr).text(),
-			child.exited,
+			text(child.stdout),
+			text(child.stderr),
+			new Promise<number | null>((done, failed) => {
+				child.once("error", failed);
+				child.once("close", (code) => done(code));
+			}),
 		]);
 		const log = (await readFile(logFile, "utf8"))
 			.split("\n")
@@ -155,7 +168,7 @@ async function runReviewer(args: string[], env: Record<string, string> = {}) {
 }
 
 test("relative --cwd resolves against the launcher and defaults are the documented ones", () => {
-	expect(parseReviewArgs(["--cwd", "sub/dir", "--inspect-tools"])).toEqual({
+	assert.deepEqual(parseReviewArgs(["--cwd", "sub/dir", "--inspect-tools"]), {
 		cwd: resolve("sub/dir"),
 		inspectTools: true,
 		effort: "high",
@@ -168,7 +181,7 @@ test("the default model is the listed -sol slug Codex ranks first", () => {
 		priority,
 		visibility,
 	});
-	expect(
+	assert.equal(
 		resolveDefaultModel({
 			models: [
 				entry("gpt-6-astra", 1),
@@ -178,30 +191,21 @@ test("the default model is the listed -sol slug Codex ranks first", () => {
 				entry("gpt-6-solar", 0),
 			],
 		}),
-	).toBe("gpt-7-sol");
-	expect(() => resolveDefaultModel({ models: [entry("gpt-6-astra", 1)] })).toThrow(
-		/pass --model/,
+		"gpt-7-sol",
 	);
+	assert.throws(() => resolveDefaultModel({ models: [entry("gpt-6-astra", 1)] }), /pass --model/);
 });
 
 test("the brief comes from exactly one source and must be non-empty", () => {
-	expect(parseReviewArgs(["--", "look", "here"])).toMatchObject({
-		brief: "look here",
-	});
-	expect(() => parseReviewArgs(["--brief", "a", "--", "b"])).toThrow(
-		/not both/,
-	);
-	expect(() => parseReviewArgs(["--brief", "a", "b"])).toThrow(/not both/);
-	expect(() => parseReviewArgs(["--brief", "a", "--brief", "b"])).toThrow(
-		/only once/,
-	);
-	expect(() => parseReviewArgs([])).toThrow(/non-empty review brief/);
-	expect(() => parseReviewArgs(["--brief", " ", "--model", "x"])).toThrow(
-		/non-empty/,
-	);
-	expect(() => parseReviewArgs(["--model", "--inspect-tools"])).toThrow(
-		/requires a value/,
-	);
+	const parsed = parseReviewArgs(["--", "look", "here"]);
+	assert.ok(!("help" in parsed));
+	assert.equal(parsed.brief, "look here");
+	assert.throws(() => parseReviewArgs(["--brief", "a", "--", "b"]), /not both/);
+	assert.throws(() => parseReviewArgs(["--brief", "a", "b"]), /not both/);
+	assert.throws(() => parseReviewArgs(["--brief", "a", "--brief", "b"]), /only once/);
+	assert.throws(() => parseReviewArgs([]), /non-empty review brief/);
+	assert.throws(() => parseReviewArgs(["--brief", " ", "--model", "x"]), /non-empty/);
+	assert.throws(() => parseReviewArgs(["--model", "--inspect-tools"]), /requires a value/);
 });
 
 test("model selection accepts only an exact catalog slug and its efforts", () => {
@@ -213,16 +217,11 @@ test("model selection accepts only an exact catalog slug and its efforts", () =>
 			},
 		],
 	};
-	expect(() =>
-		validateModelSelection(catalog, "gpt-6.1-sol", "high"),
-	).not.toThrow();
-	expect(() => validateModelSelection(catalog, "gpt-6.1", "high")).toThrow(
-		/exact model "gpt-6\.1"/,
-	);
-	expect(() => validateModelSelection(catalog, "GPT-6.1-sol", "high")).toThrow(
-		/exact model/,
-	);
-	expect(() => validateModelSelection(catalog, "gpt-6.1-sol", "max")).toThrow(
+	assert.doesNotThrow(() => validateModelSelection(catalog, "gpt-6.1-sol", "high"));
+	assert.throws(() => validateModelSelection(catalog, "gpt-6.1", "high"), /exact model "gpt-6\.1"/);
+	assert.throws(() => validateModelSelection(catalog, "GPT-6.1-sol", "high"), /exact model/);
+	assert.throws(
+		() => validateModelSelection(catalog, "gpt-6.1-sol", "max"),
 		/does not support effort "max"/,
 	);
 });
@@ -232,12 +231,12 @@ test("feature rows parse with multi-word stages", () => {
 		"hooks                                    stable             false\n" +
 			"code_mode                                under development  true\n",
 	);
-	expect(states.get("hooks")).toBe(false);
-	expect(states.get("code_mode")).toBe(true);
+	assert.equal(states.get("hooks"), false);
+	assert.equal(states.get("code_mode"), true);
 });
 
 test("boundary guard accepts only the read-only, offline, MCP-free boundary", () => {
-	expect(() => assertRestrictedReviewBoundary(restricted)).not.toThrow();
+	assert.doesNotThrow(() => assertRestrictedReviewBoundary(restricted));
 	const widened: Partial<ReviewBoundarySnapshot>[] = [
 		{ probes: { write: "allowed", network: "denied" } },
 		{ probes: { write: "denied", network: "allowed" } },
@@ -262,80 +261,77 @@ test("boundary guard accepts only the read-only, offline, MCP-free boundary", ()
 		},
 	];
 	for (const change of widened) {
-		expect(() =>
-			assertRestrictedReviewBoundary({ ...restricted, ...change }),
-		).toThrow(/Restricted reviewer/);
+		assert.throws(
+			() => assertRestrictedReviewBoundary({ ...restricted, ...change }),
+			/Restricted reviewer/,
+		);
 	}
 });
 
-test("installed codex --inspect-tools reports a denied boundary without running exec", async () => {
+test("installed codex --inspect-tools reports a denied boundary without running exec", { timeout: 60_000 }, async () => {
 	const run = await runReviewer(["--inspect-tools"]);
-	expect(run.stderr).toBe("");
-	expect(run.exitCode).toBe(0);
+	assert.equal(run.stderr, "");
+	assert.equal(run.exitCode, 0);
 	const snapshot = JSON.parse(run.stdout);
-	expect(snapshot).toMatchObject({
-		model: "gpt-6.1-sol",
-		effort: "high",
-		sandbox: "read-only",
-		approvalPolicy: "never",
-		disabledFeatures: [...DISABLED_FEATURES],
-		mcpServers: [],
-		probes: { write: "denied", network: "denied" },
-	});
-	expect(snapshot.argv).toEqual(
-		expect.arrayContaining(["exec", "--ignore-user-config"]),
-	);
-	expect(run.subcommands).toContain("sandbox");
-	expect(run.subcommands).not.toContain("exec");
+	assert.equal(snapshot.model, "gpt-6.1-sol");
+	assert.equal(snapshot.effort, "high");
+	assert.equal(snapshot.sandbox, "read-only");
+	assert.equal(snapshot.approvalPolicy, "never");
+	assert.deepEqual(snapshot.disabledFeatures, [...DISABLED_FEATURES]);
+	assert.deepEqual(snapshot.mcpServers, []);
+	assert.deepEqual(snapshot.probes, { write: "denied", network: "denied" });
+	assert.ok(snapshot.argv.includes("exec"));
+	assert.ok(snapshot.argv.includes("--ignore-user-config"));
+	assert.ok(run.subcommands.includes("sandbox"));
+	assert.ok(!run.subcommands.includes("exec"));
 	// The write probe left nothing behind.
-	expect(run.repoFiles).toEqual([".git"]);
-}, 60_000);
+	assert.deepEqual(run.repoFiles, [".git"]);
+});
 
-test("installed codex rejects a partial model ID instead of a sibling model", async () => {
+test("installed codex rejects a partial model ID instead of a sibling model", { timeout: 60_000 }, async () => {
 	const run = await runReviewer(["--model", "gpt-6.1", "--inspect-tools"]);
-	expect(run.exitCode).toBe(1);
-	expect(run.stdout).toBe("");
-	expect(run.stderr).toMatch(/exact model "gpt-6\.1"/);
-	expect(run.subcommands).not.toContain("sandbox");
-}, 60_000);
+	assert.equal(run.exitCode, 1);
+	assert.equal(run.stdout, "");
+	assert.match(run.stderr, /exact model "gpt-6\.1"/);
+	assert.ok(!run.subcommands.includes("sandbox"));
+});
 
-test("a review prints only the last message and sends the brief on stdin", async () => {
+test("a review prints only the last message and sends the brief on stdin", { timeout: 60_000 }, async () => {
 	const run = await runReviewer(["--brief", "check the diff"], {
 		FAKE_EXEC_OUTPUT: "No findings.\n",
 	});
-	expect(run.stderr).toBe("");
-	expect(run.exitCode).toBe(0);
-	expect(run.stdout).toBe("No findings.\n");
-	expect(run.stdin).toBe("Review brief:\ncheck the diff\n");
+	assert.equal(run.stderr, "");
+	assert.equal(run.exitCode, 0);
+	assert.equal(run.stdout, "No findings.\n");
+	assert.equal(run.stdin, "Review brief:\ncheck the diff\n");
 	// The boundary was inspected before the model process started.
-	expect(run.subcommands.indexOf("sandbox")).toBeLessThan(
-		run.subcommands.indexOf("exec"),
-	);
+	assert.ok(run.subcommands.indexOf("sandbox") < run.subcommands.indexOf("exec"));
 	const outputFile = run.execArgs?.[run.execArgs.indexOf("-o") + 1] ?? "";
-	expect(outputFile).toStartWith(tmpdir());
-	expect(existsSync(outputFile)).toBe(false);
-}, 60_000);
+	assert.ok(outputFile.startsWith(tmpdir()));
+	assert.equal(existsSync(outputFile), false);
+});
 
-test("a widened boundary is refused before codex exec starts", async () => {
+test("a widened boundary is refused before codex exec starts", { timeout: 60_000 }, async () => {
 	const run = await runReviewer(["--brief", "check the diff"], {
 		FAKE_MCP_JSON: JSON.stringify([{ name: "planted", enabled: true }]),
 		FAKE_EXEC_OUTPUT: "should not appear",
 	});
-	expect(run.exitCode).toBe(1);
-	expect(run.stdout).toBe("");
-	expect(run.stderr).toMatch(/MCP servers: planted/);
-	expect(run.subcommands).not.toContain("exec");
-}, 60_000);
+	assert.equal(run.exitCode, 1);
+	assert.equal(run.stdout, "");
+	assert.match(run.stderr, /MCP servers: planted/);
+	assert.ok(!run.subcommands.includes("exec"));
+});
 
-test("failed or empty codex exec runs exit 1 without stdout", async () => {
-	for (const env of [
+test("failed or empty codex exec runs exit 1 without stdout", { timeout: 60_000 }, async () => {
+	const envs: Record<string, string>[] = [
 		{ FAKE_EXEC_OUTPUT: "partial", FAKE_EXEC_EXIT: "2" },
 		{ FAKE_EXEC_OUTPUT: "  \n" },
 		{},
-	]) {
+	];
+	for (const env of envs) {
 		const run = await runReviewer(["--brief", "check the diff"], env);
-		expect(run.exitCode).toBe(1);
-		expect(run.stdout).toBe("");
-		expect(run.stderr).toMatch(/codex exec exited with code 2|no text output/);
+		assert.equal(run.exitCode, 1);
+		assert.equal(run.stdout, "");
+		assert.match(run.stderr, /codex exec exited with code 2|no text output/);
 	}
-}, 60_000);
+});

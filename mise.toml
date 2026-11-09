@@ -1,0 +1,36 @@
+# Tool versions and the only entry points for installing and checking hstack. docs/guides/installation.md owns usage.
+[tools]
+node = "24.22.2"
+"npm:rulesync" = "43.8.0"
+
+[tasks.setup]
+description = "Install the pinned development dependencies (TypeScript, changesets)"
+run = "npm ci --no-audit --no-fund"
+sources = ["package.json", "package-lock.json"]
+outputs = ["node_modules/.package-lock.json"]
+
+[tasks.typecheck]
+description = "Type-check the TypeScript sources without emitting"
+depends = ["setup"]
+run = "npx --no-install tsc --noEmit"
+
+[tasks.test]
+description = "Run every maintained test suite with node --test"
+run = "node --test 'plugin/**/*.test.mjs' 't3/**/*.test.mjs' 'codex/**/*.test.ts' 'scripts/**/*.test.ts'"
+
+[tasks.check]
+description = "Type-check, test, and confirm the tracked plugin files match their sources; touches no host configuration"
+depends = ["typecheck", "test"]
+run = "node plugin/build.mjs --host claude --check"
+
+[tasks.plan]
+description = "Show what install would change on this machine, without writing"
+run = "node scripts/install.ts"
+
+[tasks.install]
+description = "Link skills, apply agent permissions, and install the hstack plugin, never dropping an existing setting"
+run = "node scripts/install.ts --apply"
+
+[tasks.update]
+description = "Fast-forward this checkout from origin/main, then run install"
+run = "node scripts/update.ts"
