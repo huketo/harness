@@ -1,6 +1,6 @@
 {
   "name": "hstack",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Agent harness for Claude Code, Codex, and Antigravity CLI: shared skills, a merge guard, and credential guardrails.",

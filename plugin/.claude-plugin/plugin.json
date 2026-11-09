@@ -1,6 +1,6 @@
 {
   "name": "hstack",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules.",
   "author": {
     "name": "huketo"
