@@ -12,6 +12,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const hasFallback = computed(() => Boolean(props.fallback && props.fallback.trim().length > 0))
+const type = computed(() => (/\.webm($|[?#])/i.test(props.src) || props.src.startsWith('data:video/webm') ? 'video/webm' : 'video/mp4'))
 </script>
 
 <template>
@@ -27,7 +28,7 @@ const hasFallback = computed(() => Boolean(props.fallback && props.fallback.trim
         :poster="poster"
         autoreset="click"
       >
-        <source :src="src" type="video/mp4" />
+        <source :src="src" :type="type" />
       </SlidevVideo>
     </div>
     <figcaption class="as-demo-caption">{{ caption }}</figcaption>

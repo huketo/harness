@@ -1,0 +1,16 @@
+/* Deck tokens. Rewrite these from the deck's DESIGN.md; style.css and the
+   layouts read only these variables. Font families come from fonts/fonts.css. */
+:root {
+  --as-bg: #f7f6f2;
+  --as-fg: #1c1c1a;
+  --as-muted: #5f5e58;
+  --as-accent: #2f55c4;
+  --as-line: #d8d6ce;
+  --as-surface: #ecebe5;
+  --as-radius: 4px;
+  --as-font: 'Deck Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --as-font-display: 'Deck Display', var(--as-font);
+  --as-font-serif: 'Deck Serif', 'AppleMyungjo', 'Batang', serif;
+  --as-mono: 'Deck Mono', ui-monospace, 'Consolas', monospace;
+  --as-heading-weight: 700;
+}

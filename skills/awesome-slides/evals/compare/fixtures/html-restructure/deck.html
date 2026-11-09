@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>캐시 도입 검토</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#fff;color:#222}
+section{display:none;padding:40px 60px}section.on{display:block}
+h1{font-size:28px;color:#0b5394}p,li{font-size:16px}
+</style></head>
+<body>
+<section class="on"><h1>캐시 도입 검토</h1><p>API 응답 지연을 줄이기 위한 읽기 캐시 도입안 (교육용 합성 자료)</p></section>
+<section><h1>현황</h1><ul><li>평균 응답 320ms, p95 1,200ms</li><li>읽기 요청 비율 85%</li><li>DB CPU 사용률 피크 78%</li></ul></section>
+<section><h1>도입안과 위험</h1><ul><li>읽기 캐시(TTL 60초) 도입 시 p95 400ms 이하 기대 — 측정 전 추정</li><li>위험: 갱신 직후 최대 60초 동안 오래된 값 노출</li><li>완화: 주문·결제 API는 캐시 제외</li></ul><p>요청: 2주 시범 적용 승인</p></section>
+<section><h1>비용</h1><ul><li>캐시 노드 2대 월 180,000원</li><li>구축 3인일</li></ul></section>
+<section><h1>중단 기준</h1><ul><li>오래된 값으로 인한 고객 문의 1건 이상 시 즉시 끄기</li><li>2주 뒤 p95가 600ms를 넘으면 철회</li></ul></section>
+<script>
+const s=[...document.querySelectorAll('section')];let i=0
+addEventListener('keydown',e=>{if(e.key==='ArrowRight'&&i<s.length-1){s[i].classList.remove('on');s[++i].classList.add('on')}if(e.key==='ArrowLeft'&&i>0){s[i].classList.remove('on');s[--i].classList.add('on')}})
+</script>
+</body></html>

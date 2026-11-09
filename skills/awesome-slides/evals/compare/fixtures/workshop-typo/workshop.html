@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>현장 운영 워크숍</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #fff8ef; color: #2a1f14; }
+  section { display: none; min-height: 100vh; padding: 8vh 10vw; box-sizing: border-box; }
+  section.active { display: block; }
+  h1 { font-size: 3rem; color: #c2410c; }
+  li { font-size: 1.6rem; margin: .6em 0; }
+  nav { position: fixed; bottom: 16px; right: 24px; }
+</style>
+</head>
+<body>
+<section class="active"><h1>현장 운영 워크숍</h1><p>행사 운영자를 위한 오프라인 점검 교육</p></section>
+<section><h1>일정</h1><ul><li>시작 10:00 — 등록과 안내</li><li>11:00 — 장비 점검 실습</li><li>12:00 — 점심</li></ul></section>
+<section><h1>출발 전 체크리슽</h1><ul><li>발표 파일과 PDF를 로컬에 저장</li><li>전원과 화면 연결 확인</li><li>현장 안내 데스크 위치 확인</li></ul></section>
+<section><h1>문제가 생기면</h1><ul><li>파일 다시 열기</li><li>PDF로 전환</li><li>안내 데스크에 요청</li></ul></section>
+<nav><button id="prev">이전</button> <button id="next">다음</button></nav>
+<script>
+  const s = [...document.querySelectorAll('section')]; let i = 0
+  const show = n => { s[i].classList.remove('active'); i = Math.max(0, Math.min(s.length - 1, n)); s[i].classList.add('active') }
+  document.getElementById('prev').onclick = () => show(i - 1)
+  document.getElementById('next').onclick = () => show(i + 1)
+  addEventListener('keydown', e => { if (e.key === 'ArrowRight') show(i + 1); if (e.key === 'ArrowLeft') show(i - 1) })
+</script>
+</body>
+</html>
