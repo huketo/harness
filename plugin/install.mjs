@@ -8,7 +8,7 @@
 // `harness` plugin are reported with the command that removes them. Never removes a marketplace, a plugin, or a
 // setting. A foreign marketplace or plugin of the same name, or unreadable settings, is a conflict.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,16 +44,21 @@ export function ensureAutoUpdate(settings, name, source) {
 	return true;
 }
 
-/** Rewrite a settings file through `mutate`, keeping a timestamped `.hstack-bak-<time>` copy of the original. */
+/**
+ * Rewrite a settings file through `mutate`, keeping a timestamped `.hstack-bak-<time>` copy. A symlinked file is
+ * written through to its target so the link survives; the file keeps its mode, and a new file is created 0600.
+ */
 function rewriteSettings(file, mutate) {
-	if (!existsSync(file)) {
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, "{}\n");
-	} else copyFileSync(file, `${file}.hstack-bak-${new Date().toISOString().replace(/[:.]/g, "-")}`);
-	const next = JSON.parse(readFileSync(file, "utf8"));
+	const real = existsSync(file) ? realpathSync(file) : file;
+	const mode = existsSync(real) ? statSync(real).mode & 0o777 : 0o600;
+	if (existsSync(real)) copyFileSync(real, `${real}.hstack-bak-${new Date().toISOString().replace(/[:.]/g, "-")}`);
+	const next = existsSync(real) ? JSON.parse(readFileSync(real, "utf8")) : {};
 	mutate(next);
-	writeFileSync(`${file}.tmp-${process.pid}`, `${JSON.stringify(next, null, 2)}\n`);
-	renameSync(`${file}.tmp-${process.pid}`, file);
+	mkdirSync(dirname(real), { recursive: true });
+	const tmp = `${real}.tmp-${process.pid}`;
+	writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode });
+	chmodSync(tmp, mode);
+	renameSync(tmp, real);
 }
 
 function claudeSteps({ env, claudeDir, add }) {

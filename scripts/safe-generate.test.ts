@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
@@ -62,6 +62,29 @@ test("applyPlan refuses a lossy plan and backs up what it replaces", () => {
 	applyPlan({ files: [{ target: file, prev: "{}", next: '{"a":1}\n', added: ["a=1"], restored: [], lost: [] }], log: [], skipped: [] }, "STAMP");
 	assert.equal(readFileSync(file, "utf8"), '{"a":1}\n');
 	assert.equal(readFileSync(`${file}.hstack-bak-STAMP`, "utf8"), "{}");
+});
+
+test("applyPlan writes through a symlinked settings file, keeps its mode, and refuses a file changed since the plan", () => {
+	const home = tempHome();
+	const real = join(home, "dotfiles/settings.json");
+	const link = join(home, "settings.json");
+	put(real, "{}");
+	chmodSync(real, 0o600);
+	symlinkSync(real, link);
+	applyPlan({ files: [{ target: link, prev: "{}", next: '{"a":1}\n', added: ["a=1"], restored: [], lost: [] }], log: [], skipped: [] }, "S1");
+	assert.ok(lstatSync(link).isSymbolicLink(), "the link survives");
+	assert.equal(readlinkSync(link), real);
+	assert.equal(readFileSync(real, "utf8"), '{"a":1}\n');
+	assert.equal(statSync(real).mode & 0o777, 0o600);
+	assert.equal(readFileSync(`${real}.hstack-bak-S1`, "utf8"), "{}");
+
+	writeFileSync(real, '{"model":"newer"}');
+	assert.throws(() => applyPlan({ files: [{ target: link, prev: '{"a":1}\n', next: '{"a":2}\n', added: [], restored: [], lost: [] }], log: [], skipped: [] }), /changed since/);
+	assert.equal(readFileSync(real, "utf8"), '{"model":"newer"}');
+
+	const fresh = join(home, "new/settings.json");
+	applyPlan({ files: [{ target: fresh, prev: null, next: "{}\n", added: [], restored: [], lost: [] }], log: [], skipped: [] });
+	assert.equal(statSync(fresh).mode & 0o777, 0o600);
 });
 
 const rulesync = findRulesync(REPO);

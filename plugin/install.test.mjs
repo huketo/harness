@@ -2,9 +2,9 @@
 // arguments; HOME and the artifact directory are temporary, so no real agent home is read or written.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { repoSlug } from "./build.mjs";
 import { ensureAutoUpdate } from "./install.mjs";
@@ -90,6 +90,22 @@ test("auto-update goes to CLAUDE_CONFIG_DIR, and a person's autoUpdate value sta
 	const chosen = { extraKnownMarketplaces: { hstack: { source: { source: "github", repo: SLUG }, autoUpdate: false } } };
 	assert.equal(ensureAutoUpdate(chosen, "hstack", {}), false);
 	assert.equal(chosen.extraKnownMarketplaces.hstack.autoUpdate, false);
+});
+
+test("a symlinked settings file keeps its link and mode; a new one is created 0600", () => {
+	const real = join(root, "dotfiles/settings.json");
+	mkdirSync(dirname(real), { recursive: true });
+	renameSync(join(home, ".claude/settings.json"), real);
+	chmodSync(real, 0o600);
+	symlinkSync(real, join(home, ".claude/settings.json"));
+	assert.equal(run().status, 0);
+	assert.ok(lstatSync(join(home, ".claude/settings.json")).isSymbolicLink());
+	assert.equal(JSON.parse(readFileSync(real, "utf8")).extraKnownMarketplaces.hstack.autoUpdate, true);
+	assert.equal(statSync(real).mode & 0o777, 0o600);
+
+	const work = join(home, ".claude-new");
+	assert.equal(run([], { CLAUDE_CONFIG_DIR: work }).status, 0);
+	assert.equal(statSync(join(work, "settings.json")).mode & 0o777, 0o600);
 });
 
 test("foreign entries are left alone and reported", () => {
