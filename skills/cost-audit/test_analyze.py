@@ -114,6 +114,18 @@ class LocalSourcesTest(unittest.TestCase):
                 compaction = next(d for d in report['detectors'] if d['id'] == 'compaction_churn')
                 self.assertEqual(compaction['details']['compaction_count'], 1)
 
+    def test_default_claude_dirs_add_claude_config_dir_once(self):
+        home = self.root / 'home'
+        (home / '.claude').mkdir(parents=True)
+        (home / '.claude-work').mkdir()
+        self.assertEqual(analyze.default_claude_dirs({}, home), [home / '.claude'])
+        work = {'CLAUDE_CONFIG_DIR': str(home / '.claude-work')}
+        self.assertEqual(analyze.default_claude_dirs(work, home), [home / '.claude', home / '.claude-work'])
+        same = {'CLAUDE_CONFIG_DIR': str(home / '.claude')}
+        self.assertEqual(analyze.default_claude_dirs(same, home), [home / '.claude'])
+        missing = {'CLAUDE_CONFIG_DIR': str(home / 'absent')}
+        self.assertEqual(analyze.default_claude_dirs(missing, home), [home / '.claude'])
+
     def test_multiple_claude_roots_and_invalid_line_warning(self):
         other = self.root / 'claude-other'
         shutil.copytree(self.claude, other)
