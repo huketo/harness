@@ -1,0 +1,20 @@
+{
+  // Credential reads every agent is denied. scripts/safe-generate.ts runs rulesync with this file for Claude Code and
+  // Antigravity CLI only: rulesync's Codex output replaces Codex's sandbox profile (default_permissions), so Codex
+  // keeps codex/harness.rules instead (docs/AGENT-CONFIG.md). Removing an entry here does not remove it from a host;
+  // the installer never drops an existing setting.
+  // {{CLAUDE_CONFIG_DIR}} is the Claude Code config directory the installer runs with, written as ~/... when it is
+  // under HOME; it equals ~/.claude when CLAUDE_CONFIG_DIR is unset.
+  "permission": {
+    "read": {
+      "~/.ssh/**": "deny",
+      "~/.aws/**": "deny",
+      "~/.claude/.credentials.json": "deny",
+      "{{CLAUDE_CONFIG_DIR}}/.credentials.json": "deny",
+      "~/.config/gh/**": "deny",
+      "~/.config/glab-cli/**": "deny",
+      "~/.gemini/antigravity-cli/antigravity-oauth-token": "deny",
+      "~/.t3/userdata/providers/**": "deny"
+    }
+  }
+}

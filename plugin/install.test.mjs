@@ -1,14 +1,16 @@
 // Contract tests for plugin/install.mjs. Fake `claude` and `agy` executables come first on PATH and log their
 // arguments; HOME and the artifact directory are temporary, so no real agent home is read or written.
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { unionRules } from "./install.mjs";
+import { join } from "node:path";
+import { afterEach, beforeEach, test } from "node:test";
+import { repoSlug } from "./build.mjs";
+import { ensureAutoUpdate } from "./install.mjs";
 
-const INSTALL = join(import.meta.dir, "install.mjs");
-const REPO = dirname(import.meta.dir);
+const INSTALL = join(import.meta.dirname, "install.mjs");
+const SLUG = repoSlug();
 let root, home, bin, out, log;
 
 const FAKE = (name) => `#!/bin/sh
@@ -16,18 +18,17 @@ echo "${name} $*" >> "$FAKE_LOG"
 case "$*" in
   "plugin marketplace list --json") cat "$FAKE_STATE/markets.json" 2>/dev/null || echo '[]' ;;
   "plugin list --json") cat "$FAKE_STATE/${name}-plugins.json" 2>/dev/null || echo '[]' ;;
-  "plugin install "/*) [ "${name}" = agy ] && rm -rf "$HOME/.gemini/config/plugins/harness" && cp -R "$3" "$HOME/.gemini/config/plugins/harness" ;;
+  "plugin install "/*) [ "${name}" = agy ] && rm -rf "$HOME/.gemini/config/plugins/hstack" && cp -R "$3" "$HOME/.gemini/config/plugins/hstack" ;;
 esac
 `;
 
 beforeEach(() => {
-	root = mkdtempSync(join(tmpdir(), "harness-plugin-install-"));
+	root = mkdtempSync(join(tmpdir(), "hstack-plugin-install-"));
 	home = join(root, "home");
 	bin = join(root, "bin");
 	out = join(root, "out");
 	log = join(root, "cli.log");
 	mkdirSync(join(home, ".claude"), { recursive: true });
-	mkdirSync(join(home, ".gemini/antigravity-cli"), { recursive: true });
 	mkdirSync(join(home, ".gemini/config/plugins"), { recursive: true });
 	mkdirSync(bin);
 	for (const name of ["claude", "agy"]) {
@@ -35,85 +36,104 @@ beforeEach(() => {
 		chmodSync(join(bin, name), 0o755);
 	}
 	writeFileSync(join(home, ".claude/settings.json"), JSON.stringify({ permissions: { deny: ["WebFetch"] }, model: "x" }));
-	writeFileSync(join(home, ".gemini/antigravity-cli/settings.json"), JSON.stringify({ permissions: { deny: ["command(sudo)"] } }));
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-function run(...args) {
-	return spawnSync("node", [INSTALL, "--out", out, ...args], {
+function run(args = [], extraEnv = {}) {
+	return spawnSync(process.execPath, [INSTALL, "--out", out, ...args], {
 		encoding: "utf8",
-		env: { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}`, FAKE_LOG: log, FAKE_STATE: root, XDG_STATE_HOME: "" },
+		env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: "", PATH: `${bin}:${process.env.PATH}`, FAKE_LOG: log, FAKE_STATE: root, XDG_STATE_HOME: "", ...extraEnv },
 	});
 }
 const calls = () => (existsSync(log) ? readFileSync(log, "utf8").trim().split("\n") : []);
+const settings = (dir = join(home, ".claude")) => JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"));
 
 test("dry run plans every step and changes nothing", () => {
-	symlinkSync(join(REPO, "agy/config/plugins/harness"), join(home, ".gemini/config/plugins/harness"));
-	const dry = run("--dry-run");
-	expect(dry.status).toBe(0);
-	expect(dry.stdout).toContain(`would build artifact: ${join(out, "claude")}`);
-	expect(dry.stdout).toContain(`would register Claude marketplace: harness -> ${join(out, "claude")}`);
-	expect(dry.stdout).toContain("would install Claude plugin: harness@harness (user scope)");
-	expect(dry.stdout).toContain("would retire symlinked agy plugin");
-	expect(dry.stdout).toContain("would add 7 permissions.deny rule(s)");
-	expect(dry.stdout).toContain(`read_file(${home}/.config/gh)`);
-	expect(existsSync(out)).toBe(false);
-	expect(calls().every((c) => c.endsWith("--json"))).toBe(true);
-	expect(JSON.parse(readFileSync(join(home, ".claude/settings.json"), "utf8")).permissions.deny).toEqual(["WebFetch"]);
+	const dry = run(["--dry-run"]);
+	assert.equal(dry.status, 0, dry.stderr);
+	assert.ok(dry.stdout.includes(`would register Claude marketplace: hstack -> github:${SLUG}`));
+	assert.ok(dry.stdout.includes("would install Claude plugin: hstack@hstack (user scope)"));
+	assert.ok(dry.stdout.includes("would turn on Claude marketplace auto-update: hstack"));
+	assert.ok(dry.stdout.includes(`would build artifact: ${join(out, "agy")}`));
+	assert.ok(dry.stdout.includes("would install agy plugin copy"));
+	assert.equal(existsSync(out), false);
+	assert.equal(calls().every((c) => c.endsWith("--json")), true);
+	assert.deepEqual(settings(), { permissions: { deny: ["WebFetch"] }, model: "x" });
 });
 
-test("apply builds, registers, installs, and unions settings once with a backup", () => {
-	symlinkSync(join(REPO, "agy/config/plugins/harness"), join(home, ".gemini/config/plugins/harness"));
+test("apply registers, installs, and turns auto-update on once with a backup; a second plan is unchanged", () => {
 	const first = run();
-	expect(first.status).toBe(0);
-	expect(existsSync(join(out, "claude/.claude-plugin/plugin.json"))).toBe(true);
-	expect(lstatSync(join(home, ".gemini/config/plugins/harness")).isDirectory()).toBe(true);
-	expect(calls()).toContain(`claude plugin marketplace add ${join(out, "claude")} --scope user`);
-	expect(calls()).toContain("claude plugin install harness@harness --scope user");
-	expect(calls()).toContain(`agy plugin install ${join(out, "agy")}`);
-	const claude = JSON.parse(readFileSync(join(home, ".claude/settings.json"), "utf8"));
-	expect(claude.permissions.deny[0]).toBe("WebFetch");
-	expect(claude.permissions.deny).toContain("Read(~/.ssh/**)");
-	expect(claude.model).toBe("x");
-	expect(JSON.parse(readFileSync(join(home, ".claude/settings.json.harness-bak"), "utf8")).permissions.deny).toEqual(["WebFetch"]);
+	assert.equal(first.status, 0, first.stderr);
+	assert.ok(calls().includes(`claude plugin marketplace add ${SLUG} --scope user`));
+	assert.ok(calls().includes("claude plugin install hstack@hstack --scope user"));
+	assert.ok(calls().includes(`agy plugin install ${join(out, "agy")}`));
+	assert.equal(lstatSync(join(home, ".gemini/config/plugins/hstack")).isDirectory(), true);
+	const claude = settings();
+	assert.deepEqual(claude.extraKnownMarketplaces.hstack, { source: { source: "github", repo: SLUG }, autoUpdate: true });
+	assert.deepEqual(claude.permissions.deny, ["WebFetch"]);
+	assert.equal(claude.model, "x");
+	assert.equal(readdirSync(join(home, ".claude")).filter((f) => f.startsWith("settings.json.hstack-bak-")).length, 1);
 
-	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "harness", path: join(out, "claude") }]));
-	writeFileSync(join(root, "claude-plugins.json"), JSON.stringify([{ id: "harness@harness", scope: "user", readFromFolder: join(out, "claude") }]));
-	const second = run("--dry-run");
-	expect(second.status).toBe(0);
-	expect(second.stdout).not.toContain("would ");
-	expect(second.stdout).toContain("unchanged Claude marketplace");
+	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "hstack", source: "github", repo: SLUG }]));
+	writeFileSync(join(root, "claude-plugins.json"), JSON.stringify([{ id: "hstack@hstack", scope: "user", version: "0.1.0" }]));
+	const second = run(["--dry-run"]);
+	assert.equal(second.status, 0, second.stderr);
+	assert.ok(!second.stdout.includes("would "), second.stdout);
+	assert.ok(second.stdout.includes("unchanged Claude plugin: hstack@hstack (version 0.1.0)"));
+});
+
+test("auto-update goes to CLAUDE_CONFIG_DIR, and a person's autoUpdate value stays", () => {
+	const work = join(home, ".claude-work");
+	assert.equal(run([], { CLAUDE_CONFIG_DIR: work }).status, 0);
+	assert.equal(settings(work).extraKnownMarketplaces.hstack.autoUpdate, true);
+	assert.equal(settings().extraKnownMarketplaces, undefined);
+	const chosen = { extraKnownMarketplaces: { hstack: { source: { source: "github", repo: SLUG }, autoUpdate: false } } };
+	assert.equal(ensureAutoUpdate(chosen, "hstack", {}), false);
+	assert.equal(chosen.extraKnownMarketplaces.hstack.autoUpdate, false);
 });
 
 test("foreign entries are left alone and reported", () => {
-	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "harness", path: "/elsewhere" }]));
-	symlinkSync("/elsewhere/plugin", join(home, ".gemini/config/plugins/harness"));
-	writeFileSync(join(home, ".gemini/antigravity-cli/settings.json"), "{not json");
-	mkdirSync(join(root, "foreign"), { recursive: true });
-	writeFileSync(join(root, "foreign/plugin.json"), JSON.stringify({ name: "harness", description: "someone else's harness" }));
-	const dry = run("--dry-run");
-	expect(dry.status).toBe(1);
-	expect(dry.stderr).toContain("Claude marketplace harness points at /elsewhere");
-	expect(dry.stderr).toContain("which this repo did not install");
-	expect(dry.stderr).toContain("settings not valid JSON");
-	rmSync(join(home, ".gemini/config/plugins/harness"));
-	cpSync(join(root, "foreign"), join(home, ".gemini/config/plugins/harness"), { recursive: true });
-	const foreign = run("--dry-run");
-	expect(foreign.stderr).toContain("holds a plugin this repo did not ship (harness)");
-	expect(foreign.stdout).not.toContain("agy plugin");
+	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "hstack", source: "directory", path: "/elsewhere" }]));
+	symlinkSync("/elsewhere/plugin", join(home, ".gemini/config/plugins/hstack"));
+	const dry = run(["--dry-run"]);
+	assert.equal(dry.status, 1);
+	assert.ok(dry.stderr.includes("Claude marketplace hstack comes from directory /elsewhere"));
+	assert.ok(dry.stdout.includes("Claude plugin hstack@hstack not installed: its marketplace is not ours"));
+	assert.ok(dry.stderr.includes("this repo did not create it"));
+	rmSync(join(home, ".gemini/config/plugins/hstack"));
+	mkdirSync(join(root, "foreign"));
+	writeFileSync(join(root, "foreign/plugin.json"), JSON.stringify({ name: "hstack", description: "someone else's hstack" }));
+	cpSync(join(root, "foreign"), join(home, ".gemini/config/plugins/hstack"), { recursive: true });
+	writeFileSync(join(home, ".claude/settings.json"), "{not json");
+	writeFileSync(join(root, "markets.json"), "[]");
+	const foreign = run(["--dry-run"]);
+	assert.ok(foreign.stderr.includes("holds a plugin this repo did not ship (hstack)"));
+	assert.ok(foreign.stderr.includes("settings not valid JSON"));
+	assert.ok(!foreign.stdout.includes("agy plugin copy"));
 });
 
-test("a legacy agy copy this repo shipped is refreshed", () => {
-	mkdirSync(join(home, ".gemini/config/plugins/harness/rules"), { recursive: true });
-	writeFileSync(join(home, ".gemini/config/plugins/harness/plugin.json"), JSON.stringify({ name: "harness", description: "Personal harness for the Antigravity CLI: the always-on rules that keep this CLI aligned with the OMP and Claude Code setup." }));
-	expect(run("--dry-run").stdout).toContain("would refresh agy plugin copy");
+test("leftovers of the legacy harness plugin are reported with their removal command, not removed", () => {
+	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "harness", source: "directory", path: join(home, ".local/state/harness/plugins/claude") }]));
+	mkdirSync(join(home, ".gemini/config/plugins/harness"), { recursive: true });
+	writeFileSync(
+		join(home, ".gemini/config/plugins/harness/plugin.json"),
+		JSON.stringify({ name: "harness", description: "Personal harness guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity rules." }),
+	);
+	const result = run();
+	assert.equal(result.status, 0, result.stderr);
+	assert.ok(result.stdout.includes("legacy Claude marketplace harness"));
+	assert.ok(result.stdout.includes("claude plugin marketplace remove harness"));
+	assert.ok(result.stdout.includes("agy plugin uninstall harness"));
+	assert.ok(existsSync(join(home, ".gemini/config/plugins/harness/plugin.json")));
+	assert.ok(!calls().some((c) => c.includes("remove") || c.includes("uninstall")));
+
+	writeFileSync(join(root, "markets.json"), JSON.stringify([{ name: "harness", source: "github", repo: "someone/else" }]));
+	assert.ok(!run(["--dry-run"]).stdout.includes("legacy Claude marketplace"), "another owner's harness marketplace is not ours to mention");
 });
 
-test("unionRules only appends missing rules", () => {
-	const settings = { permissions: { deny: ["a"] } };
-	expect(unionRules(settings, ["permissions", "deny"], ["a", "b"])).toEqual(["b"]);
-	expect(settings.permissions.deny).toEqual(["a", "b"]);
-	const empty = {};
-	unionRules(empty, ["permissions", "deny"], ["x"]);
-	expect(empty).toEqual({ permissions: { deny: ["x"] } });
+test("CLIs that are not on PATH are skipped", () => {
+	const result = spawnSync(process.execPath, [INSTALL, "--out", out, "--dry-run"], { encoding: "utf8", env: { ...process.env, HOME: home, PATH: "/nonexistent" } });
+	assert.equal(result.status, 0);
+	assert.ok(result.stdout.includes("claude not on PATH"));
+	assert.ok(result.stdout.includes("agy not on PATH"));
 });

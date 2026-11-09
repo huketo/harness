@@ -1,0 +1,35 @@
+# Keeps one "chore(release): version hstack" pull request open while changesets are pending on main.
+# Merging that pull request is the release: Claude Code picks up the bumped plugin.json version through
+# marketplace auto-update. Once that leaves no pending changesets, the publish script tags the new version
+# (v<version>) and the action creates its GitHub release from CHANGELOG.md; nothing is published to npm.
+# docs/guides/plugin-release.md owns the procedure.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Version pull request
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise run setup
+      - uses: changesets/action@v2
+        with:
+          version-script: npm run version-packages
+          publish-script: npm run tag-release
+          commit-message: "chore(release): version hstack"
+          pr-title: "chore(release): version hstack"
+        env:
+          # @changesets/changelog-github reads this to link each entry to its pull request.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

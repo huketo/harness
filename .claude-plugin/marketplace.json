@@ -1,0 +1,12 @@
+{
+  "name": "hstack",
+  "owner": { "name": "huketo" },
+  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules.",
+  "plugins": [
+    {
+      "name": "hstack",
+      "source": "./plugin",
+      "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules."
+    }
+  ]
+}
