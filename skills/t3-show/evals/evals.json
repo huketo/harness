@@ -4,8 +4,8 @@
     {
       "id": 1,
       "name": "codebase-map",
-      "prompt": "t3-show로 이 레포의 install.sh가 스킬과 플러그인을 어떻게 설치하는지 설명해 주세요.",
-      "expected_output": "install.sh를 실제로 읽고, 단계나 모듈을 고르면 상세 패널에 path:line이 뜨는 인터랙티브 화면을 html_render로 한 번 띄운다.",
+      "prompt": "t3-show로 이 레포의 `mise run install`이 스킬과 플러그인을 어떻게 설치하는지 설명해 주세요.",
+      "expected_output": "scripts/install.ts를 실제로 읽고, 단계나 모듈을 고르면 상세 패널에 path:line이 뜨는 인터랙티브 화면을 html_render로 한 번 띄운다.",
       "files": [],
       "expectations": [
         "화면의 모든 노드와 단계가 읽은 파일의 path:line을 가진다.",

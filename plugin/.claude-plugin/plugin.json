@@ -1,0 +1,10 @@
+{
+  "name": "hstack",
+  "version": "0.0.0",
+  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules.",
+  "author": {
+    "name": "huketo"
+  },
+  "repository": "https://github.com/huketo/harness",
+  "license": "MIT"
+}

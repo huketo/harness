@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+  "changelog": ["@changesets/changelog-github", { "repo": "huketo/harness" }],
+  "commit": false,
+  "access": "restricted",
+  "baseBranch": "main",
+  "privatePackages": { "version": true, "tag": true },
+  "ignore": []
+}

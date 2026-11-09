@@ -1,0 +1,19 @@
+# Type-checks and tests every push and pull request with the tool versions mise.toml pins.
+# docs/agents/testing.md owns what `mise run check` covers.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise run check

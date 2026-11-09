@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-// Builds the harness plugin artifacts from plugin/ for each agent CLI.
+// Builds the hstack plugin files from plugin/ for each agent CLI.
 //   node plugin/build.mjs [--out DIR] [--host claude|agy]... [--no-hooks] [--check]
-// Output: <out>/<host>/, default <out> = ${XDG_STATE_HOME:-~/.local/state}/harness/plugins. The directory is
-// stable (no content hash) because Claude Code reads a directory marketplace live and agy copies on install.
-// --check compares the rendered files with <out> and exits 1 on a difference without writing.
+// claude: plugin/ is itself the Claude Code plugin root (the repository marketplace in .claude-plugin/ points at
+//   it), so this writes only the two generated files, .claude-plugin/plugin.json and hooks/hooks.json, in place and
+//   tracked in git. The version comes from the root package.json, which changesets bumps. --out does not apply.
+// agy: a copy under <out>/agy/, default <out> = ${XDG_STATE_HOME:-~/.local/state}/hstack/plugins. The directory is
+//   stable (no content hash) because agy copies it on install.
+// --check compares the rendered files with their target and exits 1 on a difference without writing.
 // Codex has no artifact: its plugins cannot ship rules, and plugin hooks run only after a per-hook trust hash is
 // written to config.toml, so the Codex merge guard is codex/harness.rules instead (see docs/REPO.md).
 import { createHash } from "node:crypto";
@@ -14,21 +17,34 @@ import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 
 const SOURCE = dirname(fileURLToPath(import.meta.url));
+const ROOT = dirname(SOURCE);
 export const HOSTS = ["claude", "agy"];
 
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const read = (rel) => readFileSync(join(SOURCE, rel), "utf8");
 
-export function defaultOut(env = process.env) {
-	const state = env.XDG_STATE_HOME && isAbsolute(env.XDG_STATE_HOME) ? env.XDG_STATE_HOME : join(homedir(), ".local/state");
-	return join(state, "harness/plugins");
+/** manifest.json plus the version that changesets keeps in the root package.json. */
+export function manifest() {
+	const { version } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+	return { ...JSON.parse(read("manifest.json")), version };
 }
 
-/** Files of one host artifact as { relative path: content }. */
+/** `owner/name` of the GitHub repository the manifest names, which is also the marketplace source. */
+export function repoSlug(meta = manifest()) {
+	const match = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(meta.repository ?? "");
+	if (!match) throw new Error(`manifest repository is not a github.com URL: ${meta.repository}`);
+	return match[1];
+}
+
+export function defaultOut(env = process.env) {
+	const state = env.XDG_STATE_HOME && isAbsolute(env.XDG_STATE_HOME) ? env.XDG_STATE_HOME : join(homedir(), ".local/state");
+	return join(state, "hstack/plugins");
+}
+
+/** Files of one host as { relative path: content }: the generated files for claude, the whole copy for agy. */
 export function render(host, { hooks = true } = {}) {
-	const meta = JSON.parse(read("manifest.json"));
+	const meta = manifest();
 	const files = {};
-	const guard = read("hooks/merge-guard.mjs");
 	switch (host) {
 		case "claude":
 			files[".claude-plugin/plugin.json"] = json({
@@ -39,15 +55,7 @@ export function render(host, { hooks = true } = {}) {
 				repository: meta.repository,
 				license: meta.license,
 			});
-			files[".claude-plugin/marketplace.json"] = json({
-				name: meta.name,
-				owner: meta.author,
-				description: meta.description,
-				plugins: [{ name: meta.name, source: "./", description: meta.description, version: meta.version }],
-			});
-			files["agents/reviewer.md"] = read("agents/reviewer.md");
 			if (hooks) {
-				files["hooks/merge-guard.mjs"] = guard;
 				files["hooks/hooks.json"] = json({
 					hooks: {
 						PreToolUse: [
@@ -71,14 +79,15 @@ export function render(host, { hooks = true } = {}) {
 			files["plugin.json"] = json({
 				$schema: "https://antigravity.google/schemas/v1/plugin.json",
 				name: meta.name,
+				version: meta.version,
 				description: meta.description,
 			});
 			files["rules/AGENTS.md"] = read("rules/AGENTS.md");
 			if (hooks) {
-				files["hooks/merge-guard.mjs"] = guard;
+				files["hooks/merge-guard.mjs"] = read("hooks/merge-guard.mjs");
 				// agy runs plugin hooks with `sh -c` from the directory that holds hooks.json.
 				files["hooks.json"] = json({
-					"harness-merge-guard": {
+					"hstack-merge-guard": {
 						PreToolUse: [
 							{
 								matcher: "run_command",
@@ -121,6 +130,26 @@ export function diffTree(dir, files) {
 	return changes;
 }
 
+/** Like diffTree, for files that live among other tracked files: reports only `missing` and `changed`. */
+export function diffFiles(dir, files) {
+	return Object.keys(files)
+		.sort()
+		.flatMap((rel) => {
+			const path = join(dir, rel);
+			if (!existsSync(path)) return [`missing ${rel}`];
+			return readFileSync(path, "utf8") === files[rel] ? [] : [`changed ${rel}`];
+		});
+}
+
+/** Write each of <files> under <dir> and leave every other file there alone. */
+export function writeFiles(dir, files) {
+	for (const [rel, content] of Object.entries(files)) {
+		const path = join(dir, rel);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	}
+}
+
 /** Replace <dir> with exactly <files>, through a sibling temporary directory and a rename. */
 export function writeTree(dir, files) {
 	const tmp = `${dir}.tmp-${process.pid}`;
@@ -159,9 +188,10 @@ export function build(opts) {
 	let stale = false;
 	for (const host of opts.hosts) {
 		const files = render(host, { hooks: opts.hooks });
-		const dir = join(opts.out, host);
-		const changes = diffTree(dir, files);
-		if (changes.length && !opts.check) writeTree(dir, files);
+		const inPlace = host === "claude";
+		const dir = inPlace ? (opts.pluginRoot ?? SOURCE) : join(opts.out, host);
+		const changes = inPlace ? diffFiles(dir, files) : diffTree(dir, files);
+		if (changes.length && !opts.check) (inPlace ? writeFiles : writeTree)(dir, files);
 		if (changes.length && opts.check) stale = true;
 		result[host] = { dir, digest: digest(files), files: Object.keys(files).length, changes };
 	}

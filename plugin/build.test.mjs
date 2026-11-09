@@ -1,74 +1,94 @@
 // Contract tests for plugin/build.mjs. Output goes to temporary directories; the CLI validators run only when
 // installed and never touch the real agent homes (agy validate reads the given path only).
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { build, defaultOut, diffTree, parseArgs, render } from "./build.mjs";
+import { dirname, join } from "node:path";
+import { after, before, test } from "node:test";
+import { build, defaultOut, diffFiles, diffTree, manifest, parseArgs, render, repoSlug } from "./build.mjs";
 
-const BUILD = join(import.meta.dir, "build.mjs");
+const BUILD = join(import.meta.dirname, "build.mjs");
+const REPO = dirname(import.meta.dirname);
 let out;
-beforeAll(() => {
-	out = mkdtempSync(join(tmpdir(), "harness-plugin-build-"));
+before(() => {
+	out = mkdtempSync(join(tmpdir(), "hstack-plugin-build-"));
 });
-afterAll(() => rmSync(out, { recursive: true, force: true }));
+after(() => rmSync(out, { recursive: true, force: true }));
 
-test("each host artifact carries its manifest, the merge guard, and its own extras", () => {
+test("claude renders only the generated files; agy is a full copy with the guard and its rules", () => {
 	const claude = render("claude");
-	expect(Object.keys(claude).sort()).toEqual([
-		".claude-plugin/marketplace.json",
-		".claude-plugin/plugin.json",
-		"agents/reviewer.md",
-		"hooks/hooks.json",
-		"hooks/merge-guard.mjs",
-	]);
+	assert.deepEqual(Object.keys(claude).sort(), [".claude-plugin/plugin.json", "hooks/hooks.json"]);
 	const hook = JSON.parse(claude["hooks/hooks.json"]).hooks.PreToolUse[0];
-	expect(hook.matcher).toBe("Bash");
-	expect(hook.hooks[0].onFailure).toBe("block");
-	expect(hook.hooks[0].command).toContain('"${CLAUDE_PLUGIN_ROOT}/hooks/merge-guard.mjs" --format claude');
-	expect(JSON.parse(claude[".claude-plugin/marketplace.json"]).plugins[0].source).toBe("./");
+	assert.equal(hook.matcher, "Bash");
+	assert.equal(hook.hooks[0].onFailure, "block");
+	assert.ok(hook.hooks[0].command.includes('"${CLAUDE_PLUGIN_ROOT}/hooks/merge-guard.mjs" --format claude'));
+	assert.deepEqual(Object.keys(render("claude", { hooks: false })), [".claude-plugin/plugin.json"]);
 
 	const agy = render("agy");
-	expect(Object.keys(agy).sort()).toEqual(["hooks.json", "hooks/merge-guard.mjs", "plugin.json", "rules/AGENTS.md"]);
-	expect(JSON.parse(agy["hooks.json"])["harness-merge-guard"].PreToolUse[0].matcher).toBe("run_command");
-	expect(Object.keys(render("agy", { hooks: false })).sort()).toEqual(["plugin.json", "rules/AGENTS.md"]);
-	expect(() => render("codex")).toThrow(/unknown host/);
+	assert.deepEqual(Object.keys(agy).sort(), ["hooks.json", "hooks/merge-guard.mjs", "plugin.json", "rules/AGENTS.md"]);
+	assert.equal(JSON.parse(agy["hooks.json"])["hstack-merge-guard"].PreToolUse[0].matcher, "run_command");
+	assert.deepEqual(Object.keys(render("agy", { hooks: false })).sort(), ["plugin.json", "rules/AGENTS.md"]);
+	assert.throws(() => render("codex"), /unknown host/);
+});
+
+test("one name and one version: package.json, plugin.json, and the root marketplace agree", () => {
+	const pkg = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8"));
+	const plugin = JSON.parse(render("claude")[".claude-plugin/plugin.json"]);
+	assert.equal(plugin.name, "hstack");
+	assert.equal(plugin.version, pkg.version);
+	assert.equal(manifest().version, pkg.version);
+	assert.equal(repoSlug(), "huketo/harness");
+	assert.throws(() => repoSlug({ repository: "https://example.com/x/y" }), /github\.com/);
+	const market = JSON.parse(readFileSync(join(REPO, ".claude-plugin/marketplace.json"), "utf8"));
+	assert.equal(market.name, plugin.name);
+	assert.deepEqual(market.plugins.map((p) => [p.name, p.source]), [[plugin.name, "./plugin"]]);
+	assert.deepEqual(diffFiles(import.meta.dirname, render("claude")), [], "run `node plugin/build.mjs --host claude` and commit the result");
 });
 
 test("rendering is deterministic and the guard is copied verbatim", () => {
-	expect(render("claude")).toEqual(render("claude"));
-	expect(render("agy")["hooks/merge-guard.mjs"]).toBe(readFileSync(join(import.meta.dir, "hooks/merge-guard.mjs"), "utf8"));
+	assert.deepEqual(render("claude"), render("claude"));
+	assert.equal(render("agy")["hooks/merge-guard.mjs"], readFileSync(join(import.meta.dirname, "hooks/merge-guard.mjs"), "utf8"));
 });
 
-test("build writes stable host directories, --check reports drift, and a rebuild repairs it", () => {
-	const first = build({ out, hosts: ["claude", "agy"], hooks: true, check: false });
-	expect(first.stale).toBe(false);
-	expect(first.result.claude.dir).toBe(join(out, "claude"));
-	expect(diffTree(join(out, "agy"), render("agy"))).toEqual([]);
+test("build writes a stable agy directory, --check reports drift, and a rebuild repairs it", () => {
+	const first = build({ out, hosts: ["agy"], hooks: true, check: false });
+	assert.equal(first.stale, false);
+	assert.equal(first.result.agy.dir, join(out, "agy"));
+	assert.deepEqual(diffTree(join(out, "agy"), render("agy")), []);
 	writeFileSync(join(out, "agy", "stray.txt"), "x");
 	writeFileSync(join(out, "agy", "plugin.json"), "{}");
-	const check = spawnSync("node", [BUILD, "--out", out, "--host", "agy", "--check"], { encoding: "utf8" });
-	expect(check.status).toBe(1);
-	expect(JSON.parse(check.stdout).agy.changes).toEqual(["changed plugin.json", "extra stray.txt"]);
-	expect(spawnSync("node", [BUILD, "--out", out, "--host", "agy"]).status).toBe(0);
-	expect(spawnSync("node", [BUILD, "--out", out, "--check"]).status).toBe(0);
+	const check = spawnSync(process.execPath, [BUILD, "--out", out, "--host", "agy", "--check"], { encoding: "utf8" });
+	assert.equal(check.status, 1);
+	assert.deepEqual(JSON.parse(check.stdout).agy.changes, ["changed plugin.json", "extra stray.txt"]);
+	assert.equal(spawnSync(process.execPath, [BUILD, "--out", out, "--host", "agy"]).status, 0);
+	assert.equal(spawnSync(process.execPath, [BUILD, "--out", out, "--host", "agy", "--check"]).status, 0);
+});
+
+test("claude files are written in place among other files, and only they are compared", () => {
+	const root = join(out, "claude-root");
+	cpSync(import.meta.dirname, root, { recursive: true });
+	writeFileSync(join(root, "hooks/hooks.json"), "{}");
+	assert.deepEqual(build({ out, hosts: ["claude"], hooks: true, check: true, pluginRoot: root }).result.claude.changes, ["changed hooks/hooks.json"]);
+	build({ out, hosts: ["claude"], hooks: true, check: false, pluginRoot: root });
+	assert.deepEqual(diffFiles(root, render("claude")), []);
+	assert.equal(readFileSync(join(root, "agents/reviewer.md"), "utf8"), readFileSync(join(import.meta.dirname, "agents/reviewer.md"), "utf8"));
 });
 
 test("arguments are validated and the default output follows XDG_STATE_HOME", () => {
-	expect(() => parseArgs(["--out", "relative"])).toThrow(/absolute/);
-	expect(() => parseArgs(["--out", out, "--host", "codex"])).toThrow(/--host/);
-	expect(defaultOut({ XDG_STATE_HOME: "/s" })).toBe("/s/harness/plugins");
-	expect(defaultOut({ XDG_STATE_HOME: "rel" })).toMatch(/\.local\/state\/harness\/plugins$/);
-	expect(spawnSync("node", [BUILD, "--bogus"]).status).toBe(2);
+	assert.throws(() => parseArgs(["--out", "relative"]), /absolute/);
+	assert.throws(() => parseArgs(["--out", out, "--host", "codex"]), /--host/);
+	assert.equal(defaultOut({ XDG_STATE_HOME: "/s" }), "/s/hstack/plugins");
+	assert.match(defaultOut({ XDG_STATE_HOME: "rel" }), /\.local\/state\/hstack\/plugins$/);
+	assert.equal(spawnSync(process.execPath, [BUILD, "--bogus"]).status, 2);
 });
 
 test("installed CLIs accept the artifacts", () => {
-	build({ out, hosts: ["claude", "agy"], hooks: true, check: false });
+	build({ out, hosts: ["agy"], hooks: true, check: false });
 	const agy = spawnSync("agy", ["plugin", "validate", join(out, "agy"), "--strict"], { encoding: "utf8" });
 	if (agy.error) console.log("agy not installed; skipped");
-	else expect(agy.status).toBe(0);
-	const claude = spawnSync("claude", ["plugin", "validate", "--strict", join(out, "claude")], { encoding: "utf8" });
+	else assert.equal(agy.status, 0, `${agy.stdout}${agy.stderr}`);
+	const claude = spawnSync("claude", ["plugin", "validate", "--strict", import.meta.dirname], { encoding: "utf8" });
 	if (claude.error) console.log("claude not installed; skipped");
-	else expect(claude.status).toBe(0);
+	else assert.equal(claude.status, 0, `${claude.stdout}${claude.stderr}`);
 });

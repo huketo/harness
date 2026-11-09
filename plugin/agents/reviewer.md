@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Read-only reviewer for review-loop and council rounds. Use only when a review brief or skill names harness:reviewer.
+description: Read-only reviewer for review-loop and council rounds. Use only when a review brief or skill names hstack:reviewer.
 tools: Read, Grep, Glob
 model: inherit
 ---
