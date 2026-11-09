@@ -31,7 +31,7 @@ export interface Deps {
 
 export function defaultDeps(): Deps {
 	return {
-		repoRoot: gitText(["rev-parse", "--show-toplevel"], import.meta.dir),
+		repoRoot: gitText(["rev-parse", "--show-toplevel"], import.meta.dirname),
 		tmpRoot: "/tmp/skill-eval",
 		cwd: process.cwd(),
 		runAgent: spawnAgent,

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Case, CaseJudgement, RunGrading, RunMeta } from "../schema";
-import type { Benchmark } from "./benchmark";
+import type { Case, CaseJudgement, RunGrading, RunMeta } from "../schema.ts";
+import type { Benchmark } from "./benchmark.ts";
 
 export interface ViewerRun {
 	k: number;
@@ -20,7 +20,7 @@ export interface ViewerCase {
 	arms: { key: string; runs: ViewerRun[] }[];
 }
 
-export const VIEWER_TEMPLATE = join(import.meta.dir, "viewer.template.html");
+export const VIEWER_TEMPLATE = join(import.meta.dirname, "viewer.template.html");
 
 export function viewerCase(def: Case, rest: Omit<ViewerCase, "id" | "title" | "prompt">): ViewerCase {
 	return { id: def.id, title: def.title, prompt: def.prompt, ...rest };

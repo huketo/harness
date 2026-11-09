@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 // Guard for T3 scheduled tasks. A T3 scheduled task is an agent turn with no
 // timeout, daily run limit, or auto-disable. The guard enforces those from
 // jobs.json so the turn only starts, waits for, and reports a supervised run.
@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 const SELF = fileURLToPath(import.meta.url);
@@ -219,7 +220,7 @@ async function waitFor(job, dir, run, maxSeconds) {
 			console.log(resultLine(job, run, "running", null, null));
 			return EXIT.running;
 		}
-		await Bun.sleep(1000);
+		await sleep(1000);
 	}
 	const { status, exit } = JSON.parse(readFileSync(resultFile, "utf8"));
 	const log = join(dir, `${run}.log`);
@@ -231,11 +232,11 @@ async function waitFor(job, dir, run, maxSeconds) {
 
 function usage() {
 	return [
-		"usage: bun t3/scheduled/guard.mjs run <job> [--max-seconds N] [--jobs FILE]",
-		"       bun t3/scheduled/guard.mjs wait <job> <run> [--max-seconds N] [--jobs FILE]",
-		"       bun t3/scheduled/guard.mjs admit <job> [--jobs FILE]",
-		"       bun t3/scheduled/guard.mjs finish <job> <run> --status ok|noop|failed [--jobs FILE]",
-		"       bun t3/scheduled/guard.mjs status <job> [--jobs FILE]",
+		"usage: node t3/scheduled/guard.mjs run <job> [--max-seconds N] [--jobs FILE]",
+		"       node t3/scheduled/guard.mjs wait <job> <run> [--max-seconds N] [--jobs FILE]",
+		"       node t3/scheduled/guard.mjs admit <job> [--jobs FILE]",
+		"       node t3/scheduled/guard.mjs finish <job> <run> --status ok|noop|failed [--jobs FILE]",
+		"       node t3/scheduled/guard.mjs status <job> [--jobs FILE]",
 		"",
 		"run starts a supervised shell job and waits up to --max-seconds (default 240) for it;",
 		`exit ${EXIT.running} means it is still running: call wait with the printed run id.`,

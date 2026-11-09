@@ -5,7 +5,7 @@
  * judged numbers.
  */
 
-import type { Case, CaseJudgement, IterationMeta, RunGrading, RunMeta, Suite } from "../schema";
+import type { Case, CaseJudgement, IterationMeta, RunGrading, RunMeta, Suite } from "../schema.ts";
 
 export interface RunData {
 	k: number;

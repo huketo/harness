@@ -8,15 +8,7 @@
 // can never leak into these fixtures (or into the module under test, which
 // inherits the same environment when it shells out to `git`).
 //
-import {
-	afterAll,
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	test,
-} from "bun:test";
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
 	existsSync,
@@ -31,6 +23,14 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	after,
+	afterEach,
+	before,
+	beforeEach,
+	describe,
+	test,
+} from "node:test";
 
 import { finalize, prepare } from "./host-sync.mjs";
 
@@ -99,7 +99,7 @@ const savedEnvironment = Object.fromEntries(
 	].map((key) => [key, process.env[key]]),
 );
 
-beforeAll(() => {
+before(() => {
 	// One throwaway HOME + git config file for the whole suite, so no fixture
 	// ever consults the real user's global git config or credentials.
 	sandboxHome = realpathSync(mkdtempSync(join(tmpdir(), "host-sync-home-")));
@@ -116,7 +116,7 @@ beforeAll(() => {
 	process.env.GIT_TERMINAL_PROMPT = "0";
 });
 
-afterAll(() => {
+after(() => {
 	try {
 		rmSync(sandboxHome, { recursive: true, force: true });
 	} finally {
@@ -183,10 +183,10 @@ describe("t3/scheduled/host-sync contract", () => {
 			stateRoot: makeStateRoot(),
 		});
 
-		expect(result.status).toBe("skipped");
-		expect(result.reason).toBe("not_main");
-		expect(treeSnapshot(original)).toEqual(before);
-		expect(remoteSnapshot(remote)).toBe(beforeRemote);
+		assert.equal(result.status, "skipped");
+		assert.equal(result.reason, "not_main");
+		assert.deepEqual(treeSnapshot(original), before);
+		assert.equal(remoteSnapshot(remote), beforeRemote);
 	});
 
 	for (const kind of ["staged", "unstaged", "untracked"]) {
@@ -203,33 +203,29 @@ describe("t3/scheduled/host-sync contract", () => {
 				stateRoot: makeStateRoot(),
 			});
 
-			expect(result.status).toBe("skipped");
-			expect(result.reason).toBe("dirty");
-			expect(treeSnapshot(original)).toEqual(before);
-			expect(existsSync(join(original, ".git", "FETCH_HEAD"))).toBe(false);
+			assert.equal(result.status, "skipped");
+			assert.equal(result.reason, "dirty");
+			assert.deepEqual(treeSnapshot(original), before);
+			assert.equal(existsSync(join(original, ".git", "FETCH_HEAD")), false);
 		});
 	}
 
 	test("prepare creates an isolated private clone and leaves the original checkout untouched", async () => {
 		const { remote, original, prepared } = await prepareFixture();
 
-		expect(prepared.status).toBe("ready");
-		expect(prepared.base).toBe(git(original, ["rev-parse", "HEAD"]));
-		expect(existsSync(join(prepared.workspace, ".git"))).toBe(true);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
-		expect(git(prepared.workspace, ["remote", "get-url", "origin"])).toBe(
-			remote,
-		);
-		expect(existsSync(join(prepared.session, "manifest.json"))).toBe(true);
+		assert.equal(prepared.status, "ready");
+		assert.equal(prepared.base, git(original, ["rev-parse", "HEAD"]));
+		assert.equal(existsSync(join(prepared.workspace, ".git")), true);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
+		assert.equal(git(prepared.workspace, ["remote", "get-url", "origin"]), remote);
+		assert.equal(existsSync(join(prepared.session, "manifest.json")), true);
 
 		const beforeOriginalContent = readFileSync(
 			join(original, "docs", "REPO.md"),
 			"utf8",
 		);
 		editAllowlisted(prepared.workspace);
-		expect(readFileSync(join(original, "docs", "REPO.md"), "utf8")).toBe(
-			beforeOriginalContent,
-		);
+		assert.equal(readFileSync(join(original, "docs", "REPO.md"), "utf8"), beforeOriginalContent);
 	});
 
 	test("finalize commits allowlisted edits and publishes to the bare remote when push is requested", async () => {
@@ -243,9 +239,9 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "host-sync: update docs/REPO.md",
 		});
 
-		expect(result.status).toBe("published");
-		expect(result.paths).toEqual(["docs/REPO.md"]);
-		expect(git(remote, ["rev-parse", "refs/heads/main"])).toBe(result.commit);
+		assert.equal(result.status, "published");
+		assert.deepEqual(result.paths, ["docs/REPO.md"]);
+		assert.equal(git(remote, ["rev-parse", "refs/heads/main"]), result.commit);
 
 		const published = execFileSync(
 			"git",
@@ -254,9 +250,9 @@ describe("t3/scheduled/host-sync contract", () => {
 				encoding: "utf8",
 			},
 		);
-		expect(published).toContain("appended by agent");
+		assert.ok(published.includes("appended by agent"));
 		// The original checkout is never fast-forwarded, even on a successful publish.
-		expect(treeSnapshot(original)).toEqual(originalBefore);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
 	});
 
 	test("finalize is a no-op when the workspace has no candidate changes", async () => {
@@ -270,9 +266,9 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "nothing to publish",
 		});
 
-		expect(result.status).toBe("noop");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(treeSnapshot(original)).toEqual(originalBefore);
+		assert.equal(result.status, "noop");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
 	});
 
 	test("finalize blocks edits outside the snapshot allowlist and preserves them privately", async () => {
@@ -288,11 +284,11 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "attempt forbidden path",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
-		expect(readFileSync(forbidden, "utf8")).toBe("forbidden edit\n");
+		assert.equal(result.status, "blocked");
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
+		assert.equal(readFileSync(forbidden, "utf8"), "forbidden edit\n");
 	});
 
 	test("finalize blocks when the original checkout becomes dirty after prepare", async () => {
@@ -310,11 +306,11 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
-		expect(readFileSync(target, "utf8")).toContain("agent edit");
-		expect(existsSync(join(original, "unexpected.txt"))).toBe(true);
+		assert.equal(result.status, "blocked");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
+		assert.ok(readFileSync(target, "utf8").includes("agent edit"));
+		assert.equal(existsSync(join(original, "unexpected.txt")), true);
 	});
 
 	test("finalize blocks when the original checkout switches branches after prepare", async () => {
@@ -329,10 +325,10 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(git(original, ["rev-parse", "--abbrev-ref", "HEAD"])).toBe("other");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
+		assert.equal(result.status, "blocked");
+		assert.equal(git(original, ["rev-parse", "--abbrev-ref", "HEAD"]), "other");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
 	});
 
 	test("finalize blocks when the private clone already has staged changes before it runs", async () => {
@@ -348,13 +344,11 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(treeSnapshot(original)).toEqual(originalBefore);
+		assert.equal(result.status, "blocked");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
 		// The pre-staged change is preserved for inspection, not silently reset.
-		expect(git(prepared.workspace, ["status", "--porcelain=v1"])).toContain(
-			"docs/REPO.md",
-		);
+		assert.ok(git(prepared.workspace, ["status", "--porcelain=v1"]).includes("docs/REPO.md"));
 	});
 
 	test("finalize blocks when origin/main advances past base before it runs", async () => {
@@ -376,11 +370,11 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
+		assert.equal(result.status, "blocked");
 		// The interloper's push stands; finalize must not touch the remote further.
-		expect(remoteSnapshot(remote)).toBe(advancedRemote);
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
+		assert.equal(remoteSnapshot(remote), advancedRemote);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
 	});
 
 	test("finalize rejects a candidate path replaced with a symlink", async () => {
@@ -397,12 +391,12 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
+		assert.equal(result.status, "blocked");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
 		// Rejected work is preserved privately, not converted or committed.
-		expect(lstatSync(target).isSymbolicLink()).toBe(true);
+		assert.equal(lstatSync(target).isSymbolicLink(), true);
 	});
 
 	test("finalize rejects a candidate path deletion", async () => {
@@ -418,12 +412,12 @@ describe("t3/scheduled/host-sync contract", () => {
 			message: "should be blocked",
 		});
 
-		expect(result.status).toBe("blocked");
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(git(prepared.workspace, ["rev-parse", "HEAD"])).toBe(prepared.base);
-		expect(existsSync(target)).toBe(false);
-		expect(existsSync(join(original, "README.md"))).toBe(true);
+		assert.equal(result.status, "blocked");
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(git(prepared.workspace, ["rev-parse", "HEAD"]), prepared.base);
+		assert.equal(existsSync(target), false);
+		assert.equal(existsSync(join(original, "README.md")), true);
 	});
 
 	test("prepare preserves an active index lock without contacting the remote", async () => {
@@ -436,9 +430,9 @@ describe("t3/scheduled/host-sync contract", () => {
 			repo: original,
 			stateRoot: makeStateRoot(),
 		});
-		expect(result.status).toBe("skipped");
-		expect(result.reason).toBe("git_operation_in_progress");
-		expect(readFileSync(lock, "utf8")).toBe("owned by another process\n");
+		assert.equal(result.status, "skipped");
+		assert.equal(result.reason, "git_operation_in_progress");
+		assert.equal(readFileSync(lock, "utf8"), "owned by another process\n");
 	});
 
 	test("prepare refuses a clean but unpublished local main commit", async () => {
@@ -453,10 +447,10 @@ describe("t3/scheduled/host-sync contract", () => {
 			repo: original,
 			stateRoot: makeStateRoot(),
 		});
-		expect(result.status).toBe("skipped");
-		expect(result.reason).toBe("unpublished_or_diverged_head");
-		expect(treeSnapshot(original)).toEqual(before);
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
+		assert.equal(result.status, "skipped");
+		assert.equal(result.reason, "unpublished_or_diverged_head");
+		assert.deepEqual(treeSnapshot(original), before);
+		assert.equal(remoteSnapshot(remote), remoteBefore);
 	});
 
 	test("default finalize verifies JSON snapshot and doc changes without publishing", async () => {
@@ -472,19 +466,20 @@ describe("t3/scheduled/host-sync contract", () => {
 			session: prepared.session,
 			message: "verify private candidate",
 		});
-		expect(result.status).toBe("verified");
-		expect(result.paths).toEqual([
+		assert.equal(result.status, "verified");
+		assert.deepEqual(result.paths, [
 			"docs/REPO.md",
 			"third-party/skills.lock.json",
 		]);
-		expect(
+		assert.equal(
 			git(prepared.workspace, [
 				"show",
 				`${result.commit}:third-party/skills.lock.json`,
 			]),
-		).toBe('{"skills":{}}');
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
+			'{"skills":{}}',
+		);
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(remoteSnapshot(remote), remoteBefore);
 	});
 
 	test("finalize refuses a credential value in an otherwise valid JSON snapshot", async () => {
@@ -500,10 +495,10 @@ describe("t3/scheduled/host-sync contract", () => {
 			push: true,
 			message: "must not publish credential",
 		});
-		expect(result.status).toBe("blocked");
-		expect(result.reason).toBe("possible_secret:agy/settings.snapshot.json");
-		expect(treeSnapshot(original)).toEqual(originalBefore);
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
+		assert.equal(result.status, "blocked");
+		assert.equal(result.reason, "possible_secret:agy/settings.snapshot.json");
+		assert.deepEqual(treeSnapshot(original), originalBefore);
+		assert.equal(remoteSnapshot(remote), remoteBefore);
 	});
 
 	test("a symlinked state root still produces a finalizable owned session", async () => {
@@ -518,8 +513,8 @@ describe("t3/scheduled/host-sync contract", () => {
 			session: prepared.session,
 			message: "verify alias",
 		});
-		expect(result.status).toBe("verified");
-		expect(git(original, ["status", "--porcelain"])).toBe("");
+		assert.equal(result.status, "verified");
+		assert.equal(git(original, ["status", "--porcelain"]), "");
 	});
 
 	test("an in-repo ..cache name cannot bypass ignored-state ownership", async () => {
@@ -528,9 +523,9 @@ describe("t3/scheduled/host-sync contract", () => {
 		});
 		const stateRoot = join(original, "..cache", "host-sync");
 		const result = await prepare({ repo: original, stateRoot });
-		expect(result.status).toBe("skipped");
-		expect(result.reason).toBe("state_root_not_ignored");
-		expect(existsSync(stateRoot)).toBe(false);
+		assert.equal(result.status, "skipped");
+		assert.equal(result.reason, "state_root_not_ignored");
+		assert.equal(existsSync(stateRoot), false);
 	});
 
 	for (const [shape, value] of [
@@ -553,9 +548,9 @@ describe("t3/scheduled/host-sync contract", () => {
 				push: true,
 				message: "reject credential shape",
 			});
-			expect(result.status).toBe("blocked");
-			expect(result.reason).toBe("possible_secret:agy/settings.snapshot.json");
-			expect(remoteSnapshot(remote)).toBe(before);
+			assert.equal(result.status, "blocked");
+			assert.equal(result.reason, "possible_secret:agy/settings.snapshot.json");
+			assert.equal(remoteSnapshot(remote), before);
 		});
 	}
 
@@ -571,9 +566,9 @@ describe("t3/scheduled/host-sync contract", () => {
 			push: true,
 			message: "reject comment token",
 		});
-		expect(result.status).toBe("blocked");
-		expect(result.reason).toBe("possible_secret:docs/FACTS.md");
-		expect(remoteSnapshot(remote)).toBe(before);
+		assert.equal(result.status, "blocked");
+		assert.equal(result.reason, "possible_secret:docs/FACTS.md");
+		assert.equal(remoteSnapshot(remote), before);
 	});
 
 	test("signing failure stays fail-closed with its original cause and private candidate", async () => {
@@ -593,17 +588,16 @@ describe("t3/scheduled/host-sync contract", () => {
 			push: true,
 			message: "signed candidate",
 		});
-		expect(result.status).toBe("blocked");
-		expect(result.reason).toBe("commit_failed");
-		expect(
+		assert.equal(result.status, "blocked");
+		assert.equal(result.reason, "commit_failed");
+		assert.equal(
 			JSON.parse(readFileSync(join(prepared.session, "manifest.json"), "utf8"))
 				.reason,
-		).toBe("commit_failed");
-		expect(treeSnapshot(original)).toEqual(before);
-		expect(remoteSnapshot(remote)).toBe(remoteBefore);
-		expect(
-			readFileSync(join(prepared.workspace, "docs/REPO.md"), "utf8"),
-		).toContain("agent edit");
+			"commit_failed",
+		);
+		assert.deepEqual(treeSnapshot(original), before);
+		assert.equal(remoteSnapshot(remote), remoteBefore);
+		assert.ok(readFileSync(join(prepared.workspace, "docs/REPO.md"), "utf8").includes("agent edit"));
 	});
 
 	test("an inherited alternate index cannot redirect candidate staging into the original", async () => {
@@ -624,9 +618,9 @@ describe("t3/scheduled/host-sync contract", () => {
 			if (previous === undefined) delete process.env.GIT_INDEX_FILE;
 			else process.env.GIT_INDEX_FILE = previous;
 		}
-		expect(result.status).toBe("published");
-		expect(readFileSync(index)).toEqual(before);
-		expect(git(original, ["status", "--porcelain"])).toBe("");
-		expect(git(remote, ["rev-parse", "main"])).toBe(result.commit);
+		assert.equal(result.status, "published");
+		assert.deepEqual(readFileSync(index), before);
+		assert.equal(git(original, ["status", "--porcelain"]), "");
+		assert.equal(git(remote, ["rev-parse", "main"]), result.commit);
 	});
 });

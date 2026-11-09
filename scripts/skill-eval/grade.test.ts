@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, describe, test } from "node:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { gradeIteration, parseGradeArgs, type GradeOptions } from "./grade";
-import { gradeRun } from "./lib/grade/checks";
+import { gradeIteration, parseGradeArgs, type GradeOptions } from "./grade.ts";
+import { gradeRun } from "./lib/grade/checks.ts";
 import {
 	assignLabels,
 	buildJudgeArgs,
@@ -13,11 +14,11 @@ import {
 	redactionTerms,
 	type JudgeInvoker,
 	type JudgeRequest,
-} from "./lib/grade/judge";
-import { listFiles } from "./lib/grade/layout";
-import type { Renderer } from "./lib/grade/render";
-import type { Benchmark } from "./lib/grade/benchmark";
-import type { CaseJudgement, IterationMeta, RunGrading, RunMeta, Suite } from "./lib/schema";
+} from "./lib/grade/judge.ts";
+import { listFiles } from "./lib/grade/layout.ts";
+import type { Renderer } from "./lib/grade/render.ts";
+import type { Benchmark } from "./lib/grade/benchmark.ts";
+import type { CaseJudgement, IterationMeta, RunGrading, RunMeta, Suite } from "./lib/schema.ts";
 
 const EMIL_COMMIT = "f1090bec277140d02ed202440185ad9d02ac1490";
 const ITERATION = 3;
@@ -252,7 +253,7 @@ afterEach(() => {
 describe("machine checks", () => {
 	test("every check type passes or fails from changes.json, workspace/, and final.md", async () => {
 		await gradeIteration(options({ judge: false }));
-		expect(byId(readGrading(runDir("c1", "none")))).toEqual({
+		assert.deepEqual(byId(readGrading(runDir("c1", "none"))), {
 			"unchanged-ok": true,
 			"unchanged-bad": false,
 			"changed-ok": true,
@@ -271,10 +272,10 @@ describe("machine checks", () => {
 		});
 		const ai = readGrading(runDir("c1", "ai"));
 		const render = ai.checks.find((c) => c.id === "render")!;
-		expect(render.pass).toBe(false);
-		expect(render.detail).toContain("390-light 25px");
-		expect(render.detail).toContain("boom");
-		expect(ai.screens.map((s) => s.path).sort()).toEqual([
+		assert.equal(render.pass, false);
+		assert.ok(render.detail.includes("390-light 25px"));
+		assert.ok(render.detail.includes("boom"));
+		assert.deepEqual(ai.screens.map((s) => s.path).sort(), [
 			"screens/index-1280-dark.png",
 			"screens/index-1280-light.png",
 			"screens/index-390-dark.png",
@@ -287,11 +288,11 @@ describe("machine checks", () => {
 	test("checks are null when inputs are missing or the run failed", async () => {
 		await gradeIteration(options({ judge: false }));
 		const timedOut = readGrading(runDir("c1", "emil-animate"));
-		expect(timedOut.checks.every((c) => c.pass === null)).toBe(true);
-		expect(timedOut.checks.find((c) => c.id === "unchanged-ok")!.detail).toBe("changes.json missing");
-		expect(timedOut.checks.find((c) => c.id === "mentions-ok")!.detail).toBe("final.md missing");
+		assert.equal(timedOut.checks.every((c) => c.pass === null), true);
+		assert.equal(timedOut.checks.find((c) => c.id === "unchanged-ok")!.detail, "changes.json missing");
+		assert.equal(timedOut.checks.find((c) => c.id === "mentions-ok")!.detail, "final.md missing");
 		const failed = readGrading(runDir("c2", "emil-animate"));
-		expect(failed.checks).toEqual([
+		assert.deepEqual(failed.checks, [
 			{ id: "mentions-menu", type: "final-mentions", pass: null, detail: "run failed: meta.json missing" },
 		]);
 	});
@@ -300,11 +301,11 @@ describe("machine checks", () => {
 		const unavailable: Renderer = async () => ({ ok: false, error: "chromium did not start" });
 		const def = suite.cases[0];
 		const grading = await gradeRun(def, runDir("c1", "none"), unavailable);
-		expect(grading.checks.find((c) => c.id === "render")).toMatchObject({ pass: null });
-		expect(grading.screens).toEqual([]);
+		assert.equal(grading.checks.find((c) => c.id === "render")?.pass, null);
+		assert.deepEqual(grading.screens, []);
 		rmSync(join(runDir("c1", "none"), "workspace/index.html"));
 		const missing = await gradeRun(def, runDir("c1", "none"), unavailable);
-		expect(missing.checks.find((c) => c.id === "render")).toMatchObject({ pass: false });
+		assert.equal(missing.checks.find((c) => c.id === "render")?.pass, false);
 	});
 });
 
@@ -320,33 +321,35 @@ describe("blind judge", () => {
 			return c1Answer();
 		};
 		await gradeIteration(options({ invokeJudge: invoke }));
-		expect(calls).toHaveLength(1);
+		assert.equal(calls.length, 1);
 		const labels = c1Labels();
-		expect(Object.keys(labels)).toEqual(["A", "B", "C"]);
-		expect(c1Labels()).toEqual(labels);
+		assert.deepEqual(Object.keys(labels), ["A", "B", "C"]);
+		assert.deepEqual(c1Labels(), labels);
 		const judgement = JSON.parse(readFileSync(join(iterDir, "c1/judge.json"), "utf8")) as CaseJudgement;
-		expect(judgement.labels).toEqual(labels);
-		expect(judgement.seed).toBe(judgeSeed("c1", ITERATION));
+		assert.deepEqual(judgement.labels, labels);
+		assert.equal(judgement.seed, judgeSeed("c1", ITERATION));
 
 		const names = Object.keys(packetFiles);
-		expect(names).toContain("case.md");
+		assert.ok(names.includes("case.md"));
 		for (const label of Object.keys(labels)) {
-			for (const f of ["final.md", "diff.patch", "changes.json", "checks.json"]) expect(names).toContain(`${label}/${f}`);
+			for (const f of ["final.md", "diff.patch", "changes.json", "checks.json"]) assert.ok(names.includes(`${label}/${f}`));
 		}
-		expect(names.some((n) => /transcript|system-append|meta\.json/.test(n))).toBe(false);
+		assert.equal(names.some((n) => /transcript|system-append|meta\.json/.test(n)), false);
 		const all = Object.values(packetFiles).join("\n");
 		for (const leak of ["awesome-interface", "emilkowalski", "Emil Kowalski", ".skills", "/tmp/skill-eval", "emil-animate"])
-			expect(all).not.toContain(leak);
+			assert.ok(!all.includes(leak));
 		const aiLabel = Object.keys(labels).find((l) => labels[l] === "ai")!;
-		expect(packetFiles[`${aiLabel}/final.md`]).toBe(
+		assert.equal(
+			packetFiles[`${aiLabel}/final.md`],
 			"Fixed the card in [redacted]/index.html following [redacted] ([redacted] style, [redacted]/skills [redacted]).\n",
 		);
 		// Generic words and longer words stay: arm `none` is not a redaction term, `animated` is not `animate`.
-		expect(packetFiles[`${aiLabel}/files/index.html`]).toContain('style="display: none">animated Title');
-		expect(names).toContain(`${aiLabel}/files/new/a.html`);
-		expect(names).toContain(`${aiLabel}/screens/index-390-light.png`);
+		assert.ok(packetFiles[`${aiLabel}/files/index.html`].includes('style="display: none">animated Title'));
+		assert.ok(names.includes(`${aiLabel}/files/new/a.html`));
+		assert.ok(names.includes(`${aiLabel}/screens/index-390-light.png`));
 		// 12 screens > 8: two per rendered label (390 light, 1280 dark).
-		expect(calls[0].images.map((p) => p.slice(calls[0].packetDir.length + 1))).toEqual(
+		assert.deepEqual(
+			calls[0].images.map((p) => p.slice(calls[0].packetDir.length + 1)),
 			Object.keys(labels)
 				.filter((l) => labels[l] !== "emil-animate")
 				.flatMap((l) => [`${l}/screens/index-390-light.png`, `${l}/screens/index-1280-dark.png`]),
@@ -357,47 +360,47 @@ describe("blind judge", () => {
 		const orders = new Set(
 			["c1", "c2", "c3", "c4", "c5", "c6"].map((id) => JSON.stringify(assignLabels(["x", "y", "z"], judgeSeed(id, 1)))),
 		);
-		expect(orders.size).toBeGreaterThan(1);
-		expect(judgeSeed("c1", 1)).not.toBe(judgeSeed("c1", 2));
+		assert.ok(orders.size > 1);
+		assert.notEqual(judgeSeed("c1", 1), judgeSeed("c1", 2));
 	});
 
 	test("the label-keyed answer is mapped back to arms", async () => {
 		await gradeIteration(options());
 		const j = JSON.parse(readFileSync(join(iterDir, "c1/judge.json"), "utf8")) as CaseJudgement;
-		expect(j.ranking).toEqual(["ai", "none", "emil-animate"]);
-		expect(j.judgeModel).toBe("gpt-6.1-sol");
-		expect(j.perArm.ai.rubric).toEqual([
+		assert.deepEqual(j.ranking, ["ai", "none", "emil-animate"]);
+		assert.equal(j.judgeModel, "gpt-6.1-sol");
+		assert.deepEqual(j.perArm.ai.rubric, [
 			{ criterion: "Visual quality", score: 5, reason: "이유" },
 			{ criterion: "Scope discipline", score: 4, reason: "이유" },
 		]);
-		expect(j.perArm.none.expectations.map((e) => [e.text, e.pass])).toEqual([
+		assert.deepEqual(j.perArm.none.expectations.map((e) => [e.text, e.pass]), [
 			["The card fits a phone screen.", true],
 			["The card keeps its title.", false],
 		]);
-		expect(j.perArm["emil-animate"].summary).toBe("emil-animate 요약");
+		assert.equal(j.perArm["emil-animate"].summary, "emil-animate 요약");
 		// c2 has one judgeable arm: no judge call, no file.
-		expect(existsSync(join(iterDir, "c2/judge.json"))).toBe(false);
+		assert.equal(existsSync(join(iterDir, "c2/judge.json")), false);
 	});
 
 	test("a schema mismatch is retried once", async () => {
 		const calls: JudgeRequest[] = [];
 		await gradeIteration(options({ invokeJudge: stubJudge(["not json", c1Answer()], calls) }));
-		expect(calls).toHaveLength(2);
-		expect(existsSync(join(iterDir, "c1/judge.json"))).toBe(true);
-		expect(existsSync(join(iterDir, "c1/judge.error.json"))).toBe(false);
+		assert.equal(calls.length, 2);
+		assert.equal(existsSync(join(iterDir, "c1/judge.json")), true);
+		assert.equal(existsSync(join(iterDir, "c1/judge.error.json")), false);
 	});
 
 	test("two mismatches leave judge.error.json and grading continues", async () => {
 		const calls: JudgeRequest[] = [];
 		const wrong = JSON.stringify({ labels: [], ranking: [], rationale: "x" });
 		const summary = await gradeIteration(options({ invokeJudge: stubJudge(["not json", wrong], calls) }));
-		expect(calls).toHaveLength(2);
-		expect(existsSync(join(iterDir, "c1/judge.json"))).toBe(false);
+		assert.equal(calls.length, 2);
+		assert.equal(existsSync(join(iterDir, "c1/judge.json")), false);
 		const error = JSON.parse(readFileSync(join(iterDir, "c1/judge.error.json"), "utf8"));
-		expect(error.attempts.map((a: { raw: string }) => a.raw)).toEqual(["not json", wrong]);
-		expect(error.attempts[1].error).toContain("labels must cover");
-		expect(summary.judgeErrors).toEqual(["c1"]);
-		expect(readFileSync(join(iterDir, "benchmark.md"), "utf8")).toContain("판정 없음: 판정 오류");
+		assert.deepEqual(error.attempts.map((a: { raw: string }) => a.raw), ["not json", wrong]);
+		assert.ok(error.attempts[1].error.includes("labels must cover"));
+		assert.deepEqual(summary.judgeErrors, ["c1"]);
+		assert.ok(readFileSync(join(iterDir, "benchmark.md"), "utf8").includes("판정 없음: 판정 오류"));
 	});
 
 	test("codex arguments keep the read-only boundary and attach images before the prompt", () => {
@@ -408,31 +411,34 @@ describe("blind judge", () => {
 			outputFile: "/o.json",
 			images: ["/p/A/x.png", "/p/B/y.png"],
 		});
-		expect(args.slice(0, 3)).toEqual(["exec", "--sandbox", "read-only"]);
-		expect(args).toContain('approval_policy="never"');
-		expect(args).toContain('model_reasoning_effort="high"');
+		assert.deepEqual(args.slice(0, 3), ["exec", "--sandbox", "read-only"]);
+		assert.ok(args.includes('approval_policy="never"'));
+		assert.ok(args.includes('model_reasoning_effort="high"'));
 		for (const flag of ["--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules"])
-			expect(args).toContain(flag);
-		expect(args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
-		expect(args.slice(-7)).toEqual(["-i", "/p/A/x.png", "-i", "/p/B/y.png", "-o", "/o.json", "-"]);
+			assert.ok(args.includes(flag));
+		assert.ok(!args.includes("--dangerously-bypass-approvals-and-sandbox"));
+		assert.deepEqual(args.slice(-7), ["-i", "/p/A/x.png", "-i", "/p/B/y.png", "-o", "/o.json", "-"]);
 	});
 
 	test("redaction terms come from the suite", () => {
 		const terms = redactionTerms(suite);
-		expect(terms).toContain("emil-animate");
-		expect(terms).toContain("animate");
-		expect(terms).not.toContain("none");
-		expect(terms).not.toContain("ai");
+		assert.ok(terms.includes("emil-animate"));
+		assert.ok(terms.includes("animate"));
+		assert.ok(!terms.includes("none"));
+		assert.ok(!terms.includes("ai"));
 		const redact = makeRedactor(terms);
 		// A plain-word skill name is hidden only where it names a skill; code identifiers survive.
-		expect(redact("animate animated emil-animate element.animate(k)")).toBe(
+		assert.equal(
+			redact("animate animated emil-animate element.animate(k)"),
 			"animate animated [redacted] element.animate(k)",
 		);
-		expect(redact("the animate skill, skills/animate, `Animate` 스킬, skill: animate")).toBe(
+		assert.equal(
+			redact("the animate skill, skills/animate, `Animate` 스킬, skill: animate"),
 			"the [redacted] skill, skills/[redacted], `[redacted]` 스킬, skill: [redacted]",
 		);
 		const withPrototype = makeRedactor([...terms, "prototype"]);
-		expect(withPrototype("Object.prototype.toString; .skills/prototype/SKILL.md")).toBe(
+		assert.equal(
+			withPrototype("Object.prototype.toString; .skills/prototype/SKILL.md"),
 			"Object.prototype.toString; [redacted]/[redacted]/SKILL.md",
 		);
 	});
@@ -449,7 +455,7 @@ describe("blind judge", () => {
 			rationale: "r",
 		});
 		const result = parseJudgeAnswer(raw, def, packet, "m");
-		expect(result.ok).toBe(false);
+		assert.equal(result.ok, false);
 	});
 });
 
@@ -463,28 +469,28 @@ describe("reuse and --force", () => {
 		const again = await gradeIteration(
 			options({ renderer: stubRenderer(renders), invokeJudge: stubJudge([c1Answer()], calls) }),
 		);
-		expect(renders).toEqual([]);
-		expect(calls).toEqual([]);
-		expect(again.reusedGradings).toBe(5);
-		expect(again.reusedJudgements).toEqual(["c1"]);
-		expect(readGrading(runDir("c1", "none"))).toEqual(sentinelGrading);
+		assert.deepEqual(renders, []);
+		assert.deepEqual(calls, []);
+		assert.equal(again.reusedGradings, 5);
+		assert.deepEqual(again.reusedJudgements, ["c1"]);
+		assert.deepEqual(readGrading(runDir("c1", "none")), sentinelGrading);
 
 		const forced = await gradeIteration(
 			options({ force: true, renderer: stubRenderer(renders), invokeJudge: stubJudge([c1Answer()], calls) }),
 		);
-		expect(forced.graded).toBe(5);
-		expect(forced.judged).toEqual(["c1"]);
-		expect(renders).toHaveLength(2);
-		expect(calls).toHaveLength(1);
-		expect(readGrading(runDir("c1", "none")).checks).toHaveLength(15);
+		assert.equal(forced.graded, 5);
+		assert.deepEqual(forced.judged, ["c1"]);
+		assert.equal(renders.length, 2);
+		assert.equal(calls.length, 1);
+		assert.equal(readGrading(runDir("c1", "none")).checks.length, 15);
 	});
 
 	test("--no-judge with --force keeps an existing judge.json in the benchmark", async () => {
 		await gradeIteration(options());
 		const calls: JudgeRequest[] = [];
 		const summary = await gradeIteration(options({ judge: false, force: true, invokeJudge: stubJudge([], calls) }));
-		expect(calls).toEqual([]);
-		expect(summary.benchmark.perCase.find((c) => c.case === "c1")!.judged).toBe(true);
+		assert.deepEqual(calls, []);
+		assert.equal(summary.benchmark.perCase.find((c) => c.case === "c1")!.judged, true);
 	});
 });
 
@@ -492,10 +498,10 @@ describe("benchmark", () => {
 	test("aggregates match hand-computed values", async () => {
 		const { benchmark } = await gradeIteration(options());
 		const written = JSON.parse(readFileSync(join(iterDir, "benchmark.json"), "utf8")) as Benchmark;
-		expect(written).toEqual(benchmark);
+		assert.deepEqual(written, benchmark);
 		const arm = (key: string) => benchmark.perArm.find((a) => a.arm === key)!;
-		expect(benchmark.perArm.map((a) => a.arm)).toEqual(["none", "ai", "emil-animate"]);
-		expect(arm("none")).toEqual({
+		assert.deepEqual(benchmark.perArm.map((a) => a.arm), ["none", "ai", "emil-animate"]);
+		assert.deepEqual(arm("none"), {
 			arm: "none",
 			cases: 1,
 			judgedCases: 1,
@@ -512,7 +518,7 @@ describe("benchmark", () => {
 			failed: 0,
 			timedOut: 0,
 		});
-		expect(arm("ai")).toEqual({
+		assert.deepEqual(arm("ai"), {
 			arm: "ai",
 			cases: 2,
 			judgedCases: 1,
@@ -529,7 +535,7 @@ describe("benchmark", () => {
 			failed: 0,
 			timedOut: 0,
 		});
-		expect(arm("emil-animate")).toEqual({
+		assert.deepEqual(arm("emil-animate"), {
 			arm: "emil-animate",
 			cases: 2,
 			judgedCases: 1,
@@ -545,19 +551,19 @@ describe("benchmark", () => {
 			failed: 1,
 			timedOut: 1,
 		});
-		expect(benchmark.focusArms).toEqual(["ai"]);
-		expect(benchmark.comparisons).toEqual([
+		assert.deepEqual(benchmark.focusArms, ["ai"]);
+		assert.deepEqual(benchmark.comparisons, [
 			{ case: "c1", focus: "ai", other: "none", rubricDiff: 1.5, result: "win" },
 			{ case: "c1", focus: "ai", other: "emil-animate", rubricDiff: 3, result: "win" },
 			{ case: "c2", focus: "ai", other: "emil-animate", rubricDiff: null, result: null },
 		]);
-		expect(benchmark.comparisonSummary).toEqual([
+		assert.deepEqual(benchmark.comparisonSummary, [
 			{ focus: "ai", other: "none", cases: 1, wins: 1, losses: 0, meanRubricDiff: 1.5 },
 			{ focus: "ai", other: "emil-animate", cases: 1, wins: 1, losses: 0, meanRubricDiff: 3 },
 		]);
 		const c2 = benchmark.perCase.find((c) => c.case === "c2")!;
-		expect(c2.judged).toBe(false);
-		expect(c2.arms.map((a) => [a.arm, a.rubricMean, a.rank, a.checks])).toEqual([
+		assert.equal(c2.judged, false);
+		assert.deepEqual(c2.arms.map((a) => [a.arm, a.rubricMean, a.rank, a.checks]), [
 			["ai", null, null, { passed: 1, evaluated: 1 }],
 			["emil-animate", null, null, { passed: 0, evaluated: 0 }],
 		]);
@@ -566,40 +572,40 @@ describe("benchmark", () => {
 	test("benchmark.md and viewer.html are written with Korean labels and inlined data", async () => {
 		await gradeIteration(options());
 		const md = readFileSync(join(iterDir, "benchmark.md"), "utf8");
-		expect(md).toContain("# 스킬 비교 벤치마크: demo-suite iteration 3");
-		expect(md).toContain(`emil \`https://github.com/emilkowalski/skills\` @ \`${EMIL_COMMIT}\``);
-		expect(md).toContain("판정 모델: `gpt-6.1-sol`");
-		expect(md).toContain("자동 트리거 미측정");
-		expect(md).toContain("| `ai` | 2 | 1 | 100% (2/2) | 4.50 | 50% (8/16) | 0 | 1 | 1.00 | 25.0 | 250 | 1.50 | 0 | 0 |");
-		expect(md).toContain("| `c1` | `emil-animate` | +3.00 | 승 |");
-		expect(md).toContain("| `c2` | `emil-animate` | 판정 없음 | 판정 없음 |");
-		expect(md).toContain("### `c2`: Menu (판정 없음)");
+		assert.ok(md.includes("# 스킬 비교 벤치마크: demo-suite iteration 3"));
+		assert.ok(md.includes(`emil \`https://github.com/emilkowalski/skills\` @ \`${EMIL_COMMIT}\``));
+		assert.ok(md.includes("판정 모델: `gpt-6.1-sol`"));
+		assert.ok(md.includes("자동 트리거 미측정"));
+		assert.ok(md.includes("| `ai` | 2 | 1 | 100% (2/2) | 4.50 | 50% (8/16) | 0 | 1 | 1.00 | 25.0 | 250 | 1.50 | 0 | 0 |"));
+		assert.ok(md.includes("| `c1` | `emil-animate` | +3.00 | 승 |"));
+		assert.ok(md.includes("| `c2` | `emil-animate` | 판정 없음 | 판정 없음 |"));
+		assert.ok(md.includes("### `c2`: Menu (판정 없음)"));
 		const html = readFileSync(join(iterDir, "viewer.html"), "utf8");
-		expect(html).not.toContain("/*__DATA__*/");
-		expect(html).not.toMatch(/<(?:link|script)[^>]+(?:href|src)=["']https?:/);
+		assert.ok(!html.includes("/*__DATA__*/"));
+		assert.doesNotMatch(html, /<(?:link|script)[^>]+(?:href|src)=["']https?:/);
 		const data = JSON.parse(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)![1]);
-		expect(data.cases.map((c: { id: string }) => c.id)).toEqual(["c1", "c2"]);
-		expect(data.cases[0].arms[1].runs[0].grading.screens[0].path).toMatch(/^screens\//);
+		assert.deepEqual(data.cases.map((c: { id: string }) => c.id), ["c1", "c2"]);
+		assert.match(data.cases[0].arms[1].runs[0].grading.screens[0].path, /^screens\//);
 	});
 });
 
 describe("cli", () => {
 	test("parses the contract flags", () => {
-		expect(parseGradeArgs(["--iteration-dir", "/x", "--case", "a,b", "--no-judge", "--judge-model", "m", "--force"])).toEqual({
+		assert.deepEqual(parseGradeArgs(["--iteration-dir", "/x", "--case", "a,b", "--no-judge", "--judge-model", "m", "--force"]), {
 			iterationDir: "/x",
 			cases: ["a", "b"],
 			judge: false,
 			judgeModel: "m",
 			force: true,
 		});
-		expect(() => parseGradeArgs([])).toThrow("--iteration-dir is required");
-		expect(() => parseGradeArgs(["--iteration-dir", "/x", "--bogus"])).toThrow("unknown argument");
+		assert.throws(() => parseGradeArgs([]), { message: /--iteration-dir is required/ });
+		assert.throws(() => parseGradeArgs(["--iteration-dir", "/x", "--bogus"]), { message: /unknown argument/ });
 	});
 
 	test("--case limits grading to the named cases", async () => {
 		const summary = await gradeIteration(options({ cases: ["c2"], judge: false }));
-		expect(summary.graded).toBe(2);
-		expect(existsSync(join(runDir("c1", "none"), "grading.json"))).toBe(false);
-		expect(readdirSync(iterDir)).toContain("viewer.html");
+		assert.equal(summary.graded, 2);
+		assert.equal(existsSync(join(runDir("c1", "none"), "grading.json")), false);
+		assert.ok(readdirSync(iterDir).includes("viewer.html"));
 	});
 });

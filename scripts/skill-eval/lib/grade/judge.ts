@@ -4,13 +4,16 @@
  * answer mapped back to arm keys as a CaseJudgement.
  */
 
+import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { DISABLED_FEATURES, REVIEW_APPROVAL_POLICY, REVIEW_SANDBOX } from "../../../../codex/review";
-import type { ArmJudgement, Case, CaseJudgement, Changes, RunGrading, Suite } from "../schema";
-import { decodeText, readJson, readText, runMeta, writeJson, type CaseRef } from "./layout";
+import { DISABLED_FEATURES, REVIEW_APPROVAL_POLICY, REVIEW_SANDBOX } from "../../../../codex/review.ts";
+import type { ArmJudgement, Case, CaseJudgement, Changes, RunGrading, Suite } from "../schema.ts";
+import { collectText, exitStatus } from "../process.ts";
+import { which } from "../which.ts";
+import { decodeText, readJson, readText, runMeta, writeJson, type CaseRef } from "./layout.ts";
 
 export const DEFAULT_JUDGE_MODEL = "gpt-6.1-sol";
 export const JUDGE_EFFORT = "high";
@@ -483,29 +486,31 @@ export function buildJudgeArgs(options: {
 }
 
 export const codexJudge: JudgeInvoker = async (request) => {
-	const codex = Bun.which("codex");
+	const codex = which("codex");
 	if (!codex) throw new Error("codex is not installed");
 	const work = await mkdtemp(join(tmpdir(), "skill-eval-judge-io-"));
 	try {
 		const schemaFile = join(work, "schema.json");
 		const outputFile = join(work, "last-message.json");
 		writeFileSync(schemaFile, JSON.stringify(request.schema));
-		const child = Bun.spawn(
-			[
-				codex,
-				...buildJudgeArgs({
-					packetDir: request.packetDir,
-					model: request.model,
-					schemaFile,
-					outputFile,
-					images: request.images,
-				}),
-			],
-			{ cwd: request.packetDir, stdin: new Blob([request.prompt]), stdout: "ignore", stderr: "pipe" },
+		const child = spawn(
+			codex,
+			buildJudgeArgs({
+				packetDir: request.packetDir,
+				model: request.model,
+				schemaFile,
+				outputFile,
+				images: request.images,
+			}),
+			{ cwd: request.packetDir, stdio: ["pipe", "ignore", "pipe"] },
 		);
-		const stderr = new Response(child.stderr).text();
+		const exited = exitStatus(child);
+		// A child that exits before reading the prompt must not crash the grader with EPIPE.
+		child.stdin.on("error", () => {});
+		child.stdin.end(request.prompt);
+		const stderr = collectText(child.stderr);
 		const timer = setTimeout(() => child.kill("SIGTERM"), JUDGE_TIMEOUT_MS);
-		const code = await child.exited.finally(() => clearTimeout(timer));
+		const code = await exited.finally(() => clearTimeout(timer));
 		let output = "";
 		try {
 			output = (await readFile(outputFile, "utf8")).trim();

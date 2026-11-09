@@ -7,7 +7,7 @@ export const DEFAULT_PARALLEL = 3;
 export const DEFAULT_TIMEOUT_SEC = 900;
 
 export const USAGE =
-	"usage: bun scripts/skill-eval/run.ts --suite <suite.json> [--iteration <n>] [--case <id,...>] [--arm <key,...>] [--runs <n>] [--model <m>] [--effort <e>] [--parallel <p>] [--ref <arm>=<gitref>] [--out-root <dir>] [--force] [--dry-run]";
+	"usage: node scripts/skill-eval/run.ts --suite <suite.json> [--iteration <n>] [--case <id,...>] [--arm <key,...>] [--runs <n>] [--model <m>] [--effort <e>] [--parallel <p>] [--ref <arm>=<gitref>] [--out-root <dir>] [--force] [--dry-run]";
 
 export interface CliOptions {
 	suite: string;

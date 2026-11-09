@@ -12,13 +12,13 @@
 
 ```bash
 # 실행 계획만 보기
-bun scripts/skill-eval/run.ts --suite skills/awesome-interface/evals/compare/suite.json --effort high --dry-run
+node scripts/skill-eval/run.ts --suite skills/awesome-interface/evals/compare/suite.json --effort high --dry-run
 
 # 새 iteration 실행 (var/skill-eval/<suite>/iteration-<n>/)
-bun scripts/skill-eval/run.ts --suite skills/awesome-interface/evals/compare/suite.json --effort high
+node scripts/skill-eval/run.ts --suite skills/awesome-interface/evals/compare/suite.json --effort high
 
 # 채점: 기계 검사, 화면 캡처, Codex 블라인드 판정, benchmark.md, viewer.html
-bun scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interface-compare/iteration-<n>
+node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interface-compare/iteration-<n>
 ```
 
 - 일부만 돌리려면 `--case <id,...>`, `--arm <key,...>`를 씁니다. 중단된 iteration은 `--iteration <n>`으로 이어 가며, 이미 끝난 run은 건너뜁니다.
@@ -35,5 +35,5 @@ bun scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interface
 ## 테스트
 
 ```bash
-bun test scripts/skill-eval
+node --test 'scripts/skill-eval/**/*.test.ts'
 ```
