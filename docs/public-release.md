@@ -23,8 +23,6 @@
 
 이 저장소는 소유자만 유지하는 개인 쇼케이스입니다. 버그 제보, 기능 요청, issue, pull request, 외부 기여, 지원 요청, 취약점 제보를 받지 않습니다. 재사용자는 MIT 라이선스에 따라 fork를 독립적으로 유지합니다. Issues, pull requests, Discussions, Private Vulnerability Reporting을 협업이나 연락 채널로 제공하지 않습니다.
 
-일일보고 기능은 공개 [GitLab](https://gitlab.com)과 `glab`, 기존 iCal/`khal` 수집기를 사용해 근거 있는 초안을 만드는 개인 워크플로입니다. 사용자가 초안을 검토한 뒤 자신의 [Daou Office](https://daouoffice.com) tenant UI에 직접 입력하고 제출합니다. Harness는 Daou Office CLI, API, 인증 경로, 자동 제출 기능을 제공한다고 주장하지 않습니다.
-
 ## 배포 전 소유자 점검
 
 배포하는 정확한 트리에서 다음 불변식을 확인합니다.

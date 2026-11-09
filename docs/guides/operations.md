@@ -17,31 +17,6 @@ python3 skills/cost-audit/analyze.py --days 7 --format markdown --out var/cost-a
 
 이 명령은 개인 작업 내용이 드러날 수 있는 로컬 세션 로그를 읽습니다. 카탈로그 환산 비용과 실제 청구액을 구분하고, 한 시점의 결과를 전체 환경의 절감 보장으로 해석하지 않습니다. 계산 경계는 [비용 감사 문서](../../skills/cost-audit/README.md)와 [가격 근거](../PRICING.md)를 참고합니다.
 
-## 일일보고 초안과 수동 제출
-
-공개 `daily-report` 스킬은 다음 흐름만 제공합니다.
-
-1. [GitLab](https://gitlab.com) 활동은 인증된 `glab`과 저장소의 collector로 모읍니다.
-2. 기존 iCal/`khal` collector로 회의·출장·외근·휴가 등 사용자가 선택한 일정 입력을 모읍니다.
-3. 수집 근거에 있는 사실만 사용해 초안을 작성하고, GitLab 항목과 일정 항목을 사용자가 대조합니다.
-4. 사용자가 자신의 [Daou Office](https://daouoffice.com) tenant UI를 열어 초안을 직접 입력하고 최종 내용을 검토한 뒤 제출합니다.
-
-실제 명령과 필요한 입력은 [daily-report 스킬](../../skills/daily-report/SKILL.md)이 소유합니다. Harness는 Daou Office CLI, API 경로, 인증 구현, 자동 제출, 제출 영수증 검증을 제공하지 않습니다. 로그인, tenant 선택, 내용 수정, 제출은 사용자 작업입니다.
-
-수집 결과와 초안에는 개인 일정과 작업 내용이 들어갈 수 있으므로 `var/` 등 로컬 비추적 경로에만 둡니다. 공개 예제는 처음부터 합성 자료로 작성합니다. 실제 보고서를 이름만 바꾸어 fixture나 문서 예제로 만들지 않습니다.
-
-## Google Calendar 미러
-
-일일보고 스킬은 사용자가 선택한 Google Calendar의 **비공개 iCal 주소**를 읽을 수 있습니다. `collect_calendar.py`가 UID별 vdir 미러를 만들고 `khal`이 반복 일정을 전개합니다. OAuth 클라이언트나 GCP 프로젝트를 만드는 방식이 아닙니다.
-
-```bash
-uv tool install --python 3.13 khal
-bash skills/daily-report/scripts/link_google_calendar.sh --check
-bash skills/daily-report/scripts/link_google_calendar.sh
-```
-
-비공개 iCal 주소 자체가 자격증명입니다. 주소는 스크립트가 사용하는 사용자 설정 파일에만 두며 저장소, 스냅샷, 로그, 문서에 복사하지 않습니다. 피드 특성과 알려진 제한은 [calendar setup](../../skills/daily-report/references/calendar-setup.md)에 있습니다.
-
 ## 호스트 동기화의 격리 경계
 
 `t3/scheduled/host-sync.mjs`는 개인 호스트에서 선택한 공개 가능한 설정의 변경을 검토하기 위한 guard입니다. 실행 전에 [REPO의 격리 경계](../REPO.md#harness-host-sync의-격리-경계)를 읽습니다.

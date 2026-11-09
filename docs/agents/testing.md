@@ -44,14 +44,6 @@ Nothing under `archived/` is tested or maintained; do not run or repair its test
 
 ## Python
 
-The daily-report GitLab collector has a focused regression file:
-
-```bash
-python3 -m unittest discover -s skills/daily-report/scripts -p test_collect_gitlab.py -v
-```
-
-This collector test does not prove authentication, upstream availability, draft quality, or manual Daou Office submission. The public repository contains no Daou Office API or automatic-submission test boundary.
-
 The cost-audit analyzer and the MR watcher have synthetic, offline suites; neither reads real session logs nor contacts GitLab or GitHub:
 
 ```bash
@@ -100,10 +92,6 @@ MISE_DATA_DIR="$real/.local/share/mise" MISE_CONFIG_DIR="$real/.config/mise" \
 ```
 
 Without `claude` or `agy` settings directories under the fake `HOME`, their steps are skipped. The mutating form against the real `HOME` is governed by [`authority.md`](authority.md) and is not routine verification.
-
-## Authenticated collection
-
-Daily-report collection can authenticate to GitLab and read private calendar feeds. Its output can contain private work and schedule data even though final Daou Office entry is manual. Obtain the authority required by [`authority.md`](authority.md), keep artifacts outside version control, and label the evidence precisely.
 
 ## Delivery evidence
 
