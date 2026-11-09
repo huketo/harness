@@ -1,75 +1,150 @@
 {
   "skill_name": "awesome-slides",
+  "_comment": "Generated from compare/suite.json, the single source of these cases; regenerate instead of editing.",
   "evals": [
     {
       "id": 1,
-      "name": "korean-technical-talk",
-      "prompt": "technical-brief.md, requests.csv, latency.mjs를 바탕으로 한국어 15분 기술 발표를 만들어 주세요. 합성 데이터임을 밝히고 평균·p95를 정확히 계산해 코드와 도식으로 설명하세요. 브리프의 산출물인 Slidev 원본, 웹 빌드, PDF, 발표자 노트를 제공하세요. 디자인과 청중은 브리프에 정해져 있으므로 추가 승인 없이 완성해 주세요.",
-      "expected_output": "근거와 한계를 표시한 한국어 기술 덱. A/B 평균은 모두 100ms, nearest-rank p95는 A 100ms/B 460ms이며, 발표자 노트와 읽을 수 있는 코드·도식, 실제 웹/PDF 결과가 있다.",
-      "expectations": [
-        "A/B의 평균 총시간이 각각 100ms이고 nearest-rank p95가 A 100ms, B 460ms로 정확하다.",
-        "각 20개 요청의 합성 데이터와 작은 표본의 한계를 밝히며 현업 성능 개선으로 주장하지 않는다.",
-        "대기·처리·총시간의 관계와 지표에서 원인 가설로 넘어가는 순서를 코드와 도식으로 설명한다.",
-        "한국어 본문과 긴 코드 식별자를 포함한 모든 슬라이드의 필수 내용이 실제 화면과 PDF에 잘림 없이 표시된다.",
-        "실제 발표자 보기에서 각 본문 장의 설명·전환·시간 노트를 찾을 수 있고 웹 이동이 작동한다."
+      "name": "northstar-design",
+      "prompt": "northstar 폴더에 승인용 발표 자료의 brief.md와 outline.md를 정리해 두었고 둘 다 승인했습니다. 참고할 디자인 자료는 따로 없어요. 저는 디자인 용어를 잘 모릅니다. 이제 디자인을 정하는 단계를 진행해 주세요.",
+      "expected_output": "레퍼런스 없는 디자인 결정 (스무고개)",
+      "files": [
+        "evals/compare/fixtures/northstar-design/decision-brief.md",
+        "evals/compare/fixtures/northstar-design/northstar/brief.md",
+        "evals/compare/fixtures/northstar-design/northstar/outline.md"
       ],
-      "files": ["evals/fixtures/technical-brief.md", "evals/fixtures/requests.csv", "evals/fixtures/latency.mjs"]
+      "expectations": [
+        "brief.md와 outline.md를 다시 쓰거나 처음부터 질문하지 않고, 승인된 내용을 그대로 이어받는다.",
+        "outline의 실제 문구와 수치(예: 세 대안 비용 표, 월 40시간·1,200,000원 계산)로 시안을 렌더링하며, 자리표시 문구로 된 시안을 보여 주지 않는다.",
+        "서로 확연히 다른 두 디자인을 같은 슬라이드로 나란히 놓은 이미지를 실제로 만들어 보여 준다.",
+        "사람에게 디자인 용어로 설명을 요구하지 않고, 왼쪽/오른쪽/둘 다 별로/둘 다 괜찮음처럼 그림을 보고 고르는 질문 하나로 응답을 요청한 뒤 멈춘다.",
+        "디자인이 확정되기 전에 덱 전체 제작이나 deck.html·PDF 패키징으로 넘어가지 않는다."
+      ]
     },
     {
       "id": 2,
-      "name": "decision-reading-deck",
-      "prompt": "decision-brief.md를 예산 승인자가 혼자 읽을 한국어 슬라이드로 만들어 주세요. 브랜드와 합성 자료의 경계를 지키고 비용·대안·가정·중단 기준을 포함하세요. Slidev 편집 원본, 웹 빌드, PDF를 제공하세요. 발표자 설명 없이도 승인 범위를 이해할 수 있어야 하며 추가 스타일 승인 없이 제작해 주세요.",
-      "expected_output": "파일럿 승인 범위, 공정한 비용 비교, 월 40시간/1,200,000원의 가정과 비현금성 한계, 단계별 검토와 접근권한 누출 시 중단을 담은 자족적인 웹/PDF 덱.",
-      "expectations": [
-        "40명·20일·3분 절감에서 월 40시간과 1,200,000원을 도출하고 비현금성 합성 가정임을 명시한다.",
-        "세 대안의 초기/월 비용과 SaaS의 낮은 초기비용 및 내부 운영 책임을 공정하게 보존한다.",
-        "4주 파일럿의 3,000,000원 초기 한도·200,000원 월 상한과 전체 확대 미승인을 본문에서 이해할 수 있다.",
-        "동등 과제 중앙값 ≤3분·미허가 접근 0건·월 비용 추정 200,000원 이하의 성공 기준과 접근권한 누출 1건 이상 시 중단·기존 검색 복귀 조건을 보존한다.",
-        "브랜드를 유지한 모든 읽기 슬라이드와 PDF가 설명·수치·출처를 가림 없이 전달하고 웹 이동이 작동한다."
+      "name": "latency-design-md",
+      "prompt": "technical-brief.md, requests.csv, latency.mjs로 15분 기술 발표를 만들어 주세요. 디자인은 DESIGN.md를 따라 주세요. 중간 확인 없이 끝까지 진행해서, 네트워크 없이 열리는 HTML 파일 하나와 PDF를 만들어 주세요.",
+      "expected_output": "제공된 DESIGN.md로 끝까지 제작",
+      "files": [
+        "evals/compare/fixtures/latency-design-md/DESIGN.md",
+        "evals/compare/fixtures/latency-design-md/latency.mjs",
+        "evals/compare/fixtures/latency-design-md/requests.csv",
+        "evals/compare/fixtures/latency-design-md/technical-brief.md"
       ],
-      "files": ["evals/fixtures/decision-brief.md"]
+      "expectations": [
+        "A/B 평균 총시간이 모두 100ms이고 nearest-rank p95가 A 100ms, B 460ms로 정확하며, 합성 데이터와 작은 표본의 한계를 밝힌다.",
+        "DESIGN.md의 색(#f4f1e8 배경, #14213d 본문, #0f766e 강조), 세리프 제목, 왼쪽 위 제목, 근거 장 아래 출처 한 줄, radius 0, 제목 아래 강조색 가로줄을 따른다.",
+        "결과 HTML 하나를 네트워크 없이 열어도 외부 요청 없이 모든 장과 클릭이 동작하고, 한글이 한국어 폰트로 표시된다.",
+        "PDF가 모든 장을 순서대로 담고, 코드·표·도식이 잘리거나 흐려지지 않으며 텍스트를 선택할 수 있다.",
+        "requestQueueResidenceTimeMilliseconds 같은 긴 식별자가 코드나 도식에서 잘리지 않고, 각 본문 장에 설명·전환·시간이 담긴 발표자 노트가 있다.",
+        "실제로 확인한 것과 확인하지 않은 것을 구분해 보고한다."
+      ]
     },
     {
       "id": 3,
-      "name": "single-file-offline",
-      "prompt": "offline-brief.md대로 네트워크 없는 행사장에서 열 단일 HTML 슬라이드와 PDF를 만들어 주세요. 한국어, 이전/다음 버튼·방향키·현재 장 복구, 좁은 화면의 읽기 보기를 포함하세요. 파일 하나에 필요한 내용과 동작이 모두 있어야 하며 추가 자료나 스타일 질문 없이 완성해 주세요.",
-      "expected_output": "외부 요청 없이 신선한 브라우저에서 열리는 HTML, 정확한 이동/fragment 복구, 동일 콘텐츠의 좁은 화면 읽기 보기와 내용을 보존한 PDF.",
-      "expectations": [
-        "최종 HTML 하나를 새 브라우저 문맥에서 네트워크 차단 상태로 열었을 때 외부 리소스 요청 없이 모든 슬라이드가 작동한다.",
-        "이전/다음 버튼·좌우 방향키·처음과 마지막 경계·fragment 재열기로 현재 장이 올바르게 복구된다.",
-        "390px 폭 읽기 보기에서 같은 내용을 가로 넘침이나 내용 겹침 없이 읽을 수 있고 키보드 초점이 숨은 슬라이드로 사라지지 않는다.",
-        "여섯 가지 필수 운영 지침을 보존하고 실제 영상이 없는 곳에 가짜 재생 UI를 넣지 않는다.",
-        "PDF가 의도한 모든 장과 도식을 순서대로 포함하고 잘림·빈 페이지·누락 없이 한국어 텍스트를 보존한다."
+      "name": "taskforge-pdf",
+      "prompt": "demo-brief.md로 10분 발표를 만들어 주세요. 디자인과 청중은 브리프에 정해져 있으니 추가 승인 없이 완성해 주세요. 오프라인에서 여는 HTML 파일 하나와 배포용 PDF가 필요합니다.",
+      "expected_output": "클릭과 코드 전환이 많은 덱의 HTML과 PDF",
+      "files": [
+        "evals/compare/fixtures/taskforge-pdf/demo-brief.md"
       ],
-      "files": ["evals/fixtures/offline-brief.md"]
+      "expectations": [
+        "v1 코드가 v2 코드로 바뀌는 과정이 정적 2열 비교가 아니라 단계적 전환으로 제시되고, 두 코드의 내용이 브리프와 일치한다.",
+        "PDF에서 클릭이 있는 모든 장이 최종 상태의 결론과 v2 코드 전체를 잃지 않으며, 전환 과정 자체가 핵심인 장은 단계별 쪽으로 나뉜다.",
+        "데모 클립 자리는 포스터나 정지 상태 설명과 함께 플레이스홀더임이 드러나고, 실제 영상이 없는데 재생되는 척하는 가짜 UI를 만들지 않는다.",
+        "합성 벤치마크 수치(320→1,150 jobs/sec, 42→9 ms, 148→52 MB)가 합성임을 캡션이나 주석으로 표시한다.",
+        "HTML 하나가 네트워크 없이 열리고 외부 요청이 없다."
+      ]
     },
     {
       "id": 4,
-      "name": "existing-deck-revision",
-      "prompt": "revision-brief.md에 따라 crowded.html의 과밀한 레이아웃을 개선해 주세요. 원본은 보존하고 plain HTML 엔진·브랜드·수치·조건·발표자 노트의 의미를 유지하세요. 필요한 장 분할은 허용합니다. 개선 HTML과 PDF를 제공하고 무엇을 어디로 옮겼는지 알려 주세요.",
-      "expected_output": "원본의 수치·제약·중단 조건·노트 의미를 잃지 않고 5~7장 정도로 재구성한 HTML/PDF. 가림이나 과도한 축소 대신 내용 배치를 개선한다.",
-      "expectations": [
-        "원본의 plain HTML 엔진과 배경·본문·강조 색을 유지하면서 원본 fixture는 변경하지 않는다.",
-        "인원·시간·환산 가치·세 대안의 비용·4주 예산·성공 기준·중단/복귀 조건이 모두 보존된다.",
-        "합성 가정·비현금성 가치·실측 ROI 아님·전체 확대 미승인이라는 제한이 관련 주장 곁에 남는다.",
-        "세 원본 슬라이드의 노트 의도를 새 슬라이드에서 찾을 수 있고 source mapping이 내용 이동을 설명한다.",
-        "개선본 전체 화면과 PDF가 필수 내용을 숨기거나 축소해 해결하지 않고 읽기 좋은 분할·배치와 작동하는 이동을 제공한다."
+      "name": "resume-outline",
+      "prompt": "어제 하던 발표 자료 이어서 진행해 주세요. talk 폴더에 있어요.",
+      "expected_output": "초안 아웃라인에서 이어서 진행",
+      "files": [
+        "evals/compare/fixtures/resume-outline/talk/brief.md",
+        "evals/compare/fixtures/resume-outline/talk/outline.md"
       ],
-      "files": ["evals/fixtures/revision-brief.md", "evals/fixtures/crowded.html"]
+      "expectations": [
+        "talk/brief.md가 승인된 상태임을 알아보고 브리프 질문을 다시 하지 않는다.",
+        "talk/outline.md가 초안(draft) 상태임을 알아보고, 아웃라인을 제목과 한 줄 요약으로 보여 주며 승인을 요청한다.",
+        "아웃라인 승인 전에 디자인 시안 제작, 덱 전체 제작, 빌드로 넘어가지 않는다."
+      ]
     },
     {
       "id": 5,
-      "name": "slidev-motion-demo",
-      "prompt": "demo-brief.md를 바탕으로 개발자 청중 대상의 10분 한국어 Slidev 발표를 만들어 주세요. 발표자 주도 형식으로 코드 변화 시연과 데모 클립을 포함하고, 네트워크가 없는 오프라인 발표장 조건과 배포용 PDF 요구를 충족하세요. Slidev 원본, 웹 빌드, PDF, 발표자 노트를 제공하고 디자인과 청중은 브리프에 정해져 있으므로 추가 승인 없이 완성해 주세요.",
-      "expected_output": "단계적 코드 전환과 로컬 플레이스홀더 데모 클립, 합성 수치 한계를 표시한 오프라인 완결형 한국어 Slidev 덱. 웹 빌드에서 외부 요청 없이 그 로컬 미디어가 재생되고, PDF에서도 내용 손실이 없으며 발표자 노트에 클릭 시점과 시간 배분이 있다.",
-      "expectations": [
-        "코드 변화가 정적 비교가 아니라 단계적 전환으로 제시되고, 두 코드 조각의 내용이 브리프와 일치한다.",
-        "데모 클립이 로컬 자산으로 삽입되고 포스터·정지 상태 설명이 함께 있으며, 클립이 플레이스홀더라는 사실이 슬라이드나 노트에서 드러난다.",
-        "클릭·트랜지션이 있는 모든 슬라이드가 PDF에서 결론과 설명을 잃지 않는다.",
-        "네트워크가 차단된 상태에서 웹 빌드가 외부 요청 없이 열리고, 덱과 함께 제공된 로컬 플레이스홀더 클립이 그 자리에서 재생된다.",
-        "합성 수치가 합성으로 표기되고 실제 성과 주장으로 바뀌지 않으며, 발표자 노트가 각 장의 클릭 시점과 시간 배분을 담는다."
+      "name": "workshop-typo",
+      "prompt": "workshop.html 3번째 장 제목의 '체크리슽' 오타를 고치고, 일정의 시작 시간 10:00을 10:30으로 바꿔 주세요.",
+      "expected_output": "다른 엔진 덱의 작은 수정 (일상 과제)",
+      "files": [
+        "evals/compare/fixtures/workshop-typo/workshop.html"
       ],
-      "files": ["evals/fixtures/demo-brief.md"]
+      "expectations": [
+        "workshop.html 안에서 오타와 시작 시간만 고치고, Slidev로 옮기거나 새 덱을 만들지 않는다.",
+        "나머지 내용, 스타일, 이동 스크립트는 그대로 둔다."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "pptx-routing",
+      "prompt": "content.md 내용으로 발표 자료를 PowerPoint 파일로 만들어 주세요. 받는 쪽에서 글자와 표를 PowerPoint에서 직접 고칠 수 있어야 합니다.",
+      "expected_output": "편집 가능한 PowerPoint 요청",
+      "files": [
+        "evals/compare/fixtures/pptx-routing/content.md"
+      ],
+      "expectations": [
+        "PowerPoint에서 글자와 표를 직접 고칠 수 있는 PPTX를 만들거나, 그런 PPTX를 만드는 경로(예: officecli 같은 네이티브 PPTX 도구)로 안내한다.",
+        "슬라이드를 이미지로 넣은 PPTX를 만들었다면 그것이 편집 가능하다고 주장하지 않는다.",
+        "content.md의 수치(12,400건, 11,800건, 4.2일→3.6일, 3일 이내, 5% 미만, 2명 증원)와 합성 자료 표시를 바꾸지 않는다."
+      ]
+    },
+    {
+      "id": 7,
+      "name": "html-restructure",
+      "prompt": "deck.html 발표의 구성을 처음부터 다시 짜고 디자인도 새로 해 주세요. 결과는 네트워크 없이 열리는 HTML 파일 하나면 됩니다. 중간 확인 없이 끝까지 진행해 주세요.",
+      "expected_output": "다른 엔진 덱의 구성·디자인 변경",
+      "files": [
+        "evals/compare/fixtures/html-restructure/deck.html"
+      ],
+      "expectations": [
+        "원본 deck.html을 고치지 않고 새 결과물을 만든다.",
+        "원본의 수치와 조건(320ms·p95 1,200ms, 읽기 85%, CPU 78%, TTL 60초, p95 400ms 이하는 측정 전 추정, 주문·결제 제외, 2주 시범, 월 180,000원·3인일, 문의 1건 이상 즉시 끄기, p95 600ms 초과 시 철회)을 모두 보존하고 추정을 측정처럼 바꾸지 않는다.",
+        "구성을 실제로 바꾸고(예: 결론·요청을 앞에, 위험과 중단 기준을 묶음) 그 이유나 원본 대비 변경을 보고한다.",
+        "결과 HTML 하나가 네트워크 없이 외부 요청 없이 열린다."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "reading-pdf-only",
+      "prompt": "decision-brief.md로 예산 승인자가 혼자 읽고 판단할 결재 자료를 만들어 주세요. 필요한 건 PDF 하나뿐입니다. 중간 확인 없이 끝까지 진행해 주세요.",
+      "expected_output": "혼자 읽는 결재 자료 (PDF만)",
+      "files": [
+        "evals/compare/fixtures/reading-pdf-only/decision-brief.md"
+      ],
+      "expectations": [
+        "전달물로 PDF 하나를 제시하며, 발표용 HTML 등 요청하지 않은 파일을 전달물로 내놓지 않는다(작업 중간 파일은 무방).",
+        "발표자 설명 없이 읽어도 승인 범위(4주, 초기 3,000,000원 한도, 월 200,000원 상한, 전체 확대 미승인)와 성공·중단 기준을 이해할 수 있도록 설명이 화면에 들어 있다.",
+        "40명·20일·3분에서 월 40시간과 1,200,000원을 도출하고, 비현금성 합성 가정임을 수치 곁에 밝힌다.",
+        "세 대안의 초기/월 비용을 공정하게 비교하고 SaaS의 낮은 초기비용을 숨기지 않는다."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "reference-gate",
+      "prompt": "northstar 폴더의 brief.md와 outline.md는 승인했고, 참고할 사내 디자인 규칙을 reference/DESIGN.md에 넣어 두었습니다. 디자인 단계를 진행해 주세요.",
+      "expected_output": "레퍼런스가 있을 때 디자인 확인에서 멈춤",
+      "files": [
+        "evals/compare/fixtures/reference-gate/decision-brief.md",
+        "evals/compare/fixtures/reference-gate/northstar/brief.md",
+        "evals/compare/fixtures/reference-gate/northstar/outline.md",
+        "evals/compare/fixtures/reference-gate/northstar/reference/DESIGN.md"
+      ],
+      "expectations": [
+        "reference/DESIGN.md의 색(#ffffff, #1b2430, 강조 #c2410c), 산세리프, 장 번호, 가로선만 쓰는 표, 큰 결론 숫자를 시안에 반영한다.",
+        "레퍼런스에 없는 부분(차트, 계산 단계 등)을 같은 언어로 채운 시안을 실제 내용으로 보여 준다.",
+        "시안을 보여 준 뒤 이대로 진행할지 아닌지 하나만 묻고 멈추며, 처음부터 여러 시안 중 고르게 하거나 디자인 용어로 설명을 요구하지 않는다.",
+        "디자인 확정 전에 전체 덱 제작이나 패키징으로 넘어가지 않는다."
+      ]
     }
   ]
 }

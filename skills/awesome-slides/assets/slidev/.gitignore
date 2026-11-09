@@ -1,4 +1,9 @@
 node_modules/
 dist/
 .slidev/
-slides-export.*
+.cache/
+.font-cache/
+fonts/full/
+fonts/subset/
+deck.html
+deck.pdf

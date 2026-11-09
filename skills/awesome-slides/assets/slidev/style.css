@@ -1,6 +1,8 @@
+@import './fonts/fonts.css';
 @import './theme.css';
 
 .slidev-layout {
+  --slidev-code-font-family: var(--as-mono);
   background: var(--as-bg);
   color: var(--as-fg);
   font-family: var(--as-font);
@@ -15,8 +17,6 @@
 .slidev-layout strong { color: var(--as-accent); font-weight: 700; }
 .slidev-layout .as-eyebrow { font: 600 14px/1.4 var(--as-mono); letter-spacing: .1em; color: var(--as-muted); }
 .slidev-layout .as-lead { font-size: 24px; max-width: 28em; }
-.slidev-layout .as-number { font: 700 84px/1 var(--as-font); color: var(--as-accent); font-variant-numeric: tabular-nums; margin-block: 12px; }
-.slidev-layout .as-takeaway { margin: 20px 0 0; padding-top: 10px; border-top: 2px solid var(--as-accent); font-size: 23px; }
 .slidev-layout table { width: 100%; font-size: 19px; border-collapse: collapse; }
 .slidev-layout th, .slidev-layout td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--as-line); }
 .slidev-layout th { color: var(--as-muted); font-weight: 500; }
@@ -28,9 +28,6 @@
 /* Role classes for enhanced layouts and components */
 .slidev-layout.two-columns { gap: 48px; }
 .slidev-layout.two-columns .col-right { border-inline-start: 1px solid var(--as-line); padding-inline-start: 36px; }
-.slidev-layout .as-decision-box { margin-top: 20px; padding: 18px 22px; border: 2px solid var(--as-accent); border-radius: var(--as-radius, 4px); background: var(--as-surface, rgba(0, 0, 0, 0.05)); }
-.slidev-layout .as-decision-box h3 { margin: 0 0 8px; font-size: 18px; color: var(--as-accent); }
-.slidev-layout .as-decision-box ul { margin: 0; padding-left: 20px; font-size: 16px; }
 .slidev-layout .shiki-magic-move-container { font-family: var(--as-mono); font-size: 17px; line-height: 1.65; padding: 20px; border-radius: var(--as-radius, 4px); }
 
 @media (prefers-reduced-motion: reduce) {

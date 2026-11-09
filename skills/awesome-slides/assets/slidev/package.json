@@ -1,15 +1,19 @@
 {
-  "name": "awesome-slides-slidev",
+  "name": "awesome-slides-deck",
   "private": true,
   "type": "module",
   "scripts": {
+    "fonts": "uv run tools/fonts.py fetch",
     "dev": "slidev slides.md",
-    "build": "slidev build slides.md",
-    "export": "slidev export slides.md --with-clicks false"
+    "build:html": "node tools/package.mjs html",
+    "build:pdf": "node tools/package.mjs pdf"
   },
   "devDependencies": {
     "@slidev/cli": "53.0.0",
     "@slidev/theme-default": "0.25.0",
+    "pdf-lib": "1.17.1",
+    "playwright-chromium": "1.64.1",
+    "vite-plugin-singlefile": "2.3.4",
     "vue": "3.5.42"
   }
 }

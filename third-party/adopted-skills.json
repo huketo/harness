@@ -11,71 +11,62 @@
   "skills": {
     "awesome-slides": {
       "adopted_on": "2026-09-10",
-      "source": "Original workflow with attributed implementation, template, and design-recipe adaptations from pinned upstream sources",
+      "source": "Original workflow and tooling; bundles the pinned official Slidev reference set",
       "ownership": "harness-owned; excluded from skills CLI updates",
-      "license": "MIT for original skill and fixtures; source-specific MIT and Apache-2.0 terms retained with adapted assets",
+      "license": "MIT for the original skill, starter, tools, and fixtures; the bundled Slidev reference keeps its MIT notice. Fonts are downloaded at build time under their own OFL-1.1 terms, not redistributed by the skill.",
       "license_path": "skills/awesome-slides/LICENSE",
       "previous_registration": null,
       "upstreams": [
         {
-          "source": "https://github.com/zarazhangrui/frontend-slides",
-          "commit": "9906a34d640d2111f724544cbc50f7f130569ae1",
-          "license": "MIT",
-          "use": "Adapted native-engine palette tokens and composition recipes; exact map and MIT notice in assets/styles/ATTRIBUTION.md. Generic HTML starter superseded by complete theme-specific source templates."
-        },
-        {
-          "source": "https://github.com/vstorm-co/content-skills",
-          "commit": "5138a11b1e3407ea3352d4010cbe33233bdeb01c",
-          "license": "MIT",
-          "use": "Adapted Slidev pitch-deck sequence and timed notes, Reveal native sections/plugins/configuration and brand mapping; MIT notices in both engine asset directories"
-        },
-        {
-          "source": "https://github.com/AlemTuzlak/skills",
-          "commit": "4b16f3e052635c873d4eede00e8dc5f471f5fc3a",
-          "license": "MIT declared in README and plugin metadata; root license text not found in the reviewed snapshot",
-          "use": "Research only: official Slidev skill dependency and concrete syntax recipes, assertion/evidence and rendered-state verification; no source copied"
-        },
-        {
-          "source": "https://github.com/zarazhangrui/beautiful-html-templates",
-          "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
-          "license": "MIT, Copyright 2026 Zara Zhang",
-          "license_path": "skills/awesome-slides/assets/template-library/LICENSE",
-          "paths": [
-            "templates",
-            "runtime",
-            "index.json",
-            "LICENSE"
-          ],
-          "use": "Direct unmodified copy of all 34 complete HTML themes, design guides, metadata and runtime. Generator clones the chosen theme and supplies missing shared deck-stage.js. ORIGIN.json records scope; screenshot gallery remains pinned upstream. Demo content and online fonts require task-specific adaptation."
-        },
-        {
-          "source": "https://github.com/BaizeAI/talks",
-          "commit": "5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99",
-          "license": "Apache-2.0",
-          "use": "Adapted TtftBreakdown, StageFlow and CaseStory into typed AsBreakdown, AsStageFlow and AsCaseStory Vue components; modification notices, source map and Apache-2.0 license in assets/slidev; no domain measurements, media or trademarks reused"
-        },
-        {
           "source": "https://github.com/slidevjs/slidev",
           "commit": "30a0a54c8739b4b395d9b336a6304cc8ebcc3947",
           "license": "MIT",
-          "license_path": "skills/awesome-slides/references/slidev-official/LICENSE.txt",
+          "license_path": "skills/awesome-slides/slidev-official/LICENSE.txt",
           "paths": [
             "skills/slidev/SKILL.md",
             "skills/slidev/references/",
             "LICENSE"
           ],
-          "use": "Official Slidev agent reference set bundled unmodified under references/slidev-official/ so the skill routes to pinned syntax documentation without installing a second top-level skill. SKILL.md renamed to INDEX.md with its frontmatter removed; README.md excluded. Provenance in references/slidev-official/ORIGIN.json."
+          "use": "Official Slidev agent reference set bundled unmodified under slidev-official/ so the skill routes to pinned syntax documentation without installing a second top-level skill. SKILL.md renamed to INDEX.md with its frontmatter removed; README.md excluded. Provenance in slidev-official/ORIGIN.json."
         }
       ],
       "local_changes": [
-        "Author original presentation and reading workflows joining evidence, narrative, visual direction, notes, and actual output verification.",
-        "Preserve existing engines; default unconstrained new decks to a complete HTML theme, port its visual system when native Slidev/Reveal source is required, and distinguish native-editable from image-based PPTX.",
-        "Add Korean/CJK, truthful data provenance, offline, static-media, privacy, and meaning-preserving revision guidance.",
-        "Add five original synthetic evaluation cases without real organizational data.",
-        "Bundle a theme-specific HTML library, native Slidev/Reveal engine mechanisms and technical components, an exclusive-destination template copier, and a verified officecli native-editable recipe.",
-        "Bundle the pinned official Slidev agent reference set inside the skill and route to it, instead of depending on a separately installed slidev skill."
+        "Single Slidev pipeline: brief, outline, design, build, package, verify, each phase writing one status-marked artifact in the deck directory so work resumes at the first unsettled phase.",
+        "Design settled from supplied references or DESIGN.md, or by pairwise twenty-questions rounds rendered from the deck's real slides (tools/variants.mjs).",
+        "One-file offline deck.html via vite-plugin-singlefile with public/ media inlining, font subsetting to the deck's own characters, embedded font licenses, a remote-resource guard, and a 30 MB budget (tools/package.mjs).",
+        "PDF at final click state with per-slide click-step pages for slides marked pdf: steps.",
+        "Pinned OFL-1.1 Korean fonts by role (tools/fonts.json, tools/fonts.py) with sha256 verification and Reserved-Font-Name-free renaming of subsets.",
+        "Offline headless walk of every slide and click state with layout-loss detection and a contact sheet (tools/check.mjs).",
+        "Comparison suite against no skill and the previous theme-catalog version (evals/compare/)."
       ],
-      "excluded_sources": []
+      "excluded_sources": [],
+      "retired_upstreams": [
+        {
+          "source": "https://github.com/zarazhangrui/beautiful-html-templates",
+          "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+          "removed": "34-theme HTML catalog removed; design is now settled per deck from references or pairwise comparison."
+        },
+        {
+          "source": "https://github.com/zarazhangrui/frontend-slides",
+          "commit": "9906a34d640d2111f724544cbc50f7f130569ae1",
+          "removed": "Native-engine palette presets removed."
+        },
+        {
+          "source": "https://github.com/vstorm-co/content-skills",
+          "commit": "5138a11b1e3407ea3352d4010cbe33233bdeb01c",
+          "removed": "Adapted pitch-deck slides.md and Reveal sections replaced by an original skeleton; Reveal route removed."
+        },
+        {
+          "source": "https://github.com/BaizeAI/talks",
+          "commit": "5ce7e28b8763d6adb82ee7b0b2dcdb58afad7c99",
+          "removed": "AsBreakdown, AsStageFlow, AsCaseStory components removed with their Apache-2.0 notice."
+        },
+        {
+          "source": "https://github.com/AlemTuzlak/skills",
+          "commit": "4b16f3e052635c873d4eede00e8dc5f471f5fc3a",
+          "removed": "Research-only reference; nothing remains."
+        }
+      ]
     },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
