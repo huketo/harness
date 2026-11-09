@@ -209,7 +209,8 @@ export function generate(opts: GenerateOptions): GeneratePlan {
 			const prev = existsSync(target) ? readFileSync(target, "utf8") : null;
 			if (prev === staged) continue;
 			const plan = { target, ...reconcile(prev, staged) };
-			if (plan.prev !== plan.next) files.push(plan);
+			// The same facts in another order (an agent CLI rewrites its settings sorted) are not a change.
+			if (plan.prev !== plan.next && (plan.added.length || plan.lost.length)) files.push(plan);
 		}
 		return { files, log, skipped };
 	} finally {

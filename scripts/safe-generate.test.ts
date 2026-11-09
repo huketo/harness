@@ -119,3 +119,17 @@ test("rulesync run: an agent that is not installed is skipped, not created", { s
 	const plan = generate({ repo: REPO, home, claudeDir: join(home, ".claude"), rulesync: rulesync! });
 	assert.deepEqual(plan, { files: [], log: [], skipped: ["claudecode", "antigravity-cli"] });
 });
+
+test("rulesync run: a deny list another tool reordered is not rewritten", { skip: rulesync ? false : "rulesync not installed (mise install)" }, () => {
+	const home = tempHome();
+	const claudeDir = join(home, ".claude");
+	put(join(claudeDir, "settings.json"), { permissions: { deny: ["Read(~/.other/secret)"] } });
+	applyPlan(generate({ repo: REPO, home, claudeDir, rulesync: rulesync! }));
+	// The agent CLIs rewrite settings.json in their own order, which moves the kept entry out of the tail.
+	const file = join(claudeDir, "settings.json");
+	const settings = JSON.parse(readFileSync(file, "utf8"));
+	settings.permissions.deny.sort();
+	writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`);
+
+	assert.deepEqual(generate({ repo: REPO, home, claudeDir, rulesync: rulesync! }).files, []);
+});
