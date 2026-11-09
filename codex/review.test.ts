@@ -26,6 +26,8 @@ import type { ReviewBoundarySnapshot } from "./review.ts";
 
 const REVIEW_ENTRY = join(import.meta.dirname, "review.ts");
 const REAL_CODEX = findExecutable("codex");
+// These cases probe the installed binary's sandbox, features, and MCP list; without codex (as on CI) they are skipped.
+const needsCodex = { timeout: 60_000, skip: REAL_CODEX ? false : "codex is not installed" };
 
 const restricted: ReviewBoundarySnapshot = {
 	codexVersion: "codex-cli 0.164.0",
@@ -268,7 +270,7 @@ test("boundary guard accepts only the read-only, offline, MCP-free boundary", ()
 	}
 });
 
-test("installed codex --inspect-tools reports a denied boundary without running exec", { timeout: 60_000 }, async () => {
+test("installed codex --inspect-tools reports a denied boundary without running exec", needsCodex, async () => {
 	const run = await runReviewer(["--inspect-tools"]);
 	assert.equal(run.stderr, "");
 	assert.equal(run.exitCode, 0);
@@ -288,7 +290,7 @@ test("installed codex --inspect-tools reports a denied boundary without running 
 	assert.deepEqual(run.repoFiles, [".git"]);
 });
 
-test("installed codex rejects a partial model ID instead of a sibling model", { timeout: 60_000 }, async () => {
+test("installed codex rejects a partial model ID instead of a sibling model", needsCodex, async () => {
 	const run = await runReviewer(["--model", "gpt-6.1", "--inspect-tools"]);
 	assert.equal(run.exitCode, 1);
 	assert.equal(run.stdout, "");
@@ -296,7 +298,7 @@ test("installed codex rejects a partial model ID instead of a sibling model", { 
 	assert.ok(!run.subcommands.includes("sandbox"));
 });
 
-test("a review prints only the last message and sends the brief on stdin", { timeout: 60_000 }, async () => {
+test("a review prints only the last message and sends the brief on stdin", needsCodex, async () => {
 	const run = await runReviewer(["--brief", "check the diff"], {
 		FAKE_EXEC_OUTPUT: "No findings.\n",
 	});
@@ -311,7 +313,7 @@ test("a review prints only the last message and sends the brief on stdin", { tim
 	assert.equal(existsSync(outputFile), false);
 });
 
-test("a widened boundary is refused before codex exec starts", { timeout: 60_000 }, async () => {
+test("a widened boundary is refused before codex exec starts", needsCodex, async () => {
 	const run = await runReviewer(["--brief", "check the diff"], {
 		FAKE_MCP_JSON: JSON.stringify([{ name: "planted", enabled: true }]),
 		FAKE_EXEC_OUTPUT: "should not appear",
@@ -322,7 +324,7 @@ test("a widened boundary is refused before codex exec starts", { timeout: 60_000
 	assert.ok(!run.subcommands.includes("exec"));
 });
 
-test("failed or empty codex exec runs exit 1 without stdout", { timeout: 60_000 }, async () => {
+test("failed or empty codex exec runs exit 1 without stdout", needsCodex, async () => {
 	const envs: Record<string, string>[] = [
 		{ FAKE_EXEC_OUTPUT: "partial", FAKE_EXEC_EXIT: "2" },
 		{ FAKE_EXEC_OUTPUT: "  \n" },
