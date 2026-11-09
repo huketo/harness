@@ -259,9 +259,26 @@ describe("agent", () => {
 		});
 		assert.deepEqual(outcome, { rc: null, timedOut: true });
 		const grandchild = Number(readFileSync(pidFile, "utf8"));
-		assert.throws(() => process.kill(grandchild, 0));
+		assert.ok(!running(grandchild), `grandchild ${grandchild} still runs`);
 	});
 });
+
+/**
+ * Whether a process still runs. A killed process stays a zombie until its new parent reaps it, and a container's
+ * PID 1 may never do so; kill(pid, 0) succeeds on a zombie, so its /proc state decides.
+ */
+function running(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+	} catch {
+		return false;
+	}
+	try {
+		return readFileSync(`/proc/${pid}/stat`, "utf8").split(") ").at(-1)?.[0] !== "Z";
+	} catch {
+		return false;
+	}
+}
 
 describe("changes and diff", () => {
 	test("exclusion rules, added/modified/deleted, text-only patch", () => {
