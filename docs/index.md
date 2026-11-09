@@ -8,7 +8,8 @@ Choose the document for the task rather than reading the entire directory. The R
 
 | Document | Read it for |
 | --- | --- |
-| [Installation](guides/installation.md) | Linux/WSL2 prerequisites, installer side effects, updates, retired-link cleanup, and manual rollback. |
+| [Installation](guides/installation.md) | Linux/WSL2 and mise prerequisites, `mise run install` side effects, updates, retired-link cleanup, and manual rollback. |
+| [Plugin release](guides/plugin-release.md) | When a change needs a changeset, how a release is cut, and how a new `hstack` plugin version reaches Claude Code. |
 | [상세 사용법](guides/usage.md) | T3 Code threads, skill loading per provider, orchestration, review loop, council, watched terminal work through `t3-terminal` and Herdr, interactive in-thread visuals through `t3-show`, MR lifecycle and work modes, BrowserSkill on WSL2, and interface improvement/review. |
 | [소유자 운영 절차](guides/operations.md) | Cost audits, guarded host sync, the T3 scheduled-task guard, GitLab/calendar draft collection, manual Daou Office entry, and snapshot boundaries. Not a general installation recipe. |
 | [공개 배포 정책](public-release.md) | License, fresh-history, privacy, dependency, support, and publication invariants. |
@@ -22,7 +23,8 @@ Choose the document for the task rather than reading the entire directory. The R
 | [Workflow](agents/workflow.md) | Work order, source evidence, integration, and completion. |
 | [Authority](agents/authority.md) | Local work versus host, external-write, and publication decisions. |
 | [Writing](agents/writing.md) | Document ownership, bilingual parity, and progressive disclosure. |
-| [Testing](agents/testing.md) | Focused Bash, Bun, and Python checks and what each proves. |
+| [Testing](agents/testing.md) | `mise run check` and focused Node, Bash, and Python checks, and what each proves. |
+| [Decisions](adr/README.md) | Architecture decision records: the toolchain and the `hstack` packaging. |
 | [Human-decision rules](agents/hitl.md) | Thread questions, approvals, delegated children, and unattended scheduled runs in T3 Code. |
 
 ## Reference and evidence / 구조와 근거

@@ -10,6 +10,8 @@ Write for the reader who performs the next action. Keep each rule, fact, command
 - `docs/guides/installation.md` — recommended environment, installation, update, and safe inspection steps.
 - `docs/guides/usage.md` — supported day-to-day user workflows.
 - `docs/guides/operations.md` — optional owner operations and external-effect boundaries.
+- `docs/guides/plugin-release.md` — changesets, release, and how a plugin version reaches Claude Code.
+- `docs/adr/` — numbered architecture decision records.
 - `docs/REPO.md` — source/runtime ownership and repository layout invariants.
 - `docs/AGENT-CONFIG.md` — Claude Code, Codex, and AGY configuration surface, packaging, the merge guard, and guardrail decisions.
 - `docs/FACTS.md` — dated public technical observations and their limits.

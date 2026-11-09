@@ -6,14 +6,16 @@ This file is the compact repository router for coding agents working for the own
 
 1. Bound the requested outcome, owning files, affected callers, and external or sensitive effects.
 2. Inspect the source, nearby tests, and relevant repository documentation before editing. Source behavior wins over stale prose.
-3. Reuse the existing shell, Bun, or Python mechanism instead of adding a second convention.
+3. Reuse the existing Node/TypeScript, shell, or Python mechanism instead of adding a second convention. `mise.toml` pins the tools and owns the entry points (`mise run check`, `plan`, `install`).
 4. Verify at the narrowest boundary that proves the requested behavior, then report exact evidence and relevant checks not run.
 
 Before asking a person, accepting an approval, or handling an unattended or scheduled run, read [`docs/agents/hitl.md`](docs/agents/hitl.md). It owns the channel, approval-response, completion-gate, and unattended-run rules for agents running as T3 Code threads.
 
 ## Repository map
 
-- `plugin/` — one source for the Claude Code and AGY plugins (merge-guard hook, read-only reviewer agent, AGY rules), their builder and installer, and the deny rules merged into agent settings; [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where.
+- `plugin/` — the `hstack` plugin for Claude Code and AGY (merge-guard hook, read-only reviewer agent, AGY rules), its builder and installer; the repository root is its marketplace (`.claude-plugin/`). [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where. Before changing a shipped plugin file, read [`docs/guides/plugin-release.md`](docs/guides/plugin-release.md).
+- `scripts/`, `.rulesync/` — the installer, updater, and rulesync wrapper behind `mise run`, the credential deny rules they apply, and the skill-eval runner.
+- `.changeset/`, `.github/workflows/` — pending release notes and the CI and release workflows.
 - `codex/` — the read-only `codex exec` reviewer (`review.ts`) used outside T3, and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
 - `t3/` — the guard for T3 Code scheduled tasks, its job definitions, and the guarded host-sync source; the distributed `jobs.json` contains no jobs.
 - `skills/` — personal skill sources, including the T3-facing `t3-orchestrate`, `t3-handoff` (continue work in a new thread), `t3-terminal` (Herdr as a plain terminal multiplexer for work a person watches), and `t3-show` (interactive explanations, simulations, and data views shown inline in a thread); preserve each adopted skill's license and provenance.
@@ -30,10 +32,10 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 - [`docs/agents/workflow.md`](docs/agents/workflow.md) — evidence-first work order, review, and completion.
 - [`docs/agents/authority.md`](docs/agents/authority.md) — local autonomy, external writes, host changes, publication, and irreversible actions.
 - [`docs/agents/writing.md`](docs/agents/writing.md) — document ownership, bilingual consistency, instruction writing, comments, and sensitive evidence.
-- [`docs/agents/testing.md`](docs/agents/testing.md) — focused shell, Bun, and Python verification boundaries and grounded commands.
+- [`docs/agents/testing.md`](docs/agents/testing.md) — `mise run check`, focused Node, shell, and Python verification boundaries, and grounded commands.
 - [`docs/agents/hitl.md`](docs/agents/hitl.md) — questions, approvals, delegated children, and unattended runs in T3 Code threads.
 
-User documentation starts at [`docs/index.md`](docs/index.md). Installation, usage, and owner operations belong in `docs/guides/`. Enduring public-distribution rules belong in [`docs/public-release.md`](docs/public-release.md).
+Architectural decisions live in [`docs/adr/`](docs/adr/); read them before reshaping an area. User documentation starts at [`docs/index.md`](docs/index.md). Installation, usage, and owner operations belong in `docs/guides/`. Enduring public-distribution rules belong in [`docs/public-release.md`](docs/public-release.md).
 
 ## Public and third-party boundary
 

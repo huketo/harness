@@ -6,19 +6,20 @@
 
 ## 1. 배포 형태의 결정
 
-스킬은 세 에이전트가 공통으로 읽는 기본 배포 단위입니다(`install.sh`가 `~/.agents/skills`와 `~/.claude/skills`에 연결합니다). 스킬로 표현할 수 없거나 에이전트별 제어가 필요한 것만 플러그인, 실행 정책, 설정 병합으로 배포합니다. 정본은 [`plugin/`](../plugin/) 하나이고, `plugin/build.mjs`가 에이전트별 산출물을 `${XDG_STATE_HOME:-~/.local/state}/harness/plugins/<host>/`에 만들며, `plugin/install.mjs`가 설치합니다.
+스킬은 세 에이전트가 공통으로 읽는 기본 배포 단위입니다(`mise run install`이 `~/.agents/skills`와 Claude Code 설정 디렉터리의 `skills`에 연결합니다). 스킬을 플러그인에 넣지 않는 이유는 [ADR 0002](adr/0002-hstack-marketplace-ships-guardrails-only.md)에 있습니다. 스킬로 표현할 수 없거나 에이전트별 제어가 필요한 것만 플러그인, 실행 정책, 설정 병합으로 배포합니다. 플러그인 정본은 [`plugin/`](../plugin/) 하나이고 이름은 `hstack`입니다. Claude Code는 저장소 루트의 마켓플레이스에서 `plugin/`을 그대로 받고, AGY는 `plugin/build.mjs`가 `${XDG_STATE_HOME:-~/.local/state}/hstack/plugins/agy/`에 만든 사본을 받습니다.
 
 | 항목 | 형태 | 이유 |
 | --- | --- | --- |
 | MR 수명주기(`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`), `review-loop`, `council`, `t3-orchestrate` | 스킬 | 세 에이전트가 같은 절차를 읽어야 하고, 다른 스킬이 이 스킬들을 부릅니다. |
 | 작업 모드 `full-send`, `full-stop` | 사용자 호출 스킬(Claude `disable-model-invocation`, Codex `allow_implicit_invocation: false`) | 세 CLI 모두 스킬을 `/이름`이나 `$이름`으로 부릅니다. Claude 플러그인 명령은 `/harness:full-send`처럼 이름이 바뀌고, agy와 Codex 플러그인은 명령을 싣지 못합니다. |
 | 머지 가드 | Claude·agy 플러그인 PreToolUse 훅, Codex `codex/harness.rules` | 아래 2절. 모드에 따라 판정이 달라지는 부분은 훅만 표현할 수 있습니다. |
-| 읽기 전용 Claude 리뷰어 | Claude 플러그인 agent `harness:reviewer`(`tools: Read, Grep, Glob`) | 하위 agent의 `permissionMode`는 부모가 `bypassPermissions`·`auto`이면 무시되므로, 읽기 전용은 도구 목록으로만 강제됩니다. |
+| 읽기 전용 Claude 리뷰어 | Claude 플러그인 agent `hstack:reviewer`(`tools: Read, Grep, Glob`) | 하위 agent의 `permissionMode`는 부모가 `bypassPermissions`·`auto`이면 무시되므로, 읽기 전용은 도구 목록으로만 강제됩니다. |
 | agy 전역 규칙(`plugin/rules/AGENTS.md`) | agy 플러그인 `rules/` | 규칙을 플러그인으로 묶어 `agy plugin disable`로 끌 수 있게 합니다. |
-| 자격 증명 읽기 금지 | `plugin/guardrails.json` → Claude·agy 설정의 `permissions.deny`에 합집합으로 추가 | 플러그인은 권한 규칙을 싣지 못합니다(Claude 플러그인 `settings`는 `agent`, `subagentStatusLine`만 받습니다). |
+| 자격 증명 읽기 금지 | `.rulesync/permissions.jsonc` → rulesync가 Claude·agy 설정의 `permissions.deny`를 생성하고, `scripts/safe-generate.ts`가 기존 항목을 모두 보존한 결과만 반영 | 플러그인은 권한 규칙을 싣지 못합니다(Claude 플러그인 `settings`는 `agent`, `subagentStatusLine`만 받습니다). rulesync는 범주 단위로 항목을 소유해 기존 Read deny를 교체하므로 래퍼가 빠진 항목을 되돌립니다([FACTS 7절](FACTS.md#7-rulesync-4380로-권한을-생성할-때-2026-11-09)). |
+| Codex 자격 증명 읽기 금지 | 생성하지 않음 | rulesync의 Codex 권한 출력은 `config.toml`에 `default_permissions = "rulesync"`와 새 권한 프로필, `approval_policy`, `approvals_reviewer`를 써서 Codex의 샌드박스 동작 자체를 바꾸고, 이 항목은 끌 수 없습니다. 같은 실험에서 `~/.aws/**` filesystem deny가 세션 시작을 막은 적도 있습니다. Codex에는 지금처럼 `codex/harness.rules`만 둡니다. |
 | Codex 플러그인 | 만들지 않음 | Codex 플러그인은 규칙·지침을 싣지 못하고, 플러그인 훅은 `config.toml`에 훅별 `trusted_hash`와 번들 `trusted_content_hash`를 기록해야 실행됩니다. 설치기가 그 해시를 계산해 사용자 설정에 쓰는 것은 코드를 묵시적으로 신뢰하는 일이므로, 같은 목적을 신뢰 절차 없이 이루는 실행 정책 파일을 씁니다. |
 
-산출물 경로는 해시 없이 고정합니다. Claude Code는 디렉터리 마켓플레이스를 폴더에서 바로 읽으므로 다시 빌드하면 다음 세션부터 반영되고, agy는 `agy plugin install`이 사본을 만들므로 설치기가 차이가 있을 때만 다시 설치합니다. agy 1.4.7은 심링크한 플러그인 디렉터리를 건너뛰므로, 이전 설치기가 만든 `~/.gemini/config/plugins/harness` 심링크는 로드되지 않으며 설치기가 그 링크를 사본으로 바꿉니다.
+Claude Code는 `plugin.json`의 버전이 바뀔 때만 마켓플레이스에서 새 플러그인을 받으므로, 배포되는 파일을 바꾸면 changeset과 릴리스가 필요합니다([plugin-release](guides/plugin-release.md)). agy 사본의 경로는 해시 없이 고정하며, `agy plugin install`이 사본을 만들므로 설치기가 차이가 있을 때만 다시 설치합니다. agy는 심링크한 플러그인 디렉터리를 건너뜁니다. 이전 이름 `harness`로 설치된 마켓플레이스와 agy 플러그인은 설치기가 제거 명령과 함께 알리기만 합니다.
 
 ## 2. 머지 가드와 작업 모드
 
@@ -48,7 +49,7 @@
 
 | 에이전트 | 설정 | 권장 | 근거 | T3 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| Claude Code | `permissions.deny`의 자격 증명 읽기 | `Read(~/.ssh/**)`, `Read(~/.aws/**)`, `Read(~/.claude/.credentials.json)`, `Read(~/.config/gh/**)`, `Read(~/.config/glab-cli/**)`, agy OAuth 토큰, `Read(~/.t3/userdata/providers/**)` | deny는 `bypassPermissions`에서도 막습니다 | 예 | 적용 |
+| Claude Code | `permissions.deny`의 자격 증명 읽기 | `Read(~/.ssh/**)`, `Read(~/.aws/**)`, `Read(~/.claude/.credentials.json)`과 `CLAUDE_CONFIG_DIR`의 자격 증명, `Read(~/.config/gh/**)`, `Read(~/.config/glab-cli/**)`, agy OAuth 토큰, `Read(~/.t3/userdata/providers/**)` | deny는 `bypassPermissions`에서도 막습니다 | 예 | 적용 |
 | Claude Code | PreToolUse 머지 가드 | 플러그인 훅, `onFailure: "block"` | 종료 코드 1, 시간 초과, 충돌은 기본적으로 통과(fail open)합니다 | 예 | 적용 |
 | Claude Code | 읽기 전용 리뷰어 | `tools: Read, Grep, Glob` | 부모가 bypass·auto이면 하위 agent의 `permissionMode`가 무시됩니다 | 예 | 적용 |
 | Claude Code | 머지 `ask` 규칙 | 쓰지 않음 | ask 규칙은 bypass에서도 사람에게 묻기 때문에 무인 `full-send`가 멈춥니다. 훅이 모드를 판단합니다 | 예 | 결정 |
@@ -62,7 +63,7 @@
 | Codex | 사용자 정의 역할 | 읽기 전용 샌드박스는 역할로 만들 수 없으므로 리뷰어는 `codex/review.ts` | 역할은 샌드박스를 좁히지 못합니다 | 부분 | 결정 |
 | agy | 플러그인 설치 | `agy plugin install`로 만든 사본 | 1.4.7은 심링크한 플러그인 디렉터리를 건너뜁니다 | 아니요 | 적용 |
 | agy | 플러그인 머지 가드 | 루트 `hooks.json` | `agy plugin validate --strict` 통과 | 아니요 | 적용 |
-| agy | `permissions.deny` | `~/.config/gh`, `~/.config/glab-cli`, `~/.claude/.credentials.json`, `~/.t3/userdata/providers` 읽기 금지 | `action(target)` 문법, Deny > Ask > Allow | 아니요(ACP 설정에는 권한 항목이 없음) | 적용 |
+| agy | `permissions.deny` | Claude Code와 같은 자격 증명 경로(`~/.ssh`, `~/.aws`, `~/.config/gh`, `~/.config/glab-cli`, Claude 자격 증명, agy OAuth 토큰, `~/.t3/userdata/providers`) 읽기 금지 | `action(target)` 문법, Deny > Ask > Allow | 아니요(ACP 설정에는 권한 항목이 없음) | 적용 |
 | agy | `toolPermission`, `trustedWorkspaces` | 대화형은 `auto`나 `proceed-in-sandbox`, `$HOME`·`/tmp`를 신뢰 목록에서 빼기 | 권한 문서 | 아니요 | 사용자 결정 |
 
 ## 4. T3 Antigravity 세션이 받는 것
@@ -73,8 +74,8 @@ T3는 agy CLI가 아니라 고정된 ACP 서버를 T3 전용 `GEMINI_HOME`으로
 
 | 결정 | 방향 | 적용 |
 | --- | --- | --- |
-| Claude·agy 설정에 자격 증명 읽기 금지 추가(`plugin/guardrails.json`) | 강화 | 설치 시 합집합 추가, 처음 한 번 `.harness-bak` 백업 |
-| Codex에서 `gh pr merge`, `glab mr merge`를 `prompt`로 | 강화 | `install.sh`가 `~/.codex/rules/harness.rules`를 연결 |
+| Claude·agy 설정에 자격 증명 읽기 금지 추가(`.rulesync/permissions.jsonc`) | 강화. agy에도 `~/.ssh`, `~/.aws`, agy OAuth 토큰 금지를 더함 | rulesync로 생성하고 기존 항목은 보존, 바꿀 때마다 `.hstack-bak-<시각>` 백업 |
+| Codex에서 `gh pr merge`, `glab mr merge`를 `prompt`로 | 강화 | `mise run install`이 `~/.codex/rules/harness.rules`를 연결 |
 | 모드 없는 머지 차단, `full-stop` 머지 차단, `--admin` 차단 | 강화 | Claude·agy 플러그인 훅 |
 | `full-send`의 머지 허용 | 사람이 쓴 허용 목록의 저장소로 한정하며, 목록이 없으면 허용하지 않음 | 훅이 저장소와 명령 대상을 실행 시점에 확인 |
 | 권한을 넓히는 변경 | 없음 | — |

@@ -50,7 +50,7 @@ The root MIT license and no-contributions policy are settled repository policy, 
 
 ## Host and external boundaries
 
-`bash install.sh` changes skill and rule links, and through `plugin/install.mjs` installs the Claude Code and AGY plugins and adds deny rules to their settings. Foreign or unexpected entries remain conflicts and are preserved. Run it only under explicit host-change authority. The documented `--dry-run` form inspects machine state without changing it and therefore still requires the task to permit host inspection.
+`mise run install` changes skill and rule links, merges the `.rulesync` deny rules into the Claude Code and AGY settings files, and installs the `hstack` plugin into Claude Code and AGY. Foreign or unexpected entries remain conflicts and are preserved. Run it, and `mise run update`, only under explicit host-change authority. `mise run plan` inspects machine state without changing it and therefore still requires the task to permit host inspection. A plugin release reaches every machine that auto-updates the marketplace, so it is a publication ([`plugin-release.md`](../guides/plugin-release.md)).
 
 Benchmark runs can invoke paid providers. Daily-report collectors can authenticate to GitLab and read private calendar feeds; the final Daou Office entry and submission are human UI actions. Cron commands can alter unattended behavior. Treat each boundary according to its effects rather than inferring safety from a command name or dry run.
 
