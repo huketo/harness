@@ -10,7 +10,7 @@
 
 ### 스킬과 지침이 로드되는 경로
 
-`bash install.sh`와 `--skills-only`는 `skills/*/SKILL.md`가 있는 모든 디렉터리를 `~/.agents/skills`와 `~/.claude/skills`에 연결합니다. 따라서 `t3-orchestrate`, `t3-terminal`, `review-loop`, `council`과 MR 수명주기 스킬도 별도 설정 없이 함께 연결됩니다.
+`mise run install`과 `--skills-only`는 `skills/*/SKILL.md`가 있는 모든 디렉터리를 `~/.agents/skills`와 Claude Code 설정 디렉터리(`CLAUDE_CONFIG_DIR`, 기본값 `~/.claude`)의 `skills`에 연결합니다. 따라서 `t3-orchestrate`, `t3-terminal`, `review-loop`, `council`과 MR 수명주기 스킬도 별도 설정 없이 함께 연결됩니다.
 
 | 제공자 | 스킬 | 사용자 지침 | 저장소 지침 |
 | --- | --- | --- | --- |
@@ -24,11 +24,11 @@ T3는 agy CLI가 아니라 별도 ACP 서버를 T3 전용 설정 디렉터리에
 
 T3 스레드에서 독립 구현을 여러 워크트리로 나눌 때는 `t3-orchestrate`, 변경 하나를 다른 계열의 리뷰어로 반복 검토할 때는 `review-loop`, 설계나 변경을 세 계열의 플래그십으로 교차 검토하고 모두 만족할 때까지 고칠 때는 `council`을 사용합니다. 세 스킬은 `delegate_task`의 워크트리 자식을 쓰고, 용도별 제공자·모델 대응은 `skills/t3-orchestrate/references/targets.md`가 정합니다. Antigravity는 Auto 모드가 없으므로 자식에게 Full access를 명시해야 하며, 이것은 부모 스레드가 Full access일 때만 가능합니다.
 
-기본 독립 리뷰어는 Codex의 현재 Sol 모델입니다. T3 안에서는 다른 리뷰어와 같이 `delegate_task`의 워크트리 자식으로 실행되므로 스레드 목록에서 진행을 추적할 수 있고, 끝난 뒤 `tree-unchanged.sh`로 워크트리가 그대로인지 확인합니다. T3 밖에서는 읽기 전용 Codex 리뷰어 `codex/review.ts`를 씁니다. `--model`을 생략하면 `codex debug models`에서 현재 Sol 모델을 고르고, 읽기 전용 샌드박스와 네트워크·MCP·하위 agent 차단을 모델 호출 전에 확인합니다. Claude Code 스레드에서는 하네스 플러그인의 `harness:reviewer` 하위 agent(`Read`, `Grep`, `Glob`만 사용)를 쓸 수 있습니다.
+기본 독립 리뷰어는 Codex의 현재 Sol 모델입니다. T3 안에서는 다른 리뷰어와 같이 `delegate_task`의 워크트리 자식으로 실행되므로 스레드 목록에서 진행을 추적할 수 있고, 끝난 뒤 `tree-unchanged.sh`로 워크트리가 그대로인지 확인합니다. T3 밖에서는 읽기 전용 Codex 리뷰어 `codex/review.ts`를 씁니다. `--model`을 생략하면 `codex debug models`에서 현재 Sol 모델을 고르고, 읽기 전용 샌드박스와 네트워크·MCP·하위 agent 차단을 모델 호출 전에 확인합니다. Claude Code 스레드에서는 `hstack` 플러그인의 `hstack:reviewer` 하위 agent(`Read`, `Grep`, `Glob`만 사용)를 쓸 수 있습니다.
 
 ```bash
-bun --no-install codex/review.ts --cwd <worktree> --inspect-tools
-bun --no-install codex/review.ts --cwd <worktree> --brief "Read <review-brief.md> and review its supplied diff."
+node codex/review.ts --cwd <worktree> --inspect-tools
+node codex/review.ts --cwd <worktree> --brief "Read <review-brief.md> and review its supplied diff."
 ```
 
 `review-loop`의 위험 등급 스크립트는 독립 리뷰 횟수의 하한을 정하며, `t3-orchestrate`도 같은 기준을 씁니다. 문서·테스트만 바꿔도 지시 문서나 보안 경계에 해당하면 상위 등급이 적용되며, 리뷰어는 놓친 보안 경계를 올릴 수 있습니다.
@@ -109,7 +109,7 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 
 독립 로고는 [Logo](../../skills/imagegen/references/logo.md) 분기가 유형·배치·스타일을 구분해 처리합니다. [둥근 IP 프리셋](../../skills/imagegen/references/logo/rounded-ip.md)은 해당 캐릭터 방향을 선택했을 때만 읽습니다. 기존 로고로 보드만 만드는 요청은 `brandkit`에서 자산을 보존하고, 새 로고와 보드를 함께 요청하면 로고 방향을 먼저 정해 재사용합니다. 상세 검수 기준은 각 분기에서 소유합니다.
 
-설치는 기존 `install.sh`의 스킬 링크 경로를 사용합니다. 이미 설치된 `better-*`, `interface-review`, `break`, `variant`, `explain-interface`를 교체할 때에는 먼저 수정본과 참조를 탐색 경로 밖에 백업하고 설치 관리자의 등록 여부를 확인합니다. 등록된 항목은 관리자의 제거 명령을 사용하고, 미등록 사본은 백업 후 탐색 경로에서 옮깁니다. 새 스킬과 이전 사본을 함께 활성화하지 않습니다. 설치 직후 기존 대화의 목록은 그대로일 수 있으므로 새 세션에서 확인합니다.
+설치는 `mise run install`의 스킬 링크 경로를 사용합니다. 이미 설치된 `better-*`, `interface-review`, `break`, `variant`, `explain-interface`를 교체할 때에는 먼저 수정본과 참조를 탐색 경로 밖에 백업하고 설치 관리자의 등록 여부를 확인합니다. 등록된 항목은 관리자의 제거 명령을 사용하고, 미등록 사본은 백업 후 탐색 경로에서 옮깁니다. 새 스킬과 이전 사본을 함께 활성화하지 않습니다. 설치 직후 기존 대화의 목록은 그대로일 수 있으므로 새 세션에서 확인합니다.
 
 검증용 합성 입력과 기대 동작은 각 스킬의 `evals/evals.json`에 있습니다: [UI](../../skills/awesome-interface/evals/evals.json), [이미지 기반 구현](../../skills/image-to-code/evals/evals.json), [이미지 생성](../../skills/imagegen/evals/evals.json), [설계 문서](../../skills/design-md/evals/evals.json). `files`가 있는 사례는 fixture를 같은 상대 경로로 배치한 격리 작업공간에서 실행합니다. 계획 전용 사례는 지시·단계·보존 경계를 검증하며 실제 생성이나 구현의 성공을 증명하지 않습니다. 실제 모델 응답과 캡처는 버전 관리하지 않습니다.
 

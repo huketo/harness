@@ -63,8 +63,8 @@ T3 예약 작업은 셸 명령이 아니라 에이전트 턴이며 시간 초과
 배포한 `jobs.json`은 `version: 1`과 빈 `jobs` 목록만 가지며 T3 작업을 만들지 않습니다. 작업을 정의하면 T3 작업의 프롬프트가 가드를 실행하고 `GUARD_RESULT` 줄만 보고하게 합니다. 무인 실행 규칙은 [T3 사람 개입 규칙](../agents/hitl.md)의 "Unattended runs"이며, T3의 Antigravity 세션은 저장소 `AGENTS.md`를 로드하지 않으므로 프롬프트에 그 파일의 경로를 직접 적습니다. T3 작업을 만들거나 켜고 끄는 일은 예약 작업 변경이므로 매번 별도 결정이 필요합니다.
 
 ```bash
-bun t3/scheduled/guard.mjs --help
-bun test t3/scheduled/guard.test.mjs
+node t3/scheduled/guard.mjs --help
+mise exec -- node --test t3/scheduled/guard.test.mjs
 ```
 
 ## AGY 권한 설정

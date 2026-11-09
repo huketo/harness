@@ -10,10 +10,10 @@ Harness configures an existing coding-agent workstation. It does not install T3 
 | --- | --- |
 | Operating environment | Linux or WSL2 with Bash 4+ and GNU-compatible utilities (`readlink -f`, `cmp`, `cp`, `ln`). Native Windows and macOS installation are not maintained targets. |
 | Agent CLIs | Claude Code, Codex CLI, and Antigravity CLI (`agy`), installed and authenticated separately. [T3 Code](https://github.com/pingdotgg/t3code) runs them as threads. Review future releases before adopting them; this guide does not promise blanket compatibility. |
-| Bun | **1.3.14**. The T3 scheduled-task guard, host sync, the Codex reviewer (`codex/review.ts`), and the Bun tests use Bun; other releases are not maintained compatibility targets. |
+| mise | Required. [`mise.toml`](../../mise.toml) pins **Node.js 24.22.2** and **rulesync 43.8.0**, and defines every entry point (`mise run plan`, `install`, `update`, `check`). Run `mise trust && mise install` once per checkout. Node runs the installer, the merge-guard hook, the T3 scheduled-task guard, host sync, and the Codex reviewer (`codex/review.ts`); other versions are not maintained compatibility targets. |
 | Python 3 | Required for the cost-audit analyzer and selected skill collectors. |
-| Node.js | Required for the full installation's plugin step (`plugin/install.mjs`) and for the merge-guard hook it installs into Claude Code and AGY. `--skills-only` does not use it. |
-| Existing personal instructions | `~/.claude/CLAUDE.md` must already be a file you maintain. The installer links it into AGY's global rules. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
+| Existing personal instructions | Optional. When `<Claude config dir>/CLAUDE.md` exists, the installer links it into AGY's global rules; otherwise that step is skipped. The repository's `CLAUDE.md` is a separate owner-maintenance adapter. |
+| Claude Code config directory | `CLAUDE_CONFIG_DIR` when it is set, otherwise `~/.claude`. Skills, settings, and the credentials deny follow it. |
 | Optional integrations | Install [Herdr](https://github.com/herdrdev/herdr) before using `t3-terminal`; the skill drives it as a plain terminal multiplexer, and the installer does not configure it. BrowserSkill and the daily-report drafting workflow have separate prerequisites. |
 
 See [recorded compatibility evidence](../FACTS.md). This is a recommended personal setup, not a compatibility or support commitment.
@@ -23,20 +23,19 @@ See [recorded compatibility evidence](../FACTS.md). This is a recommended person
 ```bash
 git clone https://github.com/huketo/harness.git
 cd harness
-bash install.sh --help
-bash install.sh --dry-run
+mise trust && mise install
+mise run plan
 ```
 
-Read [install.sh](../../install.sh) and [plugin/install.mjs](../../plugin/install.mjs) before running mutating commands. Inspect the plugin sources under `plugin/`, and the deny rules in `plugin/guardrails.json` as part of the proposed changes. `--dry-run` reports planned links, backups, and conflicts without changing them. A missing personal instruction file or ownership conflict can make the plan exit nonzero.
+Read [scripts/install.ts](../../scripts/install.ts), [scripts/links.ts](../../scripts/links.ts), [scripts/safe-generate.ts](../../scripts/safe-generate.ts), and [plugin/install.mjs](../../plugin/install.mjs) before running mutating commands, and inspect the plugin sources under `plugin/` and the deny rules in [`.rulesync/permissions.jsonc`](../../.rulesync/permissions.jsonc) as part of the proposed changes. `mise run plan` reports planned links, backups, permission changes, plugin steps, and conflicts without changing anything; it exits nonzero when a step needs a person.
 
 The installer is not transactional. It can create links before discovering a later conflict. Resolve each reported path issue deliberately; a failed run does not imply that nothing changed.
 
 ### Shared machines: skills only
 
-Use `bash install.sh --skills-only --dry-run`, then
-`bash install.sh --skills-only` to link only `skills/*` into the two skill
-directories. This mode needs no personal Claude instruction file and leaves
-AGY slots, Codex rules, plugins, and agent settings unchanged. Existing foreign skill
+Use `node scripts/install.ts --skills-only` to review, then
+`node scripts/install.ts --skills-only --apply` to link only `skills/*` into the two skill
+directories. This mode leaves AGY slots, Codex rules, plugins, and agent settings unchanged. Existing foreign skill
 names remain ownership conflicts; the installer does not rename or overwrite them.
 
 Keep the clone at a stable path because the installed skills point into it.
@@ -48,28 +47,35 @@ installation. A pin or lock snapshot does not install manager-owned skills.
 After reviewing and accepting the workstation changes:
 
 ```bash
-bash install.sh
+mise run install
+mise run plan
 ```
 
-Start new agent sessions or T3 threads after installation so they discover the current skill list; a running session does not reload it retroactively.
+The second command should report every step as unchanged: the installer is idempotent. Start new agent sessions or T3 threads after installation so they discover the current skill list; a running session does not reload it retroactively.
 
 ## What changes
 
 | Source | Destination or effect |
 | --- | --- |
-| `skills/*` | Per-skill links in `~/.agents/skills/` and `~/.claude/skills/`. |
-| `plugin/` (through `plugin/install.mjs`) | Builds plugin artifacts under `${XDG_STATE_HOME:-~/.local/state}/harness/plugins/`. When `claude` is on `PATH`, registers the `harness` directory marketplace and installs `harness@harness` at user scope. When `agy` is on `PATH`, installs an AGY plugin copy with `agy plugin install`, replacing an older checkout-owned `~/.gemini/config/plugins/harness` symlink because AGY 1.4.7 skips symlinked plugin directories. Adds the deny rules in `plugin/guardrails.json` to existing `~/.claude/settings.json` and `~/.gemini/antigravity-cli/settings.json`, keeping a one-time `.harness-bak` copy; it never removes a rule. Shared skills and existing personal instructions are linked into AGY's global slots. |
-| `codex/harness.rules` | Link at `~/.codex/rules/harness.rules`. Codex asks before `gh pr merge` and `glab mr merge`, and refuses them under `approval_policy = "never"`. |
+| `skills/*` | Per-skill links in `~/.agents/skills/` and `<Claude config dir>/skills/`. |
+| AGY slots | `~/.gemini/config/skills` links to `~/.agents/skills`, and `~/.gemini/config/rules/AGENTS.md` links to `<Claude config dir>/CLAUDE.md` when that file exists. An existing entry in either slot is a conflict. |
+| `codex/harness.rules` | Link at `~/.codex/rules/harness.rules`. Codex asks before the `gh` and `glab` merge commands, and refuses them under `approval_policy = "never"`. |
+| `.rulesync/permissions.jsonc` (through `scripts/safe-generate.ts`) | Credential-read deny rules merged into `<Claude config dir>/settings.json` and `~/.gemini/antigravity-cli/settings.json`, for each agent whose config directory exists. rulesync runs in a throwaway `HOME`; every existing setting is kept, and a change that would still drop one is refused as a conflict. Each replaced file keeps a `<file>.hstack-bak-<time>` copy. Codex permissions are not generated, because rulesync's Codex output replaces Codex's sandbox profile; see [AGENT-CONFIG](../AGENT-CONFIG.md). |
+| `plugin/` (through `plugin/install.mjs`) | When `claude` is on `PATH`, registers this repository's GitHub marketplace as `hstack`, installs `hstack@hstack` at user scope, and turns marketplace auto-update on unless you set it. When `agy` is on `PATH`, builds an AGY plugin copy under `${XDG_STATE_HOME:-~/.local/state}/hstack/plugins/agy` and installs it with `agy plugin install`, because AGY skips symlinked plugin directories. [plugin-release.md](plugin-release.md) explains how a new plugin version reaches Claude Code. |
 
-Existing regular configuration files receive a `.bak` copy before replacement. A differing existing backup, external symlink, or real skill directory is a conflict, not permission to overwrite it. Correct links are left unchanged. Links that earlier installer versions created for components now in [`archived/`](../../archived/) are neither refreshed nor removed; see [Updating and undoing](#updating-and-undoing). See [ownership rules](../REPO.md).
+Existing regular configuration files receive a `.bak` copy before replacement with a link. A differing existing backup, external symlink, or real skill directory is a conflict, not permission to overwrite it. Correct links are left unchanged. Links that earlier installer versions created for components now in [`archived/`](../../archived/) are neither refreshed nor removed; see [Updating and undoing](#updating-and-undoing). See [ownership rules](../REPO.md).
 
 The installer does **not** create or enable T3 scheduled tasks, copy AGY settings (it only adds deny rules), install agent CLIs or Herdr, write the `full-send` allowlist, provision credentials, publish Git changes, or submit reports. The distributed `t3/scheduled/jobs.json` is intentionally empty (`version: 1`, `jobs: []`). Example snapshots are review aids, not host restore inputs.
 
-The plugin step prints one line per planned action in the same `would …`, `unchanged …`, and `skipped …` form as the rest of the installer. A Claude marketplace or AGY plugin named `harness` that this checkout did not ship, or a settings file that is not valid JSON, is reported as a conflict and left unchanged. Remove the merge guard with `claude plugin uninstall harness@harness` and `agy plugin uninstall harness`; deny rules added to settings files stay until you remove them, and the `.harness-bak` copy holds the pre-install file.
+Every step prints one line in the same `would …`, `unchanged …`, `skipped: …`, and `conflict: …` form. A Claude marketplace or AGY plugin named `hstack` that this checkout did not ship, or a settings file that is not valid JSON, is reported as a conflict and left unchanged. Remove the plugin with `claude plugin uninstall hstack@hstack` and `agy plugin uninstall hstack`; deny rules added to settings files stay until you remove them, and the `.hstack-bak-<time>` copy holds the file before each change.
+
+### Moving from the `harness` plugin
+
+Earlier versions installed the same plugin as `harness@harness` from a directory marketplace under `${XDG_STATE_HOME:-~/.local/state}/harness/plugins/claude`, and the AGY copy as `harness`. The installer reports such a leftover as `skipped: legacy …` with the command that removes it, and does not remove it itself, because removing a marketplace uninstalls its plugin at every scope. Until it is removed both plugins load, so the merge guard runs twice and the reviewer exists under both names. Remove it with `claude plugin marketplace remove harness` and `agy plugin uninstall harness`.
 
 ## External skills and plugins
 
-- Repository-owned and adopted skills are linked by `install.sh`. Provenance and retained licenses are recorded in [adopted-skills.json](../../third-party/adopted-skills.json) and component license files.
+- Repository-owned and adopted skills are linked by `mise run install`. Provenance and retained licenses are recorded in [adopted-skills.json](../../third-party/adopted-skills.json) and component license files.
 - [skills.lock.json](../../third-party/skills.lock.json) is a comparison snapshot of publicly available manager-owned skills, not a portable lockfile with a verified bulk restore command. Install only what you choose to trust.
 - BrowserSkill is an external CLI and manager-owned skill. On WSL2, install the Linux CLI in WSL and the extension in Windows Chrome:
 
@@ -106,31 +112,29 @@ Repository adoption does not apply these host changes automatically. See the [di
 
 ## Updating and undoing
 
-The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun dry-run and installation, then start new agent sessions. Review compatibility deliberately before changing agent CLI or Bun versions.
+The checkout is the live source for installed symlinks: edits and repository updates immediately affect linked assets. Review changes before updating an installed checkout. After an update, rerun `mise run plan` and installation, then start new agent sessions. Review compatibility deliberately before changing agent CLI, Node, or rulesync versions.
 
-For a clean `main` clone tracking the public repository, update from any working
-directory with:
+For a clean `main` clone tracking the public repository, update with:
 
 ```bash
-bash /path/to/harness/update.sh --skills-only --dry-run
-bash /path/to/harness/update.sh --skills-only
+mise run update -- --dry-run
+mise run update
 ```
 
-Use the actual stable clone path. The script requires `main` and a clean worktree,
-runs `git fetch origin main` and `git log --oneline HEAD..origin/main` to show
-incoming commits, then `git merge --ff-only FETCH_HEAD` and installation.
+`scripts/update.ts` requires `main` and a clean worktree,
+runs `git fetch origin main` and lists the incoming commits, then fast-forwards and
+runs the freshly fetched installer with `--apply` (`--skills-only` is passed through).
 `--dry-run` fetches and shows commits without changing the checkout or installed
 assets. A topic branch, detached revision, dirty checkout, or divergent history
-is not switched, stashed, rebased, merged with a merge commit, or reset.
+is not switched, stashed, rebased, combined with a merge commit, or reset.
 Review the dry-run before updating: fast-forwarding changes live symlink targets
-before reinstallation, and an installation conflict does not roll back that merge.
-Omit `--skills-only` only for an intentionally full workstation installation.
+before reinstallation, and an installation conflict does not roll back that fast-forward.
 
-For a fixed release pin, keep the clone detached and deliberately select the next
-reviewed public commit, then rerun `bash install.sh --skills-only`. The updater
-does not advance detached pins. Neither update mode installs agent CLIs, Bun, or external
+For a fixed release pin, keep the clone detached on a release tag (`v<version>`) and deliberately select the next
+reviewed release, then rerun `mise run install`. The updater
+does not advance detached pins. Neither update mode installs agent CLIs or external
 skills, or changes another tool's installation.
 
-There is no automated uninstaller. Inspect each installed link and remove only links still pointing into this checkout; restore matching `.bak` files where appropriate. Deny rules merged into agent settings and plugin registrations require deliberate rollback; removing links does not undo them, and the one-time `.harness-bak` copy records the settings before the first merge. Keep credentials, manager-owned skills, transcripts, backups, and unrelated configuration intact.
+There is no automated uninstaller. Inspect each installed link and remove only links still pointing into this checkout; restore matching `.bak` files where appropriate. Deny rules merged into agent settings and plugin registrations require deliberate rollback; removing links does not undo them, and each `.hstack-bak-<time>` copy records a settings file before one change (older installs left a one-time `.harness-bak`). Keep credentials, manager-owned skills, transcripts, backups, and unrelated configuration intact.
 
 Links left by earlier installer versions for components now in [`archived/`](../../archived/), such as entries under `~/.omp/agent/extensions/` and `~/.config/herdr/` and the `omp-profile` and `harness-run` launchers in `~/.local/bin/`, are cleaned up the same way: inspect each with `readlink -f` and remove only links that still resolve into this checkout. Because those sources moved, such links now dangle. Earlier settings applied through the removed `--with-config` option are not rolled back by removing links.

@@ -5,7 +5,7 @@
 ## 1. 도구 가용성
 
 - 현재 설치·설정의 정본은 [설치 안내](guides/installation.md)입니다.
-- Bun 1.3.14가 Bun 테스트, Codex 리뷰어, T3 예약 작업 guard, host-sync의 기준 환경입니다.
+- `mise.toml`이 고정한 Node.js 24.22.2가 테스트, 설치기, Codex 리뷰어, T3 예약 작업 guard, host-sync의 기준 환경입니다. `.ts` 파일은 Node의 타입 제거(type stripping)로 바로 실행하며, `enum`처럼 제거만으로 실행할 수 없는 문법은 `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`로 실패합니다.
 - Python 3 표준 라이브러리는 cost-audit 분석기와 collector에 사용됩니다. `sqlite3`나 `jq` CLI가 모든 실행 환경에 있다고 가정하지 않습니다.
 - 네이티브 Windows와 macOS는 설치 대상으로 확인하지 않았습니다. WSL2의 BrowserSkill 연결 검증은 전체 Windows 설치 지원과 별개입니다.
 
@@ -70,3 +70,15 @@ T3 Code v0.1.2 데스크톱 앱(WSL 백엔드), Claude Code 2.1.310, Codex CLI 0
 - Codex 실행 정책: `codex execpolicy check`에 기본 규칙 파일과 `codex/harness.rules`를 함께 주자 `glab mr` 아래의 머지 하위 명령은 `prompt`, `glab mr view 5`는 `allow`였습니다. 기본 규칙에는 `prefix_rule(["glab","mr"], allow)`가 있었습니다. Codex는 `rules/`의 모든 `*.rules`를 읽고, 더 엄격한 결정이 우선하며, `approval_policy = "never"`에서 `prompt`를 거부로 바꿉니다.
 - Claude Code 플러그인: 임시 `CLAUDE_CONFIG_DIR`에서 `plugin/build.mjs` 산출물을 디렉터리 마켓플레이스로 등록하고 설치하자 `claude plugin list --json`이 `readFromFolder`로 산출물 경로를 보고했고 agent 1개(`reviewer`)와 PreToolUse 훅 1개가 보였습니다. 버전을 올리지 않고 폴더를 고치면 다음 세션부터 반영됩니다.
 - GitLab MR 감시: T3는 GitLab MR을 `glab` REST로 2분마다 읽고, head 파이프라인 하나를 `Pipeline` 검사로 보며, 시스템 note를 이벤트에서 빼므로 승인은 스레드를 깨우지 않습니다(`packages/source-control-gitlab/src/shared/definition.ts`, `gitLabMergeRequestJson.ts`). 기존 GitLab MR 하나에 연결·감시·해제가 동작했고, 감시가 실제 이벤트로 스레드를 깨우는 것은 관찰하지 않았습니다.
+
+## 7. rulesync 43.8.0로 권한을 생성할 때 (2026-11-09)
+
+rulesync 43.8.0을 Node 24.22.2에서 `generate --global -f permissions`로 실행하고, 합성 설정을 넣은 임시 `HOME`에서 결과를 비교했습니다. 아래는 그 버전에서 관측한 동작이며 다른 버전의 동작을 보장하지 않습니다.
+
+- 권한은 범주 단위로 소유합니다. `permission.read`를 선언하면 Claude Code 설정의 기존 `Read(...)` deny를 모두 생성 결과로 바꾸고 "will overwrite N existing Read deny entries"라고 경고합니다. 선언하지 않은 범주(`Bash(...)` 등)와 다른 키는 유지했습니다.
+- agy 설정에서는 `~/.ssh/**`를 `read_file(<HOME>/.ssh)`처럼 실행 시점 `HOME`의 절대 경로로 바꾸고, 기존 `command(sudo)`는 유지했지만 생성 결과에 없는 `read_file(...)` 항목은 지웠습니다.
+- Claude Code 파일은 `CLAUDE_CONFIG_DIR`과 관계없이 항상 `$HOME/.claude/`에 쓰고, `--global`에서는 `--output-roots`를 무시하고 `$HOME` 아래에 씁니다.
+- Codex 대상은 `config.toml`에 `default_permissions = "rulesync"`, `[permissions.rulesync]` 프로필(`extends = ":workspace"`), `approval_policy = "on-request"`, `approvals_reviewer = "auto_review"`를 추가합니다. `codexcli` 블록은 `approval_policy` 같은 값을 바꿀 수 있지만 `default_permissions`를 쓰지 않게 할 수는 없습니다.
+- hook의 입력과 출력은 에이전트 사이에서 번역하지 않습니다. agy는 명령을 `toolCall.args.CommandLine`으로 넘기고 `{"decision":"deny"}`로 거부하며, Claude Code와 Codex는 `tool_input.command`를 씁니다. 이 저장소는 hook을 rulesync로 배포하지 않고 플러그인으로 배포합니다.
+
+`scripts/safe-generate.ts`는 이 관측에 맞춰 rulesync를 실제 설정의 사본이 든 임시 `HOME`에서 실행하고, 빠진 배열 항목을 되돌리며, Claude Code 결과를 `CLAUDE_CONFIG_DIR`로 보냅니다. `scripts/safe-generate.test.ts`가 고정한 rulesync로 이 동작을 확인합니다.

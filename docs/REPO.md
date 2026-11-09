@@ -7,11 +7,12 @@
 - 사람이 작성하는 개인 스킬과 Codex 실행 정책(`codex/harness.rules`)은 레포 파일을 정본으로 삼고 사용자 설정 경로에는 심링크합니다. 체크아웃 변경이 설치된 자산에 즉시 보이는 방식입니다.
 - `~/.agents/.skill-lock.json`은 스킬 설치 관리자가 갱신합니다. `third-party/skills.lock.json`은 공개 의존성 핀의 비교 사본이며 실제 잠금 파일을 대체하지 않습니다.
 - `agy/settings.snapshot.json`은 공개 가능한 개인 정책 예시입니다. live 설정을 복원하지 않고, trusted workspace·개인 경로·자격증명을 담지 않습니다.
-- Claude Code와 AGY 플러그인은 `plugin/`이 정본이고, 설치 대상은 `plugin/build.mjs`가 만든 산출물입니다. Claude Code는 산출물 디렉터리를 마켓플레이스로 읽고, AGY는 `agy plugin install`로 사본을 만듭니다. 두 CLI의 설정 파일(`~/.claude/settings.json`, `~/.gemini/antigravity-cli/settings.json`)은 도구 소유이므로 `plugin/install.mjs`는 `plugin/guardrails.json`의 거부 규칙을 합집합으로 더하기만 하고 다른 값을 바꾸지 않습니다.
+- Claude Code와 AGY용 `hstack` 플러그인은 `plugin/`이 정본입니다. 저장소 루트의 `.claude-plugin/marketplace.json`이 `plugin/`을 가리키므로 Claude Code는 GitHub 마켓플레이스에서 이 디렉터리를 그대로 받고, 생성 파일(`plugin/.claude-plugin/plugin.json`, `plugin/hooks/hooks.json`)만 `plugin/build.mjs`가 만들어 추적합니다. AGY는 `agy plugin install`로 빌드 사본을 복사합니다. 릴리스 절차는 [plugin-release](guides/plugin-release.md)가 소유합니다.
+- 두 CLI의 설정 파일(Claude Code 설정 디렉터리의 `settings.json`, `~/.gemini/antigravity-cli/settings.json`)은 도구 소유입니다. `scripts/safe-generate.ts`는 `.rulesync/permissions.jsonc`의 거부 규칙을 rulesync로 생성하되, 기존 항목을 하나도 지우지 않는 경우에만 반영합니다. 설정 디렉터리 경로는 `CLAUDE_CONFIG_DIR`을 따릅니다.
 - T3 Code 예약 작업의 실제 상태는 T3 상태 DB가 소유합니다. `t3/scheduled/jobs.json`은 가드가 읽는 작업 정의이며 공개본에서는 빈 목록입니다. 가드의 실행 기록은 `${XDG_STATE_HOME:-~/.local/state}/harness-t3-jobs/`에 둡니다.
 - `full-send` 허용 목록(`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`)은 사람이 쓰는 사용자 설정입니다. 저장소는 이 파일을 만들거나 배포하지 않습니다.
 
-`install.sh`는 이 경계를 자동화합니다. 일반 파일을 심링크로 바꾸기 전에 `<경로>.bak`을 만들고, 이미 정확한 심링크가 있으면 유지합니다. 레포 밖을 가리키는 심링크나 심링크가 아닌 기존 스킬은 다른 소유자의 자산으로 보아 건너뛰고 충돌을 보고합니다.
+`mise run install`(`scripts/install.ts`)은 이 경계를 자동화합니다. 일반 파일을 심링크로 바꾸기 전에 `<경로>.bak`을 만들고, 이미 정확한 심링크가 있으면 유지합니다. 레포 밖을 가리키는 심링크나 심링크가 아닌 기존 스킬은 다른 소유자의 자산으로 보아 건너뛰고 충돌을 보고합니다.
 
 ## 디렉터리와 문서
 
@@ -19,7 +20,12 @@
 | --- | --- |
 | `t3/scheduled/host-sync.mjs`, `host-sync.test.mjs` | 허용 목록 기반 동기화 guard와 임시 Git 저장소 회귀 테스트 |
 | `t3/scheduled/guard.mjs`, `guard.test.mjs`, `jobs.json` | T3 예약 작업에 없는 시간 초과·일일 실행 횟수·연속 실패 중지·월간 실행일을 강제하는 가드와 회귀 테스트. `jobs.json`은 빈 공개 배포 상태 |
-| `plugin/` | Claude Code·AGY 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, AGY 규칙), 산출물 빌더 `build.mjs`, 설치 계획기 `install.mjs`, 설정에 합칠 거부 규칙 `guardrails.json`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
+| `plugin/` | Claude Code·AGY용 `hstack` 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, AGY 규칙), 생성 파일 빌더 `build.mjs`, 플러그인 설치 계획기 `install.mjs`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
+| `scripts/install.ts`, `links.ts`, `safe-generate.ts`, `update.ts` | `mise run plan`·`install`·`update`의 구현. 링크 계획, rulesync 래퍼, fast-forward 업데이트와 각 테스트 |
+| `.rulesync/` | rulesync 입력. 현재는 Claude Code·AGY 자격 증명 읽기 거부 규칙(`permissions.jsonc`)만 둠 |
+| `.claude-plugin/marketplace.json` | 저장소 루트를 `hstack` 마켓플레이스로 만드는 목록. 플러그인 원본은 `plugin/` |
+| `mise.toml`, `package.json`, `tsconfig.json`, `.changeset/`, `.github/workflows/` | 도구 버전과 진입점, 버전의 단일 원천, 타입 검사 설정, 대기 중인 릴리스 노트, CI·릴리스 워크플로 |
+| `docs/adr/` | 되돌리기 어려운 구조 결정 기록 |
 | `codex/` | T3 밖에서 쓰는 읽기 전용 Codex 리뷰어 `review.ts`와 테스트, `~/.codex/rules/harness.rules`로 연결하는 실행 정책(머지 명령은 사람의 승인) |
 | `skills/` | 이 레포가 소유하는 개인 스킬과 고지를 유지한 편입 스킬 |
 | `skills/daily-report/` | GitLab/iCal 근거 수집과 초안 작성 지침. Daou Office 제출은 사용자 UI 작업 |
@@ -53,7 +59,7 @@
 격리된 회귀 테스트는 다음과 같이 임시 로컬 Git 저장소만 사용합니다.
 
 ```bash
-bun test t3/scheduled/host-sync.test.mjs
+mise exec -- node --test t3/scheduled/host-sync.test.mjs
 ```
 
 테스트 성공은 실제 원격 게시 권한이나 host scheduler 상태를 입증하지 않습니다.
@@ -62,17 +68,17 @@ bun test t3/scheduled/host-sync.test.mjs
 
 `agy`는 `~/.gemini/config/` 아래의 rules, skills, plugins, hooks, MCP 설정을 읽습니다. Harness가 내용을 소유하는 것은 플러그인 하나와 공개 예시 스냅샷뿐입니다.
 
-- 플러그인의 정본은 `plugin/`이며, `plugin/build.mjs`가 만든 산출물을 `plugin/install.mjs`가 `agy plugin install`로 `~/.gemini/config/plugins/harness`에 복사합니다. AGY 1.4.7은 심링크한 플러그인 디렉터리를 건너뛰므로 저장소 디렉터리를 심링크하지 않으며, 이전 설치기가 만든 checkout 소유 심링크는 사본으로 바꿉니다([FACTS 6절](FACTS.md#6-t3-code와-에이전트-설정-표면-2026-10-26)).
+- 플러그인의 정본은 `plugin/`이며, `plugin/build.mjs`가 만든 산출물을 `plugin/install.mjs`가 `agy plugin install`로 `~/.gemini/config/plugins/hstack`에 복사합니다. AGY 1.4.7은 심링크한 플러그인 디렉터리를 건너뛰므로 저장소 디렉터리를 심링크하지 않으며, 이전 설치기가 만든 checkout 소유 심링크는 사본으로 바꿉니다([FACTS 6절](FACTS.md#6-t3-code와-에이전트-설정-표면-2026-10-26)).
 - hooks와 MCP 설정은 각 설치 관리자가 쓰는 상태이므로 복사하거나 심링크하지 않습니다.
 - 공유 스킬 디렉터리는 `~/.agents/skills`의 정본을 사용합니다. 기계별 절대 경로를 설정 파일에 박아 넣는 사본을 만들지 않습니다.
-- 개인 instruction은 사용자가 소유한 기존 `~/.claude/CLAUDE.md`를 AGY rule 슬롯에 연결합니다. 저장소의 `CLAUDE.md`와 역할이 다릅니다.
+- 개인 instruction은 사용자가 소유한 Claude Code 설정 디렉터리의 `CLAUDE.md`가 있으면 AGY rule 슬롯에 연결합니다. 저장소의 `CLAUDE.md`와 역할이 다릅니다.
 - `agy/settings.snapshot.json`은 live 파일의 정본이 아닙니다. 개인 `always-proceed` 선택을 포함하더라도 새 호스트의 안전한 기본값이나 샌드박스라고 주장하지 않습니다.
 
 비대화형 실행에서는 작업 디렉터리, 모델, 종료 코드, 구조화 결과를 각각 확인합니다. 성공 상태만으로 도구가 의도한 작업공간을 사용했거나 외부 효과가 안전했다고 판단하지 않습니다.
 
 ## 개인 스킬의 소유권
 
-이 레포의 `skills/`가 사용자가 직접 만들고 통제하는 스킬을 소유합니다. 정본은 `skills/<스킬-이름>/SKILL.md`이며, `install.sh`가 `~/.agents/skills/<스킬-이름>`과 `~/.claude/skills/<스킬-이름>`에 심링크를 만듭니다.
+이 레포의 `skills/`가 사용자가 직접 만들고 통제하는 스킬을 소유합니다. 정본은 `skills/<스킬-이름>/SKILL.md`이며, `mise run install`이 `~/.agents/skills/<스킬-이름>`과 Claude Code 설정 디렉터리의 `skills/<스킬-이름>`에 심링크를 만듭니다.
 
 현재 스킬 목록은 `skills/`에서 확인합니다. `t3-orchestrate`, `t3-handoff`, `t3-terminal`, `t3-show`는 CLI 자체가 아니라 T3와 터미널·시각화 도구를 엮어 쓰는 작업 방식이므로 이 레포가 소유합니다. 은퇴한 오케스트레이션 스킬은 [`archived/skills/`](../archived/skills/)에 보관하며 설치하지 않습니다. 특정 프로젝트의 비공개 용어, endpoint, 고정 보고 양식, 사내 저장소를 전제로 하지 않습니다. 공개 `daily-report` 스킬은 `glab`을 통한 GitLab 수집과 iCal/`khal` 일정 수집, 근거 있는 초안, 사용자의 수동 Daou Office UI 입력까지만 설명합니다.
 

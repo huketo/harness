@@ -17,32 +17,31 @@ Harness configures an existing [T3 Code](https://github.com/pingdotgg/t3code) wo
 | T3 Code path | `t3-orchestrate`, `review-loop`, and `council` delegate through T3's orchestration tools; `t3-handoff` continues the work in a new thread from a handoff document; [T3 human-in-the-loop rules](docs/agents/hitl.md) route questions through the thread; `codex/review.ts` runs an independent review in Codex's read-only sandbox outside T3 (inside T3 the Codex reviewer is a `delegate_task` child); `t3/scheduled/guard.mjs` adds timeouts and run limits to scheduled tasks. |
 | Watched terminal work | `t3-terminal` opens Herdr workspaces, tabs, and panes for dev servers, interactive prompts, REPLs, ssh, and TUIs that a person must watch or step into. It is not a substitute for background processes. |
 | Interactive visuals | `t3-show` builds explorable views inside the thread with `html_render`: codebase maps, algorithm steppers, assumption-driven simulations such as GTM metrics, and data exploration. Each page is grounded in code read or numbers computed in the shell, self-checks against them, and is driven through its interactions in `html_preview` before it is shown. |
-| MR lifecycle and work modes | GitLab MR and GitHub PR skills adapted from tstack (`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`) and the user-selected `full-send`/`full-stop` modes. A merge-guard hook in the `plugin/` artifacts for Claude Code and AGY, and `codex/harness.rules` for Codex, block merges the mode does not allow; `full-send` merges only in repositories you list in an allowlist. See [AGENT-CONFIG](docs/AGENT-CONFIG.md). |
+| MR lifecycle and work modes | GitLab MR and GitHub PR skills adapted from tstack (`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`) and the user-selected `full-send`/`full-stop` modes. A merge-guard hook in the `hstack` plugin for Claude Code and AGY, and `codex/harness.rules` for Codex, block merges the mode does not allow; `full-send` merges only in repositories you list in an allowlist. See [AGENT-CONFIG](docs/AGENT-CONFIG.md). |
 | Personal operations | Cost audits over Claude Code and Codex sessions, guarded host synchronization, and a human-reviewed daily-report drafting workflow. These are not hosted services. |
 
 ## Recommended environment
 
-The maintained showcase target is **Linux or WSL2 with Bash, GNU-compatible utilities, and Bun 1.3.14**. Node.js is needed for the full installation's plugin step, Bun for the scheduled-task guard, host sync, and the Codex reviewer, and Python 3 for the cost-audit analyzer and skill collectors. An existing `~/.claude/CLAUDE.md` is required by the current installer. Install and authenticate T3 Code, Claude Code, Codex CLI, and AGY separately. Native Windows and macOS are not maintained installation targets. Future agent CLI or Bun releases must be reviewed rather than assumed compatible.
+The maintained showcase target is **Linux or WSL2 with [mise](https://mise.jdx.dev)**. `mise.toml` pins Node.js 24 and [rulesync](https://github.com/dyoshikawa/rulesync); every script runs on that Node, and Python 3 runs the cost-audit analyzer and skill collectors. Install and authenticate T3 Code, Claude Code, Codex CLI, and AGY separately. Native Windows and macOS are not maintained installation targets. Future agent CLI, Node, or rulesync releases must be reviewed rather than assumed compatible.
 
 ```bash
 git clone https://github.com/huketo/harness.git
 cd harness
-bash install.sh --dry-run
+mise trust && mise install
+mise run plan
 ```
 
 Review the [installation guide](docs/guides/installation.md), the source, and the proposed workstation changes before proceeding.
 
 ```bash
-bash install.sh
+mise run install
 ```
 
-**Installation changes your workstation:** it links shared assets, backs up eligible existing configuration files, installs the `harness` plugin into Claude Code and AGY when they are on `PATH`, adds credential-read deny rules to their settings files, and links a Codex execpolicy file. A foreign or unexpected entry remains a conflict and is not removed; dry-run reports the plan without mutating it. Start new agent sessions afterwards so they load the current skills. Links that earlier installer versions created for components now in `archived/` are not removed; see [manual rollback boundaries](docs/guides/installation.md#updating-and-undoing). AGY settings and T3 scheduled tasks are not restored by the installer.
+**Installation changes your workstation:** it links shared skills and the Codex execpolicy file, backs up an eligible existing file before replacing it with a link, merges credential-read deny rules into the Claude Code and AGY settings files through rulesync without dropping any existing setting, and installs the `hstack` plugin into Claude Code (from this repository's marketplace, with auto-update) and AGY when they are on `PATH`. A foreign or unexpected entry remains a conflict and is not removed; `mise run plan` reports the plan without mutating anything. Running install again on an unchanged checkout changes nothing. Start new agent sessions afterwards so they load the current skills. AGY settings and T3 scheduled tasks are not restored by the installer.
 
-On a shared workstation, `bash install.sh --skills-only` links only skills and
-leaves tool configuration and commands unchanged. Keep the clone at a stable
-path; `bash /path/to/harness/update.sh --skills-only` fast-forwards a clean `main`
-clone and reinstalls. Review updates first because installed links are live.
-See [installation and update boundaries](docs/guides/installation.md).
+On a shared workstation, `node scripts/install.ts --skills-only --apply` links only skills and leaves tool configuration unchanged. Keep the clone at a stable path; `mise run update` fast-forwards a clean `main` clone and reinstalls. Review updates first because installed links are live. See [installation and update boundaries](docs/guides/installation.md).
+
+To take only the merge guard and read-only reviewer into Claude Code, without the skills or settings changes, install the plugin from this repository's marketplace in Claude Code: `/plugin install hstack --marketplace huketo/harness`.
 
 ## Everyday use
 
@@ -53,7 +52,7 @@ Send terminal work a person must watch or step into through `t3-terminal`; attac
 Check the boundary of the Codex reviewer used outside T3 without calling a model:
 
 ```bash
-bun --no-install codex/review.ts --cwd <worktree> --inspect-tools
+node codex/review.ts --cwd <worktree> --inspect-tools
 ```
 
 See [detailed usage and state boundaries](docs/guides/usage.md) (Korean). Dated measurements live in [FACTS](docs/FACTS.md) and pricing evidence in [PRICING](docs/PRICING.md); they are observations, not performance guarantees.
@@ -71,7 +70,8 @@ See [detailed usage and state boundaries](docs/guides/usage.md) (Korean). Dated 
 | Path | Purpose |
 | --- | --- |
 | [`skills/`](skills/) | Personal skills and adopted skills with retained notices. |
-| [`plugin/`](plugin/) | One source for the Claude Code and AGY plugins: merge guard, read-only reviewer agent, AGY rules, builder, installer, and deny rules. |
+| [`plugin/`](plugin/) | The `hstack` plugin for Claude Code and AGY: merge guard, read-only reviewer agent, AGY rules, builder, and plugin installer. The repository root is its marketplace. |
+| [`scripts/`](scripts/) and [`.rulesync/`](.rulesync/) | The installer, updater, and rulesync wrapper behind `mise run`, and the credential deny rules it applies. |
 | [`codex/`](codex/) | Read-only Codex reviewer and the execpolicy rules that make Codex ask before merging. |
 | [`t3/`](t3/) | Guard for T3 Code scheduled tasks and the guarded host sync; the distributed job list is empty. |
 | [`agy/`](agy/) | An example AGY settings snapshot. |

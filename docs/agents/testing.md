@@ -1,40 +1,46 @@
 # Focused verification
 
-Harness has shell installers, Bun/TypeScript scripts and runners, and Python collectors and analyzers. It has no root package manifest or single universal quality command. Select the narrowest existing boundary that proves the change.
+Harness is a Node.js 24 + TypeScript repository: `.ts` files run directly through Node's type stripping, so there is no build step. Python collectors and analyzers live inside skills. `mise.toml` pins Node and rulesync and owns every repository command; run them through `mise run` so the pinned versions are used. Select the narrowest boundary that proves the change.
 
 For behavior changes, test edits, flaky failures, or fixture/runner changes, use the tracked `skills/tdd/SKILL.md` procedure when available. When a required runtime is unavailable, report the exact missing prerequisite and describe source inspection only as source inspection.
 
-## Bun and TypeScript
-
-Bun tests import `bun:test` and live beside the mechanism they exercise. Pass the changed test file or owning directory explicitly, for example:
+## Repository check
 
 ```bash
-bun test t3/scheduled/host-sync.test.mjs
-bun test plugin/hooks/merge-guard.test.mjs plugin/build.test.mjs plugin/install.test.mjs
-bun test codex/review.test.ts
-bun test t3/scheduled/guard.test.mjs
-bun test scripts/skill-eval
+mise install
+mise run check
+```
+
+`mise run check` installs the pinned development dependencies (`npm ci`), runs `tsc --noEmit`, runs every maintained `node --test` suite, and confirms that the tracked plugin files (`plugin/.claude-plugin/plugin.json`, `plugin/hooks/hooks.json`) match `node plugin/build.mjs --host claude`. CI runs the same task on every push and pull request. It reads no host configuration.
+
+## Node tests
+
+Tests use `node:test` with `node:assert/strict` and live beside the mechanism they exercise. Pass the changed test file or owning directory explicitly through the pinned Node, for example:
+
+```bash
+mise exec -- node --test t3/scheduled/host-sync.test.mjs
+mise exec -- node --test plugin/hooks/merge-guard.test.mjs plugin/build.test.mjs plugin/install.test.mjs
+mise exec -- node --test codex/review.test.ts
+mise exec -- node --test t3/scheduled/guard.test.mjs
+mise exec -- node --test 'scripts/skill-eval/**/*.test.ts'
+mise exec -- node --test scripts/install.test.ts scripts/safe-generate.test.ts
 ```
 
 The host-sync test uses temporary local Git repositories and is the focused boundary for `t3/scheduled/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test needs an installed `codex`: a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`; it covers timeouts, daily run limits, failure stop, and `daysOfMonth` admission. The skill-eval tests run the runner and grader against temporary repositories with a fake agent and synthetic captures; they call no model and do not prove a real comparison run.
 
-To check built plugin artifacts against installed CLIs, build into a temporary directory only:
+`scripts/install.test.ts` covers the skill, agy, and Codex links and `scripts/update.ts` against a temporary `HOME` and temporary local Git remotes: skills-only ownership, `CLAUDE_CONFIG_DIR`, conflicts that are preserved, fast-forward reinstallation, and refusal of dirty, topic-branch, or divergent checkouts. `scripts/safe-generate.test.ts` runs the pinned rulesync against synthetic Claude Code and agy settings in a temporary `HOME`; it proves that existing entries survive, that `CLAUDE_CONFIG_DIR` is honored, and that a second run changes nothing. It skips the rulesync cases when rulesync is not installed, and it does not prove the agents enforce the generated rules.
+
+To check built plugin artifacts against installed CLIs, validate the tracked Claude plugin and build the agy copy into a temporary directory only:
 
 ```bash
+claude plugin validate --strict plugin
 out=$(mktemp -d)
-node plugin/build.mjs --out "$out"
-claude plugin validate --strict "$out/claude"
+node plugin/build.mjs --host agy --out "$out"
 agy plugin validate "$out/agy" --strict
 rm -rf "$out"
 ```
 
-When a change crosses components, pass each owning directory with a `./` prefix so Bun does not also collect tests under `archived/`:
-
-```bash
-bun test ./t3 ./plugin ./codex
-```
-
-Nothing under `archived/` is tested or maintained; do not run or repair its tests as part of current work.
+Nothing under `archived/` is tested or maintained; do not run or repair its tests as part of current work. `mise run test` lists the maintained suites explicitly so `archived/` is never collected.
 
 ## Python
 
@@ -64,19 +70,10 @@ These prove the safety verdicts, inlining, and the render checks against fixture
 
 ## Shell
 
-For an edited shell script, first check the exact file with Bash's parser:
+For an edited shell script, first check the exact file with Bash's parser, for example:
 
 ```bash
-bash -n install.sh
-```
-
-The installer/update integration test uses temporary local Git remotes and an
-isolated HOME. It proves skills-only ownership, fast-forward reinstallation,
-and refusal of dirty, topic-branch, or divergent checkouts without a live install:
-
-```bash
-bash -n update.sh update.test.sh
-bash update.test.sh
+bash -n skills/full-send/scripts/harness-mode
 bash skills/review-loop/scripts/review-tier.test.sh
 bash skills/review-loop/scripts/tree-unchanged.test.sh
 ```
@@ -88,12 +85,21 @@ Use `shellcheck` only when it is available; it is not a repository-installed man
 These source-defined checks inspect the current machine and are appropriate only when the task authorizes host inspection:
 
 ```bash
-bash install.sh --dry-run
+mise run plan
 ```
 
-`install.sh --dry-run` reports planned links, backups, and conflicts without applying them. Its plugin step runs `plugin/install.mjs --dry-run`, which reads `claude plugin marketplace list --json` and `claude plugin list --json` when `claude` is on `PATH` but installs nothing. It does not replace a focused unit or integration test of changed source.
+`mise run plan` reports planned links, backups, conflicts, and permission changes without applying them. Its permission step runs rulesync in a throwaway `HOME` seeded with copies of the agent settings files; its plugin step reads `claude plugin marketplace list --json` and `claude plugin list --json` when `claude` is on `PATH` but installs nothing. It does not replace a focused unit or integration test of changed source.
 
-The mutating form of the installation command is governed by [`authority.md`](authority.md) and are not routine verification.
+To exercise a full installation without touching the real configuration, point `HOME` (and `CLAUDE_CONFIG_DIR`, when set) at a temporary directory and keep mise's own directories on the real ones so the checkout stays trusted:
+
+```bash
+real="$HOME" fake=$(mktemp -d)
+MISE_DATA_DIR="$real/.local/share/mise" MISE_CONFIG_DIR="$real/.config/mise" \
+  MISE_STATE_DIR="$real/.local/state/mise" MISE_CACHE_DIR="$real/.cache/mise" \
+  HOME="$fake" mise run install
+```
+
+Without `claude` or `agy` settings directories under the fake `HOME`, their steps are skipped. The mutating form against the real `HOME` is governed by [`authority.md`](authority.md) and is not routine verification.
 
 ## Authenticated collection
 
