@@ -7,7 +7,7 @@
 // (the installer only ever adds), any other loss refuses the whole apply, and results are written to the real paths
 // with a timestamped backup of each replaced file.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
@@ -217,14 +217,37 @@ export function generate(opts: GenerateOptions): GeneratePlan {
 	}
 }
 
-/** Write each planned file through a temporary sibling, keeping `<file>.hstack-bak-<stamp>` of what it replaces. */
+/**
+ * Replace `target` with `content` through a temporary sibling and a rename. A symlinked target is written through
+ * to the file it resolves to, so a link a person keeps (a dotfiles checkout, a shared config directory) survives.
+ * The file keeps its mode; a new file is created 0600 because agent settings can hold API keys.
+ */
+export function writeSettings(target: string, content: string) {
+	const real = existsSync(target) ? realpathSync(target) : target;
+	const mode = existsSync(real) ? statSync(real).mode & 0o777 : 0o600;
+	mkdirSync(dirname(real), { recursive: true });
+	const tmp = `${real}.tmp-${process.pid}`;
+	writeFileSync(tmp, content, { mode });
+	chmodSync(tmp, mode);
+	renameSync(tmp, real);
+}
+
+/**
+ * Write each planned file, keeping `<file>.hstack-bak-<stamp>` beside the file it replaces. A file whose content
+ * changed after the plan was made is refused rather than overwritten, so a setting saved meanwhile is not lost.
+ */
 export function applyPlan(plan: GeneratePlan, stamp = new Date().toISOString().replace(/[:.]/g, "-")): string[] {
 	if (plan.files.some((f) => f.lost.length)) throw new Error("refusing to apply a plan that loses existing settings");
+	for (const { target, prev } of plan.files) {
+		const now = existsSync(target) ? readFileSync(target, "utf8") : null;
+		if (now !== prev) throw new Error(`${target} changed since the plan was made; run the installer again`);
+	}
 	return plan.files.map(({ target, next, prev }) => {
-		mkdirSync(dirname(target), { recursive: true });
-		if (prev !== null) copyFileSync(target, `${target}.hstack-bak-${stamp}`);
-		writeFileSync(`${target}.tmp-${process.pid}`, next);
-		renameSync(`${target}.tmp-${process.pid}`, target);
+		if (prev !== null) {
+			const real = realpathSync(target);
+			copyFileSync(real, `${real}.hstack-bak-${stamp}`);
+		}
+		writeSettings(target, next);
 		return target;
 	});
 }
