@@ -7,6 +7,7 @@ import argparse
 import bisect
 import json
 import math
+import os
 import statistics
 import sys
 import time
@@ -54,6 +55,18 @@ class AuditData:
     low_effort_segments: list[dict[str, Any]]
     compactions: list[dict[str, Any]]
     parse_warnings: list[str]
+
+
+def default_claude_dirs(env: Any, home: Path) -> list[Path]:
+    """~/.claude and CLAUDE_CONFIG_DIR, each once and only when it exists; a second account keeps its own logs."""
+    candidates = [home / ".claude"]
+    if env.get("CLAUDE_CONFIG_DIR"):
+        candidates.append(Path(env["CLAUDE_CONFIG_DIR"]).expanduser())
+    found: list[Path] = []
+    for path in candidates:
+        if path.is_dir() and all(path.resolve() != seen.resolve() for seen in found):
+            found.append(path)
+    return found
 
 
 def positive_int(value: str) -> int:
@@ -1318,7 +1331,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         parse_warnings.append("Local model rates unavailable or invalid; unpriced nominal costs are stored as zero")
     claude_dirs = args.claude_dir
     if claude_dirs is None:
-        claude_dirs = [path for path in (Path.home() / ".claude",) if path.is_dir()]
+        claude_dirs = default_claude_dirs(os.environ, Path.home())
     for source in sources:
         directories = claude_dirs if source == "claude" else [args.codex_dir]
         rows, calls, events, warnings = load_local_source(

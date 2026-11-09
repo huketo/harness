@@ -12,7 +12,7 @@ python3 skills/cost-audit/analyze.py --days 7 --format markdown
 
 ```text
 --source claude|codex|all  기본값 all. 존재하는 소스만 포함합니다.
---claude-dir DIR          설정 디렉터리. 반복 가능. 기본은 존재하는 ~/.claude. 다른 계정의 설정 디렉터리는 이 옵션으로 더합니다.
+--claude-dir DIR          설정 디렉터리. 반복 가능. 기본은 존재하는 ~/.claude와 CLAUDE_CONFIG_DIR. 그 밖의 계정 설정 디렉터리는 이 옵션으로 더합니다.
 --codex-dir DIR           기본 ~/.codex.
 --rates PATH              기본 ~/.t3/userdata/usage-model-rates.json.
 --days N                  조회 기간입니다. 기본값은 7일입니다.
