@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Run the Windows host's cua-driver from WSL.
+
+`cua-win call <tool> [JSON]` sends the arguments on stdin (Windows argv quoting
+mangles JSON), adds the `$CUA_WIN_SESSION` label (default `agent`) when the tool
+accepts `session`, saves every base64 image in the result to a file, and prints
+the remaining JSON. Other subcommands (doctor, list-tools, describe, status,
+check-update, update, ...) pass straight through to cua-driver.exe.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+OUT_DIR = Path(os.environ.get("CUA_WIN_OUT", Path(tempfile.gettempdir()) / "cua-win"))
+SESSION = os.environ.get("CUA_WIN_SESSION", "agent")
+INSTALL_HINT = (
+    "cua-win: Windows cua-driver.exe not found. Install it on Windows (PowerShell):\n"
+    "  irm https://cua.ai/driver/install.ps1 | iex; cua-driver autostart kick\n"
+    "or set CUA_WIN_DRIVER to its WSL path."
+)
+
+
+def driver() -> str:
+    explicit = os.environ.get("CUA_WIN_DRIVER")
+    if explicit:
+        return explicit
+    found = shutil.which("cua-driver.exe")
+    if found:
+        return found
+    # WSL interop may run without the Windows PATH (appendWindowsPath=false).
+    try:
+        local = subprocess.run(
+            ["cmd.exe", "/d", "/c", "echo %LOCALAPPDATA%"],
+            capture_output=True, text=True, check=True, cwd="/mnt/c",
+        ).stdout.strip()
+        candidate = subprocess.run(
+            ["wslpath", "-u", rf"{local}\Programs\Cua\cua-driver\bin\cua-driver.exe"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit(INSTALL_HINT)
+    if not Path(candidate).is_file():
+        sys.exit(INSTALL_HINT)
+    return candidate
+
+
+def extract_images(value, tool: str, stamp: str, saved: list[str]):
+    """Replace `<name>_b64` image payloads with `<name>_path` files, recursively."""
+    if isinstance(value, list):
+        return [extract_images(v, tool, stamp, saved) for v in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if key.endswith("_b64") and isinstance(item, str):
+            stem = key[: -len("_b64")]
+            mime = value.get(f"{stem.rsplit('_', 1)[0]}_mime_type") or value.get("mime_type") or ""
+            ext = "jpg" if "jpeg" in mime or stem.endswith("jpeg") else "png"
+            path = OUT_DIR / f"{tool}-{stamp}-{len(saved)}.{ext}"
+            path.write_bytes(base64.b64decode(item))
+            saved.append(str(path))
+            result[f"{stem}_path"] = str(path)
+        else:
+            result[key] = extract_images(item, tool, stamp, saved)
+    return result
+
+
+def accepts_session(exe: str, tool: str) -> bool:
+    """Whether the tool's input schema declares `session`, cached per driver binary.
+
+    Each `cua-driver call` is a new transport lease, so without a shared session
+    label an element_token from one call is stale in the next (0.30.4).
+    """
+    stat = Path(exe).stat()
+    cache_path = OUT_DIR / ".session-tools.json"
+    key = f"{exe}:{stat.st_size}:{stat.st_mtime_ns}"
+    try:
+        cache = json.loads(cache_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        cache = {}
+    if cache.get("key") != key:
+        cache = {"key": key, "tools": {}}
+    if tool not in cache["tools"]:
+        text = subprocess.run([exe, "describe", tool], capture_output=True, text=True).stdout
+        _, _, schema = text.partition("input_schema:")
+        try:
+            cache["tools"][tool] = "session" in json.loads(schema).get("properties", {})
+        except json.JSONDecodeError:
+            return False  # unknown tool: let the driver report it
+        cache_path.write_text(json.dumps(cache))
+    return cache["tools"][tool]
+
+
+def call(exe: str, argv: list[str]) -> int:
+    if not argv:
+        sys.exit("usage: cua-win call <tool> [JSON | -] [--tree]")
+    tool, rest = argv[0], argv[1:]
+    keep_tree = "--tree" in rest
+    rest = [a for a in rest if a != "--tree"]
+    payload = rest[0] if rest and rest[0] != "-" else (sys.stdin.read() if rest else "{}")
+    try:
+        args = json.loads(payload)  # fail here, not after a round trip to Windows
+    except json.JSONDecodeError as exc:
+        sys.exit(f"cua-win: invalid JSON arguments for {tool}: {exc}")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    if isinstance(args, dict) and "session" not in args and accepts_session(exe, tool):
+        payload = json.dumps({**args, "session": SESSION})
+    proc = subprocess.run([exe, "call", tool], input=payload, capture_output=True, text=True)
+    sys.stderr.write(proc.stderr)
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        sys.stdout.write(proc.stdout)
+        return proc.returncode
+    data = extract_images(data, tool, time.strftime("%Y%m%d-%H%M%S"), [])
+    if isinstance(data, dict) and not keep_tree:
+        data.pop("tree_markdown", None)
+        data.pop("_note", None)
+    print(json.dumps(data, ensure_ascii=False, indent=1))
+    return proc.returncode
+
+
+def main() -> int:
+    exe = driver()
+    args = sys.argv[1:]
+    if args[:1] == ["call"]:
+        return call(exe, args[1:])
+    if args[:1] == ["path"]:
+        print(exe)
+        return 0
+    return subprocess.run([exe, *args]).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())
