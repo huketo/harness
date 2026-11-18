@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 ## 2. 템플릿을 설치한다
 
-`templates/<스택>/`의 파일을 점으로 시작하는 파일(`.github/`, `.gitlab-ci.yml`, `.gitignore`)까지 저장소 루트로 복사한다(`cp -rn templates/<스택>/. <루트>/`). 같은 경로에 파일이 이미 있으면 덮어쓰지 않고, 그 파일에 빠진 설정만 더하자고 제안한다. `{{PROJECT_NAME}}`은 저장소 이름으로 채운다.
+`templates/<스택>/`의 파일을 점으로 시작하는 파일(`.github/`, `.gitlab-ci.yml`, `.gitignore`)까지 저장소 루트로 복사한다. 같은 경로에 파일이 이미 있으면 덮어쓰지 않고, 그 파일에 빠진 설정만 더하자고 제안한다. `{{PROJECT_NAME}}`은 저장소 이름으로 채운다.
 
 개발 의존성은 템플릿에 버전을 적어 두지 않았다. STACKS.md가 적은 설치 명령을 실행해 지금의 버전을 잠금 파일에 고정하고, 잠금 파일을 추적한다.
 

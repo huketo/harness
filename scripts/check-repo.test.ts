@@ -30,6 +30,7 @@ test("accepts plain values, block scalars, and nested keys", () => {
 	const text = "---\nname: demo\ndescription: Review a change since a fixed point (commit, branch, tag).\nmetadata:\n  note: a: b\nlicense: MIT\n---\n";
 	assert.deepEqual(checkFrontmatter(text, "demo"), []);
 	assert.deepEqual(checkFrontmatter("---\nname: demo\ndescription: >-\n  Review: every change,\n  twice.\n---\n", "demo"), []);
+	assert.deepEqual(checkFrontmatter("---\nname: demo\ndescription: |\n\n  After a blank line.\n---\n", "demo"), []);
 	assert.match(checkFrontmatter("---\nname: demo\ndescription: |\n---\n", "demo")[0]?.message ?? "", /description/);
 });
 

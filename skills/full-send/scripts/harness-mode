@@ -82,7 +82,7 @@ case ${1:-show} in
     ;;
   readiness)
     missing=$(lacks)
-    if [ -z "$missing" ]; then echo "ready: a CI definition and a verification skill are present"; else echo "not ready, lacks:"; printf '%s\n' "$missing" | sed 's/^/  - /'; fi
+    if [ -z "$missing" ]; then echo "ready: a CI definition file and a verification skill file are present (presence only)"; else echo "not ready, lacks:"; printf '%s\n' "$missing" | sed 's/^/  - /'; fi
     ;;
   *) die "usage: harness-mode set full-send|full-stop | allow-merge <ref> | show | clear | allowlist | readiness" ;;
 esac
