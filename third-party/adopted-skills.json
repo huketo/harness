@@ -517,7 +517,8 @@
       ],
       "local_changes": [
         "2026-09-28: Add the verified-route checklist item and mechanical-check prevention question re-authored from lauren-poteto-rules principles 3 and 5; preserve the notice in LICENSE.lauren-poteto-rules.",
-        "2026-11-04: Port the upstream Redact section (efce423, bda79a3) and redacted-artifact wording, the hitl-loop capture comment, and the forced-mutation diff check (f3fc563); read GLOSSARY.md/GLOSSARY-MAP.md with a legacy CONTEXT.md fallback (d80fa0f)."
+        "2026-11-04: Port the upstream Redact section (efce423, bda79a3) and redacted-artifact wording, the hitl-loop capture comment, and the forced-mutation diff check (f3fc563); read GLOSSARY.md/GLOSSARY-MAP.md with a legacy CONTEXT.md fallback (d80fa0f).",
+        "2026-11-18: Hand recurring mistake classes and architectural prevention to the correct skill instead of the removed improve-codebase-architecture."
       ]
     },
     "code-review": {
@@ -549,7 +550,24 @@
       },
       "installed_snapshot_sha256": "c46b49303a81c7fc8934d0f4fbc44382cdecb73942d85d8d7db3523407fff8fa",
       "local_changes": [
-        "2026-11-04: Name GLOSSARY.md vocabulary in DESIGN-IT-TWICE.md (upstream d80fa0f) with a legacy CONTEXT.md fallback."
+        "2026-11-04: Name GLOSSARY.md vocabulary in DESIGN-IT-TWICE.md (upstream d80fa0f) with a legacy CONTEXT.md fallback.",
+        "2026-11-18: Rewrite SKILL.md as a sketch procedure (trace, two shapes, pick, name the enforcement) with structural defaults and a short vocabulary; the upstream glossary, diagrams, and testability examples are dropped. DEEPENING.md and DESIGN-IT-TWICE.md are kept."
+      ],
+      "upstreams": [
+        {
+          "source": "https://github.com/cursor/plugins",
+          "commit": "93b916d4a1e806507e22f4716b352fa91f2b227e",
+          "paths": [
+            "pstack/LICENSE",
+            "pstack/skills/architect"
+          ],
+          "snapshot_sha256": "b6d0b1e386114ef1653be4be3b044a14c1bdb6bc047fdd836bbedd53fe23001e",
+          "license": "MIT",
+          "license_path": "pstack/LICENSE"
+        }
+      ],
+      "additional_license_paths": [
+        "skills/codebase-design/LICENSE.pstack"
       ]
     },
     "domain-modeling": {
@@ -565,23 +583,8 @@
       },
       "installed_snapshot_sha256": "40afc20cd49261811d7fe377fff53c1804f5e27644b42adb65469c7fc305a3a2",
       "local_changes": [
-        "2026-11-04: Rename the CONTEXT.md/CONTEXT-MAP.md convention and CONTEXT-FORMAT.md to GLOSSARY.md/GLOSSARY-MAP.md/GLOSSARY-FORMAT.md (upstream d80fa0f); read legacy names as the same document and propose git mv on write."
-      ]
-    },
-    "improve-codebase-architecture": {
-      "previous_registration": {
-        "source": "mattpocock/skills",
-        "sourceType": "github",
-        "sourceUrl": "https://github.com/mattpocock/skills.git",
-        "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
-        "skillFolderHash": "bce229692e60dff3462e49bc5e774e83bef348e6",
-        "pluginName": "mattpocock-skills",
-        "installedAt": "2026-05-06T05:31:26.973Z",
-        "updatedAt": "2026-08-06T12:13:15.258Z"
-      },
-      "installed_snapshot_sha256": "d3682058df92c259b47c36503baa02345d5811758621b5dc03081d5ba0f7b69b",
-      "local_changes": [
-        "2026-11-04: Read GLOSSARY.md or the matching one in GLOSSARY-MAP.md (upstream d80fa0f) with a legacy CONTEXT.md fallback."
+        "2026-11-04: Rename the CONTEXT.md/CONTEXT-MAP.md convention and CONTEXT-FORMAT.md to GLOSSARY.md/GLOSSARY-MAP.md/GLOSSARY-FORMAT.md (upstream d80fa0f); read legacy names as the same document and propose git mv on write.",
+        "2026-11-18: Reduce to the owner of the glossary and ADR formats and locations; drop the in-session challenge, scenario, and code cross-reference prompts."
       ]
     },
     "prototype": {
@@ -688,7 +691,8 @@
         "skills/writing-for-agents/LICENSE.lauren-poteto-rules"
       ],
       "local_changes": [
-        "2026-09-28: Add corrections-become-constraints and evaluating-a-change sections re-authored from lauren-poteto-rules principles 5 and 7; preserve the notice in LICENSE.lauren-poteto-rules."
+        "2026-09-28: Add corrections-become-constraints and evaluating-a-change sections re-authored from lauren-poteto-rules principles 5 and 7; preserve the notice in LICENSE.lauren-poteto-rules.",
+        "2026-11-18: Point the corrections ladder at the correct skill, which runs it as a procedure."
       ]
     },
     "wait-what": {
@@ -922,7 +926,8 @@
       "local_changes": [
         "Rewrite in Korean as a user-invoked work mode (disable-model-invocation, Codex allow_implicit_invocation false) instead of a trigger phrase.",
         "Record the mode with scripts/harness-mode; full-send applies only to repositories the person lists in ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos and degrades to full-stop elsewhere or without that file; the plugin merge guard hook reads the same allowlist.",
-        "Replace sol-loop with review-loop (council on request), file-pr with file-mr, babysit-pr with babysit-mr; adapt the merge gate to GitLab pipelines, approvals, discussions, and detailed_merge_status; route questions through docs/agents/hitl.md."
+        "Replace sol-loop with review-loop (council on request), file-pr with file-mr, babysit-pr with babysit-mr; adapt the merge gate to GitLab pipelines, approvals, discussions, and detailed_merge_status; route questions through docs/agents/hitl.md.",
+        "2026-11-18: harness-mode also degrades full-send to full-stop in a worktree without a CI definition or a verify-* skill, and reports what is missing (readiness)."
       ],
       "excluded_sources": []
     },
@@ -1029,7 +1034,8 @@
         }
       ],
       "local_changes": [
-        "Target GitLab MRs with glab and GitHub PRs with gh; link the MR to the T3 thread; localize the model and harness footer for Korean descriptions; hand review-bot results to the repository's bot-consumer skill when one exists."
+        "Target GitLab MRs with glab and GitHub PRs with gh; link the MR to the T3 thread; localize the model and harness footer for Korean descriptions; hand review-bot results to the repository's bot-consumer skill when one exists.",
+        "2026-11-18: Replace the one-line proof note with an evidence section the reviewer can judge from: one observed proof per claimed behavior, with unobserved claims labelled."
       ],
       "excluded_sources": []
     },
@@ -1161,7 +1167,94 @@
       "local_changes": [
         "Replace setup-matt-pocock-skills (removed 2026-09-09) with a harness-specific initializer: explore, confirm each section with the recommended answer first, then write the AGENTS.md router, CLAUDE.md, docs/agents/{workflow,authority,writing,testing,hitl,issue-tracker}.md, GLOSSARY.md or GLOSSARY-MAP.md, and docs/adr/.",
         "Adapt the upstream issue-tracker seeds (GitHub, GitLab, local) and procedure shape; drop triage labels, wayfinder and remote setup; generalize the remaining templates from this repository's own agent guides.",
-        "Add three judgment evals with fixtures (empty GitHub repo, GitLab repo with CLAUDE.md and legacy CONTEXT.md, partially documented monorepo)."
+        "Add three judgment evals with fixtures (empty GitHub repo, GitLab repo with CLAUDE.md and legacy CONTEXT.md, partially documented monorepo).",
+        "2026-11-18: Add a Rules and enforcement table to the AGENTS.md template and point at repo-bootstrap and verify-init for the code-side mechanisms."
+      ],
+      "excluded_sources": []
+    },
+    "correct": {
+      "adopted_on": "2026-11-18",
+      "source": "https://github.com/cursor/plugins",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/correct/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/cursor/plugins",
+          "commit": "93b916d4a1e806507e22f4716b352fa91f2b227e",
+          "paths": [
+            "pstack/LICENSE",
+            "pstack/skills/correct",
+            "pstack/skills/principle-encode-lessons-in-structure"
+          ],
+          "snapshot_sha256": "f6ddf36a2ae4dfbd3e48777eb144f589b8fcef2a6f51025823a6b28d9e4c504c",
+          "license": "MIT",
+          "license_path": "pstack/LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Rewrite in Korean as a model-invoked skill other skills can hand off to.",
+        "Count a mistake as a class only after two occurrences with cited evidence; add the ratchet rule for patterns already spread; require a red run on a real past mistake and a green run on current code.",
+        "Keep the rule table in AGENTS.md under Rules and enforcement with three values: a check, judgment, or unenforced."
+      ],
+      "excluded_sources": []
+    },
+    "verify-init": {
+      "adopted_on": "2026-11-18",
+      "source": "https://github.com/cursor/plugins",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/verify-init/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/cursor/plugins",
+          "commit": "93b916d4a1e806507e22f4716b352fa91f2b227e",
+          "paths": [
+            "pstack/LICENSE",
+            "pstack/skills/create-verification-skill",
+            "pstack/skills/maintain-verification-skill"
+          ],
+          "snapshot_sha256": "7d20b766135f19af13935d38023ec3d621ce31d18319590df7bbec1522de98b0",
+          "license": "MIT",
+          "license_path": "pstack/LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Rewrite in Korean as one user-invoked skill that also owns keeping the feature map in step with the app.",
+        "Generate into .agents/skills/verify-<app>/ with a relative .claude/skills link instead of .cursor/skills; name the harness's own drive tools per surface.",
+        "Copy references/feature-map-example/ unchanged."
+      ],
+      "excluded_sources": []
+    },
+    "formal-verify": {
+      "adopted_on": "2026-11-18",
+      "source": "https://github.com/cursor/plugins",
+      "ownership": "harness-owned; excluded from skills CLI updates",
+      "license": "MIT",
+      "license_path": "skills/formal-verify/LICENSE",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/cursor/plugins",
+          "commit": "93b916d4a1e806507e22f4716b352fa91f2b227e",
+          "paths": [
+            "pstack/LICENSE",
+            "pstack/skills/create-formal-verification-skill",
+            "pstack/skills/maintain-formal-verification-skill"
+          ],
+          "snapshot_sha256": "d3aa760623da7118e432caab9b5cafb3dca1f4b35b44b7ba8a737e37fffc7752",
+          "license": "MIT",
+          "license_path": "pstack/LICENSE"
+        }
+      ],
+      "local_changes": [
+        "Rewrite in Korean as one user-invoked skill; add property-based tests in the repository's own test runner as the default home for input properties.",
+        "Drop the statechart dependency: a counterexample is reported as steps in the code's words."
       ],
       "excluded_sources": []
     }
@@ -1181,5 +1274,23 @@
     "to-tickets",
     "triage",
     "wayfinder"
-  ]
+  ],
+  "removed_after_adoption": {
+    "improve-codebase-architecture": {
+      "removed_on": "2026-11-18",
+      "replaced_by": "correct",
+      "reason": "The HTML deepening report left nothing in the repository; the correct skill turns repeated mistakes into checks instead.",
+      "previous_registration": {
+        "source": "mattpocock/skills",
+        "sourceType": "github",
+        "sourceUrl": "https://github.com/mattpocock/skills.git",
+        "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+        "skillFolderHash": "bce229692e60dff3462e49bc5e774e83bef348e6",
+        "pluginName": "mattpocock-skills",
+        "installedAt": "2026-05-06T05:31:26.973Z",
+        "updatedAt": "2026-08-06T12:13:15.258Z"
+      },
+      "installed_snapshot_sha256": "d3682058df92c259b47c36503baa02345d5811758621b5dc03081d5ba0f7b69b"
+    }
+  }
 }

@@ -51,7 +51,7 @@ GitLab MR과 GitHub PR을 같은 스킬로 다룹니다. `file-mr`로 올리고,
 
 T3의 `watch_pull_request`와 `link_pull_request`는 GitLab MR URL도 받습니다. 파이프라인은 `Pipeline` 검사 하나로 보이고 승인과 rebase 필요 상태는 스레드를 깨우지 않습니다. T3 밖에서는 `skills/babysit-mr/scripts/mr-wait`가 GitLab과 GitHub를 모두 기다립니다.
 
-작업 모드는 기본값이 아니며 사람이 작업마다 고릅니다. `/full-send`는 증명·리뷰·제출·감시·머지까지 맡기는 모드이고, `/full-stop`은 같은 일을 하되 사람이 머지할 수 있는 MR에서 멈춥니다. Codex에서는 `$full-send`, `$full-stop`으로 부릅니다. `full-send`는 사람이 직접 적은 허용 목록의 저장소에서만 머지하며, 목록이 없으면 `full-stop`으로 낮아집니다.
+작업 모드는 기본값이 아니며 사람이 작업마다 고릅니다. `/full-send`는 증명·리뷰·제출·감시·머지까지 맡기는 모드이고, `/full-stop`은 같은 일을 하되 사람이 머지할 수 있는 MR에서 멈춥니다. Codex에서는 `$full-send`, `$full-stop`으로 부릅니다. `full-send`는 사람이 직접 적은 허용 목록의 저장소에서만 머지하며, 목록이 없으면 `full-stop`으로 낮아집니다. 허용 목록에 있어도 워크트리에 CI 설정과 `verify-*` 검증 스킬(`verify-init`으로 만듭니다)이 없으면 `full-stop`으로 낮아집니다. `skills/full-send/scripts/harness-mode readiness`가 빠진 것을 보여 줍니다.
 
 ```text
 # ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos
@@ -60,6 +60,20 @@ gitlab.example/<group>/<repo>
 ```
 
 한 줄에 `<host>/<path>` 하나를 적고, `<host>/<owner>/*`는 그 아래 모든 저장소를 뜻합니다. `skills/full-send/scripts/harness-mode allowlist`가 현재 저장소의 판정을 보여 줍니다. 머지 가드 훅(Claude Code·agy 플러그인)과 Codex 실행 정책(`codex/harness.rules`)이 모드가 허락하지 않는 머지를 막습니다. 판정 표는 [AGENT-CONFIG](../AGENT-CONFIG.md#2-머지-가드와-작업-모드)에 있습니다. 허용 목록과 모드 파일은 에이전트도 쓸 수 있으므로 이 장치는 실수로 머지하는 것을 막는 장치이지 권한 체계가 아닙니다.
+
+### 교정을 저장소의 장치로 옮기기
+
+에이전트가 같은 실수를 되풀이할 때 지침 문장을 더하는 대신 저장소가 그 실수를 막게 하는 스킬들입니다. `repo-bootstrap`, `verify-init`, `formal-verify`는 사람이 이름으로 부를 때만 실행됩니다.
+
+| 스킬 | 쓰는 때 | 저장소에 남는 것 |
+| --- | --- | --- |
+| `repo-bootstrap` | 새 저장소를 시작할 때 | 기본 스택의 타입·린트·경계 규칙·테스트·CI와 단일 check 명령 |
+| `codebase-design` | 함수 경계를 넘는 코드를 쓰기 전에 | 고른 모양과 그 경계를 강제하는 검사의 이름 |
+| `correct` | 같은 실수로 다시 교정했을 때 | 실수를 막는 구조·타입·린트·테스트와 `AGENTS.md`의 규칙 표 |
+| `verify-init` | 앱을 실제로 실행해 증명할 방법이 없을 때 | 저장소 전용 `verify-<앱>` 스킬과 기능 지도 |
+| `formal-verify` | 상태 기계·동시성·파서처럼 예시 테스트가 닿지 않을 때 | 다시 돌릴 수 있는 속성 검사 |
+
+기본 스택은 [`skills/repo-bootstrap/STACKS.md`](../../skills/repo-bootstrap/STACKS.md)가 정하며 지금은 TypeScript 하나입니다. `file-mr`은 MR 본문에 증거 절을 두어, 리뷰하는 사람이 diff보다 먼저 관측된 증거를 보게 합니다.
 
 ## WSL2에서 Windows Chrome 쓰기
 

@@ -18,6 +18,7 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 - `.changeset/`, `.github/workflows/` — pending release notes and the CI and release workflows.
 - `codex/` — the read-only `codex exec` reviewer (`review.ts`) used outside T3, and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
 - `t3/` — the guard for T3 Code scheduled tasks, its job definitions, and the guarded host-sync source; the distributed `jobs.json` contains no jobs.
+- `.agents/skills/verify-hstack/` — this repository's own verification skill and feature map (Claude Code reads it through `.claude/skills/`): how to drive the merge guard, `harness-mode`, and the installer in an isolated run and capture proof. `full-send` merges here only while it exists.
 - `skills/` — personal skill sources, including the T3-facing `t3-orchestrate`, `t3-handoff` (continue work in a new thread), `t3-terminal` (Herdr as a plain terminal multiplexer for work a person watches), and `t3-show` (interactive explanations, simulations, and data views shown inline in a thread); preserve each adopted skill's license and provenance.
 - `agy/` — an example snapshot of Antigravity CLI settings; the AGY plugin source lives in `plugin/`.
 - `third-party/` — public external pins, provenance records, and patches; it is not a second source tree.
@@ -34,6 +35,19 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 - [`docs/agents/writing.md`](docs/agents/writing.md) — document ownership, bilingual consistency, instruction writing, comments, and sensitive evidence.
 - [`docs/agents/testing.md`](docs/agents/testing.md) — `mise run check`, focused Node, shell, and Python verification boundaries, and grounded commands.
 - [`docs/agents/hitl.md`](docs/agents/hitl.md) — questions, approvals, delegated children, and unattended runs in T3 Code threads.
+
+## Rules and enforcement
+
+A rule that a check can enforce lives in the check, not in prose. This table pairs each repository rule with what enforces it: a check, `judgment` when a reviewer must decide, or `unenforced` with the reason when a check is still owed. The `correct` skill maintains it.
+
+| Rule | Enforced by |
+| --- | --- |
+| A skill's frontmatter parses, names its directory, and has a description. | `scripts/check-repo.ts` (`mise run rules`) |
+| A relative Markdown link points at a file that exists. | `scripts/check-repo.ts` (`mise run rules`) |
+| The tracked plugin files match their sources. | `node plugin/build.mjs --host claude --check` (`mise run check`) |
+| `harness-mode` and the merge guard read the full-send allowlist the same way. | `plugin/hooks/allowlist.property.test.mjs` |
+| `README.md` and `README.ko.md` carry the same claims. | `unenforced`: equivalent meaning across two languages is not detectable by a script; reviewed by hand. |
+| Tracked files hold no private or sensitive material. | `judgment` ([`docs/agents/writing.md`](docs/agents/writing.md)) |
 
 Architectural decisions live in [`docs/adr/`](docs/adr/); read them before reshaping an area. User documentation starts at [`docs/index.md`](docs/index.md). Installation, usage, and owner operations belong in `docs/guides/`. Enduring public-distribution rules belong in [`docs/public-release.md`](docs/public-release.md).
 

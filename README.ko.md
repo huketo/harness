@@ -17,7 +17,8 @@ Harness는 에이전트를 Claude Code, Codex CLI, Antigravity CLI(`agy`) 기반
 | T3 Code 경로 | `t3-orchestrate`, `review-loop`, `council`이 T3의 오케스트레이션 도구로 작업을 위임합니다. `t3-handoff`는 인계 문서를 첫 메시지로 받는 새 스레드에서 작업을 이어 갑니다. [T3 사람 개입 규칙](docs/agents/hitl.md)이 질문을 스레드로 보내고, `codex/review.ts`가 T3 밖에서 Codex의 읽기 전용 샌드박스로 독립 리뷰를 실행하고(T3 안의 Codex 리뷰어는 `delegate_task` 자식으로 실행됩니다), `t3/scheduled/guard.mjs`가 예약 작업에 시간 초과와 실행 횟수 제한을 더합니다. |
 | 지켜보는 터미널 작업 | `t3-terminal`이 개발 서버, 대화형 프롬프트, REPL, ssh, TUI처럼 사람이 지켜보거나 직접 입력해야 하는 작업을 Herdr의 workspace·tab·pane에 엽니다. 백그라운드 프로세스를 대신하지는 않습니다. |
 | 인터랙티브 시각화 | `t3-show`가 `html_render`로 스레드 안에 직접 조작하는 화면을 만듭니다. 코드베이스 지도, 알고리즘 단계 실행, GTM 지표 같은 가정 조절 시뮬레이션, 데이터 탐색이 대상입니다. 각 화면은 셸에서 읽은 코드나 계산한 값을 근거로 자체 검사를 수행하며, 띄우기 전에 `html_preview`에서 조작까지 실행해 확인합니다. |
-| MR 수명주기와 작업 모드 | tstack에서 편입한 GitLab MR·GitHub PR 스킬(`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`)과 사람이 고르는 `full-send`·`full-stop` 모드를 제공합니다. Claude Code·AGY용 `hstack` 플러그인의 머지 가드 훅과 Codex용 `codex/harness.rules`가 모드가 허락하지 않는 머지를 막으며, `full-send`는 사람이 허용 목록에 적은 저장소에서만 머지합니다. [AGENT-CONFIG](docs/AGENT-CONFIG.md)를 참고하세요. |
+| MR 수명주기와 작업 모드 | tstack에서 편입한 GitLab MR·GitHub PR 스킬(`file-mr`, `babysit-mr`, `leaving-mr-comments`, `takeover`, `modernize`)과 사람이 고르는 `full-send`·`full-stop` 모드를 제공합니다. Claude Code·AGY용 `hstack` 플러그인의 머지 가드 훅과 Codex용 `codex/harness.rules`가 모드가 허락하지 않는 머지를 막으며, `full-send`는 사람이 허용 목록에 적은 저장소 가운데 CI 설정과 `verify-*` 검증 스킬이 있는 곳에서만 머지합니다. [AGENT-CONFIG](docs/AGENT-CONFIG.md)를 참고하세요. |
+| 교정을 저장소 구조로 | `repo-bootstrap`이 잘못된 import가 실패하는 경계 규칙을 갖춘 기본 스택을 설치하고, `codebase-design`이 모양을 스케치해 그것을 강제할 장치를 정하며, `correct`가 두 번 반복된 실수를 타입·린트·테스트로 옮깁니다. `verify-init`은 저장소 전용 검증 스킬과 기능 지도를 만들고, `formal-verify`는 속성 하나를 생성 입력이나 모델 검사로 확인합니다. 일부는 pstack에서 편입했습니다. [사용법](docs/guides/usage.md)을 참고하세요. |
 | 개인 운영 | Claude Code·Codex 세션의 비용 감사, 보호된 호스트 동기화를 제공합니다. 호스팅 서비스가 아닙니다. |
 
 ## 권장 환경
