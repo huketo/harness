@@ -14,14 +14,15 @@ row() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:--}"; }
 first() { for f in "$@"; do [ -e "$f" ] && { printf '%s' "$f"; return 0; }; done; return 1; }
 globfirst() { local m; m=$(compgen -G "$1" | head -n 1) && [ -n "$m" ] && printf '%s' "$m"; }
 
-# Tracked source files. Configuration, documents, and lock files do not count.
-sources=$(git ls-files | grep -cE '\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|sh)$' || true)
+# Tracked source files. Tool configuration (`*.config.*`, dotfiles), documents, and lock files do not count.
+sources=$(git ls-files | grep -vE '(^|/)\.[^/]+$|(^|/)[^/]+\.config\.[^/]+$' |
+  grep -cE '\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|sh)$' || true)
 if [ "$sources" -eq 0 ]; then row code sources none "no tracked source file"; else row code sources "$sources" "git ls-files"; fi
 
 # One check command that runs everything, the same locally and in CI.
 check=
 if [ -f mise.toml ] && grep -qE '^\[tasks\.check\]' mise.toml; then check="mise.toml [tasks.check]"
-elif [ -f package.json ] && grep -qE '"check"[[:space:]]*:' package.json; then check="package.json scripts.check"
+elif [ -f package.json ] && node -e 'process.exit(String(JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.check ?? "").trim() ? 0 : 1)' 2>/dev/null; then check="package.json scripts.check"
 elif m=$(first Makefile makefile GNUmakefile) && grep -qE '^check:' "$m"; then check="$m check:"
 elif m=$(first justfile Justfile .justfile) && grep -qE '^check' "$m"; then check="$m check"
 fi
@@ -31,8 +32,15 @@ lint=$(first eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.
 [ -z "$lint" ] && [ -f pyproject.toml ] && grep -qE '^\[tool\.ruff' pyproject.toml && lint="pyproject.toml [tool.ruff]"
 if [ -n "$lint" ]; then row static lint present "$lint"; else row static lint missing; fi
 
-boundary=$(git grep -lE 'no-restricted-imports|\[tool\.importlinter\]|depguard' -- ':!*.md' ':!**/templates/**' ':!**/fixtures/**' 2>/dev/null | head -n 1 || true)
-[ -z "$boundary" ] && boundary=$(first .dependency-cruiser.js .dependency-cruiser.cjs .dependency-cruiser.json .importlinter || true)
+# Import-boundary rules declared in a root configuration file, not mentioned anywhere in the tree.
+boundary=$(first .dependency-cruiser.js .dependency-cruiser.cjs .dependency-cruiser.json .importlinter || true)
+if [ -z "$boundary" ]; then
+  for f in eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.ts .eslintrc.js .eslintrc.cjs .eslintrc.json .eslintrc.yml .eslintrc; do
+    [ -f "$f" ] && grep -qE 'no-restricted-imports|import/no-restricted-paths|boundaries/' "$f" && { boundary="$f"; break; }
+  done
+fi
+[ -z "$boundary" ] && [ -f pyproject.toml ] && grep -qE '^\[tool\.importlinter' pyproject.toml && boundary="pyproject.toml [tool.importlinter]"
+[ -z "$boundary" ] && for f in .golangci.yml .golangci.yaml; do [ -f "$f" ] && grep -q depguard "$f" && boundary="$f"; done
 if [ -n "$boundary" ]; then row static boundary-rules present "$boundary"; else row static boundary-rules missing; fi
 
 ci=$(globfirst '.github/workflows/*.y*ml' || first .gitlab-ci.yml || true)
@@ -45,21 +53,24 @@ formal=$(globfirst '.agents/skills/formal-*/SKILL.md' || true)
 [ -z "$formal" ] && formal=$(git grep -lE '"fast-check"|hypothesis' -- package.json pyproject.toml requirements*.txt 2>/dev/null | head -n 1 || true)
 if [ -n "$formal" ]; then row verify properties present "$formal"; else row verify properties none "used only where examples cannot reach"; fi
 
+# The rule table is the first Markdown table under `## Rules and enforcement`; its last column is `Enforced by`.
+table=
+[ -f AGENTS.md ] && table=$(awk '/^## /{inside=($0 ~ /^## Rules and enforcement[[:space:]]*$/); next} inside && /^\|/{print; seen=1; next} inside && seen{exit}' AGENTS.md)
 unenforced=0
 if [ ! -f AGENTS.md ]; then
   row prose rule-table missing "no AGENTS.md"
-elif ! grep -qE '^## Rules and enforcement' AGENTS.md; then
-  row prose rule-table missing "AGENTS.md has no Rules and enforcement section"
+elif [ -z "$table" ]; then
+  row prose rule-table missing "AGENTS.md has no table under Rules and enforcement"
 else
-  unenforced=$(grep -cE '^\|.*\|[[:space:]]*`?unenforced' AGENTS.md || true)
+  unenforced=$(printf '%s\n' "$table" | awk -F'|' 'NR > 2 { cell = $(NF - 1); gsub(/[`[:space:]]/, "", cell); if (cell ~ /^unenforced/) n++ } END { print n + 0 }')
   row prose rule-table present "AGENTS.md, $unenforced unenforced"
 fi
 
 if [ -n "$ci" ] && [ -n "$verify" ]; then row review full-send-ready yes "CI definition and verify skill present"; else row review full-send-ready no "full-send runs as full-stop here"; fi
 
 next() { printf 'next\t%s\t%s\n' "$1" "$2"; exit 0; }
-[ "$sources" -eq 0 ] && [ -z "$check" ] && next repo-bootstrap "no source code yet: if the repository will hold code, install the default stack; a documentation-only repository needs only repo-init"
-grep -qE '^## Rules and enforcement' AGENTS.md 2>/dev/null || next repo-init "write AGENTS.md and the Rules and enforcement table that records what is enforced today"
+[ "$sources" -eq 0 ] && next repo-bootstrap "no source code yet: if the repository will hold code, install the default stack; a documentation-only repository needs only repo-init"
+[ -n "$table" ] || next repo-init "write AGENTS.md and the Rules and enforcement table that records what is enforced today"
 { [ -z "$check" ] || [ -z "$ci" ]; } && next repo-bootstrap "existing repository: wire one check command and CI (the skill's existing-repository section)"
 [ -z "$verify" ] && next verify-init "no verification skill: generate one so changes can be proven and full-send can merge"
 [ "$unenforced" -gt 0 ] && next correct "$unenforced unenforced rule(s): move the most frequent one to a check"
