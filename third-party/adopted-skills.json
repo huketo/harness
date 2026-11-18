@@ -169,6 +169,21 @@
           "license": "BSD-3-Clause",
           "license_path": "LICENSE",
           "use": "Re-author selected copy principles (gain over loss framing, no asserted feelings, condition density, single-claim surfaces, one language per screen, Korean sentence-ending consistency) into references/writing.md; exclude the separate skill, /ait commands, design G6 hand-off, docs MCP lookups, mandatory confirmation before applying, and upstream before/after examples."
+        },
+        {
+          "source": "https://github.com/emilkowalski/skills",
+          "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+          "paths": [
+            "LICENSE",
+            "skills/break-ui/SKILL.md",
+            "skills/choreograph/RECIPES.md",
+            "skills/choreograph/SKILL.md",
+            "skills/gestures/SKILL.md"
+          ],
+          "snapshot_sha256": "2f6ca662ff5306d3f99c9326dde3f9c08c2818a585f6b5285d907f5db629645e",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author choreograph's roles, pair relationships, one-entrance-per-container, non-uniform overlap, interruption and reduced-motion collapse into the conditional references/choreography.md, and its CSS stagger and sibling-menu direction into playbook recipes; add gestures' linked values, entry-axis dismissal, release-only overshoot and the inherited-custom-property cost to references/gestures.md; take break-ui's 'no limit found' wording. Exclude the initial response, mandatory 300ms caps and uniform-stagger bans as hard rules, useMeasure/useAnimate recipes, Vaul curves, Motion drag props and the ask-emil router."
         }
       ],
       "local_changes": [
@@ -181,7 +196,10 @@
         "Selectively adapt taste-skill and redesign-skill into conditional art-direction and preservation-first redesign references; omit theme/output entry points and arbitrary aesthetic bans.",
         "2026-10-21: Re-author selected ux-writing principles from toss/apps-in-toss-harness into references/writing.md: claim density and repetition, choices stated without pressure, one language per screen and a Korean copy section; retain the BSD-3-Clause notice in LICENSE.toss-apps-in-toss-harness.",
         "2026-10-21: Replace the Korean copy section of references/writing.md with Korean, English and Japanese interface notes; Japanese notes re-author yomiyasu and SmartHR conventions (recorded under writing-for-humans for yomiyasu).",
-        "2026-11-04: From the first awesome-interface comparison run, keep stress fixtures as reproducible evidence outside production paths and propose a fix per break; add worst-case data and conditional mobile-web references; make exiting surfaces unfocusable, keep over-dragged edge sheets attached, exclude shortcut and high-frequency surfaces from motion, address layout jumps on reveal, size answers to the question and avoid unverified version or maintenance claims."
+        "2026-11-04: From the first awesome-interface comparison run, keep stress fixtures as reproducible evidence outside production paths and propose a fix per break; add worst-case data and conditional mobile-web references; make exiting surfaces unfocusable, keep over-dragged edge sheets attached, exclude shortcut and high-frequency surfaces from motion, address layout jumps on reveal, size answers to the question and avoid unverified version or maintenance claims.",
+        "2026-11-18: Add references/choreography.md for several elements moving on one event, with upstream timing values restated as starting points beneath project tokens; ui.md's stagger paragraph now points to it.",
+        "2026-11-18: Add references/playbook.md, a symptom-name index routing declutter, spacing, copy, alignment, font, font size, imagery and motion plays to their owning sections, plus navigation dropdown, arrow shift button and reveal hero recipes; the arrow shift recipe and the imagery section in ui.md are original to this repository.",
+        "2026-11-18: Add a declutter procedure to layout.md, sibling-trigger navigation panels to ui.md, linked values, entry-axis dismissal and release-only overshoot to gestures.md, and replace 'unbounded' with 'no limit found' in worst-case-data.md."
       ],
       "excluded_sources": [
         {
@@ -347,12 +365,29 @@
           "snapshot_sha256": "9fabd790a6ae410ebad8811e9b8027941cec3d33b513100c113fb587bde1f846",
           "license": "MIT",
           "license_path": "LICENSE"
+        },
+        {
+          "source": "https://github.com/emilkowalski/skills",
+          "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+          "paths": [
+            "LICENSE",
+            "skills/learn-taste/SKILL.md"
+          ],
+          "snapshot_sha256": "ac7d986d48cecd6041591ac4b48ecd4f92686276220bcd318d7826db514895fc",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author learn-taste as design-md's corrections mode (references/corrections.md): five correction signals, the filter tree, generalization levels, user or inferred why, propose-then-stop and write on approval. Route mechanism choice to writing-for-agents' corrections-become-constraints ladder, label learned rules Approved or Current, and treat transcripts as sensitive data. Exclude the standalone user-invoked skill and fixed Claude Code transcript paths."
         }
       ],
       "local_changes": [
         "Generalize Stitch design-system authoring into optional repository-owned documentation with one source of truth.",
         "Separate Current, Approved, Proposed and Unknown evidence; link runtime owners instead of creating replacement tokens.",
-        "Keep Stitch as a conditional text adapter, not a prerequisite or implicit external action; remove preset aesthetic bans and unsourced values."
+        "Keep Stitch as a conditional text adapter, not a prerequisite or implicit external action; remove preset aesthetic bans and unsourced values.",
+        "2026-11-18: Add the corrections mode for turning a session's design corrections into approved design-system rules or proposed checks; retain Emil Kowalski's MIT notice in LICENSE.emilkowalski."
+      ],
+      "license_paths": [
+        "skills/design-md/LICENSE",
+        "skills/design-md/LICENSE.emilkowalski"
       ]
     },
     "diagram-design": {

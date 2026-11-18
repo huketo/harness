@@ -1,6 +1,6 @@
 # Worst-case data
 
-Read this from [stress testing](stress-test.md) when choosing fixture values. Each value must be something a real user could produce, or the actual limit from the project's schema, column or API contract. Random filler such as forty repeated letters proves nothing. If no limit exists, report the field as unbounded and use a long but believable value. Use `example.com`, `example.org` or `.test` for emails and URLs.
+Read this from [stress testing](stress-test.md) when choosing fixture values. Each value must be something a real user could produce, or the actual limit from the project's schema, column or API contract. Random filler such as forty repeated letters proves nothing. If you find no limit, report the field as "no limit found": the search did not show that none exists. Then use a long but believable value. Use `example.com`, `example.org` or `.test` for emails and URLs.
 
 Pick the rows that match the fields the component renders. Spread different failures across the first visible items, as real data does, instead of stacking them into one row.
 

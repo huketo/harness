@@ -1,6 +1,6 @@
 # UI surfaces, icons and motion
 
-Own surface depth and corners, optical alignment, icon rendering and motion behavior. [Typography](typography.md) owns fonts, text spacing, wrapping and truncation; [layout](layout.md) owns grouping, breakpoints and spatial RTL; [colors](colors.md) owns color tokens and contrast measurement. [Accessibility](accessibility.md) owns hit targets, focus, keyboard interaction, names and reduced-motion requirements. Ranking and report structure belong to [review](review.md).
+Own surface depth and corners, imagery, optical alignment, icon rendering and motion behavior. [Typography](typography.md) owns fonts, text spacing, wrapping and truncation; [layout](layout.md) owns grouping, breakpoints and spatial RTL; [colors](colors.md) owns color tokens and contrast measurement. [Accessibility](accessibility.md) owns hit targets, focus, keyboard interaction, names, image alternatives and reduced-motion requirements. When several elements move on one event, [choreography](choreography.md) owns their order and overlap. Ranking and report structure belong to [review](review.md).
 
 ## Start with the interaction
 
@@ -15,7 +15,19 @@ For closely nested rounded surfaces with a uniform visible inset, use concentric
 
 Distinguish a structural edge from elevation before replacing it. Dividers, table boundaries, input boundaries, selected outlines and focus indicators have jobs that a faint shadow may not preserve. For a surface that genuinely needs elevation, reuse the existing shadow token; layered transparent shadows can combine a close edge with a softer ambient shadow. Dark surfaces may need a visible edge or tonal separation rather than a larger black shadow. Verify against actual backgrounds; transparency does not guarantee suitable contrast.
 
+## Imagery
+
+Start from the project's image component or pipeline (a framework image component, CDN transforms, an asset registry) and correct its use before writing a raw `<img>` alongside it.
+
+- **Reserve the box.** Give every image its intrinsic `width` and `height` attributes or a CSS `aspect-ratio`, so loading does not push later content. A slot that receives mixed source shapes, such as a card grid, uses the slot's ratio rather than each file's.
+- **Crop deliberately.** Inside a fixed slot, `object-fit: cover` suits photos where a crop loses nothing essential; `contain` suits logos, product shots, screenshots and diagrams that must stay whole. Move the focal point with `object-position` when a crop cuts off the subject. Never let a slot stretch an image to a ratio it does not have.
+- **Serve the rendered size.** Use `srcset` and `sizes`, or the pipeline's equivalent, so a narrow viewport does not download the desktop file. `sizes` must describe the slot's actual rendered width at each breakpoint; check which resource the browser selected rather than trusting the markup.
+- **Load by priority.** Lazy-load images below the first viewport. The primary image in the first viewport, often the largest contentful element, loads eagerly; lazy-loading it delays the page's main content. Raise its fetch priority only where the supported browsers honor the hint and measurement shows a gain.
+- **Fail inside the same box.** A missing or failed image shows the project's fallback at the same dimensions, not a broken-image glyph or a collapsed slot. [Worst-case data](worst-case-data.md) lists the extreme ratios and failures to try.
+
 Where an image edge disappears into its surrounding surface, consider a subtle inset outline without changing its layout dimensions. `outline-offset: -1px` can pull a `1px` outline inside the image. Reuse the project's neutral treatment and notation; black/white at low alpha is one option, not an instruction to add outlines to every image. Check rounded corners, clipping and whether an interactive image already uses the outline for focus.
+
+Alternative text by purpose belongs to [accessibility](accessibility.md#announcements-and-alternatives). Verify imagery at the narrowest supported width and a wide one, with an extreme-ratio source, a failed load and a throttled network, in each supported appearance.
 
 ## Optical alignment
 
@@ -61,13 +73,15 @@ Keep high-frequency actions immediate or brief; a small color/opacity transition
 
 ## Entrances, exits and icon swaps
 
-For an infrequent entrance where order conveys hierarchy, group semantic chunks rather than animating every character. A stagger around `100ms` between a few chunks is a starting point; check total delay to the last action. Leave frequent tab changes, row hovers and typing unstaggered. Content and controls should not become unusable while waiting for decorative motion.
+When several elements enter, leave or swap together, such as a hero entrance, a staggered list, a view swap or an item leaving while its siblings close the gap, read [choreography](choreography.md) before choosing timing. Animate semantic chunks rather than every character, and leave frequent tab changes, row hovers and typing unstaggered.
 
 Keep context-preserving exits quieter than entrances: a small fixed displacement, such as `12px`, and a short fade can be enough. Full travel is appropriate when it communicates a drawer closing or a card returning to a source. Immediate removal is valid when motion adds no information. Integrate exit lifecycle with the existing component mechanism so the node is not removed before its intended exit or left as an invisible interaction blocker afterward. An exiting surface is no longer interactive: remove its contents from keyboard focus and the accessibility tree when the exit starts, not when it ends, using the component's existing hidden state or `inert`. `pointer-events: none` stops pointer hits but not focus; [accessibility](accessibility.md) owns the focus contract.
 
 When revealed content pushes later content, the layout jump is the change to address: animate the container's size or the following content's position, or reveal without motion. Fading in only the new content leaves the jump in place.
 
 For trigger-anchored popovers, menus and tooltips that scale, align the transform origin with the trigger and actual placement, including collision flips. Use the component's documented positioning values. Base UI's `--transform-origin` and its state attributes are library contracts, not standard CSS supplied by every popover. Keep centered dialogs centered; an opacity-only entrance is also valid.
+
+When a navigation bar's triggers open sibling panels, moving between triggers keeps the open surface: transition its position and content, with the new content entering from the side of the newly selected trigger, instead of closing and reopening it. If the pointer must cross a gap between trigger and panel, keep the panel open across that gap through the component's existing hover-intent or close-delay option. The [playbook recipe](playbook.md#navigation-dropdown) shows one implementation.
 
 For a tooltip group, preserve the initial accidental-hover delay but use the existing provider's skip-delay behavior for nearby subsequent tooltips where supported. Consider skipping their entrance animation too. Verify focus entry, dismissal and pointer travel as well as hover; avoid a second timer system or library-specific attributes on unrelated primitives.
 
@@ -101,7 +115,7 @@ For each changed or reviewed component, walk applicable default, hover, focus, p
 - Open, close and reopen rapidly; navigate away during an exit; verify no invisible layer remains over the next interaction.
 - Refresh with an already-selected state; verify initial-animation suppression and intentional page entrance independently.
 - Compare stable button bounds during icon swaps and loading transitions; inspect the smallest icon size.
-- Check trigger placement and collision flips for anchored entrances; traverse a tooltip group by pointer and keyboard.
+- Check trigger placement and collision flips for anchored entrances; traverse a tooltip group by pointer and keyboard. Sweep quickly across sibling navigation triggers; the open panel moves without closing or flickering.
 - For drag, swipe or spring-driven snapping, run the interruption and cancellation checks in [web gestures](gestures.md).
 - Replay animation slowly where tooling permits, then at normal speed. If performance is the finding, capture the actual trace or timing evidence.
 

@@ -55,6 +55,29 @@
         "Routes to the focused UI implementation workflow.",
         "Does not create or require a DESIGN.md or other design-system artifact."
       ]
+    },
+    {
+      "id": 6,
+      "name": "corrections-propose-then-stop",
+      "prompt": "design-md로 이번 세션에서 제가 고친 디자인을 규칙으로 정리해 주세요. 세션 기록 요약: (1) 사용자가 \"카드에 테두리 말고 반투명 그림자\"라고 말했고 이유는 말하지 않았습니다. (2) 에이전트가 쓴 Dropdown.tsx의 duration: 400을 사용자가 직접 200으로 바꿨습니다. (3) 같은 지적이 Popover에서도 있었습니다: \"그림자, 테두리 아님\". (4) 사용자가 \"헤드라인은 Pricing으로\"라고 고쳤습니다. 저장소에는 DESIGN.md가 있고 shadow-raised 토큰이 정의되어 있습니다.",
+      "expected_output": "Proposes class-level rules with the user's words and marked inferred reasons, skips the one-off headline, offers a check candidate where mechanical, and stops before writing.",
+      "files": [],
+      "expectations": [
+        "Generalizes the card and popover corrections to a class-level rule for raised surfaces using shadow-raised, citing the user's words, and marks its why as inferred because no reason was given.",
+        "Records the dropdown duration as a rule from the silent edit, skips the Pricing headline as a one-off, and offers at least one mechanical check candidate.",
+        "Stops at the proposal and asks which items to write, without editing DESIGN.md or component code."
+      ]
+    },
+    {
+      "id": 7,
+      "name": "corrections-none",
+      "prompt": "design-md로 이번 세션의 디자인 교정을 규칙으로 남겨 주세요. 이번 세션에서는 백엔드 API 오류만 고쳤고 디자인에 관한 지적은 없었습니다.",
+      "expected_output": "Reports in one line that there were no design corrections and writes nothing.",
+      "files": [],
+      "expectations": [
+        "States briefly that the session had no design corrections.",
+        "Writes no rule and creates or edits no design-system artifact."
+      ]
     }
   ]
 }

@@ -35,7 +35,7 @@ Separate deliverables have separate owners: `imagegen` generates UI or brand ima
 
 ## 3. Load only the domains needed
 
-The links below are the authoritative rules. Read the relevant document before applying it; add another only when its rule is involved in the request or an observed failure. Cross-domain effects do not justify an unsolicited whole-product audit.
+The links below are the authoritative rules. Read the relevant document before applying it; add another only when its rule is involved in the request or an observed failure. Cross-domain effects do not justify an unsolicited whole-product audit. When a request names a pattern or symptom rather than a domain, such as declutter, spacing, imagery, a navigation dropdown, an arrow shift button or a reveal hero, the [playbook](references/playbook.md) routes it to the owning section and holds the recipes.
 
 | Domain | Read when |
 | --- | --- |
@@ -44,7 +44,7 @@ The links below are the authoritative rules. Read the relevant document before a
 | [Writing](references/writing.md) | Creating or correcting labels, actions, instructions, empty states, confirmations, or recovery messages. |
 | [Typography](references/typography.md) | Font loading, scale, spacing, wrapping, truncation, numeric alignment, language, or bidirectional rendering is involved. |
 | [Colors](references/colors.md) | Generating or converting palettes, semantic tokens, themes, gamut, gradients, or measuring rendered contrast. Preserve established notation unless migration is requested. |
-| [UI polish and motion](references/ui.md) | Surfaces, borders, shadows, optical alignment, icons, imagery, transitions, or interaction feedback are involved. For web drag, swipe, momentum or snap behavior, also read the conditional [gesture reference](references/gestures.md). |
+| [UI polish and motion](references/ui.md) | Surfaces, borders, shadows, optical alignment, icons, imagery, transitions, or interaction feedback are involved. When several elements move on one event (entrances, staggers, view swaps, exits that close a gap), also read the conditional [choreography reference](references/choreography.md); for web drag, swipe, momentum or snap behavior, the conditional [gesture reference](references/gestures.md). |
 | [Mobile web](references/mobile-web.md) | Conditional: a web app or PWA targets phone browsers, or a defect appears only on touch devices (viewport height, sticky hover, input zoom, tap feedback, overscroll, safe areas, browser chrome color). |
 
 A full review covers accessibility → layout → writing → typography → colors → UI, plus mobile web when the product targets phone browsers. A focused review reports its narrower coverage and cannot approve the uninspected interface. A rule has one owner; report one root cause with secondary effects rather than duplicate findings.
