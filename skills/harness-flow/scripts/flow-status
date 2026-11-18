@@ -22,7 +22,7 @@ if [ "$sources" -eq 0 ]; then row code sources none "no tracked source file"; el
 # One check command that runs everything, the same locally and in CI.
 check=
 if [ -f mise.toml ] && grep -qE '^\[tasks\.check\]' mise.toml; then check="mise.toml [tasks.check]"
-elif [ -f package.json ] && node -e 'process.exit(String(JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.check ?? "").trim() ? 0 : 1)' 2>/dev/null; then check="package.json scripts.check"
+elif [ -f package.json ] && node -e 'const c = JSON.parse(require("fs").readFileSync("package.json", "utf8")).scripts?.check; process.exit(typeof c === "string" && c.trim() ? 0 : 1)' 2>/dev/null; then check="package.json scripts.check"
 elif m=$(first Makefile makefile GNUmakefile) && grep -qE '^check:' "$m"; then check="$m check:"
 elif m=$(first justfile Justfile .justfile) && grep -qE '^check' "$m"; then check="$m check"
 fi
@@ -53,16 +53,21 @@ formal=$(globfirst '.agents/skills/formal-*/SKILL.md' || true)
 [ -z "$formal" ] && formal=$(git grep -lE '"fast-check"|hypothesis' -- package.json pyproject.toml requirements*.txt 2>/dev/null | head -n 1 || true)
 if [ -n "$formal" ]; then row verify properties present "$formal"; else row verify properties none "used only where examples cannot reach"; fi
 
-# The rule table is the first Markdown table under `## Rules and enforcement`; its last column is `Enforced by`.
+# The rule table is the first Markdown table under `## Rules and enforcement`, and it counts only when its header is
+# `| Rule | Enforced by |` followed by a delimiter row. Escaped pipes (`\|`) stay inside their cell.
 table=
 [ -f AGENTS.md ] && table=$(awk '/^## /{inside=($0 ~ /^## Rules and enforcement[[:space:]]*$/); next} inside && /^\|/{print; seen=1; next} inside && seen{exit}' AGENTS.md)
+if [ -n "$table" ]; then
+  header=$(printf '%s\n' "$table" | sed -n 1p); delimiter=$(printf '%s\n' "$table" | sed -n 2p)
+  [[ $header =~ ^\|[[:space:]]*Rule[[:space:]]*\|[[:space:]]*Enforced\ by[[:space:]]*\|[[:space:]]*$ && $delimiter =~ ^\|[[:space:]:-]+\|[[:space:]:-]+\|[[:space:]]*$ ]] || table=
+fi
 unenforced=0
 if [ ! -f AGENTS.md ]; then
   row prose rule-table missing "no AGENTS.md"
 elif [ -z "$table" ]; then
-  row prose rule-table missing "AGENTS.md has no table under Rules and enforcement"
+  row prose rule-table missing "AGENTS.md has no | Rule | Enforced by | table under Rules and enforcement"
 else
-  unenforced=$(printf '%s\n' "$table" | awk -F'|' 'NR > 2 { cell = $(NF - 1); gsub(/[`[:space:]]/, "", cell); if (cell ~ /^unenforced/) n++ } END { print n + 0 }')
+  unenforced=$(printf '%s\n' "$table" | sed 's/\\|/\x01/g' | awk -F'|' 'NR > 2 { cell = $(NF - 1); gsub(/[`[:space:]]/, "", cell); if (cell ~ /^unenforced/) n++ } END { print n + 0 }')
   row prose rule-table present "AGENTS.md, $unenforced unenforced"
 fi
 
@@ -72,6 +77,6 @@ next() { printf 'next\t%s\t%s\n' "$1" "$2"; exit 0; }
 [ "$sources" -eq 0 ] && next repo-bootstrap "no source code yet: if the repository will hold code, install the default stack; a documentation-only repository needs only repo-init"
 [ -n "$table" ] || next repo-init "write AGENTS.md and the Rules and enforcement table that records what is enforced today"
 { [ -z "$check" ] || [ -z "$ci" ]; } && next repo-bootstrap "existing repository: wire one check command and CI (the skill's existing-repository section)"
-[ -z "$verify" ] && next verify-init "no verification skill: generate one so changes can be proven and full-send can merge"
+[ -z "$verify" ] && next verify-init "no verification skill: generate one so changes can be proven; full-send also requires it before it considers merging"
 [ "$unenforced" -gt 0 ] && next correct "$unenforced unenforced rule(s): move the most frequent one to a check"
 next none "the base is in place; use the event table in skills/harness-flow/SKILL.md"

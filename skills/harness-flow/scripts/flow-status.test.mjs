@@ -56,6 +56,17 @@ test("an existing repository without the rule table starts with repo-init", () =
 	assert.equal(next, "repo-init");
 });
 
+test("a table under the heading counts only with the Rule and Enforced by header", () => {
+	const agents = "# Demo\n\n## Rules and enforcement\n\n| Planned coverage | Owner |\n| --- | --- |\n| lint | team |\n";
+	assert.equal(status(repo("wrong-header", { ...base, "AGENTS.md": agents })).next, "repo-init");
+});
+
+test("an escaped pipe inside a reason does not hide an unenforced row", () => {
+	const { next, reason } = status(repo("escaped", { ...base, ...verify, "AGENTS.md": table("| A | unenforced: needs a \\| b check |") }));
+	assert.equal(next, "correct");
+	assert.match(reason, /^1 unenforced/);
+});
+
 test("a Rules and enforcement heading without a table does not count as the rule table", () => {
 	const { state, next } = status(repo("heading-only", { ...base, "AGENTS.md": "# Demo\n\n## Rules and enforcement\n\nTo do.\n\n## Other\n\n| A | B |\n| --- | --- |\n" }));
 	assert.equal(state["rule-table"], "missing");
@@ -75,10 +86,14 @@ test("a check script entry is required, not a dependency named check", () => {
 	assert.equal(state["check-command"], "missing");
 	assert.equal(next, "repo-bootstrap");
 	assert.match(reason, /existing repository/);
+	const notString = { ...files, "package.json": '{"scripts":{"check":false}}' };
+	assert.equal(status(repo("check-false", notString)).state["check-command"], "missing");
 });
 
 test("an existing repository without one check command or CI goes to repo-bootstrap's existing-repository section", () => {
-	const { next, reason } = status(repo("no-ci", { "src/app.ts": "x\n", "package.json": '{"scripts":{"check":"tsc"}}', "AGENTS.md": table() }));
+	const { state, next, reason } = status(repo("no-ci", { "src/app.ts": "x\n", "package.json": '{"scripts":{"check":"tsc"}}', "AGENTS.md": table() }));
+	assert.equal(state["check-command"], "present");
+	assert.equal(state.ci, "missing");
 	assert.equal(next, "repo-bootstrap");
 	assert.match(reason, /existing repository/);
 });
