@@ -236,10 +236,10 @@
       "id": 20,
       "name": "choreography-one-entrance",
       "prompt": "사이드 패널이 오른쪽에서 미끄러져 들어온 뒤, 안의 메뉴 항목 8개가 각각 100ms 간격으로 하나씩 아래에서 올라옵니다. 이 패널은 사용자가 하루에도 수십 번 엽니다. 모션 설계만 검토하고 파일은 수정하지 마세요.",
-      "expected_output": "Keeps one entrance for the container, removes the per-item stagger on this frequent surface, and does not propose a different uniform stagger.",
+      "expected_output": "Removes the per-item stagger on this frequent surface, leaving one entrance for the container, an immediate appearance or a brief fade, and does not propose a different uniform stagger.",
       "files": [],
       "expectations": [
-        "Recommends one entrance per container: the panel moves and its items arrive with it rather than being staggered.",
+        "Removes the per-item stagger: the items arrive with the panel's single entrance, or the panel appears immediately or with a brief fade.",
         "Cites how often the panel opens as a reason to cut motion rather than proposing a faster uniform stagger.",
         "Makes no file edits and does not claim rendered verification."
       ]

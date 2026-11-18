@@ -69,7 +69,7 @@ Hook each supporting animation to a specific moment of the lead (its start, impa
 
 ## Direction and exits
 
-- Forward moves content toward the start edge (new content enters from the end edge); back reverses it. Under RTL, follow the [layout](layout.md) direction. Content switching between sibling menus enters from the side of the newly selected trigger.
+- Forward moves content toward the start edge (new content enters from the end edge); back reverses it. Under RTL, follow the [layout](layout.md) direction. Sibling navigation panels follow the rule in [UI motion](ui.md#entrances-exits-and-icon-swaps).
 - An exit reads its direction when it starts. Pass the current direction to exiting children through the library's mechanism (Motion's `custom` on both `AnimatePresence` and the child), or the leaving view animates with a stale direction.
 - Exits happen together, shorter and quieter than entrances, as [UI motion](ui.md#entrances-exits-and-icon-swaps) describes. Do not reverse-stagger a group out; the user has already decided to leave. Leave toward the side the element entered from.
 
