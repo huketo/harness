@@ -61,6 +61,16 @@ test("a table under the heading counts only with the Rule and Enforced by header
 	assert.equal(status(repo("wrong-header", { ...base, "AGENTS.md": agents })).next, "repo-init");
 });
 
+test("a delimiter row needs a dash in each cell", () => {
+	const agents = "# Demo\n\n## Rules and enforcement\n\n| Rule | Enforced by |\n| : | : |\n| A | judgment |\n";
+	assert.equal(status(repo("no-dash", { ...base, "AGENTS.md": agents })).next, "repo-init");
+});
+
+test("a row without a trailing pipe still counts as unenforced", () => {
+	const { next } = status(repo("no-trailing", { ...base, ...verify, "AGENTS.md": table("| A | unenforced: owed") }));
+	assert.equal(next, "correct");
+});
+
 test("an escaped pipe inside a reason does not hide an unenforced row", () => {
 	const { next, reason } = status(repo("escaped", { ...base, ...verify, "AGENTS.md": table("| A | unenforced: needs a \\| b check |") }));
 	assert.equal(next, "correct");
