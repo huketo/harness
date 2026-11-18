@@ -59,6 +59,7 @@ disable-model-invocation: true
 
 최신 커밋에서 다음이 모두 참이어야 한다.
 
+- `scripts/harness-mode set full-send`를 다시 실행했을 때 `mode=full-send`가 나온다. 작업이나 rebase 도중에 CI 설정이나 검증 스킬이 없어졌으면 여기서 `full-stop`으로 낮아지며, 그때는 머지하지 않고 `full-stop` 스킬을 따른다.
 - 증명이 diff의 모든 변경을 덮는다.
 - 필수 검사가 통과했다(GitHub 필수 status check, GitLab head 파이프라인 성공).
 - 리뷰 봇이 끝났고, 각 지적은 고쳤거나 이유를 적어 기각했다.

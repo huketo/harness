@@ -42,11 +42,11 @@ A rule that a check can enforce lives in the check, not in prose. This table pai
 
 | Rule | Enforced by |
 | --- | --- |
-| A skill's frontmatter parses, names its directory, and has a description. | `scripts/check-repo.ts` (`mise run rules`) |
+| A skill's frontmatter names its directory, has a description, and holds no unquoted value that YAML would misread. | `scripts/check-repo.ts` (`mise run rules`) |
 | A relative Markdown link points at a file that exists. | `scripts/check-repo.ts` (`mise run rules`) |
 | The tracked plugin files match their sources. | `node plugin/build.mjs --host claude --check` (`mise run check`) |
 | `harness-mode` and the merge guard read the full-send allowlist the same way. | `plugin/hooks/allowlist.property.test.mjs` |
-| `README.md` and `README.ko.md` carry the same claims. | `unenforced`: equivalent meaning across two languages is not detectable by a script; reviewed by hand. |
+| `README.md` and `README.ko.md` carry the same claims. | `judgment` ([`docs/agents/writing.md`](docs/agents/writing.md)) |
 | Tracked files hold no private or sensitive material. | `judgment` ([`docs/agents/writing.md`](docs/agents/writing.md)) |
 
 Architectural decisions live in [`docs/adr/`](docs/adr/); read them before reshaping an area. User documentation starts at [`docs/index.md`](docs/index.md). Installation, usage, and owner operations belong in `docs/guides/`. Enduring public-distribution rules belong in [`docs/public-release.md`](docs/public-release.md).

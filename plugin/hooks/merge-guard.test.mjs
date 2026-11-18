@@ -37,7 +37,7 @@ before(() => {
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
-// A repository full-send may merge has a CI definition and a verify-* skill; `bare` leaves one or both out.
+// A repository full-send may merge has a CI definition and a verify-* skill; `{ ci, verify }` leave one or both out.
 function repo(name, origin, { ci = true, verify = true } = {}) {
 	const dir = join(root, name);
 	execFileSync("git", ["init", "-q", dir], { env });

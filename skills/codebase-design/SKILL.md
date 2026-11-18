@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Sketch a module's types, signatures, and dependency direction before writing code that crosses a function boundary, and name the check that will enforce the shape. Not needed for edits that keep those contracts.
+description: Sketch types, signatures, and dependency direction before adding a module or changing an interface, a state owner, or which way a dependency points, and name the check that will enforce the shape. Not needed for edits that keep those contracts.
 ---
 
 # Codebase Design
@@ -32,9 +32,9 @@ When workarounds for the current shape keep repeating, redesign it as if the new
 
 ## 4. Name the enforcement
 
-For every boundary the chosen shape draws, name the check that fails when it is crossed: a type, an import restriction, a test at the module's interface. When the repository has no such check, add it with the `correct` skill's rungs, or record the rule as `unenforced` in the `Rules and enforcement` table of `AGENTS.md`.
+For every boundary the chosen shape draws, name the check that fails when it is crossed: a type, an import restriction, a test at the module's interface. When the repository has no such check, the sketch still names the check that would enforce the boundary. Add it with the change, or record the rule as `unenforced` in the `Rules and enforcement` table of `AGENTS.md` with that proposed check as the reason's remedy.
 
-**Done:** each boundary in the sketch has a named check or an `unenforced` row.
+**Done:** each boundary in the sketch names an existing check or a proposed one; a proposed check that is not added has an `unenforced` row.
 
 ## Structural defaults
 

@@ -22,11 +22,11 @@ disable-model-invocation: true
 
 ## 2. 템플릿을 설치한다
 
-`templates/<스택>/`의 파일을 저장소 루트로 복사한다. 같은 경로에 파일이 이미 있으면 덮어쓰지 않고, 그 파일에 빠진 설정만 더하자고 제안한다. `{{PROJECT_NAME}}`은 저장소 이름으로 채운다.
+`templates/<스택>/`의 파일을 점으로 시작하는 파일(`.github/`, `.gitlab-ci.yml`, `.gitignore`)까지 저장소 루트로 복사한다(`cp -rn templates/<스택>/. <루트>/`). 같은 경로에 파일이 이미 있으면 덮어쓰지 않고, 그 파일에 빠진 설정만 더하자고 제안한다. `{{PROJECT_NAME}}`은 저장소 이름으로 채운다.
 
 개발 의존성은 템플릿에 버전을 적어 두지 않았다. STACKS.md가 적은 설치 명령을 실행해 지금의 버전을 잠금 파일에 고정하고, 잠금 파일을 추적한다.
 
-완료 기준: `grep -rn '{{' .`의 결과가 비어 있고, 잠금 파일이 생겼다.
+완료 기준: `grep -rn '{{' --exclude-dir=node_modules --exclude-dir=.git .`의 결과가 비어 있고, 잠금 파일이 생겼다.
 
 ## 3. 예시를 첫 기능으로 바꾼다
 
@@ -46,12 +46,14 @@ disable-model-invocation: true
 
 ## 5. CI를 확인한다
 
-템플릿의 CI 파일은 로컬과 같은 check 명령 하나를 실행한다. 저장소의 원격에 맞는 파일만 남긴다(`github.com`이면 `.github/workflows/ci.yml`, GitLab이면 `.gitlab-ci.yml`). 첫 파이프라인이 통과하기 전에는 CI를 확인한 것으로 보고하지 않는다. 푸시할 권한이 없으면 "CI 미확인"으로 적는다.
+템플릿의 CI 파일은 로컬과 같은 check 명령 하나를 실행한다. 저장소의 원격에 맞는 파일만 남긴다(`github.com`이면 `.github/workflows/ci.yml`, GitLab이면 `.gitlab-ci.yml`). 원격이 아직 없으면 둘 다 남기고 그 사실을 보고한다. 첫 파이프라인이 통과하기 전에는 CI를 확인한 것으로 보고하지 않는다. 푸시할 권한이 없으면 "CI 미확인"으로 적는다.
 
 ## 6. 문서와 검증으로 넘긴다
 
-- `repo-init`으로 `AGENTS.md`와 `docs/agents/`를 만든다. `Rules and enforcement` 표에는 이번에 설치한 규칙마다 한 행을 적고, 강제하는 장치로 린트 설정의 경로를 적는다.
-- `verify-init`으로 이 저장소의 검증 스킬을 만든다. `full-send`는 CI 설정과 검증 스킬이 모두 있는 저장소에서만 머지한다.
+두 스킬은 사람이 호출하는 스킬이라 스킬 도구로는 부를 수 없다. 아래 파일을 읽고 그 절차를 따른다. 사람이 없는 실행이면 따르지 않고, 남은 일로 보고한다.
+
+- [repo-init](../repo-init/SKILL.md)으로 `AGENTS.md`와 `docs/agents/`를 만든다. `Rules and enforcement` 표에는 이번에 설치한 규칙마다 한 행을 적고, 강제하는 장치로 린트 설정의 경로를 적는다.
+- [verify-init](../verify-init/SKILL.md)으로 이 저장소의 검증 스킬을 만든다. `full-send`는 CI 설정과 검증 스킬이 모두 있는 저장소에서만 머지한다.
 
 ## 보고
 

@@ -60,7 +60,7 @@
         "fixtures/partial-docs/pnpm-workspace.yaml"
       ],
       "expectations": [
-        "기존 `AGENTS.md`를 덮어쓰지 않고 빠진 절(hitl 포인터, 주제 안내 목록, 도메인 언어)만 더하자고 제안하며, `CLAUDE.md`는 `@AGENTS.md` 한 줄로 새로 만든다.",
+        "기존 `AGENTS.md`를 덮어쓰지 않고 빠진 절(hitl 포인터, 주제 안내 목록, 규칙과 강제 장치의 표, 도메인 언어)만 더하자고 제안하며, `CLAUDE.md`는 `@AGENTS.md` 한 줄로 새로 만든다.",
         "기존 `docs/agents/workflow.md`와 `testing.md`를 덮어쓰지 않고, 이미 다루는 주제는 되풀이하지 않은 채 빠진 절만 제자리에 더하자고 제안하며 들어갈 위치를 밝힌다.",
         "없는 `authority.md`, `writing.md`, `hitl.md`와 GitHub용 `issue-tracker.md`를 새로 만든다.",
         "`pnpm-workspace.yaml`을 다중 컨텍스트 신호로 보고 `GLOSSARY-MAP.md`를 권장 답으로 두며, `orders`와 `billing`을 컨텍스트 후보로 보여 주고 공유 설정 패키지 `tsconfig`는 후보에서 뺀다.",

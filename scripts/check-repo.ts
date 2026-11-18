@@ -12,7 +12,10 @@ export interface Problem {
 }
 
 // YAML reads an unquoted `key: a: b` as a nested mapping and ` #` as a comment, so the skill loads without its text.
-const PLAIN_SCALAR_TRAP = /: | #|^[\[{&*!|>%@`]/;
+// This is not a YAML parser: it rejects the plain-scalar traps and unbalanced quotes, and accepts block scalars.
+const PLAIN_SCALAR_TRAP = /: | #|^[\[{&*!|>%@`"']/;
+const QUOTED = /^"(?:[^"\\]|\\.)*"$|^'(?:[^']|'')*'$/;
+const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 
 /** Problems in one SKILL.md frontmatter block. `dir` is the skill's directory name. */
 export function checkFrontmatter(text: string, dir: string): Omit<Problem, "path">[] {
@@ -28,9 +31,12 @@ export function checkFrontmatter(text: string, dir: string): Omit<Problem, "path
 		const key = match[1] ?? "";
 		const value = (match[2] ?? "").trim();
 		seen.set(key, value);
-		const quoted = /^".*"$|^'.*'$/.test(value);
-		if (value !== "" && !quoted && PLAIN_SCALAR_TRAP.test(value)) {
-			problems.push({ line: i + 1, message: `\`${key}\` holds a colon-space, a space-hash, or a leading YAML indicator. Wrap the whole value in double quotes.` });
+		if (BLOCK_SCALAR.test(value)) {
+			// The text is the indented lines that follow; an empty block is an empty value.
+			const body = lines.slice(i + 1, end).findIndex((line) => !/^\s+\S/.test(line));
+			seen.set(key, lines.slice(i + 1, body < 0 ? end : i + 1 + body).join(" ").trim());
+		} else if (value !== "" && !QUOTED.test(value) && PLAIN_SCALAR_TRAP.test(value)) {
+			problems.push({ line: i + 1, message: `\`${key}\` holds a colon-space, a space-hash, a leading YAML indicator, or unbalanced quotes. Wrap the whole value in double quotes and escape inner double quotes.` });
 		}
 	}
 	const unquote = (value: string | undefined) => (value ?? "").replace(/^["']|["']$/g, "");
@@ -48,13 +54,18 @@ export function relativeLinks(text: string): { target: string; line: number }[] 
 	const found: { target: string; line: number }[] = [];
 	let fence: string | null = null;
 	text.split("\n").forEach((raw, index) => {
+		// A fence closes only on a bare marker of the same character at least as long as the one that opened it, so a
+		// three-backtick example inside a four-backtick fence stays inside.
 		const marker = /^\s*(```+|~~~+)/.exec(raw)?.[1];
-		if (marker) {
-			if (fence === null) fence = marker[0] ?? null;
-			else if (marker[0] === fence) fence = null;
+		if (fence === null) {
+			if (marker) {
+				fence = marker;
+				return;
+			}
+		} else {
+			if (marker && marker[0] === fence[0] && marker.length >= fence.length && /^\s*(```+|~~~+)\s*$/.test(raw)) fence = null;
 			return;
 		}
-		if (fence !== null) return;
 		const line = raw.replace(/(`+).*?\1/g, "");
 		for (const match of line.matchAll(/\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
 			const target = (match[1] ?? "").split("#")[0] ?? "";
