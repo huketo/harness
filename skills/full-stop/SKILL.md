@@ -1,6 +1,6 @@
 ---
 name: full-stop
-description: full-send와 같은 작업을 하되 머지하지 않고 사람이 머지할 준비가 된 MR에서 멈추는 작업 모드. 사람이 "/full-stop"이나 "full stop"으로 직접 고를 때와 full-send가 허용 목록에 없는 저장소에서 낮아질 때 쓴다.
+description: full-send와 같은 작업을 하되 머지하지 않고 사람이 머지할 준비가 된 MR에서 멈추는 작업 모드. 사람이 "/full-stop"이나 "full stop"으로 직접 고를 때와 full-send가 허용 목록에 없거나 CI 설정·검증 스킬이 없는 저장소에서 낮아질 때 쓴다.
 disable-model-invocation: true
 ---
 

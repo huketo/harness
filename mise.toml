@@ -16,6 +16,7 @@ run = "npx --no-install tsc --noEmit"
 
 [tasks.test]
 description = "Run every maintained test suite with node --test"
+depends = ["setup"]
 run = "node --test 'plugin/**/*.test.mjs' 't3/**/*.test.mjs' 'codex/**/*.test.ts' 'scripts/**/*.test.ts'"
 
 [tasks.rules]

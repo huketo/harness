@@ -29,6 +29,16 @@ test("rejects the unquoted description that once hid a skill's trigger text", ()
 test("accepts plain values, block scalars, and nested keys", () => {
 	const text = "---\nname: demo\ndescription: Review a change since a fixed point (commit, branch, tag).\nmetadata:\n  note: a: b\nlicense: MIT\n---\n";
 	assert.deepEqual(checkFrontmatter(text, "demo"), []);
+	assert.deepEqual(checkFrontmatter("---\nname: demo\ndescription: >-\n  Review: every change,\n  twice.\n---\n", "demo"), []);
+	assert.match(checkFrontmatter("---\nname: demo\ndescription: |\n---\n", "demo")[0]?.message ?? "", /description/);
+});
+
+test("rejects quotes that do not close around the whole value", () => {
+	for (const value of ['"Use the "preview" command."', '"unclosed', "'it's broken: here'", '"a": "b"']) {
+		assert.equal(checkFrontmatter(skill("demo", value), "demo").length, 1, value);
+	}
+	assert.deepEqual(checkFrontmatter(skill("demo", '"Use the \\"preview\\" command: now."'), "demo"), []);
+	assert.deepEqual(checkFrontmatter(skill("demo", "'it''s fine: here'"), "demo"), []);
 });
 
 test("requires a frontmatter block whose name is the directory and whose description is set", () => {
@@ -46,10 +56,17 @@ test("reads link targets outside code and skips URLs, anchors, and template plac
 		"[fenced](gone.md)",
 		"```",
 		"[after](after.md)",
+		"````md",
+		"```",
+		"[nested](gone.md)",
+		"```",
+		"````",
+		"[last](last.md)",
 	].join("\n");
 	assert.deepEqual(relativeLinks(text), [
 		{ target: "docs/a.md", line: 1 },
 		{ target: "after.md", line: 6 },
+		{ target: "last.md", line: 12 },
 	]);
 });
 

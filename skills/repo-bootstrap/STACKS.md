@@ -46,6 +46,7 @@ mise run check
 디렉터리 관례:
 
 - `src/core/<기능>/`은 순수한 로직이다. 기능 하나가 평평한 디렉터리 하나이고, `index.ts`가 유일한 공개 진입점이다.
+- 린트 설정은 ESLint의 `defineConfig`로 쓴다.
 - `src/shell/`은 입출력과 진입점이다. core를 호출하고, core가 타입으로 선언한 의존성의 구현을 넘긴다.
 
 위반 사례(`repo-bootstrap` 4단계에서 하나씩 실패를 확인한다):
@@ -53,12 +54,14 @@ mise run check
 | 위반 | 만드는 방법 | 실패하는 규칙 |
 | --- | --- | --- |
 | core의 입출력 | `src/core/<기능>/`의 파일에서 `node:fs`를 import한다 | `no-restricted-imports` |
+| 접두사 없는 내장 모듈 | core의 파일에서 `fs`나 `fs/promises`를 import한다 | `no-restricted-imports` |
+| core 테스트의 입출력 | `src/core/<기능>/*.test.ts`에서 `node:fs`를 import한다(`node:test`와 `node:assert`는 허용) | `no-restricted-imports` |
 | core가 shell에 의존 | core의 파일에서 `../../shell/main.ts`를 import한다 | `no-restricted-imports` |
 | shell의 깊은 import | `src/shell/`에서 `../core/<기능>/name.ts`를 import한다 | `no-restricted-imports` |
 | 다른 기능의 깊은 import | 다른 기능에서 `../<기능>/name.ts`를 import한다 | `no-restricted-imports` |
 | 빠진 분기 | `switch`에서 `case` 하나를 지운다 | `switch-exhaustiveness-check` |
 
-확인한 범위: 2026-11-18에 Node.js 24, TypeScript 6.0, ESLint 10.15, typescript-eslint 8.73으로 위 다섯 사례의 실패와 올바른 코드의 통과를 확인했다. `.github/workflows/ci.yml`과 `.gitlab-ci.yml`은 파이프라인에서 실행해 보지 않았다.
+확인한 범위: 2026-11-18에 Node.js 24, TypeScript 6.0, ESLint 10.15, typescript-eslint 8.73으로 위 일곱 사례의 실패와 올바른 코드(다른 기능을 `index.ts`로 import, shell의 `node:fs` 사용)의 통과를 확인했다. `.github/workflows/ci.yml`과 `.gitlab-ci.yml`은 파이프라인에서 실행해 보지 않았다.
 
 ## 시험
 

@@ -53,14 +53,15 @@ case ${1:-} in
     ;;
   guard)
     run=$(run_dir "${2:-}"); repo=${3:?repo}; cases=${4:?cases file}
+    node=$(cd "$ROOT" && mise which node) # the pinned Node; a mise shim on PATH would stop at a trust prompt inside the run
     while IFS= read -r line || [ -n "$line" ]; do
       case $line in '' | '#'*) continue ;; esac
-      payload=$(node -e 'console.log(JSON.stringify({ tool_name: "Bash", tool_input: { command: process.argv[1] }, cwd: process.argv[2] }))' "$line" "$repo")
-      out=$(printf '%s' "$payload" | isolated "$run" node "$ROOT/plugin/hooks/merge-guard.mjs" --format claude)
+      payload=$("$node" -e 'console.log(JSON.stringify({ tool_name: "Bash", tool_input: { command: process.argv[1] }, cwd: process.argv[2] }))' "$line" "$repo")
+      out=$(printf '%s' "$payload" | isolated "$run" "$node" "$ROOT/plugin/hooks/merge-guard.mjs" --format claude)
       if [ -z "$out" ]; then
         decision=pass
       else
-        decision=$(printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const o = JSON.parse(s).hookSpecificOutput; console.log(`${o.permissionDecision}: ${o.permissionDecisionReason}`); })')
+        decision=$(printf '%s' "$out" | "$node" -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const o = JSON.parse(s).hookSpecificOutput; console.log(`${o.permissionDecision}: ${o.permissionDecisionReason}`); })')
       fi
       printf '%s\n  -> %s\n' "$line" "$decision"
     done < "$cases"

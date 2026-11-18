@@ -37,7 +37,7 @@ disable-model-invocation: true
 6. **표준 문서**: 루트, `docs/`, `.github/`에서 `CONTRIBUTING.md`와 `CODING_STANDARDS.md`를 찾는다.
 7. **검사·빌드 명령의 근거**: 명령을 정의하거나 실행하는 파일을 읽고, 명령마다 목적(test, lint, typecheck, build)과 `path:line`을 적는다.
    - `package.json`의 `scripts`. 실행기는 `packageManager` 필드와 잠금 파일(`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`·`bun.lockb`, `package-lock.json`)로 정한다.
-   - `Makefile`·`justfile`의 타깃, `pyproject.toml`의 작업 설정(`[tool.poe.tasks]`, `[tool.hatch.envs.*.scripts]`, `[tool.pytest.ini_options]`), `tox.ini`, `noxfile.py`.
+   - `mise.toml`의 `[tasks.*]`, `Makefile`·`justfile`의 타깃, `pyproject.toml`의 작업 설정(`[tool.poe.tasks]`, `[tool.hatch.envs.*.scripts]`, `[tool.pytest.ini_options]`), `tox.ini`, `noxfile.py`.
    - CI 설정: `.github/workflows/*.yml`, `.gitlab-ci.yml`, 그 밖의 CI 파일이 실행하는 명령.
    - `Cargo.toml`이나 `go.mod`만 있고 그것을 실행하는 스크립트나 CI 단계가 없으면, 도구의 기본 명령(`cargo test`, `go test ./...`)은 근거가 아니라 후보로 적는다.
    - 배포, 릴리스, 게시, 마이그레이션처럼 실제 효과가 있는 명령은 따로 적는다.
