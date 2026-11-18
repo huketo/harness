@@ -30,7 +30,6 @@ To cover a new command shape, add its line to [`merge-guard.cases`](merge-guard.
 ## Gotchas
 
 - Resolve `MODE` before `cd "$REPO"`. Inside the synthetic repository `git rev-parse --show-toplevel` names that repository, which has no `skills/`.
-
 - `guard` drives the Claude Code payload format. The Codex and Antigravity formats are covered by `plugin/hooks/merge-guard.test.mjs` only.
 - The guard reads the mode from the repository named in the payload's `cwd`, not from the directory `guard` runs in.
 - A `pass` for a merge line means the guard printed nothing. It does not mean a merge happened; no merge command is executed.

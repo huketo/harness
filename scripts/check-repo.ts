@@ -33,7 +33,7 @@ export function checkFrontmatter(text: string, dir: string): Omit<Problem, "path
 		seen.set(key, value);
 		if (BLOCK_SCALAR.test(value)) {
 			// The text is the indented lines that follow; an empty block is an empty value.
-			const body = lines.slice(i + 1, end).findIndex((line) => !/^\s+\S/.test(line));
+			const body = lines.slice(i + 1, end).findIndex((line) => !/^(\s+\S|\s*$)/.test(line));
 			seen.set(key, lines.slice(i + 1, body < 0 ? end : i + 1 + body).join(" ").trim());
 		} else if (value !== "" && !QUOTED.test(value) && PLAIN_SCALAR_TRAP.test(value)) {
 			problems.push({ line: i + 1, message: `\`${key}\` holds a colon-space, a space-hash, a leading YAML indicator, or unbalanced quotes. Wrap the whole value in double quotes and escape inner double quotes.` });

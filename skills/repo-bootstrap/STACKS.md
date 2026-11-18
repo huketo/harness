@@ -31,7 +31,7 @@
 | 실행 | Node.js 24의 타입 제거 실행. 빌드 단계가 없다. |
 | 도구 버전과 진입점 | `mise.toml`. `mise run check`가 타입 검사, 린트, 테스트를 모두 실행한다. |
 | 타입 | `tsc --noEmit`, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` |
-| 린트 | ESLint와 typescript-eslint의 타입 인식 권장 규칙, `switch-exhaustiveness-check`, 경계용 `no-restricted-imports` |
+| 린트 | ESLint의 `defineConfig`로 쓴 설정. typescript-eslint의 타입 인식 권장 규칙, `switch-exhaustiveness-check`, 경계용 `no-restricted-imports` |
 | 테스트 | `node:test`와 `node:assert/strict`. 테스트는 대상 옆에 `*.test.ts`로 둔다. |
 | CI | 원격에 맞는 파일 하나가 `mise run check`를 실행한다. |
 
@@ -46,7 +46,6 @@ mise run check
 디렉터리 관례:
 
 - `src/core/<기능>/`은 순수한 로직이다. 기능 하나가 평평한 디렉터리 하나이고, `index.ts`가 유일한 공개 진입점이다.
-- 린트 설정은 ESLint의 `defineConfig`로 쓴다.
 - `src/shell/`은 입출력과 진입점이다. core를 호출하고, core가 타입으로 선언한 의존성의 구현을 넘긴다.
 
 위반 사례(`repo-bootstrap` 4단계에서 하나씩 실패를 확인한다):
