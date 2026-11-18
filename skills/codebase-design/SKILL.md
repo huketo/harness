@@ -1,116 +1,58 @@
 ---
 name: codebase-design
-description: Design or refactor a module's interface, dependency seam, or test boundary. Not needed for edits that preserve those contracts.
+description: Sketch a module's types, signatures, and dependency direction before writing code that crosses a function boundary, and name the check that will enforce the shape. Not needed for edits that keep those contracts.
 ---
 
 # Codebase Design
 
-Design **deep modules**: useful behaviour behind a small interface at a clear seam. Use this vocabulary when designing interfaces or restructuring dependencies; retain existing repository terminology elsewhere.
+Settle the shape before the code: sketch it, pick it, and name what will keep it. A shape that nothing enforces is copied wrong by the next agent, which reads only the file it opened and imitates the nearest example.
 
-## Glossary
+## 1. Trace
 
-Keep these definitions consistent in design discussions. Preserve source identifiers and established domain vocabulary rather than renaming them to fit the glossary.
+List every system the change touches: its callers, the owner of each piece of state it reads or writes, and each I/O boundary it crosses. Read the ADRs under `docs/adr/` for the area and the glossary the root `AGENTS.md` names; an ADR is a decision this sketch does not reopen silently.
 
-**Module** — anything with an interface and an implementation. Deliberately scale-agnostic: a function, class, package, or tier-spanning slice. _Avoid_: unit, component, service.
+**Done:** every caller and state owner is named with a `path:line`.
 
-**Interface** — everything a caller must know to use the module correctly: the type signature, but also invariants, ordering constraints, error modes, required configuration, and performance characteristics. _Avoid_: API, signature (too narrow — they refer only to the type-level surface).
+## 2. Sketch two shapes
 
-**Implementation** — what's inside a module, its body of code. Distinct from **Adapter**: a thing can be a small adapter with a large implementation (a Postgres repo) or a large adapter with a small implementation (an in-memory fake). Reach for "adapter" when the seam is the topic; "implementation" otherwise.
+Write two different shapes as types, signatures, and module boundaries, with no function bodies. Show how a caller uses each one. For a large or contested interface, run [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md) instead of sketching alone.
 
-**Depth** — leverage at the interface: the amount of behaviour a caller (or test) can exercise per unit of interface they have to learn. A module is **deep** when a large amount of behaviour sits behind a small interface, **shallow** when the interface is nearly as complex as the implementation.
+**Done:** two sketches that differ in where state lives or which way a dependency points, not only in names.
 
-**Seam** _(Michael Feathers)_ — a place where you can alter behaviour without editing in that place; the *location* at which a module's interface lives. Where to put the seam is its own design decision, distinct from what goes behind it. _Avoid_: boundary (overloaded with DDD's bounded context).
+## 3. Pick
 
-**Adapter** — a concrete thing that satisfies an interface at a seam. Describes *role* (what slot it fills), not substance (what's inside).
+Choose the shape where:
 
-**Leverage** — what callers get from depth: more capability per unit of interface they learn. One implementation pays back across N call sites and M tests.
+- each piece of state has one owner;
+- each task has one supported way, and the old way is deleted in the same change, with its callers migrated;
+- callers need to know the least to use it correctly (a **deep** module);
+- an invalid state cannot be written as a value.
 
-**Locality** — what maintainers get from depth: change, bugs, knowledge, and verification concentrate in one place rather than spreading across callers. Fix once, fixed everywhere.
+When workarounds for the current shape keep repeating, redesign it as if the new requirement had been there from the start instead of adding another patch.
 
-## Deep vs shallow
+## 4. Name the enforcement
 
-**Deep module** = small interface + lots of implementation:
+For every boundary the chosen shape draws, name the check that fails when it is crossed: a type, an import restriction, a test at the module's interface. When the repository has no such check, add it with the `correct` skill's rungs, or record the rule as `unenforced` in the `Rules and enforcement` table of `AGENTS.md`.
 
-```
-┌─────────────────────┐
-│   Small Interface   │  ← Few methods, simple params
-├─────────────────────┤
-│                     │
-│  Deep Implementation│  ← Complex logic hidden
-│                     │
-└─────────────────────┘
-```
+**Done:** each boundary in the sketch has a named check or an `unenforced` row.
 
-**Shallow module** = large interface + little implementation (avoid):
+## Structural defaults
 
-```
-┌─────────────────────────────────┐
-│       Large Interface           │  ← Many methods, complex params
-├─────────────────────────────────┤
-│  Thin Implementation            │  ← Just passes through
-└─────────────────────────────────┘
-```
+Use these when the repository's ADRs and existing conventions are silent. An existing convention wins over a default; change it through an ADR, not through one module.
 
-When designing an interface, ask:
+- **Functional core, imperative shell.** Logic lives in pure functions that take values and return values. I/O lives in a thin outer layer that calls the core.
+- **Ports and adapters.** Dependencies point inward: the core declares the type it needs, and the outer layer passes an implementation in. [DEEPENING.md](DEEPENING.md) classifies dependencies and says when a port is warranted.
+- **One public entry per feature.** A feature is a directory with one entry file. Code outside the feature imports the entry and nothing else.
+- **Parse at the boundary.** External input (CLI, config, network, files) is parsed once into a typed value where it enters. Code inside trusts the type and does not re-validate.
+- **States as sum types.** Model alternatives as a discriminated union and let the compiler demand that every branch is handled.
 
-- Can I reduce the number of methods?
-- Can I simplify the parameters?
-- Can I hide more complexity inside?
+## Vocabulary
 
-## Principles
+Use these terms in a sketch; keep the repository's own identifiers and domain terms otherwise.
 
-- **Depth is a property of the interface, not the implementation.** A deep module can be internally composed of small, mockable, swappable parts — they just aren't part of the interface. A module can have **internal seams** (private to its implementation, used by its own tests) as well as the **external seam** at its interface.
-- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.
-- **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is probably the wrong shape.
-- **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a seam unless something actually varies across it.
-
-## Designing for testability
-
-Good interfaces make testing natural:
-
-1. **Accept dependencies, don't create them.**
-
-   ```typescript
-   // Testable
-   function processOrder(order, paymentGateway) {}
-
-   // Hard to test
-   function processOrder(order) {
-     const gateway = new StripeGateway();
-   }
-   ```
-
-2. **Return a result when the side effect isn't the contract.**
-
-   ```typescript
-   // Testable
-   function calculateDiscount(cart): Discount {}
-
-   // Hard to test
-   function applyDiscount(cart): void {
-     cart.total -= discount;
-   }
-   ```
-
-   Not a ban on side effects: when the side effect *is* the module's contract — a persistence write, a charge, any durable or external change — push it behind a seam and test it at that boundary with the real dependency or its sanctioned stand-in, per the `tdd` skill's contract-driven boundary guidance (`mocking.md`, `tests.md`).
-
-3. **Small surface area.** Fewer methods = fewer tests needed. Fewer params = simpler test setup.
-
-## Relationships
-
-- A **Module** has exactly one **Interface** (the surface it presents to callers and tests).
-- **Depth** is a property of a **Module**, measured against its **Interface**.
-- A **Seam** is where a **Module**'s **Interface** lives.
-- An **Adapter** sits at a **Seam** and satisfies the **Interface**.
-- **Depth** produces **Leverage** for callers and **Locality** for maintainers.
-
-## Rejected framings
-
-- **Depth as ratio of implementation-lines to interface-lines** (Ousterhout): rewards padding the implementation. We use depth-as-leverage instead.
-- **"Interface" as the TypeScript `interface` keyword or a class's public methods**: too narrow — interface here includes every fact a caller must know.
-- **"Boundary"**: overloaded with DDD's bounded context. Say **seam** or **interface**.
-
-## Going deeper
-
-- **Deepening a cluster given its dependencies** — see [DEEPENING.md](DEEPENING.md): dependency categories, seam discipline, and replace-don't-layer testing.
-- **Exploring alternative interfaces** — see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): spin up parallel sub-agents to design the interface several radically different ways, then compare on depth, locality, and seam placement.
+- **Module** — anything with an interface and an implementation: a function, a class, a package, a slice.
+- **Interface** — everything a caller must know to use the module correctly: types, invariants, ordering, error modes, required configuration.
+- **Seam** — the place where a module's interface lives, where behavior can change without editing there.
+- **Adapter** — a concrete thing that satisfies an interface at a seam. One adapter is a hypothetical seam; two make it real.
+- **Depth** — how much behavior sits behind how small an interface. **Leverage** is what callers gain from depth; **locality** is what maintainers gain, because a change lands in one place.
+- **Deletion test** — imagine deleting the module. If the complexity vanishes, it was a pass-through; if it reappears in every caller, the module earns its place.

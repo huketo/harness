@@ -6,11 +6,11 @@ disable-model-invocation: true
 
 # Repo init
 
-하네스 스킬들이 저장소마다 기대하는 문서를 한 번에 만든다. 결정론적 스크립트가 아니라 프롬프트로 진행하는 절차다. 저장소를 탐색하고, 발견 사항을 보여 주고, 섹션마다 확인을 받고, 초안을 확인받은 뒤에 쓴다.
+하네스 스킬들이 저장소마다 기대하는 문서를 한 번에 만든다. 타입·린트·테스트·CI 같은 코드 쪽 장치는 `repo-bootstrap`이, 검증 스킬은 `verify-init`이 만든다. 결정론적 스크립트가 아니라 프롬프트로 진행하는 절차다. 저장소를 탐색하고, 발견 사항을 보여 주고, 섹션마다 확인을 받고, 초안을 확인받은 뒤에 쓴다.
 
 | 대상 파일 | 템플릿 | 읽는 쪽 |
 | --- | --- | --- |
-| `AGENTS.md` | [templates/AGENTS.md](templates/AGENTS.md) | 저장소에서 일하는 모든 에이전트(라우터) |
+| `AGENTS.md` | [templates/AGENTS.md](templates/AGENTS.md) | 저장소에서 일하는 모든 에이전트(라우터), `correct`(규칙과 강제 장치의 표) |
 | `CLAUDE.md` | [templates/CLAUDE.md](templates/CLAUDE.md) | Claude Code(`@AGENTS.md`로 라우터를 읽는다) |
 | `docs/agents/workflow.md` | [templates/docs/agents/workflow.md](templates/docs/agents/workflow.md) | 라우터를 따르는 에이전트 |
 | `docs/agents/authority.md` | [templates/docs/agents/authority.md](templates/docs/agents/authority.md) | `file-mr`, `full-send`, `full-stop` |
@@ -18,8 +18,8 @@ disable-model-invocation: true
 | `docs/agents/testing.md` | [templates/docs/agents/testing.md](templates/docs/agents/testing.md) | `t3-orchestrate` 브리프(테스트 실행 방법), 검사 명령을 고르는 에이전트 |
 | `docs/agents/hitl.md` | [templates/docs/agents/hitl.md](templates/docs/agents/hitl.md) | `full-send`, `council`, `t3-terminal`, `t3-orchestrate` |
 | `docs/agents/issue-tracker.md` | [GitHub](templates/docs/agents/issue-tracker-github.md), [GitLab](templates/docs/agents/issue-tracker-gitlab.md), [로컬](templates/docs/agents/issue-tracker-local.md) 중 하나 | `code-review`, `issue-doctor` |
-| `GLOSSARY.md` 또는 `GLOSSARY-MAP.md` | [templates/GLOSSARY.md](templates/GLOSSARY.md), [templates/GLOSSARY-MAP.md](templates/GLOSSARY-MAP.md) | `domain-modeling`, `improve-codebase-architecture`, `codebase-design`, `diagnosing-bugs`, `wait-what` |
-| `docs/adr/README.md` | [templates/docs/adr/README.md](templates/docs/adr/README.md) | `domain-modeling`, `improve-codebase-architecture`, `diagnosing-bugs` |
+| `GLOSSARY.md` 또는 `GLOSSARY-MAP.md` | [templates/GLOSSARY.md](templates/GLOSSARY.md), [templates/GLOSSARY-MAP.md](templates/GLOSSARY-MAP.md) | `domain-modeling`, `codebase-design`, `diagnosing-bugs`, `wait-what` |
+| `docs/adr/README.md` | [templates/docs/adr/README.md](templates/docs/adr/README.md) | `domain-modeling`, `codebase-design`, `diagnosing-bugs` |
 
 이 스킬은 저장소 작업 디렉터리 안의 파일만 쓴다. 원격 추가, 푸시, 라벨과 이슈 생성, 저장소 설정 변경은 범위 밖이므로, 필요하면 사람이 직접 실행할 명령을 완료 보고에 적어 안내만 한다. 커밋은 사람이 요청할 때만 한다.
 
@@ -98,6 +98,7 @@ GitHub나 GitLab을 골랐는데 그 호스트를 가리키는 원격이 없으�
 | `STANDARDS_POINTERS` | 있는 `CONTRIBUTING.md`·`CODING_STANDARDS.md`마다 라우터 목록 형식의 한 줄 | 줄을 지운다 |
 | `GLOSSARY_ENTRY` | `GLOSSARY.md` 또는 `GLOSSARY-MAP.md`(D의 결정) | 없음 |
 | `PROJECT_DECISIONS` | 탐색에서 찾은 실제 효과가 있는 명령마다 `` - Running `<command>` (`<path:line>`), which <effect>. `` | 줄을 지운다 |
+| `RULE_ROWS` | 탐색에서 찾은 검사 명령마다 그 명령이 강제하는 규칙 한 행(`` \| Type errors block a change. \| `command` (`path:line`) \| ``). 기존 지시 파일에 있던 규칙 가운데 검사가 없는 것은 `judgment`나 `unenforced`로 적는다 | `` \| No rule is recorded yet. \| — \| `` 한 행 |
 | `DOCUMENT_MAP` | 있는 문서와 이번에 만드는 문서마다 `` - `path` — what it owns. `` | 없음(이번에 만드는 문서가 항상 있다) |
 | `DOC_LANGUAGE_RULE` | 주 문서 언어를 정하는 문장. 번역본 README가 있으면 원본과 함께 고친다는 문장을 더한다 | 없음(A에서 정한다) |
 | `COMMAND_ROWS` | 찾은 명령마다 `` \| purpose \| `command` \| `path:line` \| `` 한 행 | 표 전체를 정의된 검사 명령이 아직 없다는 한 문장으로 바꾼다 |

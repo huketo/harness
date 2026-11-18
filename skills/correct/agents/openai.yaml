@@ -1,0 +1,3 @@
+interface:
+  display_name: "Correct"
+  short_description: "Turn a repeated correction into a structural check"

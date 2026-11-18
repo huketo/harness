@@ -93,6 +93,8 @@ A recurring correction is a signal about the environment, not only about the age
 
 Prefer the enforceable rung where feasible; written rules and automated review remain fallible. A new check must reject the bad case and accept a valid one — run both. Record the general principle and when it applies, not the incident's names and history, and extend the rule that already owns the topic instead of adding a sibling. A ban that one project chose stays in that project.
 
+The `correct` skill runs this as a procedure: it finds the repeated mistakes, picks the rung, proves the check on a real past mistake, and keeps the table that pairs each rule with what enforces it.
+
 ## Evaluating a change
 
 A document change is a hypothesis about behavior; running it is the test.
