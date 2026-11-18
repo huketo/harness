@@ -39,7 +39,7 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 A person may select a work mode for one task or thread with the `full-send` or `full-stop` skill; the mode is never a default. Without a selected mode, every rule in this guide applies unchanged.
 
 - `full-stop` authorizes the task's own commits, pushes, rebases, and `--force-with-lease` on the task branch, and the test methods its proof needs. It never merges.
-- `full-send` adds merging that one MR or PR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. Without that allowlist entry it runs as `full-stop` and says so.
+- `full-send` adds merging that one MR or PR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. The worktree must also hold a CI definition and a `verify-*` skill, so that a change can be proven without a person. Without the allowlist entry or either of those it runs as `full-stop` and says so.
 - Neither mode authorizes deleting data, production changes, writes outside the repository, closing an MR, admin bypass, force-pushing another branch, or editing the allowlist.
 
 `skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks merges the mode does not allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.

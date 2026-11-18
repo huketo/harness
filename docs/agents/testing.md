@@ -11,7 +11,7 @@ mise install
 mise run check
 ```
 
-`mise run check` installs the pinned development dependencies (`npm ci`), runs `tsc --noEmit`, runs every maintained `node --test` suite, and confirms that the tracked plugin files (`plugin/.claude-plugin/plugin.json`, `plugin/hooks/hooks.json`) match `node plugin/build.mjs --host claude`. CI runs the same task on every push and pull request. It reads no host configuration.
+`mise run check` installs the pinned development dependencies (`npm ci`), runs `tsc --noEmit`, runs every maintained `node --test` suite, runs `scripts/check-repo.ts` (`mise run rules`: skill frontmatter and relative Markdown links), and confirms that the tracked plugin files (`plugin/.claude-plugin/plugin.json`, `plugin/hooks/hooks.json`) match `node plugin/build.mjs --host claude`. CI runs the same task on every push and pull request. It reads no host configuration.
 
 ## Node tests
 
@@ -19,14 +19,18 @@ Tests use `node:test` with `node:assert/strict` and live beside the mechanism th
 
 ```bash
 mise exec -- node --test t3/scheduled/host-sync.test.mjs
-mise exec -- node --test plugin/hooks/merge-guard.test.mjs plugin/build.test.mjs plugin/install.test.mjs
+mise exec -- node --test plugin/hooks/merge-guard.test.mjs plugin/hooks/allowlist.property.test.mjs plugin/build.test.mjs plugin/install.test.mjs
 mise exec -- node --test codex/review.test.ts
 mise exec -- node --test t3/scheduled/guard.test.mjs
 mise exec -- node --test 'scripts/skill-eval/**/*.test.ts'
-mise exec -- node --test scripts/install.test.ts scripts/safe-generate.test.ts
+mise exec -- node --test scripts/install.test.ts scripts/safe-generate.test.ts scripts/check-repo.test.ts
 ```
 
-The host-sync test uses temporary local Git repositories and is the focused boundary for `t3/scheduled/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test skips its five installed-binary cases when `codex` is not on `PATH`, as on CI; with `codex` installed, a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`; it covers timeouts, daily run limits, failure stop, and `daysOfMonth` admission. The skill-eval tests run the runner and grader against temporary repositories with a fake agent and synthetic captures; they call no model and do not prove a real comparison run.
+`plugin/hooks/allowlist.property.test.mjs` is a property test (fast-check, fixed seed, 200 generated cases): it asserts that `harness-mode allowlist` and the merge guard's `allowedRepo` give the same answer for generated remote URLs and allowlist lines. It covers that agreement only, not whether either reading is the intended one.
+
+To observe a change to the merge guard, `harness-mode`, or the installer end to end, follow the repository's own verification skill, [`.agents/skills/verify-hstack/SKILL.md`](../../.agents/skills/verify-hstack/SKILL.md). It drives the real files against a synthetic `HOME` under `var/verify/` and is not part of `mise run check`.
+
+The host-sync test uses temporary local Git repositories and is the focused boundary for `t3/scheduled/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist; its repositories carry a CI definition and a `verify-*` skill unless a case removes them to exercise the readiness degrade. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test skips its five installed-binary cases when `codex` is not on `PATH`, as on CI; with `codex` installed, a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`; it covers timeouts, daily run limits, failure stop, and `daysOfMonth` admission. The skill-eval tests run the runner and grader against temporary repositories with a fake agent and synthetic captures; they call no model and do not prove a real comparison run.
 
 `scripts/install.test.ts` covers the skill, agy, and Codex links and `scripts/update.ts` against a temporary `HOME` and temporary local Git remotes: skills-only ownership, `CLAUDE_CONFIG_DIR`, conflicts that are preserved, fast-forward reinstallation, and refusal of dirty, topic-branch, or divergent checkouts. `scripts/safe-generate.test.ts` runs the pinned rulesync against synthetic Claude Code and agy settings in a temporary `HOME`; it proves that existing entries survive, that `CLAUDE_CONFIG_DIR` is honored, and that a second run changes nothing. It skips the rulesync cases when rulesync is not installed, and it does not prove the agents enforce the generated rules.
 
