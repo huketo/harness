@@ -1,0 +1,5 @@
+interface:
+  display_name: "Repo Bootstrap"
+  short_description: "Install the default stack's checks and boundary rules in a new repository"
+policy:
+  allow_implicit_invocation: false

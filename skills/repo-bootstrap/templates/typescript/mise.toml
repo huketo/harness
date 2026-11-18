@@ -1,0 +1,27 @@
+# Tool versions and the only entry points for checking this repository. CI runs `mise run check`.
+[tools]
+node = "24"
+
+[tasks.setup]
+description = "Install the locked development dependencies"
+run = "npm ci --no-audit --no-fund"
+sources = ["package.json", "package-lock.json"]
+outputs = ["node_modules/.package-lock.json"]
+
+[tasks.typecheck]
+description = "Type-check without emitting"
+depends = ["setup"]
+run = "npx --no-install tsc --noEmit"
+
+[tasks.lint]
+description = "Enforce the import boundaries and type-aware rules in eslint.config.js"
+depends = ["setup"]
+run = "npx --no-install eslint ."
+
+[tasks.test]
+description = "Run every test with node --test"
+run = "node --test 'src/**/*.test.ts'"
+
+[tasks.check]
+description = "Type-check, lint, and test; the same command runs locally and in CI"
+depends = ["typecheck", "lint", "test"]

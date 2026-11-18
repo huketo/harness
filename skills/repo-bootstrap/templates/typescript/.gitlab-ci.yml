@@ -1,0 +1,5 @@
+check:
+  image: jdxcode/mise:latest
+  script:
+    - mise trust && mise install
+    - mise run check
