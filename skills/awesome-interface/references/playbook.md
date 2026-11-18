@@ -34,7 +34,7 @@ Use one panel for the whole bar. It opens from the trigger, closes faster than i
 .nav-panel {
   position: absolute;
   translate: var(--panel-x, 0) 0;
-  transform-origin: var(--origin-x, 50%) 0;
+  transform-origin: var(--origin-x, 50%) var(--origin-y, 0);
   opacity: 0;
   transform: scale(0.96);
   visibility: hidden;
@@ -48,11 +48,15 @@ Use one panel for the whole bar. It opens from the trigger, closes faster than i
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out),
     translate 200ms var(--ease-out), visibility 0s;
 }
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel { transform: none; transition: opacity 120ms, visibility 0s 120ms; }
+  .nav-panel[data-open] { transition: opacity 120ms, visibility 0s; }
+}
 ```
 
-When a trigger is selected, set `--panel-x` to the trigger's offset clamped so the panel stays inside the viewport, and `--origin-x` to the trigger's center relative to the panel. If the panel was already open for a sibling, keep `data-open`, append the new content offset toward the side of the new trigger, and fade the old content out toward the other side before removing it. When closing starts, set `inert` on the panel so its links leave focus and the accessibility tree at once, as [UI motion](ui.md#entrances-exits-and-icon-swaps) requires; `visibility` then hides it when the exit ends. Remove `inert` when it opens. Keep the panel open across the pointer's path from trigger to panel through the component's hover-intent or close-delay option, and open on click as well for touch and keyboard.
+When a trigger is selected, set `--panel-x` to the trigger's offset clamped so the panel stays inside the viewport, `--origin-x` to the trigger's center relative to the panel, and `--origin-y` to `100%` when collision handling places the panel above the trigger. If the panel was already open for a sibling, keep `data-open`, append the new content offset toward the side of the new trigger, and fade the old content out toward the other side before removing it; mark the old content `inert` when the swap starts, so its links leave focus and the accessibility tree before they fade. Under reduced motion, append the new content without an offset. When closing starts, set `inert` on the panel so its links leave focus and the accessibility tree at once, as [UI motion](ui.md#entrances-exits-and-icon-swaps) requires; `visibility` then hides it when the exit ends. Remove `inert` when it opens. Open on hover only where `(hover: hover) and (pointer: fine)` matches, and keep the panel open across the pointer's path from trigger to panel through the component's hover-intent or close-delay option. Click and keyboard activation open it on every input type.
 
-Check: a quick sweep across triggers moves one panel without a closed frame between them; the keyboard opens it, Escape closes it and returns focus to the trigger; collision-flipped placements keep the origin under the trigger. Under reduced motion, change position and content without sliding.
+Check: a quick sweep across triggers moves one panel without a closed frame between them; the keyboard opens it, Escape closes it and returns focus to the trigger; a placement flipped above the trigger opens from the edge nearest the trigger; Tab never reaches the outgoing links during a swap. Under reduced motion, position and content change without sliding or scaling.
 
 ### Arrow shift button
 
@@ -68,31 +72,32 @@ For a call to action whose trailing arrow moves slightly on hover or focus. Move
 }
 .cta:focus-visible .cta-arrow { translate: var(--arrow-shift, 3px) 0; }
 [dir="rtl"] .cta { --arrow-shift: -3px; }
+[dir="rtl"] .cta-arrow { scale: -1 1; }
 @media (prefers-reduced-motion: reduce) {
   .cta-arrow { transition: none; }
 }
 ```
 
-The hover rule is gated to fine pointers so a tap does not leave it stuck ([mobile web](mobile-web.md)); keyboard focus gets the same signal. In RTL the arrow glyph mirrors as the [icon rules](ui.md#icon-rendering-and-state) describe, and the shift direction follows it; when the project's icon component already mirrors directional glyphs, mirror only once.
+The hover rule is gated to fine pointers so a tap does not leave it stuck ([mobile web](mobile-web.md)); keyboard focus gets the same signal. In RTL the arrow glyph mirrors as the [icon rules](ui.md#icon-rendering-and-state) describe, and the shift direction follows it; when the project's icon component already mirrors directional glyphs, drop the `scale` line so it mirrors only once.
 
 Check: the button's width is identical at rest, on hover and on focus; after a tap on a touch device no shifted state remains; RTL points and moves the arrow toward the end edge.
 
 ### Reveal hero
 
-For a one-time page or first-run entrance with a title, supporting text and actions, not for a surface the user opens repeatedly. The section itself stays still; the title and first paragraph share the first beat, and later gaps shrink:
+For a one-time page or first-run entrance with a title, supporting text and actions, not for a surface the user opens repeatedly. The section and its actions stay still, so the actions and their focus indicator are visible from the first frame; the title and first paragraph share the first beat, and later gaps shrink:
 
 ```html
 <section class="hero">
   <h1 style="--delay: 0ms">…</h1>
   <p style="--delay: 0ms">…</p>
   <p style="--delay: 120ms">…</p>
-  <div class="hero-actions" style="--delay: 200ms">…</div>
+  <div class="hero-actions">…</div>
 </section>
 ```
 
 ```css
 @media (prefers-reduced-motion: no-preference) {
-  .hero > * {
+  .hero > :not(.hero-actions) {
     animation: hero-enter 600ms var(--ease-out) both;
     animation-delay: var(--delay, 0ms);
   }
@@ -104,6 +109,6 @@ For a one-time page or first-run entrance with a title, supporting text and acti
 
 The static content is the base, and movement is added only for users without a reduced-motion preference ([accessibility](accessibility.md#motion-timing-and-reflow)). `both` holds the first keyframe during each delay so later items do not flash their final state first. Play it once on load; do not replay it as the user scrolls past.
 
-Check: measure the time until the last action is visible (`200ms + 600ms` here) and confirm the actions respond during the entrance; with reduced motion enabled, the hero renders complete without animation.
+Check: tab to an action while the entrance runs and confirm it and its focus indicator are fully visible; measure when the last text settles (`120ms + 600ms` here); with reduced motion enabled, the hero renders complete without animation.
 
 The reveal hero recipe adapts the CSS stagger from Emil Kowalski's `choreograph` skill, and the navigation dropdown draws on its sibling-menu direction rule; see `../LICENSE.emilkowalski` and the repository's adopted-skills provenance record. The arrow shift recipe is original to this repository.
