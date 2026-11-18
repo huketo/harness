@@ -54,7 +54,7 @@ Use one panel for the whole bar. It opens from the trigger, closes faster than i
 }
 ```
 
-When a trigger is selected, set `--panel-x` to the trigger's offset clamped so the panel stays inside the viewport, `--origin-x` to the trigger's center relative to the panel, and `--origin-y` to `100%` when collision handling places the panel above the trigger. If the panel was already open for a sibling, keep `data-open`, append the new content offset toward the side of the new trigger, and fade the old content out toward the other side before removing it; mark the old content `inert` when the swap starts, so its links leave focus and the accessibility tree before they fade. Under reduced motion, append the new content without an offset. When closing starts, set `inert` on the panel so its links leave focus and the accessibility tree at once, as [UI motion](ui.md#entrances-exits-and-icon-swaps) requires; `visibility` then hides it when the exit ends. Remove `inert` when it opens. Open on hover only where `(hover: hover) and (pointer: fine)` matches, and keep the panel open across the pointer's path from trigger to panel through the component's hover-intent or close-delay option. Click and keyboard activation open it on every input type.
+When a trigger is selected, set `--panel-x` to the trigger's offset clamped so the panel stays inside the viewport, `--origin-x` to the trigger's center relative to the panel, and `--origin-y` to `100%` when collision handling places the panel above the trigger. If the panel was already open for a sibling, keep `data-open`, append the new content offset toward the side of the new trigger, and fade the old content out toward the other side before removing it; mark the old content `inert` when the swap starts, so its links leave focus and the accessibility tree before they fade. Under reduced motion, both sides of the swap change opacity only, with no offset. When closing starts, set `inert` on the panel so its links leave focus and the accessibility tree at once, as [UI motion](ui.md#entrances-exits-and-icon-swaps) requires; `visibility` then hides it when the exit ends. Remove `inert` when it opens. Open on hover only where `(hover: hover) and (pointer: fine)` matches, and keep the panel open across the pointer's path from trigger to panel through the component's hover-intent or close-delay option. Click and keyboard activation open it on every input type.
 
 Check: a quick sweep across triggers moves one panel without a closed frame between them; the keyboard opens it, Escape closes it and returns focus to the trigger; a placement flipped above the trigger opens from the edge nearest the trigger; Tab never reaches the outgoing links during a swap. Under reduced motion, position and content change without sliding or scaling.
 
@@ -71,8 +71,8 @@ For a call to action whose trailing arrow moves slightly on hover or focus. Move
   .cta:hover .cta-arrow { translate: var(--arrow-shift, 3px) 0; }
 }
 .cta:focus-visible .cta-arrow { translate: var(--arrow-shift, 3px) 0; }
-[dir="rtl"] .cta { --arrow-shift: -3px; }
-[dir="rtl"] .cta-arrow { scale: -1 1; }
+.cta:dir(rtl) { --arrow-shift: -3px; }
+.cta:dir(rtl) .cta-arrow { scale: -1 1; }
 @media (prefers-reduced-motion: reduce) {
   .cta-arrow { transition: none; }
 }
@@ -84,7 +84,7 @@ Check: the button's width is identical at rest, on hover and on focus; after a t
 
 ### Reveal hero
 
-For a one-time page or first-run entrance with a title, supporting text and actions, not for a surface the user opens repeatedly. The section and its actions stay still, so the actions and their focus indicator are visible from the first frame; the title and first paragraph share the first beat, and later gaps shrink:
+For a one-time page or first-run entrance with a title, supporting text and actions, not for a surface the user opens repeatedly. The section and its actions stay still, so the actions and their focus indicator are visible from the first frame; the title and first paragraph share the first beat, and the last paragraph follows 120ms later:
 
 ```html
 <section class="hero">
