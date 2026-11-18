@@ -18,9 +18,13 @@ run = "npx --no-install tsc --noEmit"
 description = "Run every maintained test suite with node --test"
 run = "node --test 'plugin/**/*.test.mjs' 't3/**/*.test.mjs' 'codex/**/*.test.ts' 'scripts/**/*.test.ts'"
 
+[tasks.rules]
+description = "Enforce the repository rules AGENTS.md pairs with scripts/check-repo.ts"
+run = "node scripts/check-repo.ts"
+
 [tasks.check]
-description = "Type-check, test, and confirm the tracked plugin files match their sources; touches no host configuration"
-depends = ["typecheck", "test"]
+description = "Type-check, test, enforce the repository rules, and confirm the tracked plugin files match their sources; touches no host configuration"
+depends = ["typecheck", "test", "rules"]
 run = "node plugin/build.mjs --host claude --check"
 
 [tasks.plan]

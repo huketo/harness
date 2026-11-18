@@ -1,0 +1,120 @@
+// Repository rules that used to live only in prose, enforced by `mise run check`. Each check exists because the
+// mistake it rejects was made here more than once; AGENTS.md pairs every rule with the check that enforces it.
+//   node scripts/check-repo.ts [repo]     exit 1 and one `path:line: problem. Fix` line per violation
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export interface Problem {
+	path: string;
+	line: number;
+	message: string;
+}
+
+// YAML reads an unquoted `key: a: b` as a nested mapping and ` #` as a comment, so the skill loads without its text.
+const PLAIN_SCALAR_TRAP = /: | #|^[\[{&*!|>%@`]/;
+
+/** Problems in one SKILL.md frontmatter block. `dir` is the skill's directory name. */
+export function checkFrontmatter(text: string, dir: string): Omit<Problem, "path">[] {
+	const lines = text.split("\n");
+	if (lines[0] !== "---") return [{ line: 1, message: "SKILL.md must start with a `---` frontmatter block." }];
+	const end = lines.indexOf("---", 1);
+	if (end < 0) return [{ line: 1, message: "The frontmatter block is not closed. Add a `---` line after the last key." }];
+	const problems: Omit<Problem, "path">[] = [];
+	const seen = new Map<string, string>();
+	for (let i = 1; i < end; i++) {
+		const match = /^([A-Za-z][\w-]*):(?: (.*))?$/.exec(lines[i] ?? "");
+		if (!match) continue; // nested or continuation lines belong to the key above
+		const key = match[1] ?? "";
+		const value = (match[2] ?? "").trim();
+		seen.set(key, value);
+		const quoted = /^".*"$|^'.*'$/.test(value);
+		if (value !== "" && !quoted && PLAIN_SCALAR_TRAP.test(value)) {
+			problems.push({ line: i + 1, message: `\`${key}\` holds a colon-space, a space-hash, or a leading YAML indicator. Wrap the whole value in double quotes.` });
+		}
+	}
+	const unquote = (value: string | undefined) => (value ?? "").replace(/^["']|["']$/g, "");
+	if (unquote(seen.get("name")) !== dir) {
+		problems.push({ line: 1, message: `\`name\` must equal the directory name. Set \`name: ${dir}\`.` });
+	}
+	if (unquote(seen.get("description")) === "") {
+		problems.push({ line: 1, message: "`description` is missing or empty. Add a one-line `description:`." });
+	}
+	return problems;
+}
+
+/** Relative link targets in markdown, outside fenced and inline code, with their 1-based line numbers. */
+export function relativeLinks(text: string): { target: string; line: number }[] {
+	const found: { target: string; line: number }[] = [];
+	let fence: string | null = null;
+	text.split("\n").forEach((raw, index) => {
+		const marker = /^\s*(```+|~~~+)/.exec(raw)?.[1];
+		if (marker) {
+			if (fence === null) fence = marker[0] ?? null;
+			else if (marker[0] === fence) fence = null;
+			return;
+		}
+		if (fence !== null) return;
+		const line = raw.replace(/(`+).*?\1/g, "");
+		for (const match of line.matchAll(/\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
+			const target = (match[1] ?? "").split("#")[0] ?? "";
+			if (target === "" || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("/") || target.includes("{{")) continue;
+			found.push({ target, line: index + 1 });
+		}
+	});
+	return found;
+}
+
+function markdownFiles(repo: string, dir: string, out: string[] = []): string[] {
+	for (const entry of readdirSync(join(repo, dir), { withFileTypes: true })) {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (SKIPPED_DIRS.has(entry.name)) continue;
+			markdownFiles(repo, path, out);
+		} else if (entry.name.endsWith(".md")) out.push(path);
+	}
+	return out;
+}
+
+// Templates and eval fixtures hold links that resolve only after they are copied into another repository.
+const SKIPPED_DIRS = new Set(["node_modules", ".git", "archived", "var", "templates", "fixtures", "evals", "third-party"]);
+
+export function checkRepo(repo: string): Problem[] {
+	const problems: Problem[] = [];
+	// Shared skills this checkout installs, and the project-local skills agents read while working here.
+	for (const root of ["skills", ".agents/skills"]) {
+		if (!existsSync(join(repo, root))) continue;
+		for (const entry of readdirSync(join(repo, root), { withFileTypes: true })) {
+			const path = join(root, entry.name, "SKILL.md");
+			if (!entry.isDirectory() || !existsSync(join(repo, path))) continue;
+			for (const problem of checkFrontmatter(readFileSync(join(repo, path), "utf8"), entry.name)) problems.push({ path, ...problem });
+		}
+	}
+
+	const roots = readdirSync(repo, { withFileTypes: true });
+	const files = roots.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name);
+	for (const dir of ["docs", "skills", "plugin", "scripts", "codex", "t3", ".agents"]) if (existsSync(join(repo, dir))) markdownFiles(repo, dir, files);
+	for (const path of files) {
+		for (const { target, line } of relativeLinks(readFileSync(join(repo, path), "utf8"))) {
+			let decoded = target;
+			try {
+				decoded = decodeURIComponent(target);
+			} catch {}
+			if (!existsSync(resolve(repo, dirname(path), decoded))) {
+				problems.push({ path, line, message: `The link target ${target} does not exist. Point the link at the file's current path or remove it.` });
+			}
+		}
+	}
+	return problems;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+	const repo = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), ".."));
+	const problems = checkRepo(repo);
+	for (const { path, line, message } of problems) console.error(`${relative(process.cwd(), join(repo, path)) || path}:${line}: ${message}`);
+	if (problems.length > 0) {
+		console.error(`check-repo: ${problems.length} problem${problems.length === 1 ? "" : "s"}`);
+		process.exit(1);
+	}
+	console.log("check-repo: skill frontmatter and relative links are consistent");
+}
