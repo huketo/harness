@@ -18,7 +18,13 @@ For a custom Pointer Events implementation:
 4. On pointer-up, choose one outcome and enter settling. Clear the active gesture before releasing capture so the resulting `lostpointercapture` cannot undo a completed release.
 5. On `pointercancel`, unexpected capture loss, unmount or navigation, use the defined non-committing cancellation path. Release owned capture, listeners and animation resources once. Cancellation must not confirm a dismissal or destructive action, and stale completion callbacks must not overwrite a newer gesture.
 
-Keep frame updates in the existing animation value or a single owned transform writer, not competing React state and imperative style paths. Measure before changing architecture for performance. A motion library's gesture implementation may already provide this lifecycle; verify it instead of duplicating it.
+Keep frame updates in the existing animation value or a single owned transform writer, not competing React state and imperative style paths. Write that transform on the dragged element itself; driving per-frame movement through an inherited custom property on an ancestor recalculates styles for every descendant. Measure before changing architecture for performance. A motion library's gesture implementation may already provide this lifecycle; verify it instead of duplicating it.
+
+## Linked values and direction
+
+Derive every companion value of the gesture, such as overlay opacity, a scaled page behind a sheet or a progress indicator, from the same drag progress value instead of animating it separately. One source keeps the overlay exactly as faded as the sheet is dismissed, mid-gesture and on reversal; separate animations drift apart the moment the gesture is interrupted.
+
+Dismiss along the axis the surface entered on: a toast that rises from the bottom swipes down to dismiss, and a panel from the end edge leaves toward that edge. A dismissal axis the surface never moved on has to be learned.
 
 ## Release velocity and target selection
 
@@ -29,6 +35,8 @@ Confirm units at the API boundary. CSS pixels per millisecond and pixels per sec
 Select a legal target using both release position and direction-aware velocity, as the component contract requires. A quick flick can justify dismissal without a long drag; a fast reversal away from the dismiss direction should not be treated like an outward flick merely because its speed is large. For snap points, use the existing inertia/projection model to estimate where movement would settle, then choose an allowed target. Projection constants and thresholds are product-specific starting values, not universal physics requirements. Clamp the final target to the legal range unless the chosen action intentionally dismisses the surface.
 
 Pass release velocity to a settling mechanism that actually consumes it. Check the installed API: a duration/bounce preset is not interchangeable with a physics spring carrying initial velocity. Avoid introducing a spring package when the existing component already owns settling, or when a simple state transition meets the requested behavior.
+
+Overshoot belongs to a release that carries the gesture's velocity. The same surface closed by a button, Escape or another programmatic action settles without bounce, because no force was applied. A release that misses the threshold snaps back promptly.
 
 ## Re-grab and redirect
 
@@ -49,6 +57,8 @@ Exercise the actual component, first at normal speed, then slowly where useful. 
 | Grab near an edge; move outside the element | No initial jump; the owned pointer continues tracking. |
 | Add a second finger during a drag | The active gesture does not jump to the new pointer. |
 | Drag slowly, flick late, reverse direction, or pause before release | Target choice follows recent signed motion and position, not stale average speed. |
+| Reverse halfway through a dismiss drag | Overlay and other linked values report the same progress as the surface at every frame. |
+| Close the same surface by button or Escape | It settles without the overshoot a fast drag release may show. |
 | Cancel the pointer or lose capture unexpectedly | The non-committing state is restored or settled as specified; no action fires twice. |
 | Release normally, then receive capture loss | The chosen outcome is retained; cleanup does not roll it back. |
 | Re-grab during settling; rapidly close and reopen; navigate away | No snap to the old target, stale hide/focus callback or invisible interaction blocker. |

@@ -24,6 +24,8 @@ Choose the least visual structure that communicates the relationship:
 
 Keep necessary separators quiet but perceivable. Preserve borders that communicate structure or state; avoid adding a line, card and large gap to solve the same grouping problem. Do not turn every subsection into nested cards.
 
+To declutter a requested scope, inventory its visual devices (borders, backgrounds, dividers, shadows, badges, icons and decorative motion) and name the relationship, state or action each one communicates. Remove a device whose job another device already does, keeping the least structure from the order above, and a device that communicates nothing. Content, controls and deliberate density stay: decluttering removes redundancy, not information. Decorative motion follows the frequency rule in [UI motion](ui.md#decide-before-animating). Afterward, confirm that every group, state and action still reads at the narrowest supported width.
+
 Choose a small set of shared alignment edges for headings, rows, content and action bars. Use a consistent project spacing step for each hierarchy indent rather than accumulating arbitrary offsets. Align textual table columns to their reading edge and comparable numeric columns to their trailing edge; numeral shaping belongs to [typography.md](typography.md).
 
 Distinguish interaction from content with an established affordance: an underline, background, border or consistent control zone. A control styled exactly like nearby prose disappears; a static badge shaped like adjacent buttons attracts dead clicks. Borderless controls often need more surrounding space because their target edges are invisible. Resolve hit-area geometry through [accessibility.md](accessibility.md), not by prescribing one gap for all densities.

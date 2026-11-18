@@ -219,6 +219,80 @@
         "Replaces 「OK」 with an action label, words the decline neutrally, removes the missed-coupon threat and 「ワクワク」, and mentions the お知らせ tab alternative.",
         "The error explains that the OS blocked the request and points to device settings; coupon conditions are split so no sentence carries three or more."
       ]
+    },
+    {
+      "id": 19,
+      "name": "imagery-reserve-and-priority",
+      "prompt": "웹 상품 카드 목록에서 이미지가 로드되면서 카드 아래 내용이 밀리고, 세로로 긴 사진은 카드 비율에 맞춰 찌그러집니다. 첫 화면 맨 위의 대표 이미지도 loading=\"lazy\"입니다. 프로젝트에는 이미 자체 Image 컴포넌트가 있습니다. 원인과 수정 방향만 제안하고 파일은 수정하지 마세요.",
+      "expected_output": "Reserves the slot's ratio, crops with object-fit and focal position, loads the first-viewport primary image eagerly, and keeps the existing Image component.",
+      "files": [],
+      "expectations": [
+        "Reserves the image box with intrinsic width/height or aspect-ratio and crops inside the slot with object-fit, using object-position or contain where the subject or whole image matters.",
+        "Removes lazy loading from the primary first-viewport image while keeping it for images below the fold.",
+        "Works through the existing Image component instead of adding a new image library, and makes no file edits."
+      ]
+    },
+    {
+      "id": 20,
+      "name": "choreography-one-entrance",
+      "prompt": "사이드 패널이 오른쪽에서 미끄러져 들어온 뒤, 안의 메뉴 항목 8개가 각각 100ms 간격으로 하나씩 아래에서 올라옵니다. 이 패널은 사용자가 하루에도 수십 번 엽니다. 모션 설계만 검토하고 파일은 수정하지 마세요.",
+      "expected_output": "Keeps one entrance for the container, removes the per-item stagger on this frequent surface, and does not propose a different uniform stagger.",
+      "files": [],
+      "expectations": [
+        "Recommends one entrance per container: the panel moves and its items arrive with it rather than being staggered.",
+        "Cites how often the panel opens as a reason to cut motion rather than proposing a faster uniform stagger.",
+        "Makes no file edits and does not claim rendered verification."
+      ]
+    },
+    {
+      "id": 21,
+      "name": "exit-closes-gap",
+      "prompt": "필터 칩의 x를 누르면 칩이 200ms 동안 페이드아웃한 뒤에야 옆 칩들이 빈자리로 한꺼번에 튑니다. React와 Motion을 이미 쓰고 있습니다. 원인과 고치는 방향만 설명해 주세요. 코드는 수정하지 마세요.",
+      "expected_output": "Takes the exiting chip out of layout when removal starts so siblings move concurrently, using the installed presence mechanism, and removes the exiting chip from focus at once.",
+      "files": [],
+      "expectations": [
+        "Identifies that the exiting chip keeps its space until the fade ends and proposes removing it from the flow at once (popLayout or absolute positioning) so siblings close the gap during the fade.",
+        "Uses the already-installed Motion mechanism rather than adding a library.",
+        "Makes the exiting chip unfocusable when its exit starts."
+      ]
+    },
+    {
+      "id": 22,
+      "name": "arrow-shift-button",
+      "prompt": "'시작하기 →' 버튼에 hover하면 padding-right가 커져서 버튼 폭이 늘어나고 옆 버튼이 밀립니다. 휴대폰에서는 한 번 탭하면 hover 상태가 남아 있습니다. 같은 효과를 유지하면서 고치는 CSS를 제안해 주세요. 파일은 수정하지 마세요.",
+      "expected_output": "Moves only the arrow with a transform so the width is stable, gates hover to fine pointers, gives focus-visible the same signal, and covers RTL and reduced motion.",
+      "files": [],
+      "expectations": [
+        "Moves only the arrow with transform or translate and keeps the button's width unchanged.",
+        "Gates the hover rule with (hover: hover) and (pointer: fine) and applies the same shift on :focus-visible.",
+        "Addresses RTL direction and reduced motion without adding a dependency or editing files."
+      ]
+    },
+    {
+      "id": 23,
+      "name": "navigation-sibling-panels",
+      "prompt": "상단 내비게이션의 '제품', '솔루션', '가격' 드롭다운이 화면 가운데에서 커지며 열리고, 메뉴를 옮길 때마다 닫혔다가 다시 열려 깜빡입니다. 메뉴 안은 링크 목록이고 자체 컴포넌트를 씁니다. 설계 수정 방향만 제안하고 파일은 수정하지 마세요.",
+      "expected_output": "Anchors the opening to the trigger, keeps one open panel that moves between sibling triggers with directional content, and keeps the navigation as links rather than an application menu.",
+      "files": [],
+      "expectations": [
+        "Sets the transform origin to the trigger instead of the center.",
+        "Keeps the panel open while moving between sibling triggers and transitions only its position and content, with content entering from the new trigger's side.",
+        "Keeps site navigation as a navigation landmark of links rather than role=menu, and covers Escape with focus returning to the trigger."
+      ]
+    },
+    {
+      "id": 24,
+      "name": "declutter-preserves-content",
+      "prompt": "fixtures/settings.html 알림 설정 화면을 declutter 해 주세요. 기능, 문구, 정보 밀도는 그대로 두세요.",
+      "expected_output": "Removes only redundant visual structure, keeps every control, label and the existing density, and verifies the result.",
+      "files": [
+        "fixtures/settings.html"
+      ],
+      "expectations": [
+        "Removes borders, backgrounds, dividers or decoration only where another device already communicates the same grouping or nothing is communicated.",
+        "Keeps every control, label and piece of copy, and does not change colors, fonts or layout beyond the redundancy removed.",
+        "Reports what was removed with the job each removed device had, and the checks run."
+      ]
     }
   ]
 }

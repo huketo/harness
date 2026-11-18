@@ -1,6 +1,6 @@
 ---
 name: design-md
-description: "Create or maintain design-system documentation when the user explicitly requests a DESIGN.md, design-system brief, or documented design update from a brief, existing implementation, or supplied UI references. Not for ordinary UI fixes, reviews, implementation, or runtime token definitions."
+description: "Create or maintain design-system documentation when the user explicitly requests a DESIGN.md, design-system brief, or documented design update from a brief, existing implementation, or supplied UI references, or asks to turn the session's design corrections into documented rules. Not for ordinary UI fixes, reviews, implementation, or runtime token definitions."
 license: MIT
 ---
 
@@ -12,7 +12,9 @@ Produce one truthful, agent-friendly design-system artifact at the repository-ow
 
 Use this workflow only when design-system documentation is explicitly requested. An ordinary UI fix, implementation, or review stays in [awesome-interface](../awesome-interface/SKILL.md) and does not require a `DESIGN.md`.
 
-Identify the product or surface, audiences, source inputs, requested output, and whether the user wants extraction, creation, maintenance, or an intentional design update. Inspect repository guidance and search narrowly for the existing design-system document and its inbound links.
+Identify the product or surface, audiences, source inputs, requested output, and whether the user wants extraction, creation, maintenance, an intentional design update, or rules learned from corrections. Inspect repository guidance and search narrowly for the existing design-system document and its inbound links.
+
+To learn rules from the user's corrections, settle the destination here, then follow [learning from corrections](references/corrections.md) in place of sections 2–4; section 5's completion checks still apply to whatever it writes.
 
 - Honor an explicit output location.
 - Otherwise update the existing repository-owned artifact in place, even when it is not named `DESIGN.md`.
