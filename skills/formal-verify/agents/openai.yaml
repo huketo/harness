@@ -1,0 +1,5 @@
+interface:
+  display_name: "Formal Verify"
+  short_description: "Verify one property with a model checker or generated inputs"
+policy:
+  allow_implicit_invocation: false
