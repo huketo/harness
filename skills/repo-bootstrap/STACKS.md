@@ -48,6 +48,8 @@ mise run check
 - `src/core/<기능>/`은 순수한 로직이다. 기능 하나가 평평한 디렉터리 하나이고, `index.ts`가 유일한 공개 진입점이다.
 - `src/shell/`은 입출력과 진입점이다. core를 호출하고, core가 타입으로 선언한 의존성의 구현을 넘긴다.
 
+기존 저장소의 기준선: `npx eslint . --suppress-all`이 지금의 위반을 파일·규칙별 개수로 `eslint-suppressions.json`에 기록한다. 이 파일을 추적하면, 어떤 파일에서 한 규칙의 위반이 기록보다 많아질 때 ESLint가 실패한다. 위반을 고친 뒤에는 `npx eslint . --prune-suppressions`로 기록을 줄인다. 2026-11-18에 ESLint 10.15로 기록 뒤의 통과, 같은 파일과 다른 파일에 더한 위반의 실패를 확인했다.
+
 위반 사례(`repo-bootstrap` 4단계에서 하나씩 실패를 확인한다):
 
 | 위반 | 만드는 방법 | 실패하는 규칙 |

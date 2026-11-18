@@ -63,15 +63,18 @@ gitlab.example/<group>/<repo>
 
 ### 교정을 저장소의 장치로 옮기기
 
-에이전트가 같은 실수를 되풀이할 때 지침 문장을 더하는 대신 저장소가 그 실수를 막게 하는 스킬들입니다. `repo-bootstrap`, `verify-init`, `formal-verify`는 사람이 이름으로 부를 때만 실행됩니다.
+에이전트가 같은 실수를 되풀이할 때 지침 문장을 더하는 대신 저장소가 그 실수를 막게 하는 스킬들입니다. `harness-flow`, `repo-bootstrap`, `verify-init`, `formal-verify`는 사람이 이름으로 부를 때만 실행됩니다. 순서가 기억나지 않으면 `/harness-flow`를 부릅니다. 저장소의 상태를 읽어 다음에 쓸 스킬 하나와 그 이유를 알려 줍니다.
 
 | 스킬 | 쓰는 때 | 저장소에 남는 것 |
 | --- | --- | --- |
-| `repo-bootstrap` | 새 저장소를 시작할 때 | 기본 스택의 타입·린트·경계 규칙·테스트·CI와 단일 check 명령 |
+| `harness-flow` | 다음에 무엇을 할지 기억나지 않을 때 | 없음(읽기만 하고 다음 스킬을 알려 줍니다) |
+| `repo-bootstrap` | 새 저장소를 시작할 때, 또는 기존 저장소에 check 명령이나 CI가 없을 때 | 기본 스택의 타입·린트·경계 규칙·테스트·CI와 단일 check 명령. 기존 저장소에는 check 명령, CI, 기존 위반을 고정한 린트 기준선만 |
 | `codebase-design` | 함수 경계를 넘는 코드를 쓰기 전에 | 고른 모양과 그 경계를 강제하는 검사의 이름 |
 | `correct` | 같은 실수로 다시 교정했을 때 | 실수를 막는 구조·타입·린트·테스트와 `AGENTS.md`의 규칙 표 |
 | `verify-init` | 앱을 실제로 실행해 증명할 방법이 없을 때 | 저장소 전용 `verify-<앱>` 스킬과 기능 지도 |
 | `formal-verify` | 상태 기계·동시성·파서처럼 예시 테스트가 닿지 않을 때 | 다시 돌릴 수 있는 속성 검사 |
+
+이미 코드가 있는 저장소에도 그대로 씁니다. `repo-init`으로 규칙 표를 만들고, check 명령과 CI가 없으면 `repo-bootstrap`의 "기존 저장소" 절을 따르고, `verify-init`으로 검증 스킬을 만든 뒤, 이후에는 `correct`로 부채를 하나씩 검사로 옮깁니다. 기존 코드를 템플릿으로 덮어쓰는 단계는 없습니다.
 
 기본 스택은 [`skills/repo-bootstrap/STACKS.md`](../../skills/repo-bootstrap/STACKS.md)가 정하며 지금은 TypeScript 하나입니다. `file-mr`은 MR 본문에 증거 절을 두어, 리뷰하는 사람이 diff보다 먼저 관측된 증거를 보게 합니다.
 
