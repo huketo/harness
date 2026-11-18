@@ -26,8 +26,8 @@ disable-model-invocation: true
 | --- | --- | --- | --- |
 | 1 | 소스 코드가 없음(새 저장소) | `/repo-bootstrap` | 기본 스택의 타입·린트·경계 규칙·테스트·CI, check 명령 하나 |
 | 2 | `AGENTS.md`의 `Rules and enforcement` 표 | `/repo-init` | 지금 무엇이 강제되고 무엇이 부채인지 적은 표 |
-| 3 | check 명령 하나나 CI | `/repo-bootstrap`의 "기존 저장소" 절 | 기존 명령을 묶은 check 명령, CI, 기존 위반을 고정한 기준선 |
-| 4 | `verify-*` 검증 스킬 | `/verify-init` | 앱을 실행해 증거를 남기는 절차와 기능 지도. `full-send`가 머지할 수 있게 된다 |
+| 3 | check 명령 하나나 CI 가운데 하나라도 | `/repo-bootstrap`의 "기존 저장소" 절 | 기존 명령을 묶은 check 명령, CI, 기존 위반을 고정한 기준선 |
+| 4 | `verify-*` 검증 스킬 | `/verify-init` | 앱을 실행해 증거를 남기는 절차와 기능 지도. CI와 함께 `full-send`가 요구하는 저장소 조건이며, 머지 여부는 허용 목록까지 보고 `full-send`가 정한다 |
 | 5 | 표에 `unenforced` 행이 있음 | `correct` | 가장 잦은 부채 하나를 구조·타입·린트·테스트로 옮긴 결과 |
 
 이미 코드가 있는 저장소는 1을 건너뛰고 2부터 시작한다. 문서만 있는 저장소라면 1을 건너뛰고 2만 하면 된다. `next`가 `none`이면 기반은 갖춰진 것이다. 이후로는 3절의 사건이 생길 때마다 해당 스킬을 쓴다.

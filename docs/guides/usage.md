@@ -74,7 +74,7 @@ gitlab.example/<group>/<repo>
 | `verify-init` | 앱을 실제로 실행해 증명할 방법이 없을 때 | 저장소 전용 `verify-<앱>` 스킬과 기능 지도 |
 | `formal-verify` | 상태 기계·동시성·파서처럼 예시 테스트가 닿지 않을 때 | 다시 돌릴 수 있는 속성 검사 |
 
-이미 코드가 있는 저장소에도 그대로 씁니다. `repo-init`으로 규칙 표를 만들고, check 명령과 CI가 없으면 `repo-bootstrap`의 "기존 저장소" 절을 따르고, `verify-init`으로 검증 스킬을 만든 뒤, 이후에는 `correct`로 부채를 하나씩 검사로 옮깁니다. 기존 코드를 템플릿으로 덮어쓰는 단계는 없습니다.
+이미 코드가 있는 저장소에도 그대로 씁니다. `repo-init`으로 규칙 표를 만들고, check 명령이나 CI 가운데 하나라도 없으면 `repo-bootstrap`의 "기존 저장소" 절을 따르고, `verify-init`으로 검증 스킬을 만든 뒤, 이후에는 `correct`로 부채를 하나씩 검사로 옮깁니다. 기존 코드를 템플릿으로 덮어쓰는 단계는 없습니다.
 
 기본 스택은 [`skills/repo-bootstrap/STACKS.md`](../../skills/repo-bootstrap/STACKS.md)가 정하며 지금은 TypeScript 하나입니다. `file-mr`은 MR 본문에 증거 절을 두어, 리뷰하는 사람이 diff보다 먼저 관측된 증거를 보게 합니다.
 

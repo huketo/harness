@@ -44,10 +44,37 @@ test("an empty repository starts with repo-bootstrap", () => {
 	assert.equal(next, "repo-bootstrap");
 });
 
+test("a repository with only tool configuration and documents counts as having no source", () => {
+	const { state, next } = status(repo("config-only", { "eslint.config.js": "export default [];\n", ".prettierrc.js": "x\n", "mise.toml": "[tasks.check]\nrun = \"true\"\n", "AGENTS.md": table() }));
+	assert.equal(state.sources, "none");
+	assert.equal(next, "repo-bootstrap");
+});
+
 test("an existing repository without the rule table starts with repo-init", () => {
 	const { state, next } = status(repo("no-table", { ...base, "AGENTS.md": "# Demo\n" }));
 	assert.equal(state["rule-table"], "missing");
 	assert.equal(next, "repo-init");
+});
+
+test("a Rules and enforcement heading without a table does not count as the rule table", () => {
+	const { state, next } = status(repo("heading-only", { ...base, "AGENTS.md": "# Demo\n\n## Rules and enforcement\n\nTo do.\n\n## Other\n\n| A | B |\n| --- | --- |\n" }));
+	assert.equal(state["rule-table"], "missing");
+	assert.equal(next, "repo-init");
+});
+
+test("only the Enforced by column of the rule table counts as unenforced", () => {
+	const agents = `${table("| A | judgment |", "| unenforced words in the rule | `mise run check` |")}\n## Other\n\n| X | Y |\n| --- | --- |\n| a | unenforced |\n`;
+	const { state, next } = status(repo("other-tables", { ...base, ...verify, "AGENTS.md": agents }));
+	assert.match(state["rule-table"] ?? "", /present/);
+	assert.equal(next, "none");
+});
+
+test("a check script entry is required, not a dependency named check", () => {
+	const files = { "src/app.ts": "x\n", ".gitlab-ci.yml": "c: {}\n", "AGENTS.md": table(), "package.json": '{"scripts":{"test":"node --test"},"devDependencies":{"check":"1.0.0"}}' };
+	const { state, next, reason } = status(repo("dependency-named-check", files));
+	assert.equal(state["check-command"], "missing");
+	assert.equal(next, "repo-bootstrap");
+	assert.match(reason, /existing repository/);
 });
 
 test("an existing repository without one check command or CI goes to repo-bootstrap's existing-repository section", () => {
@@ -77,9 +104,10 @@ test("a repository with the base in place has no fixed next step", () => {
 	assert.equal(next, "none");
 });
 
-test("boundary rules inside a template directory do not count for the repository", () => {
-	const { state } = status(repo("template-only", { ...base, "skills/x/templates/eslint.config.js": "no-restricted-imports\n" }));
-	assert.equal(state["boundary-rules"], "missing");
+test("boundary rules count only when a root lint or dependency configuration declares them", () => {
+	const elsewhere = { ...base, "skills/x/templates/eslint.config.js": "no-restricted-imports\n", "scripts/detect.sh": "grep no-restricted-imports\n" };
+	assert.equal(status(repo("mentioned-only", elsewhere)).state["boundary-rules"], "missing");
+	assert.equal(status(repo("cruiser", { ...base, ".dependency-cruiser.cjs": "module.exports = {};\n" })).state["boundary-rules"], "present");
 });
 
 test("it refuses a directory outside a git repository", () => {
