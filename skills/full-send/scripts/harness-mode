@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # harness-mode — the work mode the merge guard hook reads, stored per worktree in its git dir.
-#   harness-mode set full-send|full-stop   record a mode; full-send outside an allowlisted repo degrades to full-stop
+#   harness-mode set full-send|full-stop   record a mode; full-send degrades to full-stop outside an allowlisted
+#                                          repo, or in a worktree that lacks a CI definition or a verification skill
 #   harness-mode allow-merge <ref>         one merge without a mode, only after the person explicitly asked for it
-#   harness-mode show | clear | allowlist
+#   harness-mode show | clear | allowlist | readiness
 # File: $(git rev-parse --git-dir)/harness-mode, `key=value` lines: mode, origin, set_at, grant, grant_expires.
 # Allowlist: ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos, one `host/path` or `host/owner/*` per line, `#`
 # comments. The person writes it; without it, full-send never merges. plugin/hooks/merge-guard.mjs reads the same file.
@@ -39,6 +40,17 @@ allowed() { # <repo key>: exit 0 when an allowlist entry names it
   return 1
 }
 
+# What this worktree lacks for an unattended merge, one item per line: a check CI runs on the change, and a
+# verify-* skill that says how to run the app and capture proof. Presence only; it cannot tell a weak check from a
+# strong one.
+lacks() {
+  local top; top=$(git rev-parse --show-toplevel)
+  compgen -G "$top/.github/workflows/*.y*ml" > /dev/null || [ -f "$top/.gitlab-ci.yml" ] ||
+    echo "a CI definition (.github/workflows/*.yml or .gitlab-ci.yml)"
+  compgen -G "$top/.agents/skills/verify-*/SKILL.md" > /dev/null || compgen -G "$top/.claude/skills/verify-*/SKILL.md" > /dev/null ||
+    echo "a verification skill (.agents/skills/verify-*/SKILL.md, created with the verify-init skill)"
+}
+
 case ${1:-show} in
   set)
     [ $# -eq 2 ] || die "usage: harness-mode set full-send|full-stop"
@@ -47,6 +59,11 @@ case ${1:-show} in
     if [ "$mode" = full-send ] && ! allowed "$(repo_key "$origin")"; then
       mode=full-stop
       echo "full-send merges only repositories listed in $ALLOW; origin is $origin, so this task runs as full-stop"
+    elif [ "$mode" = full-send ] && missing=$(lacks) && [ -n "$missing" ]; then
+      mode=full-stop
+      echo "full-send merges only where a change can be proven; this worktree lacks:"
+      printf '%s\n' "$missing" | sed 's/^/  - /'
+      echo "so this task runs as full-stop"
     fi
     write "mode=$mode" "origin=$origin" "set_at=$(date +%s)"
     echo "mode=$mode"
@@ -63,5 +80,9 @@ case ${1:-show} in
     key=$(repo_key "$origin")
     if allowed "$key"; then echo "allowed: $key is listed in $ALLOW"; else echo "not allowed: $key is not listed in $ALLOW"; fi
     ;;
-  *) die "usage: harness-mode set full-send|full-stop | allow-merge <ref> | show | clear | allowlist" ;;
+  readiness)
+    missing=$(lacks)
+    if [ -z "$missing" ]; then echo "ready: a CI definition and a verification skill are present"; else echo "not ready, lacks:"; printf '%s\n' "$missing" | sed 's/^/  - /'; fi
+    ;;
+  *) die "usage: harness-mode set full-send|full-stop | allow-merge <ref> | show | clear | allowlist | readiness" ;;
 esac

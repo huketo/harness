@@ -37,10 +37,16 @@ before(() => {
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
-function repo(name, origin) {
+// A repository full-send may merge has a CI definition and a verify-* skill; `bare` leaves one or both out.
+function repo(name, origin, { ci = true, verify = true } = {}) {
 	const dir = join(root, name);
 	execFileSync("git", ["init", "-q", dir], { env });
 	execFileSync("git", ["-C", dir, "remote", "add", "origin", origin], { env });
+	if (ci) writeFileSync(join(dir, ".gitlab-ci.yml"), "check:\n  script: [\"true\"]\n");
+	if (verify) {
+		mkdirSync(join(dir, ".agents/skills/verify-demo"), { recursive: true });
+		writeFileSync(join(dir, ".agents/skills/verify-demo/SKILL.md"), "---\nname: verify-demo\ndescription: Synthetic.\n---\n");
+	}
 	return dir;
 }
 
@@ -187,6 +193,41 @@ test("harness-mode degrades full-send outside the allowlist", () => {
 	assert.equal(mode(personal, "set", "yolo").status, 2);
 	assert.equal(mode(personal, "clear").stdout.trim(), "mode=none");
 	assert.equal(existsSync(join(personal, ".git", "harness-mode")), false);
+});
+
+test("harness-mode degrades full-send where a change cannot be proven", () => {
+	const origin = "https://github.com/example-owner/demo.git";
+	const bare = repo("bare", origin, { ci: false, verify: false });
+	const set = mode(bare, "set", "full-send");
+	assert.equal(set.status, 0);
+	assert.ok(set.stdout.includes("a CI definition"));
+	assert.ok(set.stdout.includes("a verification skill"));
+	assert.equal(set.stdout.trim().endsWith("mode=full-stop"), true);
+	assert.equal(parseState(mode(bare, "show").stdout).mode, "full-stop");
+	assert.ok(mode(bare, "readiness").stdout.startsWith("not ready"));
+
+	const noVerify = mode(repo("no-verify", origin, { verify: false }), "set", "full-send").stdout;
+	assert.equal(noVerify.includes("a CI definition"), false);
+	assert.ok(noVerify.includes("a verification skill"));
+	assert.equal(noVerify.trim().endsWith("mode=full-stop"), true);
+
+	const noCi = mode(repo("no-ci", origin, { ci: false }), "set", "full-send").stdout;
+	assert.ok(noCi.includes("a CI definition"));
+	assert.equal(noCi.trim().endsWith("mode=full-stop"), true);
+
+	const github = repo("github-ci", origin, { ci: false });
+	mkdirSync(join(github, ".github/workflows"), { recursive: true });
+	writeFileSync(join(github, ".github/workflows/ci.yml"), "name: CI\n");
+	assert.equal(mode(github, "set", "full-send").stdout.trim(), "mode=full-send");
+	assert.ok(mode(github, "readiness").stdout.startsWith("ready"));
+
+	const claude = repo("claude-skill", origin, { verify: false });
+	mkdirSync(join(claude, ".claude/skills/verify-demo"), { recursive: true });
+	writeFileSync(join(claude, ".claude/skills/verify-demo/SKILL.md"), "---\nname: verify-demo\ndescription: Synthetic.\n---\n");
+	assert.equal(mode(claude, "set", "full-send").stdout.trim(), "mode=full-send");
+
+	// full-stop never merges, so it needs neither.
+	assert.equal(mode(bare, "set", "full-stop").stdout.trim(), "mode=full-stop");
 });
 
 test("end to end: the hook reads the mode file and consumes a one-shot grant", () => {
