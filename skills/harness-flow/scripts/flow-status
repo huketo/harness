@@ -54,12 +54,13 @@ formal=$(globfirst '.agents/skills/formal-*/SKILL.md' || true)
 if [ -n "$formal" ]; then row verify properties present "$formal"; else row verify properties none "used only where examples cannot reach"; fi
 
 # The rule table is the first Markdown table under `## Rules and enforcement`, and it counts only when its header is
-# `| Rule | Enforced by |` followed by a delimiter row. Escaped pipes (`\|`) stay inside their cell.
+# `| Rule | Enforced by |` followed by a delimiter row. Escaped pipes (`\|`) stay inside their cell, and the second
+# cell is read whether or not a row ends with a pipe.
 table=
 [ -f AGENTS.md ] && table=$(awk '/^## /{inside=($0 ~ /^## Rules and enforcement[[:space:]]*$/); next} inside && /^\|/{print; seen=1; next} inside && seen{exit}' AGENTS.md)
 if [ -n "$table" ]; then
   header=$(printf '%s\n' "$table" | sed -n 1p); delimiter=$(printf '%s\n' "$table" | sed -n 2p)
-  [[ $header =~ ^\|[[:space:]]*Rule[[:space:]]*\|[[:space:]]*Enforced\ by[[:space:]]*\|[[:space:]]*$ && $delimiter =~ ^\|[[:space:]:-]+\|[[:space:]:-]+\|[[:space:]]*$ ]] || table=
+  [[ $header =~ ^\|[[:space:]]*Rule[[:space:]]*\|[[:space:]]*Enforced\ by[[:space:]]*\|[[:space:]]*$ && $delimiter =~ ^\|[[:space:]]*:?-+:?[[:space:]]*\|[[:space:]]*:?-+:?[[:space:]]*\|?[[:space:]]*$ ]] || table=
 fi
 unenforced=0
 if [ ! -f AGENTS.md ]; then
@@ -67,7 +68,7 @@ if [ ! -f AGENTS.md ]; then
 elif [ -z "$table" ]; then
   row prose rule-table missing "AGENTS.md has no | Rule | Enforced by | table under Rules and enforcement"
 else
-  unenforced=$(printf '%s\n' "$table" | sed 's/\\|/\x01/g' | awk -F'|' 'NR > 2 { cell = $(NF - 1); gsub(/[`[:space:]]/, "", cell); if (cell ~ /^unenforced/) n++ } END { print n + 0 }')
+  unenforced=$(printf '%s\n' "$table" | sed 's/\\|/\x01/g' | awk -F'|' 'NR > 2 { cell = $3; gsub(/[`[:space:]]/, "", cell); if (cell ~ /^unenforced/) n++ } END { print n + 0 }')
   row prose rule-table present "AGENTS.md, $unenforced unenforced"
 fi
 
