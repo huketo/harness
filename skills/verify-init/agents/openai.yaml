@@ -1,0 +1,5 @@
+interface:
+  display_name: "Verify Init"
+  short_description: "Generate a repository's own verification skill and feature map"
+policy:
+  allow_implicit_invocation: false

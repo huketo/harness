@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# verify-hstack — an isolated run directory for driving this checkout's CLIs without touching the real HOME.
+#   verify-hstack launch                        create var/verify/<run>/ with a synthetic HOME and allowlist; prints the run path
+#   verify-hstack doctor <run>                  read-only: pinned Node, checkout revision, and that the run is isolated
+#   verify-hstack repo <run> <name> <origin>    create a synthetic repository in the run; prints its path
+#   verify-hstack run <run> -- <command...>     run a command with the run's HOME, agent config dirs, and no user git config
+#   verify-hstack guard <run> <repo> <cases>    send each command in a cases file to the merge guard; prints the decisions
+#   verify-hstack cleanup <run>                 remove the synthetic HOME and repositories; evidence/ stays
+set -euo pipefail
+ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../../../.." && pwd)
+die() { echo "verify-hstack: $*" >&2; exit 2; }
+run_dir() { # <run>: absolute path, refused unless it is a run this script created
+  local run; run=$(readlink -f "${1:?run directory}")
+  [[ $run == "$ROOT"/var/verify/* && -f $run/.verify-hstack ]] || die "$1 is not a run directory under $ROOT/var/verify"
+  printf '%s\n' "$run"
+}
+# CLAUDE_CONFIG_DIR is set by a Claude Code session and the installer honors it, so an inherited value would send
+# links into the real configuration directory. Every agent-home variable the installer reads is pinned to the run.
+isolated() {
+  env HOME="$1/home" XDG_CONFIG_HOME="$1/config" XDG_STATE_HOME="$1/state" CLAUDE_CONFIG_DIR="$1/home/.claude" \
+    CODEX_HOME="$1/home/.codex" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 "${@:2}"
+}
+
+case ${1:-} in
+  launch)
+    run=$ROOT/var/verify/$(date +%Y%m%dT%H%M%S)-$$
+    mkdir -p "$run"/{home,config/harness,state,repos,evidence}
+    printf '# synthetic allowlist for verification\ngithub.com/example-owner/*\n' > "$run/config/harness/full-send-repos"
+    touch "$run/.verify-hstack"
+    printf '%s\n' "$run"
+    ;;
+  doctor)
+    run=$(run_dir "${2:-}")
+    want=$(sed -n 's/^node = "\(.*\)"/\1/p' "$ROOT/mise.toml")
+    have=$(cd "$ROOT" && mise exec -- node --version)
+    [ "v$want" = "$have" ] || die "node is $have, mise.toml pins $want; run \`mise install\`"
+    [ -f "$run/config/harness/full-send-repos" ] || die "the run has no synthetic allowlist; launch a new run"
+    echo "ok: node $have, checkout $(git -C "$ROOT" rev-parse --short HEAD), run $run"
+    ;;
+  repo)
+    run=$(run_dir "${2:-}"); name=${3:?name}; origin=${4:?origin}
+    dir=$run/repos/$name
+    isolated "$run" git init -q "$dir"
+    isolated "$run" git -C "$dir" remote add origin "$origin"
+    printf 'check:\n  script: ["true"]\n' > "$dir/.gitlab-ci.yml"
+    mkdir -p "$dir/.agents/skills/verify-demo"
+    printf -- '---\nname: verify-demo\ndescription: Synthetic.\n---\n' > "$dir/.agents/skills/verify-demo/SKILL.md"
+    printf '%s\n' "$dir"
+    ;;
+  run)
+    run=$(run_dir "${2:-}"); [ "${3:-}" = -- ] || die "usage: verify-hstack run <run> -- <command...>"
+    isolated "$run" "${@:4}"
+    ;;
+  guard)
+    run=$(run_dir "${2:-}"); repo=${3:?repo}; cases=${4:?cases file}
+    while IFS= read -r line || [ -n "$line" ]; do
+      case $line in '' | '#'*) continue ;; esac
+      payload=$(node -e 'console.log(JSON.stringify({ tool_name: "Bash", tool_input: { command: process.argv[1] }, cwd: process.argv[2] }))' "$line" "$repo")
+      out=$(printf '%s' "$payload" | isolated "$run" node "$ROOT/plugin/hooks/merge-guard.mjs" --format claude)
+      if [ -z "$out" ]; then
+        decision=pass
+      else
+        decision=$(printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const o = JSON.parse(s).hookSpecificOutput; console.log(`${o.permissionDecision}: ${o.permissionDecisionReason}`); })')
+      fi
+      printf '%s\n  -> %s\n' "$line" "$decision"
+    done < "$cases"
+    ;;
+  cleanup)
+    run=$(run_dir "${2:-}")
+    rm -rf -- "$run/home" "$run/config" "$run/state" "$run/repos"
+    echo "kept: $run/evidence"
+    ;;
+  *) die "usage: verify-hstack launch | doctor <run> | repo <run> <name> <origin> | run <run> -- <command...> | guard <run> <repo> <cases> | cleanup <run>" ;;
+esac

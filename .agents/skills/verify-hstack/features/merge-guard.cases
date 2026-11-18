@@ -1,0 +1,5 @@
+# One shell command per line, sent to the merge guard as a Bash tool call. `#` lines and blank lines are skipped.
+gh pr merge 3 --squash
+gh pr merge 3 --admin
+gh pr merge 3 --repo other-owner/other
+ls -la
