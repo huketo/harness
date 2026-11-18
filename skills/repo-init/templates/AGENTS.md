@@ -24,6 +24,14 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 - [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — reading, filing, and linking issues.
 {{STANDARDS_POINTERS}}
 
+## Rules and enforcement
+
+A rule that a check can enforce lives in the check, not in prose. This table pairs each repository rule with what enforces it: a check's path or command, `judgment` when a person or reviewer must decide, or `unenforced` with the reason when a check is still owed. The `correct` skill maintains it.
+
+| Rule | Enforced by |
+| --- | --- |
+{{RULE_ROWS}}
+
 ## Domain language
 
 Domain terms live in [`{{GLOSSARY_ENTRY}}`]({{GLOSSARY_ENTRY}}); architectural decisions live in [`docs/adr/`](docs/adr/). Read both before naming a domain concept or reshaping an area, and surface any conflict with an ADR instead of silently overriding it.
