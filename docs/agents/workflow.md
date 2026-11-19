@@ -26,7 +26,7 @@ Implement the narrow complete fix in the canonical source. Migrate affected call
 
 When work is split, define interfaces and file ownership before concurrent edits. Give each slice its own evidence boundary and integrate only after all callers of a changed contract are visible. The step is complete when no in-scope caller relies on the old contract.
 
-When the same edit repeats across many sites, make the first one by hand, write the smallest script or codemod that makes it, rerun the script on that first site, and confirm the result matches the hand edit before applying it to the rest. Keep such a script outside tracked files unless the repository adopts it.
+When the same edit repeats across many sites, make the first one by hand, then write the smallest script or codemod that makes it, run the script on that site's original content, and confirm its output matches the hand edit before applying it to the rest. Keep such a script outside tracked files unless the repository adopts it.
 
 ## 5. Verify the actual boundary
 
