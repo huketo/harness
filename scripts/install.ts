@@ -1,7 +1,7 @@
 // The one installation entry point (`mise run plan`, `mise run install`).
 //   node scripts/install.ts [--apply] [--skills-only]
 // Without --apply it prints what would change and writes nothing. Three parts, each reported one line per step:
-//   1. links: skills into ~/.agents/skills and <Claude config>/skills, the agy skill and rule slots, Codex rules;
+//   1. links: skills into ~/.agents/skills and <Claude config>/skills, the agy skill and rule slots, Codex rules and instructions;
 //   2. permissions: .rulesync credential denies merged into Claude Code and agy settings (scripts/safe-generate.ts);
 //   3. plugins: the hstack Claude Code marketplace and plugin, and the agy plugin copy (plugin/install.mjs).
 // --skills-only stops after the skill links. Exit 1 when a step needs a person (a conflict, a lossy permission

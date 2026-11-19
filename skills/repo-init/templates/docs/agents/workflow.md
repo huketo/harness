@@ -14,6 +14,8 @@ Read the implementation, its callers, nearby tests, and the owning guide. Inspec
 
 Read the domain glossary (see the root `AGENTS.md`) and the ADRs in `docs/adr/` that touch the area. Name domain concepts with the glossary's terms. When the change would contradict an ADR, say so explicitly and explain why it is worth reopening.
 
+When the reason for existing code is not evident from the source, read its history before changing or deleting it: `git blame` or `git log -L` on the lines and the merge or pull request the commit links. Report what the history records separately from what you infer from it.
+
 The step is complete when the current mechanism, all affected callers, and the relevant glossary terms and ADRs are accounted for.
 
 ## 3. Make the evidence red when behavior changes
@@ -28,11 +30,15 @@ Implement the narrow complete fix in the canonical source. Migrate affected call
 
 When work is split, define interfaces and file ownership before concurrent edits, give each slice its own evidence boundary, and integrate only after the callers of a changed contract are visible.
 
+When the same edit repeats across many sites, make the first one by hand, write the smallest script or codemod that makes it, rerun the script on that first site, and confirm the result matches the hand edit before applying it to the rest. Keep such a script outside tracked files unless the repository adopts it.
+
 The step is complete when no in-scope caller relies on the old contract.
 
 ## 5. Verify the actual boundary
 
 Run the focused command from [`testing.md`](testing.md) that exercises the changed mechanism. Source audit, unit test, temporary-repository integration, live-service check, and remote publication are different evidence; name what was actually obtained. A zero exit proves only the selected command, so confirm the intended scenario ran.
+
+When a check fails, confirm the observation (the command, the selected test, the environment, and the output being read) before concluding that the system is wrong. When two fixes built on the same premise have failed, write the premise as one sentence and test it directly before a third attempt.
 
 After behavior is proven, remove throwaway probes. The step is complete when the requested outcome is observed and no task-created runtime or sensitive artifact entered tracked files.
 
@@ -45,6 +51,8 @@ The step is complete when every affected claim in maintained documentation match
 ## 7. Deliver evidence
 
 Report the behavior or documentation changed, the owning files, the exact commands or scenarios run with their observed results, the relevant checks not run and why, generated artifacts, and every commit or remote write made. Redact sensitive values.
+
+Label each claim by its basis: measured (observed in this session), inferred (derived from that evidence), or assumed (not yet checked).
 
 ## Review findings
 

@@ -58,6 +58,11 @@ export function render(host, { hooks = true } = {}) {
 			if (hooks) {
 				files["hooks/hooks.json"] = json({
 					hooks: {
+						SessionStart: [
+							{
+								hooks: [{ type: "command", command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/session-rules.mjs"', timeout: 10 }],
+							},
+						],
 						PreToolUse: [
 							{
 								matcher: "Bash",
@@ -83,6 +88,8 @@ export function render(host, { hooks = true } = {}) {
 				description: meta.description,
 			});
 			files["rules/AGENTS.md"] = read("rules/AGENTS.md");
+			// agy applies rules/AGENTS.md always; any other rule file applies only with a trigger in its frontmatter.
+			files["rules/common.md"] = `---\ntrigger: always_on\n---\n\n${read("rules/common.md")}`;
 			if (hooks) {
 				files["hooks/merge-guard.mjs"] = read("hooks/merge-guard.mjs");
 				// agy runs plugin hooks with `sh -c` from the directory that holds hooks.json.

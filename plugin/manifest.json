@@ -1,6 +1,6 @@
 {
   "name": "hstack",
-  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules.",
+  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and the common working rules for Claude Code and Antigravity CLI.",
   "author": { "name": "huketo" },
   "repository": "https://github.com/huketo/harness",
   "license": "MIT"
