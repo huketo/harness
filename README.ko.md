@@ -71,7 +71,7 @@ node codex/review.ts --cwd <worktree> --inspect-tools
 | 경로 | 역할 |
 | --- | --- |
 | [`skills/`](skills/) | 개인 스킬과 원저작자 고지를 유지한 편입 스킬. |
-| [`plugin/`](plugin/) | Claude Code·AGY용 `hstack` 플러그인. 머지 가드, 읽기 전용 리뷰어 agent, AGY 규칙, 빌더, 플러그인 설치기. 저장소 루트가 이 플러그인의 마켓플레이스입니다. |
+| [`plugin/`](plugin/) | Claude Code·AGY용 `hstack` 플러그인. 머지 가드, 읽기 전용 리뷰어 agent, 공통 규칙(`plugin/rules/common.md`)과 AGY 규칙, 빌더, 플러그인 설치기. 저장소 루트가 이 플러그인의 마켓플레이스입니다. |
 | [`scripts/`](scripts/), [`.rulesync/`](.rulesync/) | `mise run` 뒤의 설치기·업데이트·rulesync 래퍼와, 이들이 적용하는 자격증명 거부 규칙. |
 | [`codex/`](codex/) | 읽기 전용 Codex 리뷰어와 머지 전에 승인을 묻게 하는 Codex 실행 정책. |
 | [`t3/`](t3/) | T3 Code 예약 작업 가드와 보호된 호스트 동기화. 배포한 작업 목록은 비어 있습니다. |

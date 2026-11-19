@@ -20,7 +20,7 @@
 | --- | --- |
 | `t3/scheduled/host-sync.mjs`, `host-sync.test.mjs` | 허용 목록 기반 동기화 guard와 임시 Git 저장소 회귀 테스트 |
 | `t3/scheduled/guard.mjs`, `guard.test.mjs`, `jobs.json` | T3 예약 작업에 없는 시간 초과·일일 실행 횟수·연속 실패 중지·월간 실행일을 강제하는 가드와 회귀 테스트. `jobs.json`은 빈 공개 배포 상태 |
-| `plugin/` | Claude Code·AGY용 `hstack` 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, AGY 규칙), 생성 파일 빌더 `build.mjs`, 플러그인 설치 계획기 `install.mjs`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
+| `plugin/` | Claude Code·AGY용 `hstack` 플러그인의 단일 정본(머지 가드 훅, 읽기 전용 리뷰어 agent, 세 에이전트가 받는 공통 규칙, AGY 규칙), 생성 파일 빌더 `build.mjs`, 플러그인 설치 계획기 `install.mjs`. 배포 형태의 결정은 [AGENT-CONFIG](AGENT-CONFIG.md)가 소유 |
 | `scripts/install.ts`, `links.ts`, `safe-generate.ts`, `update.ts` | `mise run plan`·`install`·`update`의 구현. 링크 계획, rulesync 래퍼, fast-forward 업데이트와 각 테스트 |
 | `.rulesync/` | rulesync 입력. 현재는 Claude Code·AGY 자격 증명 읽기 거부 규칙(`permissions.jsonc`)만 둠 |
 | `.claude-plugin/marketplace.json` | 저장소 루트를 `hstack` 마켓플레이스로 만드는 목록. 플러그인 원본은 `plugin/` |

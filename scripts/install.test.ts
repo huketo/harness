@@ -32,6 +32,8 @@ function fixture() {
 	const home = join(root, "home");
 	mkdirSync(join(repo, "codex"), { recursive: true });
 	writeFileSync(join(repo, "codex/harness.rules"), "prefix_rule()\n");
+	mkdirSync(join(repo, "plugin/rules"), { recursive: true });
+	writeFileSync(join(repo, "plugin/rules/common.md"), "# common\n");
 	skill(repo, "example");
 	mkdirSync(home);
 	return { root, repo, home, claudeDir: join(home, ".claude") };
@@ -97,6 +99,21 @@ test("agy slots and Codex rules: a missing CLAUDE.md is skipped, a regular rules
 	planLinks({ repo, home, claudeDir }).forEach((s) => s.kind === "change" && s.apply?.());
 	assert.equal(readlinkSync(join(home, ".gemini/config/rules/AGENTS.md")), join(claudeDir, "CLAUDE.md"));
 	assert.ok(planLinks({ repo, home, claudeDir }).every((s) => s.kind === "unchanged"));
+});
+
+test("Codex instructions: an empty AGENTS.md takes the common rules, the user's own is left alone", () => {
+	const { repo, home, claudeDir } = fixture();
+	mkdirSync(join(home, ".codex"), { recursive: true });
+	writeFileSync(join(home, ".codex/AGENTS.md"), "");
+	planLinks({ repo, home, claudeDir }).forEach((s) => s.kind === "change" && s.apply?.());
+	assert.equal(readlinkSync(join(home, ".codex/AGENTS.md")), join(repo, "plugin/rules/common.md"));
+
+	rmSync(join(home, ".codex/AGENTS.md"));
+	writeFileSync(join(home, ".codex/AGENTS.md"), "mine\n");
+	const steps = planLinks({ repo, home, claudeDir });
+	assert.ok(steps.some((s) => s.kind === "skip" && s.text.includes(".codex/AGENTS.md")));
+	steps.forEach((s) => s.kind === "change" && s.apply?.());
+	assert.equal(readFileSync(join(home, ".codex/AGENTS.md"), "utf8"), "mine\n");
 });
 
 test("a shared skill tree that links into the checkout stops the run", () => {

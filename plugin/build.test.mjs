@@ -19,16 +19,19 @@ after(() => rmSync(out, { recursive: true, force: true }));
 test("claude renders only the generated files; agy is a full copy with the guard and its rules", () => {
 	const claude = render("claude");
 	assert.deepEqual(Object.keys(claude).sort(), [".claude-plugin/plugin.json", "hooks/hooks.json"]);
-	const hook = JSON.parse(claude["hooks/hooks.json"]).hooks.PreToolUse[0];
+	const hooks = JSON.parse(claude["hooks/hooks.json"]).hooks;
+	assert.ok(hooks.SessionStart[0].hooks[0].command.endsWith('/hooks/session-rules.mjs"'));
+	const hook = hooks.PreToolUse[0];
 	assert.equal(hook.matcher, "Bash");
 	assert.equal(hook.hooks[0].onFailure, "block");
 	assert.ok(hook.hooks[0].command.includes('"${CLAUDE_PLUGIN_ROOT}/hooks/merge-guard.mjs" --format claude'));
 	assert.deepEqual(Object.keys(render("claude", { hooks: false })), [".claude-plugin/plugin.json"]);
 
 	const agy = render("agy");
-	assert.deepEqual(Object.keys(agy).sort(), ["hooks.json", "hooks/merge-guard.mjs", "plugin.json", "rules/AGENTS.md"]);
+	assert.deepEqual(Object.keys(agy).sort(), ["hooks.json", "hooks/merge-guard.mjs", "plugin.json", "rules/AGENTS.md", "rules/common.md"]);
+	assert.match(agy["rules/common.md"], /^---\ntrigger: always_on\n---\n\n# /);
 	assert.equal(JSON.parse(agy["hooks.json"])["hstack-merge-guard"].PreToolUse[0].matcher, "run_command");
-	assert.deepEqual(Object.keys(render("agy", { hooks: false })).sort(), ["plugin.json", "rules/AGENTS.md"]);
+	assert.deepEqual(Object.keys(render("agy", { hooks: false })).sort(), ["plugin.json", "rules/AGENTS.md", "rules/common.md"]);
 	assert.throws(() => render("codex"), /unknown host/);
 });
 

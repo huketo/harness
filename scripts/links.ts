@@ -1,9 +1,10 @@
-// Plans the symlinks that make this checkout's skills and Codex rules visible to each agent. Each step says what it
-// would do; `apply` runs it. The rules are the ones docs/REPO.md states for repository-owned assets:
+// Plans the symlinks that make this checkout's skills, Codex rules, and Codex's copy of the common rules visible to
+// each agent. Each step says what it would do; `apply` runs it. The rules are the ones docs/REPO.md states for repository-owned assets:
 //   - a correct link stays; a link into this checkout is refreshed; anything else at the target is a conflict;
 //   - a regular file replaced by a link is first copied to `<path>.bak`, and an existing different backup blocks it;
 //   - slots that point at assets this checkout does not own (the shared skill tree, the user's CLAUDE.md) are
-//     linked only when empty.
+//     linked only when empty;
+//   - the user's Codex instructions (~/.codex/AGENTS.md) get the common rules only when absent or an empty file.
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
@@ -117,6 +118,19 @@ function migrateFile(src: string, target: string, repo: string, steps: Step[]) {
 	});
 }
 
+function linkUserSlot(src: string, target: string, repo: string, steps: Step[]) {
+	if (!ensureDir(dirname(target), steps)) return;
+	if (sameLink(target, src)) return steps.push({ kind: "unchanged", text: `unchanged asset: ${target} -> ${src}` });
+	if (isLink(target)) {
+		if (!inside(target, repo)) return steps.push({ kind: "conflict", text: `${target} links outside this checkout; left as is` });
+		return steps.push({ kind: "change", text: `refresh asset link: ${target} -> ${src}`, apply: () => relink(target, src) });
+	}
+	if (!exists(target)) return steps.push({ kind: "change", text: `link asset: ${target} -> ${src}`, apply: () => symlinkSync(src, target) });
+	if (lstatSync(target).isFile() && lstatSync(target).size === 0)
+		return steps.push({ kind: "change", text: `replace empty ${target} with a link to ${src}`, apply: () => relink(target, src) });
+	steps.push({ kind: "skip", text: `${target} holds your own instructions; to add the common rules, append ${src} to it or remove it and rerun` });
+}
+
 /** Skill directories of this checkout: every `skills/<name>/` that holds a SKILL.md. */
 export function skillDirs(repo: string): string[] {
 	const root = join(repo, "skills");
@@ -160,5 +174,6 @@ export function planLinks({ repo, home, claudeDir, skillsOnly = false }: LinkOpt
 
 	// Codex loads every *.rules file in ~/.codex/rules; default.rules there is Codex's own.
 	migrateFile(join(repo, "codex/harness.rules"), join(home, ".codex/rules/harness.rules"), repo, steps);
+	linkUserSlot(join(repo, "plugin/rules/common.md"), join(home, ".codex/AGENTS.md"), repo, steps);
 	return steps;
 }

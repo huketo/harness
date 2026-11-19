@@ -1,7 +1,7 @@
 {
   "name": "hstack",
   "version": "0.1.0",
-  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and Antigravity CLI rules.",
+  "description": "Agent guardrails: a work-mode merge guard, a read-only reviewer agent, and the common working rules for Claude Code and Antigravity CLI.",
   "author": {
     "name": "huketo"
   },

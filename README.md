@@ -71,7 +71,7 @@ See [detailed usage and state boundaries](docs/guides/usage.md) (Korean). Dated 
 | Path | Purpose |
 | --- | --- |
 | [`skills/`](skills/) | Personal skills and adopted skills with retained notices. |
-| [`plugin/`](plugin/) | The `hstack` plugin for Claude Code and AGY: merge guard, read-only reviewer agent, AGY rules, builder, and plugin installer. The repository root is its marketplace. |
+| [`plugin/`](plugin/) | The `hstack` plugin for Claude Code and AGY: merge guard, read-only reviewer agent, common rules (`plugin/rules/common.md`) and AGY rules, builder, and plugin installer. The repository root is its marketplace. |
 | [`scripts/`](scripts/) and [`.rulesync/`](.rulesync/) | The installer, updater, and rulesync wrapper behind `mise run`, and the credential deny rules it applies. |
 | [`codex/`](codex/) | Read-only Codex reviewer and the execpolicy rules that make Codex ask before merging. |
 | [`t3/`](t3/) | Guard for T3 Code scheduled tasks and the guarded host sync; the distributed job list is empty. |

@@ -13,7 +13,7 @@ Before asking a person, accepting an approval, or handling an unattended or sche
 
 ## Repository map
 
-- `plugin/` — the `hstack` plugin for Claude Code and AGY (merge-guard hook, read-only reviewer agent, AGY rules), its builder and installer; the repository root is its marketplace (`.claude-plugin/`). [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where. Before changing a shipped plugin file, read [`docs/guides/plugin-release.md`](docs/guides/plugin-release.md).
+- `plugin/` — the `hstack` plugin for Claude Code and AGY (merge-guard hook, read-only reviewer agent, the common rules every agent receives, AGY rules), its builder and installer; the repository root is its marketplace (`.claude-plugin/`). [`docs/AGENT-CONFIG.md`](docs/AGENT-CONFIG.md) owns what ships where. Before changing a shipped plugin file, read [`docs/guides/plugin-release.md`](docs/guides/plugin-release.md).
 - `scripts/`, `.rulesync/` — the installer, updater, and rulesync wrapper behind `mise run`, the credential deny rules they apply, and the skill-eval runner.
 - `.changeset/`, `.github/workflows/` — pending release notes and the CI and release workflows.
 - `codex/` — the read-only `codex exec` reviewer (`review.ts`) used outside T3, and the execpolicy rules (`harness.rules`) that make Codex ask before merging.
