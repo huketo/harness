@@ -121,12 +121,10 @@ function migrateFile(src: string, target: string, repo: string, steps: Step[]) {
 function linkUserSlot(src: string, target: string, repo: string, steps: Step[]) {
 	if (!ensureDir(dirname(target), steps)) return;
 	if (sameLink(target, src)) return steps.push({ kind: "unchanged", text: `unchanged asset: ${target} -> ${src}` });
-	if (isLink(target)) {
-		if (!inside(target, repo)) return steps.push({ kind: "conflict", text: `${target} links outside this checkout; left as is` });
+	if (isLink(target) && inside(target, repo))
 		return steps.push({ kind: "change", text: `refresh asset link: ${target} -> ${src}`, apply: () => relink(target, src) });
-	}
 	if (!exists(target)) return steps.push({ kind: "change", text: `link asset: ${target} -> ${src}`, apply: () => symlinkSync(src, target) });
-	if (lstatSync(target).isFile() && lstatSync(target).size === 0)
+	if (!isLink(target) && lstatSync(target).isFile() && lstatSync(target).size === 0)
 		return steps.push({ kind: "change", text: `replace empty ${target} with a link to ${src}`, apply: () => relink(target, src) });
 	steps.push({ kind: "skip", text: `${target} holds your own instructions; to add the common rules, append ${src} to it or remove it and rerun` });
 }

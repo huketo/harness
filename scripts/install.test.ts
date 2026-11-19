@@ -114,6 +114,12 @@ test("Codex instructions: an empty AGENTS.md takes the common rules, the user's 
 	assert.ok(steps.some((s) => s.kind === "skip" && s.text.includes(".codex/AGENTS.md")));
 	steps.forEach((s) => s.kind === "change" && s.apply?.());
 	assert.equal(readFileSync(join(home, ".codex/AGENTS.md"), "utf8"), "mine\n");
+
+	rmSync(join(home, ".codex/AGENTS.md"));
+	writeFileSync(join(home, "dotfiles-AGENTS.md"), "mine\n");
+	spawnSync("ln", ["-s", join(home, "dotfiles-AGENTS.md"), join(home, ".codex/AGENTS.md")]);
+	const linked = planLinks({ repo, home, claudeDir }).filter((s) => s.text.includes(".codex/AGENTS.md"));
+	assert.deepEqual(linked.map((s) => s.kind), ["skip"]);
 });
 
 test("a shared skill tree that links into the checkout stops the run", () => {
