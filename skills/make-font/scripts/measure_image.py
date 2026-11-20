@@ -1,7 +1,11 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "brotli", "uharfbuzz", "numpy", "pillow"]
+# ///
 """Measure a typeface from a screenshot: proportions, stems, contrast, serifs and, with the right text, widths.
 
-  python3 -I measure_image.py <shot.png> --text "line one|line two" [--crop x0,y0,x1,y1] [--out m.json]
-  python3 -I measure_image.py --selftest <open-font.ttf> [--px 120] [--out-dir dir]
+  uv run measure_image.py <shot.png> --text "line one|line two" [--crop x0,y0,x1,y1] [--out m.json]
+  uv run measure_image.py --selftest <open-font.ttf> [--px 120] [--out-dir dir]
 
 The image holds one or more lines of dark text on a light ground (or the reverse), all at one size. --text gives
 each line's characters, lines split by "|", in order from the top. Spaces do not matter. The script splits the

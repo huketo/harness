@@ -139,7 +139,7 @@ p { font-size: 14px; }
 .qjtext { font-size: 44px; margin-top: 18px; }
 
 /* features */
-.fgrid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.fgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
 .fcell { border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 10px 12px 12px; min-height: 160px; display: flex; flex-direction: column; }
 .ftag { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--mute); }
 .ftag span:first-child { font-family: var(--mono); color: var(--ink); }
@@ -169,6 +169,16 @@ p { font-size: 14px; }
 .lic-left > p { max-width: 700px; margin-bottom: 26px; }
 .lic-right p { margin-bottom: 14px; }
 .lic-right .sec { margin-top: 4px; }
+/* provenance */
+.prov-page { display: grid; grid-template-columns: minmax(0, 1fr) 640px; gap: 72px; }
+.prov-left .h2 { margin-bottom: 22px; }
+.prov-left .lede { margin-bottom: 26px; }
+.prov-t { table-layout: fixed; }
+.prov-t th { width: 170px; vertical-align: top; padding-top: 7px; border-bottom: 1px solid var(--rule); }
+.prov-t td { vertical-align: top; overflow-wrap: anywhere; word-break: break-all; }
+.hash { overflow-wrap: anywhere; word-break: break-all; }
+.prov-right .ofl p { overflow-wrap: anywhere; }
+.prov-right > p { margin-top: 8px; }
 .code { font-family: var(--mono); font-size: 12px; line-height: 1.5; background: var(--soft); padding: 16px 18px; margin-bottom: 26px; white-space: pre; }
 .mono { font-family: var(--mono); font-size: 12px; }
 
@@ -182,7 +192,7 @@ p { font-size: 14px; }
 .cs-page.dense .cs-group { margin-bottom: 10px; }
 .cs-page.dense .cell { height: 38px; }
 .kp { font-size: 64px; }
-.fgrid { grid-template-columns: repeat(7, 1fr); }
+.fgrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .fcell { min-height: 236px; padding: 10px 10px 12px; }
 .ftag { flex-direction: column; gap: 2px; }
 .ftag span:last-child { text-align: left; }

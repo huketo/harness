@@ -10,12 +10,23 @@ on the numbers fitting cannot fix as heavily as on the ones it can.
   its category, licence, scripts, weights and whether it is variable.
 - The google/fonts GitHub tree, one request: every file path. Variable fonts carry their axes in the file name,
   `Family[opsz,wght].ttf`, so the axes are known before a download.
-- Font files from `raw.githubusercontent.com/google/fonts/main/...`, with the family's `OFL.txt`.
-- Any `--local` folder of fonts the person already has. A local font without an OFL or Apache notice in its
-  name table is skipped.
+- Font files from `raw.githubusercontent.com/google/fonts/main/ofl/...`, with the family's `OFL.txt`.
+- Any `--local` folder of fonts the person already has. A local font without the OFL notice in name ID 13 is
+  skipped. Put its `OFL.txt` beside it: the approval step records that file.
 
-Kept: OFL or Apache, the asked category (serif, sans-serif, display, monospace, handwriting), every asked script
-in its subsets, a main script that is one of them, an upright style, and no math, symbol or icon family.
+Kept: the SIL Open Font License 1.1 only, a TrueType variable font in `ofl/`, the asked category (from
+`targets.json`'s category: sans-serif, serif or monospace; `--category` for display or handwriting), every asked
+script in its subsets, a main script that is one of them, an upright style, and no math, symbol or icon family.
+An Apache-2.0 family is not a base, even when named with `--families`.
+
+GitHub limits requests without a token to 60 an hour. With `GITHUB_TOKEN` set, the script sends it over HTTPS to
+`api.github.com` and `raw.githubusercontent.com` only (to curl through its standard input, never on the command
+line) and never prints it. curl runs with `--disable` first, so it reads no `.curlrc`: a user setting such as
+`trace-ascii` or `location-trusted` cannot log the token or send it past the hop check. Each hop of a redirect is
+checked again: urllib's redirect handler and the curl fallback, which follows every hop itself, both drop the token
+on a hop to any other origin. A 403 or 429 stops the search with the requests left, the reset time and the way on:
+a token, waiting, or `--offline`. `--offline` downloads nothing: it reads the catalogue, the tree and the font
+files from `--cache` and skips what is not there.
 
 ## Two passes
 
@@ -36,10 +47,14 @@ Distance is the root of the weighted sum of squared, scaled gaps (`fontlib.DISTA
 | ascender, descender | 15 | 1 |
 | bar to stem, rhythm | 0.08 | 1 |
 | serif tip | 10 | 1 |
-| each class width | 2.5 % | 0.5, or 0.125 with a width axis |
+| each class width | 2.5 % | 0.5, or 0.125 when the width axis can move toward the target |
 
-A serif against a sans adds 50: never fit one into the other. The score adds a penalty for axes the fit needs:
-0 with width and weight, 0.5 to 0.75 with weight alone, 1.5 for a static font.
+A serif against a sans adds 50: never fit one into the other. A width axis helps only in the direction it can
+move from the measured location: an axis from 75 to 100 that sits at 100 can narrow a class, not widen it. So a
+class that is too narrow keeps its full weight on such a font, and the shortlist shows each axis as `narrow`,
+`widen`, both or `fixed`. The score adds a penalty for axes the fit needs: 0 with width and weight, 0.5 to 0.75
+with weight alone. A width axis that cannot move the way a class beyond the 3 % stretch limit needs counts as
+missing.
 
 ## Choosing
 
@@ -48,9 +63,10 @@ display size beside a reference, with cap heights matched. A candidate that wins
 skeleton (an oldstyle against a transitional, angled stress against vertical, a ball terminal against a sharp
 one) is the wrong base. Say why in one line per candidate and recommend one.
 
-Prefer, in order: the right skeleton, a weight axis, a width axis, an optical-size axis (it holds contrast),
-coverage of the scripts, then the score. A static base can work for one weight when the widths are already
-within 3 %.
+Prefer, in order: the right skeleton, a weight axis, a width axis that moves the right way, an optical-size axis
+(it holds contrast), coverage of the scripts, then the score.
 
-Wait for the person's yes before fitting. Keep the shortlist JSON: the font book's how-it-was-made page and the
-FONTLOG cite it.
+Wait for the person's answer before fitting, and record it with `record_base.py` (SKILL.md step 5): ask the
+question `--question-only` prints, which names both files' sha256 and the source, then record it with that
+question and their answer verbatim and `--decision approved` only if they approved.
+Keep the shortlist JSON: the approval step reads the chosen row from it.

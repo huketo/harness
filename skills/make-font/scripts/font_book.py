@@ -1,14 +1,28 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz"]
+# ///
 """Write the font book: one HTML page per sheet, 1600 x 1000 px, ready for render_book.mjs to print as PDF.
 
-  python3 -I font_book.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --out-dir DIR
-      [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log x.space-log.json]
-      [--check-report check-report.json] [--licence OFL.txt] [--tagline "..."] [--version 1.000]
+  uv run font_book.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --out-dir DIR
+      [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log a.space-log.json ...]
+      --check-report check-report.json [--licence OFL.txt] [--tagline "..."] [--version 1.000]
 
 Pages: cover, how it was made (with --targets), vertical metrics, weights, waterfall, text settings, character
-set (as many pages as it needs), figures, kerning and the collision guard, OpenType features, languages, and
-licence and install. Every number on a page is read from the font files or the logs when the book is written.
-The book's own text names no reference and no base family: the licence page quotes the copyright lines from
-the font's name table, which is what the OFL requires.
+set (as many pages as it needs), figures, kerning and the collision guard, OpenType features (21 to a page),
+languages, licence and install, where the check summary lists the gates that failed and those not run, and
+provenance: the approved base's file name and full sha256, its licence's sha256, and the approval question and
+answer verbatim, all from check-report.json.
+Every number on a page is read from the font files or the logs when the book is written.
+
+The book is written only for fonts check_font.py verified: every TTF given, and every WOFF2 taken from
+--webfonts, must have a sha256 that check-report.json lists among the package outputs ("package": {"outputs"}).
+Anything else, or a report that lists none, is refused, so the provenance page always belongs to the fonts the
+book shows. Each file is read once (chain.Files) and the fonts copied beside the book are those bytes. An output
+path that leads to an input, through a link or not, is refused.
+The book's own text names no reference and no base family. The licence page quotes the copyright lines from
+the font's name table, which is what the OFL requires, and the provenance page quotes the approval record,
+which names the base.
 
 Fonts are linked by relative path. The TTFs are used for the character set and languages so nothing is
 subset away; the WOFF2 files (from --webfonts, else the TTFs) set everything else.
@@ -17,18 +31,18 @@ import argparse
 import datetime
 import html
 import os
-import shutil
 import sys
 import unicodedata
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fontTools.ttLib import TTFont  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
 esc = html.escape
 ACCENT = "#0a84ff"
+FEATURES_PER_PAGE = 21  # 7 columns by 3 rows of .fcell fit inside one page
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -206,48 +220,63 @@ def main():
     ap.add_argument("--webfonts")
     ap.add_argument("--targets")
     ap.add_argument("--fit-log")
-    ap.add_argument("--space-log", action="append", default=[])
-    ap.add_argument("--check-report")
+    ap.add_argument("--space-log", action="extend", nargs="+", default=[])
+    ap.add_argument("--check-report", required=True,
+                    help="check-report.json from check_font.py: the gate summary and the approved base's provenance")
     ap.add_argument("--licence")
     ap.add_argument("--tagline")
     ap.add_argument("--version")
     a = ap.parse_args()
-    os.makedirs(a.out_dir, exist_ok=True)
+    files = C.Files()
+    check = files.read(a.check_report, "check-report.json").json("check-report.json")
+    outputs = (check.get("package") or {}).get("outputs") if isinstance(check, dict) else None
+    verified = {e.get("sha256") for e in outputs or [] if isinstance(e, dict)}
+    if not verified:
+        raise C.Refused(f"{a.check_report} lists no package output, so it is not a check-report.json that "
+                        "check_font.py wrote for a package. The font book prints the provenance of the fonts the check "
+                        "verified; run check_font.py on the package again.")
+    font_files = [files.read(p, "font") for p in a.fonts]
+    web_files = []
+    for p in a.fonts:
+        cand = os.path.join(a.webfonts, os.path.splitext(os.path.basename(p))[0] + ".woff2") if a.webfonts else None
+        web_files.append(files.read(cand, "web font") if cand and os.path.exists(cand) else None)
+    for blob in font_files + [w for w in web_files if w]:
+        if blob.sha256 not in verified:
+            raise C.Refused(f"{blob.path} (sha256 {blob.sha256}) is not a package output {a.check_report} lists. The "
+                            "font book shows only the fonts check_font.py verified, so that its provenance page "
+                            "belongs to them. Give the package's own files, with the check report made for them.")
+    T = files.read(a.targets, "targets.json").json("targets.json") if a.targets else None
+    fit = files.read(a.fit_log, "--fit-log").json("--fit-log") if a.fit_log else None
+    space = [files.read(p, "--space-log").json("--space-log") for p in a.space_log]
     fdir = os.path.join(a.out_dir, "fonts")
-    os.makedirs(fdir, exist_ok=True)
+    copies = [(os.path.join(fdir, os.path.basename(b.path)), b) for b in font_files + [w for w in web_files if w]]
+    for path in [c for c, _ in copies] + [os.path.join(a.out_dir, n) for n in ("index.html", "pages.json")]:
+        files.check_output(path)
 
-    fonts = [TTFont(p) for p in a.fonts]
+    fonts = [b.font() for b in font_files]
     reg = fonts[0]
-    nm = {r.nameID: r.toUnicode() for r in reg["name"].names if r.platformID == 3}
+    nm = L.english_names(reg)
     family = nm.get(16) or nm.get(1)
-    styles = [({r.nameID: r.toUnicode() for r in f["name"].names if r.platformID == 3}.get(17) or "Regular",
-               f["OS/2"].usWeightClass) for f in fonts]
+    styles = [(L.english_names(f).get(17) or "Regular", f["OS/2"].usWeightClass) for f in fonts]
     version = a.version or f"{reg['head'].fontRevision:.3f}"
-    T = L.load_json(a.targets) if a.targets else None
-    fit = L.load_json(a.fit_log) if a.fit_log else None
-    space = [L.load_json(p) for p in a.space_log]
-    check = L.load_json(a.check_report) if a.check_report else None
     face = L.Face(reg)
     cm = face.cmap
     upm = face.upm
     FEATS = feats(reg)
 
-    # Copy the fonts beside the book so the HTML works wherever the folder goes.
+    # Copy the fonts beside the book, the bytes checked above, so the HTML works wherever the folder goes.
+    for path, blob in copies:
+        files.write(path, blob.data)
     font_css = ""
     web = []
-    for p, (sty, w) in zip(a.fonts, styles):
-        shutil.copy(p, os.path.join(fdir, os.path.basename(p)))
-        wp = None
-        if a.webfonts:
-            cand = os.path.join(a.webfonts, os.path.splitext(os.path.basename(p))[0] + ".woff2")
-            if os.path.exists(cand):
-                shutil.copy(cand, os.path.join(fdir, os.path.basename(cand)))
-                wp = os.path.basename(cand)
+    for p, (sty, w), wb in zip(a.fonts, styles, web_files):
+        wp = os.path.basename(wb.path) if wb else None
         src = f'url("fonts/{wp}") format("woff2")' if wp else f'url("fonts/{os.path.basename(p)}") format("truetype")'
         font_css += f'@font-face {{ font-family: "{family} Book"; src: {src}; font-weight: {w}; font-style: normal; }}\n'
         web.append(wp)
     font_css += (f'@font-face {{ font-family: "{family} Book Full"; src: url("fonts/{os.path.basename(a.fonts[0])}") '
                  f'format("truetype"); font-weight: {styles[0][1]}; font-style: normal; }}\n')
+    sizes = {os.path.basename(b.path): len(b.data) for _, b in copies}
 
     # metrics of the Regular, in font units
     def top(c):
@@ -503,20 +532,20 @@ def main():
 </div>""")
 
     # features ----------------------------------------------------------------
-    names = {r.nameID: r.toUnicode() for r in reg["name"].names if r.platformID == 3}
+    names = nm
     ssname = {}
     if "GSUB" in reg:
         for fr in reg["GSUB"].table.FeatureList.FeatureRecord:
             p = fr.Feature.FeatureParams
             if p is not None and hasattr(p, "UINameID"):
                 ssname[fr.FeatureTag] = names.get(p.UINameID)
-    fcells = ""
+    fcells = []
     for tag in FEATS:
         label, sample = FEATURE_DEMO.get(tag, (ssname.get(tag) or ("Stylistic set " + tag[2:] if tag.startswith("ss") else tag), None))
         if tag not in FEATURE_DEMO or tag == "salt":
             sample = feature_chars(reg, tag) or sample
         if sample is None:
-            fcells += f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="fnote">Always on, applied by the shaper</div></div></div>'
+            fcells.append(f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="fnote">Always on, applied by the shaper</div></div></div>')
             continue
         if tag == "kern":
             off, on = "font-kerning:none", ""
@@ -524,10 +553,13 @@ def main():
             off, on = "font-variant-ligatures:none", ""
         else:
             off, on = f"font-feature-settings:'{tag}' 0", f"font-feature-settings:'{tag}' 1"
-        fcells += f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="f off" style="{off}">{esc(sample)}</div><div class="f on" style="{on}">{esc(sample)}</div></div></div>'
-    B.page("features", "OpenType features", f"""
-<div class="feat-page"><div class="cs-head"><h2 class="f h2">OpenType features</h2><p class="lede">{len(FEATS)} features, read from the GSUB and GPOS tables. Each pair shows the feature off in grey and on in black.</p></div>
-  <div class="fgrid">{fcells}</div></div>""")
+        fcells.append(f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="f off" style="{off}">{esc(sample)}</div><div class="f on" style="{on}">{esc(sample)}</div></div></div>')
+    fpages = [fcells[i:i + FEATURES_PER_PAGE] for i in range(0, len(fcells), FEATURES_PER_PAGE)] or [[]]
+    for i, cells_ in enumerate(fpages):
+        of = f", {i + 1} of {len(fpages)}" if len(fpages) > 1 else ""
+        B.page(f"features-{i + 1}" if len(fpages) > 1 else "features", "OpenType features", f"""
+<div class="feat-page"><div class="cs-head"><h2 class="f h2">OpenType features{of}</h2><p class="lede">{len(FEATS)} features, read from the GSUB and GPOS tables. Each pair shows the feature off in grey and on in black.</p></div>
+  <div class="fgrid">{''.join(cells_)}</div></div>""")
 
     # languages -------------------------------------------------------------
     def missing(chars):
@@ -550,17 +582,21 @@ def main():
     copyright_lines = esc(names.get(0, "")).replace("\n", "<br>")
     rows = ""
     for p, (s, w), wp in zip(a.fonts, styles, web):
-        rows += f"<tr><td class='mono'>{esc(os.path.basename(p))}</td><td>{esc(s)}, desktop</td><td class='n'>{os.path.getsize(p) / 1024:.0f} KB</td></tr>"
+        rows += f"<tr><td class='mono'>{esc(os.path.basename(p))}</td><td>{esc(s)}, desktop</td><td class='n'>{sizes[os.path.basename(p)] / 1024:.0f} KB</td></tr>"
         if wp:
-            rows += f"<tr><td class='mono'>{esc(wp)}</td><td>{esc(s)}, web</td><td class='n'>{os.path.getsize(os.path.join(fdir, wp)) / 1024:.0f} KB</td></tr>"
+            rows += f"<tr><td class='mono'>{esc(wp)}</td><td>{esc(s)}, web</td><td class='n'>{sizes[wp] / 1024:.0f} KB</td></tr>"
     css_snip = "\n".join(f'@font-face {{\n  font-family: "{family}";\n  src: url("webfonts/{(wp or os.path.basename(p))}");\n  font-weight: {w};\n  font-display: swap;\n}}'
                          for p, (s, w), wp in zip(a.fonts, styles, web))
     checks = ""
     if check:
-        passed = sum(1 for r in check if r["state"] == "PASS")
-        failed = [r for r in check if r["state"] == "FAIL"]
+        gates = check["gates"]
+        passed = sum(1 for r in gates if r["state"] == "PASS")
+        failed = [r for r in gates if r["state"] == "FAIL"]
         failed_names = list(dict.fromkeys(r["gate"] for r in failed))  # gate names only: details may name a reference
-        checks = f"<h3 class='sec' style='margin-top:26px'>Checks</h3><p>{passed} gates passed, {len(failed)} failed{': ' + esc(', '.join(failed_names[:6])) if failed else ''}.</p>"
+        not_run = list(dict.fromkeys(r["gate"] for r in gates if r["state"] == "NOT RUN"))
+        checks = (f"<h3 class='sec' style='margin-top:26px'>Checks</h3><p>{passed} gates passed, {len(failed)} failed"
+                  f"{': ' + esc(', '.join(failed_names[:6])) if failed else ''}."
+                  f"{' Not run: ' + esc('; '.join(not_run)) + '.' if not_run else ''}</p>")
     B.page("licence", "Licence and install", f"""
 <div class="lic-page">
   <div class="lic-left"><h2 class="f h2">Licence</h2>
@@ -573,6 +609,30 @@ def main():
     <h3 class="sec">Install on a computer</h3><p>Open each TTF and choose Install.</p></div>
 </div>""")
 
+    # provenance --------------------------------------------------------------
+    base, appr = check["base"], check["approval"]
+    src = base["source"]
+    where = {"google-fonts": f"Google Fonts, {src.get('url')}", "manifest": f"manifest entry {src.get('manifest_entry')}",
+             "local": "a file the requester supplied"}.get(src.get("kind"), str(src.get("kind")))
+    lic = base["license"]
+    B.page("provenance", "Provenance", f"""
+<div class="prov-page">
+  <div class="prov-left"><h2 class="f h2">Provenance</h2>
+    <p class="lede">Every outline in {esc(family)} comes from one open font, the base the requester approved. Each build step checked that font and its licence by sha256 before it ran, and took only files the step before it wrote.</p>
+    <table class="t small-t prov-t"><tbody>
+      <tr><th>Base font</th><td><span class="mono">{esc(base['file'])}</span><br><span class="mono hash">sha256 {esc(base['sha256'])}</span></td></tr>
+      <tr><th>Source</th><td>{esc(where)}</td></tr>
+      <tr><th>Licence</th><td>{esc(lic['id'])}, <span class="mono">{esc(lic['file'])}</span><br><span class="mono hash">sha256 {esc(lic['sha256'])}</span></td></tr>
+      <tr><th>Reserved Font Names</th><td>{esc(', '.join(lic['reserved_font_names']) or 'none')}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="prov-right"><h3 class="sec">The approval, verbatim</h3>
+    <div class="ofl"><p><b>Question.</b> {esc(appr['question'])}</p><p><b>Answer.</b> {esc(appr['answer'])}</p>
+      <p>Decision: {esc(appr.get('decision') or '')}, recorded {esc(appr['recorded_at'])}.</p></div>
+    <p>The approval is the requester's statement. The build cannot check it; it binds the statement to the two files above by their sha256 and prints it here as given.</p>
+  </div>
+</div>""")
+
     css = open(os.path.join(HERE, "book.css")).read().replace("ACCENT", ACCENT).replace('"BOOKFACE', f'"{family} Book')
     lines = f":root {{ --base: {base_em:.4f}em; --asc: {asc / upm:.4f}em; --cap: {cap / upm:.4f}em; --xh: {xh / upm:.4f}em; --desc: {-desc / upm:.4f}em; }}\n"
     doc = f"""<!doctype html>
@@ -582,9 +642,9 @@ def main():
 <body>
 {''.join(p for _, _, p in B.pages)}
 </body></html>"""
-    with open(os.path.join(a.out_dir, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(doc)
-    L.save_json({"family": family, "pages": [[n, s] for n, s, _ in B.pages]}, os.path.join(a.out_dir, "pages.json"))
+    files.write(os.path.join(a.out_dir, "index.html"), doc.encode("utf-8"))
+    files.write_json(os.path.join(a.out_dir, "pages.json"),
+                     {"family": family, "pages": [[n, s] for n, s, _ in B.pages]})
     print(f"{len(B.pages)} pages: {os.path.join(a.out_dir, 'index.html')}")
     print("next: node render_book.mjs " + a.out_dir)
 

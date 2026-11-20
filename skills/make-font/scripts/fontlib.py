@@ -1,4 +1,8 @@
-"""Shared geometry for the make-font scripts. Python 3.9+, fontTools, uharfbuzz, numpy.
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz", "numpy", "pillow"]
+# ///
+"""Shared geometry, licence reading and character sets for the make-font scripts.
 
 Every length a measurement returns is in cap-normalised units: the font is scaled so its cap height is 700.
 That puts a screenshot (no em size) and a font file on the same scale. `cap_em` keeps the file's real cap
@@ -8,6 +12,7 @@ Nothing here copies an outline. A measurement is a font-wide number or a class m
 """
 import io
 import json
+import re
 import statistics as st
 
 from fontTools.pens.basePen import BasePen
@@ -64,6 +69,350 @@ SAMPLE_LINES = [
     "HAHBHCHDHEHFHGHIHJHKHLHMHNHOHPHQHRHSHTHUHVHWHXHYHZH",
     "H0H1H2H3H4H5H6H7H8H9H",
 ]
+
+
+# The characters each script needs. check_font.py gates coverage on them, and fit_font.py subsets the base to them.
+COVERAGE = {
+    "latin": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+             "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœŠšŽžŸ"
+             ".,:;!?¡¿'\"()[]{}-–—‘’“”‚„‹›«»…•·/\\&@#*§¶©®™°%‰$€£¥¢+−×÷=<>",
+    "latin-ext": "ĀāĂăĄąĆćČčĎďĐđĒēĖėĘęĚěĞğĢģĪīĮįİıĶķĹĺĻļĽľŁłŃńŅņŇňŌōŐőŔŕŘřŚśŞşȘșŤťŢţȚțŪūŮůŰűŲųŹźŻż",
+    "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
+    "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
+    "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
+}
+# Kept for every script: printable ASCII, Latin-1, and the typographic marks the font book and plain text use
+# (dashes, quotes, ellipsis, primes, fraction slash, minus).
+COMMON_UNICODES = [(0x20, 0x7E), (0xA0, 0xFF), (0x2010, 0x2027), (0x2030, 0x203A), (0x2044, 0x2044),
+                   (0x20AC, 0x20AC), (0x2122, 0x2122), (0x2212, 0x2212)]
+
+
+def charset_unicodes(scripts):
+    """The code points a build for these scripts keeps, as pyftsubset's --unicodes value. Raises on a script
+    with no list in COVERAGE, since a subset would silently drop it."""
+    cps = {c for lo, hi in COMMON_UNICODES for c in range(lo, hi + 1)}
+    for s in scripts:
+        if s not in COVERAGE:
+            raise ValueError(f"no character list for script {s!r} (known: {', '.join(COVERAGE)})")
+        cps |= {ord(c) for c in COVERAGE[s]}
+    runs, start, prev = [], None, None
+    for c in sorted(cps):
+        if start is None:
+            start = prev = c
+        elif c == prev + 1:
+            prev = c
+        else:
+            runs.append((start, prev))
+            start = prev = c
+    if start is not None:
+        runs.append((start, prev))
+    return ",".join(f"U+{a:04X}" if a == b else f"U+{a:04X}-{b:04X}" for a, b in runs)
+
+
+# ------------------------------------------------------------------ licences and names
+# The SIL Open Font License 1.1 from its title to the end, as SIL publishes it. An OFL.txt is the copyright
+# statement, a two-line preamble whose FAQ address varies between files, then exactly this text.
+OFL_11_LICENCE = """\
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+"""
+_OFL_11_WORDS = " ".join(OFL_11_LICENCE.split())
+_OFL_PREAMBLE = re.compile(r"This Font Software is licensed under the SIL Open Font License, Version 1\.1\.\s+"
+                           r"This license is copied below, and is also available with a FAQ at:\s+"
+                           r"(?:https?://)?(?:scripts\.sil\.org/OFL|openfontlicense\.org)/?\s+-{10,}\s+")
+_QUOTES = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
+_COPYRIGHT_LINE = re.compile(r"\s*copyright\b", re.I)
+
+
+# ------------------------------------------------------------------ the forms a copyright line and a notice take
+# Code cannot read a term, so it reads forms. A copyright line and a name ID 13 notice are accepted only in the
+# forms published OFL fonts use; any other clause on them is refused as an unsupported form, never interpreted.
+
+# A name is words joined by spaces. Each word has a capital letter or a digit (Lumen, tyPoland, 3D) or is one of
+# these connectors. A full stop may end a name's last word (Inc.) and an initial or short abbreviation (J., Co.).
+_CONNECTORS = {"and", "&", "of", "the", "by", "de", "da", "das", "dos", "del", "der", "di", "du", "la", "le",
+               "van", "von", "y", "et", "und"}
+_WORD = re.compile(r"[\w&'’-]+(?:\.[\w&'’-]+)*\.?")
+
+
+def _is_name(text, commas=True):
+    """True when text is a name, or with commas=True several names joined by commas (Lumen Type, Inc.)."""
+    for group in (re.split(r"\s*,\s+", text) if commas else [text]):
+        words = group.split()
+        if not words or all(w.lower() in _CONNECTORS for w in words):
+            return False
+        for i, w in enumerate(words):
+            if not _WORD.fullmatch(w):
+                return False
+            if w.endswith(".") and i < len(words) - 1 and not (len(w) <= 4 and w[0].isupper()):
+                return False
+            if w.lower() not in _CONNECTORS and not any(c.isupper() or c.isdigit() for c in w):
+                return False
+    return True
+
+
+_YEAR = r"(?:1[89]|20)\d\d"
+_CR_HEAD = re.compile(rf"\s*copyright(?:\s*(?:\(c\)|©))?\s+{_YEAR}(?:\s*[-–,]\s*{_YEAR})*,?\s+", re.I)
+_CR_RFN = re.compile(r"[,.]?\s+with\s+reserved\s+font\s+names?\s+", re.I)
+_CR_ADDRESS = re.compile(r"\s*\(([^()\s]+)\)$")
+_ADDRESS = re.compile(r"[a-z][a-z0-9+.-]*://[^\s()|]+|[^\s()|@]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+"
+                      r"|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:/[^\s()|]*)?", re.I)
+_QUOTED = "|".join(f"{re.escape(o)}[^{re.escape(c)}]+{re.escape(c)}" for o, c in _QUOTES.items())
+_QUOTED_NAMES = re.compile(rf"(?:{_QUOTED})(?:\s*,\s*(?:{_QUOTED}))*(?:\s*,?\s+and\s+(?:{_QUOTED}))?")
+COPYRIGHT_FORM = ("Copyright, an optional (c) or ©, the year or years, the holder's name, an optional address in "
+                  "parentheses, an optional \"with Reserved Font Name(s) ...\" clause and an optional full stop")
+
+
+def copyright_line_problem(line):
+    """Why a copyright line is not in the supported form, or None when it is. The form is COPYRIGHT_FORM: the
+    holder's name and the Reserved Font Names are names (_is_name), and the address is URLs or e-mail addresses
+    joined by |. A clause after any of them, a sentence or a term, is not part of the form."""
+    head = _CR_HEAD.match(line)
+    if not head:
+        return "it does not start with Copyright, an optional (c) or ©, and the year"
+    rest = line[head.end():].rstrip()
+    rfn = _CR_RFN.search(rest)
+    holder, names = (rest[:rfn.start()], rest[rfn.end():]) if rfn else (rest, None)
+    if names is None:
+        holder = holder[:-1] if holder.endswith(".") else holder
+    else:
+        names = names[:-1] if names.endswith(".") else names
+    address = _CR_ADDRESS.search(holder)
+    if address:
+        if not all(_ADDRESS.fullmatch(a) for a in address.group(1).split("|")):
+            return f"{address.group(0).strip()} is not an address (URLs or e-mail addresses joined by |)"
+        holder = holder[:address.start()]
+    holder = holder.strip()
+    if not _is_name(holder):
+        return (f"{holder!r} is not a holder's name followed by nothing else (a name is words with a capital "
+                "letter or a digit, joined by spaces, commas, and, of, the)")
+    if names is not None:
+        quoted = _QUOTED_NAMES.fullmatch(names)
+        if not (all(_is_name(n[1:-1], commas=False) for n in re.findall(_QUOTED, names)) if quoted
+                else _is_name(names)):
+            return (f"the Reserved Font Name clause {names!r} is not names alone (quoted names, or unquoted names "
+                    "joined by commas and \"and\")")
+    return None
+
+
+def ofl_11_text_problem(text):
+    """Why a licence file is not the SIL Open Font License 1.1, or None when it is. An OFL.txt is the copyright
+    statement (copyright lines in the supported form, COPYRIGHT_FORM, and blank lines), the two-line preamble whose
+    FAQ address varies between files, then the licence word for word, white space aside. Any other line before the
+    preamble, or a copyright line in another form, may add a condition the OFL does not have, so it is refused."""
+    m = _OFL_PREAMBLE.search(text)
+    if not m:
+        return "it has no OFL 1.1 preamble (\"This Font Software is licensed under the SIL Open Font License, " \
+               "Version 1.1. This license is copied below...\")"
+    if " ".join(text[m.end():].split()) != _OFL_11_WORDS:
+        return "the text after the preamble is not the SIL Open Font License 1.1 word for word"
+    lines = [ln.strip() for ln in text[:m.start()].splitlines() if ln.strip()]
+    for ln in lines:
+        if not _COPYRIGHT_LINE.match(ln):
+            return f"the line {ln!r} stands before the licence and is not a copyright line"
+        why = copyright_line_problem(ln)
+        if why:
+            return (f"the line {ln!r} is not a supported copyright line: {why}. The supported form is "
+                    f"{COPYRIGHT_FORM}")
+    if not lines:
+        return "it has no copyright line"
+    return None
+
+
+def is_ofl_11_text(text):
+    return ofl_11_text_problem(text) is None
+
+
+# name ID 13: the sentence that grants the OFL 1.1, then only sentences published OFL fonts follow it with (where
+# the licence and its FAQ are, where a modifier's licence is, the "AS IS" disclaimer).
+_END = r"\.?(?=\s|$)"
+_URL = r"(?:https?://)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:/\S*?)?"
+_NAME_RUN = r"[^\s,;:!?()\"']+(?:\s+[^\s,;:!?()\"']+)*?"
+_NOTICE_GRANT = re.compile(r"This\s+Font\s+Software\s+is\s+licensed\s+under\s+the\s+SIL\s+Open\s+Font\s+License,?\s+"
+                           r"Version\s+1\.1" + _END, re.I)
+_NOTICE_SENTENCES = [
+    re.compile(r"This\s+license\s+is\s+(?:copied\s+below,\s+and\s+is\s+also\s+)?available\s+with\s+an?\s+FAQ\s+"
+               r"at:?\s+" + _URL + _END, re.I),
+    re.compile(rf"The\s+license\s+for\s+(?P<modifier>{_NAME_RUN})['’]s\s+Modified\s+Version(?:,\s+covering\s+"
+               rf"(?P<holder>{_NAME_RUN})['’]s\s+modifications\s+to\s+(?P<font>{_NAME_RUN}),)?\s+is\s+available\s+"
+               r"at:?\s+" + _URL + _END, re.I),
+    re.compile(r"This\s+Font\s+Software\s+is\s+distributed\s+on\s+an\s+\"AS\s+IS\"\s+BASIS,\s+"
+               r"WITHOUT\s+WARRANTIES\s+OR\s+CONDITIONS\s+OF\s+ANY\s+KIND,\s+either\s+express\s+or\s+implied" + _END,
+               re.I),
+]
+NOTICE_FORM = ("\"This Font Software is licensed under the SIL Open Font License, Version 1.1\", then only where "
+               "the licence and its FAQ are available, where a Modified Version's licence is available, or the "
+               "\"AS IS\" disclaimer")
+
+
+def ofl_11_notice_problem(notice):
+    """Why a name-table licence notice (name ID 13) does not grant the SIL Open Font License, Version 1.1 alone, or
+    None when it does. The notice is NOTICE_FORM: the grant first, then only the known sentences. A label alone
+    ("OFL-1.1"), another version, a denial, an exception or any other clause is not that form."""
+    text = (notice or "").strip()
+    m = _NOTICE_GRANT.match(text)
+    if not m:
+        return ("it does not begin with \"This Font Software is licensed under the SIL Open Font License, "
+                "Version 1.1\"")
+    pos = m.end()
+    while True:
+        pos = re.compile(r"\s*").match(text, pos).end()
+        if pos == len(text):
+            return None
+        for rx in _NOTICE_SENTENCES:
+            m = rx.match(text, pos)
+            if m and all(_is_name(v, commas=False) for v in m.groupdict().values() if v is not None):
+                pos = m.end()
+                break
+        else:
+            return f"{text[pos:]!r} follows the grant and is not one of the sentences supported after it"
+
+
+def is_ofl_11_notice(notice):
+    return ofl_11_notice_problem(notice) is None
+
+
+def _rfn_clause(rest):
+    """Names from the text after `with Reserved Font Name(s)`, up to the end of that sentence."""
+    rest = rest.lstrip(" :")
+    if rest[:1] in _QUOTES:
+        names, i = [], 0
+        while i < len(rest):
+            ch = rest[i]
+            if ch in _QUOTES:
+                end = rest.find(_QUOTES[ch], i + 1)
+                if end < 0:
+                    break
+                names.append(rest[i + 1:end].strip())
+                i = end + 1
+            elif ch == "." or ch == ";":
+                break
+            else:
+                i += 1
+        return [n for n in names if n]
+    m = re.match(r"(.*?)(?:\.(?:\s|$)|;|$)", rest)
+    return [n.strip() for n in re.split(r"\s*,\s*(?:and\s+)?|\s+and\s+", m.group(1)) if n.strip()]
+
+
+def reserved_font_names(ofl_text):
+    """Reserved Font Names declared in an OFL text, in order. Only copyright notice lines count (lines that start
+    with Copyright), from `with Reserved Font Name(s)` to the end of that sentence. The OFL body's own definition
+    of the term is not a declaration."""
+    out = []
+    for line in ofl_text.splitlines():
+        if not re.match(r"\s*copyright\b", line, re.I):
+            continue
+        m = re.search(r"\bwith\s+Reserved\s+Font\s+Names?\b(.*)", line, re.I)
+        if m:
+            out += [n for n in _rfn_clause(m.group(1)) if n not in out]
+    return out
+
+
+def english_names(font):
+    """name ID -> string, the English record first: Windows US English, other Windows English, Mac English,
+    then anything else. A plain dict over the records would let a later language overwrite the English one."""
+    def rank(r):
+        if r.platformID == 3 and r.langID == 0x409:
+            return 0
+        if r.platformID == 3 and r.langID & 0x3FF == 0x09:
+            return 1
+        if r.platformID == 1 and r.langID == 0:
+            return 2
+        return 3
+    best = {}
+    for r in font["name"].names:
+        try:
+            s = r.toUnicode()
+        except UnicodeDecodeError:
+            continue
+        k = rank(r)
+        if r.nameID not in best or k < best[r.nameID][0]:
+            best[r.nameID] = (k, s)
+    return {nid: s for nid, (_, s) in best.items()}
+
 
 
 # ------------------------------------------------------------------ outlines
@@ -377,7 +726,8 @@ WIDTH_SCALE = 0.025  # 2.5 % of a class mean advance is one unit
 
 
 def distance(target, cand, width_weight=1.0, skip=()):
-    """Weighted distance and per-key deltas (candidate minus target). Missing keys are left out."""
+    """Weighted distance and per-key deltas (candidate minus target). Missing keys are left out.
+    width_weight is a number, or a function (class, relative delta) -> number."""
     total, deltas = 0.0, {}
     for key, (scale, w) in DISTANCE.items():
         if key in skip:
@@ -396,7 +746,8 @@ def distance(target, cand, width_weight=1.0, skip=()):
         if tv and cv:
             d = cv / tv - 1
             deltas["w_" + cls] = round(d, 4)
-            total += width_weight * 0.5 * (d / WIDTH_SCALE) ** 2
+            w = width_weight(cls, d) if callable(width_weight) else width_weight
+            total += w * 0.5 * (d / WIDTH_SCALE) ** 2
     return round(total ** 0.5, 3), deltas
 
 

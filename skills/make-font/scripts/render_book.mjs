@@ -8,7 +8,7 @@
 //   - fallback: every element set in the book face renders only with the book's own fonts, never a system font
 //     standing in for a missing glyph (read through the DevTools protocol, per element);
 //   - overflow: nothing runs past a page's margins.
-// Playwright comes from build-design-system/scripts/find-chromium.mjs when that skill is installed beside this one,
+// Playwright comes from awesome-interface/scripts/find-chromium.mjs when that skill is installed beside this one,
 // else from --root, the current folder or the global install. PW_CHROMIUM may point at any Chrome or Chromium.
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -28,11 +28,14 @@ const book = JSON.parse(readFileSync(join(dir, "pages.json"), "utf8"));
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function launch() {
-  const sibling = join(here, "..", "..", "build-design-system", "scripts", "find-chromium.mjs");
+  const sibling = join(here, "..", "..", "awesome-interface", "scripts", "find-chromium.mjs");
   if (existsSync(sibling)) {
     const { launchChromium } = await import(pathToFileURL(sibling).href);
     const r = await launchChromium({}, { root: opt("--root") || process.cwd() });
-    if (r.browser) return r.browser;
+    if (r.browser) {
+      console.log(`chromium: find-chromium.mjs, ${r.how} (playwright from ${r.from})`);
+      return r.browser;
+    }
     console.error(r.error);
   }
   const places = [opt("--root"), process.cwd()].filter(Boolean);
@@ -42,7 +45,9 @@ async function launch() {
       try {
         const pw = createRequire(join(p, "noop.js"))(name);
         const exe = process.env.PW_CHROMIUM;
-        return await pw.chromium.launch(exe ? { executablePath: exe } : {});
+        const browser = await pw.chromium.launch(exe ? { executablePath: exe } : {});
+        console.log(`chromium: fallback, ${exe ? `PW_CHROMIUM ${exe}` : "Playwright's own"} (${name} from ${p})`);
+        return browser;
       } catch {}
     }
   }

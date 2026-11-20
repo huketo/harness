@@ -1,27 +1,52 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "brotli", "uharfbuzz", "numpy", "pillow"]
+# ///
 """Gate a built font against targets.json, its open base, and the licence rules. Exit 1 on any failure.
 
-  python3 -I check_font.py <font.ttf> [<font2.ttf> ...] --targets targets.json --base <base-vf.ttf>
-      [--reference ref.ttf | --reference-image shot.png --reference-text "line|line"] [--package DIR]
-      [--fit-log fit-log.json] [--out-dir DIR]
+  uv run check_font.py dist/ttf/*.ttf --targets targets.json --base-json base.json
+      --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log dist/package-log.json
+      [--package dist/] [--reference ref.ttf | --reference-image shot.png --reference-text "line|line"]
+      [--out-dir DIR]
 
-Gates, each PASS, FAIL or INFO, with the number behind it:
+First the chain, which refuses to go on (exit 1) when any link is broken. chain.verify_build is the check
+package.py ran: base.json matches the base and its OFL text; every log was made from that base.json; fit_font.py
+read only the base and this targets.json, and its subset is what the base gives again with the recorded arguments,
+byte for byte (the glyph order and character map gates compare with that remade subset); space_font.py read only
+fitted fonts and this targets.json. Then the package log: it records this targets.json and exactly these fit and
+space logs, package.py took only spaced fonts, every font checked here is one of its outputs, and every output it
+lists (each TTF and WOFF2) is in the package log's folder with the sha256 it records. Each input is read once
+(chain.Files), so the gates run on the bytes the chain checked. That structure is the provenance guarantee: the
+build steps never opened a reference font. What it cannot rule out: one agent that writes both the fonts and every
+log by hand, consistently. The chain shows the files agree with each other and with the approved base, not who made
+them.
+
+Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
 - metrics: x-height to cap, n stem, contrast, within the targets' tolerances (targets.json "tolerances").
 - widths: every class mean advance, and the shaped paragraph when the targets came from a file.
 - spacing: straight and round sidebearing means.
 - kerning: every pair of letters, figures and punctuation, shaped. The smallest ink gap must clear min_gap.
 - coverage: every character the targets' scripts need.
-- provenance: glyph order and character map equal the base's; with --fit-log, every glyph is within 3 % of the
-  height and 40 % of the width of the base glyph at the fit's y location (y comes from there, x from the
-  width classes); and, given --reference files, no outline matches a reference outline in point structure and shape.
-- validity: a ttx round trip, win metrics that cover every glyph, and fontbakery when it is installed.
+- provenance: glyph order and character map equal the subset's; every glyph is within 3 % of the height and
+  40 % of the width of the subset's glyph at the fit's y location (y comes from there, x from the width classes).
+  With --reference files, a diagnostic only: our outlines that have curves or at least 16 points are compared
+  with the reference's, and any that share point structure and shape are listed (INFO). A CFF reference cannot
+  be compared and is reported NOT RUN.
+- validity: a ttx round trip, win metrics that cover every glyph, and fontbakery (NOT RUN when not installed).
 - licence: OFL notice and URL in the name table, no trademark record, a new family name that is not the base's
   name or a Reserved Font Name, and no base family name in any table but the copyright line. With --package,
   OFL.txt and FONTLOG.txt must be there.
 Renders: <out-dir>/overlay-<style>-<size>.png sets the reference and the font on the same lines at a text and
-a display size, reference in red, ours in blue, overlap black. With a screenshot reference, the two are
-stacked at the same cap height instead.
+a display size, reference in red, ours in blue, overlap black, with that legend drawn above. With a screenshot
+reference, the two are stacked at the same cap height instead.
+
+<out-dir>/check-report.json holds the approved base (file name, full sha256, source, licence and its sha256),
+the approval as base.json records it (question, answer and decision, verbatim), the package outputs verified
+above ("package": {"outputs": [{"file", "sha256"}]}, which font_book.py matches the fonts it copies against), and
+every gate row. A report or render path that leads to an input, through a link or not, is refused.
 """
 import argparse
+import io
 import os
 import re
 import shutil
@@ -34,17 +59,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np  # noqa: E402
 from fontTools.ttLib import TTFont  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
-COVERAGE = {
-    "latin": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-             "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœŠšŽžŸ"
-             ".,:;!?¡¿'\"()[]{}-–—‘’“”‚„‹›«»…•·/\\&@#*§¶©®™°%‰$€£¥¢+−×÷=<>",
-    "latin-ext": "ĀāĂăĄąĆćČčĎďĐđĒēĖėĘęĚěĞğĢģĪīĮįİıĶķĹĺĻļĽľŁłŃńŅņŇňŌōŐőŔŕŘřŚśŞşȘșŤťŢţȚțŪūŮůŰűŲųŹźŻż",
-    "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
-    "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
-    "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
-}
+COVERAGE = L.COVERAGE
+MIN_POINTS = 16  # a straight-sided outline with fewer points (a bar, a box, an L) matches too much to mean anything
 TEXT_SAMPLE = "Hamburgefonstiv quick brown 1234"
 DISPLAY_SAMPLE = "Rag Gold"
 
@@ -53,8 +72,8 @@ class Gates:
     def __init__(self):
         self.rows = []
 
-    def add(self, group, name, ok, detail):
-        state = "INFO" if ok is None else "PASS" if ok else "FAIL"
+    def add(self, group, name, ok, detail, state=None):
+        state = state or ("INFO" if ok is None else "PASS" if ok else "FAIL")
         self.rows.append((group, name, state, detail))
 
     def failed(self):
@@ -131,11 +150,12 @@ def gate_coverage(G, f, scripts):
 
 
 def gate_provenance(G, f, base, refs, yloc=None):
-    G.add("provenance", "glyph order equals the base's", f.getGlyphOrder() == base.getGlyphOrder(), "")
-    G.add("provenance", "character map equals the base's", f.getBestCmap() == base.getBestCmap(), "")
+    """`base` is the subset of the approved base that fit_font.py made and fitted from."""
+    G.add("provenance", "glyph order equals the subset's", f.getGlyphOrder() == base.getGlyphOrder(), "")
+    G.add("provenance", "character map equals the subset's", f.getBestCmap() == base.getBestCmap(), "")
     # Every glyph is the base's glyph, fitted. Its y coordinates come from the base at the fit's y location, so
     # against that instance, at the same cap height, its ink is within 3 % as tall. Widths move with the width
-    # classes, so they may differ up to 30 %. Without the fit log, the default instance is used and the gate
+    # classes, so they may differ up to 40 %. Without a y location, the default instance is used and the gate
     # only informs, since a different optical size redraws marks.
     import copy
     from fontTools.varLib import instancer
@@ -177,35 +197,45 @@ def gate_provenance(G, f, base, refs, yloc=None):
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
         w, h = (max(xs) - min(xs)) or 1, (max(ys) - min(ys)) or 1
         return [((x - min(xs)) / w, (y - min(ys)) / h) for x, y in pts]
+
+    def comparable(o):
+        """Outlines with a curve, or with MIN_POINTS points or more: simpler shapes match by accident."""
+        return o and (0 in o[2] or len(o[0]) >= MIN_POINTS)
+    gate = "outline comparison with a reference (diagnostic)"
     for rp in refs:
         ref = TTFont(rp)
         if "glyf" not in ref:
-            G.add("provenance", "no outline matches a reference", None, f"{os.path.basename(rp)} is CFF: point structures cannot match")
+            G.add("provenance", gate, None, f"{os.path.basename(rp)} has CFF outlines, which cannot be compared "
+                  "point by point with TrueType ones: not run", state="NOT RUN")
             continue
         idx = {}
         for n in ref.getGlyphOrder():
             o = outl(ref, n)
-            if o and len(o[0]) > 8:  # a rectangle or a dot matches anything
+            if comparable(o):
                 idx.setdefault((o[1], o[2]), []).append((n, o[0]))
-        close = []
+        close, compared = [], 0
         for n in f.getGlyphOrder():
             o = outl(f, n)
-            if not o:
+            if not comparable(o):
                 continue
+            compared += 1
             for rn, pts in idx.get((o[1], o[2]), []):
                 A, B = norm(o[0]), norm(pts)
                 if max(max(abs(p[0] - q[0]), abs(p[1] - q[1])) for p, q in zip(A, B)) < 0.02:
                     close.append(f"{n}~{rn}")
-        G.add("provenance", "no outline matches a reference", not close,
-              f"{os.path.basename(rp)}: {len(close)} match" + (": " + ", ".join(close[:8]) + ". If the reference is itself built on this open base, "
-                                       "matches are expected; otherwise stop and find out why" if close else ""))
+        G.add("provenance", gate, None,
+              f"{os.path.basename(rp)}: {compared} outlines compared, {len(close)} share point structure and shape"
+              + (": " + ", ".join(close[:8]) + ". The chain shows the build never opened this file; if the "
+                 "reference is itself built on the same open base, matches are expected, otherwise find out why"
+                 if close else ""))
 
 
-def gate_validity(G, path, f):
+def gate_validity(G, blob, f):
+    """`blob` is the font as read; the tools that need a file get a copy of those bytes."""
     tmp = tempfile.mkdtemp()
     try:
         x1, x2, rt = (os.path.join(tmp, n) for n in ("a.ttx", "b.ttx", "rt.ttf"))
-        TTFont(path).saveXML(x1)
+        blob.font().saveXML(x1)
         g = TTFont()
         g.importXML(x1)
         g.save(rt)
@@ -226,21 +256,28 @@ def gate_validity(G, path, f):
     G.add("validity", "no variation data left", not left, ", ".join(left))
     fb = shutil.which("fontbakery")
     if fb:
-        r = subprocess.run([fb, "check-universal", "-l", "FAIL", path], capture_output=True, text=True)
+        tmp = tempfile.mkdtemp()
+        try:
+            local = os.path.join(tmp, os.path.basename(blob.path))
+            with open(local, "wb") as fh:
+                fh.write(blob.data)
+            r = subprocess.run([fb, "check-universal", "-l", "FAIL", local], capture_output=True, text=True)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
         out = r.stdout + r.stderr
         fails = [ln.strip() for ln in out.splitlines() if ln.strip().startswith("FAIL ")]
         tail = ("; ".join(fails[:4]) or "no FAIL lines")[:300]
         G.add("validity", "fontbakery check-universal", r.returncode == 0, tail)
     else:
-        G.add("validity", "fontbakery", None, "not installed, not run (pip install fontbakery)")
+        G.add("validity", "fontbakery", None, "not installed, not run (uv tool install fontbakery)", state="NOT RUN")
 
 
 def gate_licence(G, f, base, family, package):
-    names = {r.nameID: r.toUnicode() for r in f["name"].names if r.platformID == 3}
+    names = L.english_names(f)
     G.add("licence", "OFL notice in name 13", "Open Font License" in names.get(13, ""), names.get(13, "")[:60])
     G.add("licence", "OFL URL in name 14", "openfontlicense.org" in names.get(14, "") or "scripts.sil.org/OFL" in names.get(14, ""), names.get(14, ""))
     G.add("licence", "no trademark record (name 7)", 7 not in names, names.get(7, ""))
-    bnames = {r.nameID: r.toUnicode() for r in base["name"].names if r.platformID == 3}
+    bnames = L.english_names(base)
     base_fam = (bnames.get(16) or bnames.get(1) or "").strip()
     G.add("licence", "family renamed", names.get(16, names.get(1)) == family,
           f"{names.get(16, names.get(1))!r}, want {family!r}")
@@ -267,12 +304,20 @@ def gate_licence(G, f, base, family, package):
             G.add("licence", f"{fn} in the package", os.path.exists(os.path.join(package, fn)), package)
         p = os.path.join(package, "OFL.txt")
         if os.path.exists(p):
-            rfn = re.findall(r"Reserved Font Names? \"?([^\".\n]+)", open(p, encoding="utf-8").read())
-            clash = [r for r in rfn if r.strip().lower() in family.lower()]
+            with open(p, encoding="utf-8") as fh:
+                rfn = L.reserved_font_names(fh.read())
+            clash = [r for r in rfn if r.lower() in family.lower()]
             G.add("licence", "new name avoids every Reserved Font Name", not clash, f"RFN {rfn or 'none'}")
 
 
-def overlay(ref_face, ours, out_dir, tag):
+def save_image(files, img, path):
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    files.write(path, buf.getvalue())
+    return path
+
+
+def overlay(files, ref_face, ours, out_dir, tag):
     """Red reference, blue ours, black where both have ink. Both at the same cap height, baselines aligned."""
     from PIL import Image
     paths = []
@@ -293,12 +338,33 @@ def overlay(ref_face, ours, out_dir, tag):
         A, B = layers
         rgb = np.clip(np.stack([1 - B, 1 - np.maximum(A, B), 1 - A], axis=-1), 0, 1)
         p = os.path.join(out_dir, f"overlay-{tag}-{name}.png")
-        Image.fromarray((rgb * 255).astype(np.uint8)).save(p)
-        paths.append(p)
+        paths.append(save_image(files, with_legend(Image.fromarray((rgb * 255).astype(np.uint8))), p))
     return paths
 
 
-def stacked(img_path, text, ours, out_dir, tag):
+LEGEND = (((220, 0, 0), "reference only"), ((0, 0, 220), "this font only"), ((0, 0, 0), "both"))
+
+
+def with_legend(img):
+    """The overlay with a band above it that says what each colour is."""
+    from PIL import Image, ImageDraw, ImageFont
+    try:
+        font = ImageFont.load_default(size=14)
+    except TypeError:  # Pillow before 10.1 has one bitmap size
+        font = ImageFont.load_default()
+    band = 30
+    out = Image.new("RGB", (max(img.width, 420), img.height + band), "white")
+    out.paste(img, (0, band))
+    d = ImageDraw.Draw(out)
+    x = 10
+    for colour, label in LEGEND:
+        d.rectangle([x, 9, x + 12, 21], fill=colour)
+        d.text((x + 18, 8), label, fill=(0, 0, 0), font=font)
+        x += 24 + int(d.textlength(label, font=font)) + 16
+    return out
+
+
+def stacked(files, img_path, text, ours, out_dir, tag):
     """The screenshot above our render of the same text at the same cap height, for a reference with no file."""
     from PIL import Image
     shot = Image.open(img_path).convert("L")
@@ -312,29 +378,45 @@ def stacked(img_path, text, ours, out_dir, tag):
     rows += [np.pad(o, ((0, 0), (0, W - o.shape[1]))) for o in ours_imgs]
     sheet = np.vstack(rows)
     p = os.path.join(out_dir, f"stacked-{tag}.png")
-    L.save_png(sheet, p)
-    return [p]
+    return [save_image(files, Image.fromarray((255 - sheet * 255).clip(0, 255).astype(np.uint8)), p)]
+
+
+def verify_chain(files, a):
+    """Every link from base.json to the fonts given, by the same chain.verify_build package.py ran, then the package
+    log. Returns (the build, the package log's links, rows) or refuses."""
+    b = C.verify_build(files, a.base_json, a.targets, a.fit_log, a.space_log)
+    pk = C.verify_package_log(files, b, a.package_log, a.fonts)
+    return b, pk, b.rows + pk.rows
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("fonts", nargs="+")
     ap.add_argument("--targets", required=True)
-    ap.add_argument("--base", required=True)
+    ap.add_argument("--base-json", help="base.json from record_base.py (required)")
+    ap.add_argument("--fit-log", help="fit-log.json from fit_font.py (required)")
+    ap.add_argument("--space-log", action="extend", nargs="+", default=[],
+                    help="every .space-log.json, one or more after the flag; the flag may repeat (required)")
+    ap.add_argument("--package-log", help="package-log.json from package.py (required)")
     ap.add_argument("--reference", action="append", default=[])
     ap.add_argument("--reference-image")
     ap.add_argument("--reference-text")
     ap.add_argument("--package")
-    ap.add_argument("--fit-log", help="fit-log.json, so provenance compares each glyph with the base where it came from")
     ap.add_argument("--out-dir", default=".")
     a = ap.parse_args()
-    T = L.load_json(a.targets)
-    base_vf = TTFont(a.base)
-    os.makedirs(a.out_dir, exist_ok=True)
+    files = C.Files()
+    b, pk, chain_rows = verify_chain(files, a)
+    rec, fit, subset_font = b.rec, b.fit, b.subset
+    T = b.T
+    base_vf = b.approved.font.font()
+    report = os.path.join(a.out_dir, "check-report.json")
+    files.check_output(report)
     G = Gates()
+    for name, detail in chain_rows:
+        G.add("chain", name, True, detail)
     renders = []
-    for i, path in enumerate(a.fonts):
-        f = TTFont(path)
+    for i, (path, blob) in enumerate(zip(a.fonts, pk.fonts)):
+        f = blob.font()
         sub = f["name"].getDebugName(17) or f["name"].getDebugName(2) or ""
         style = next((s for s in T["styles"] if s["name"] == sub), T["styles"][min(i, len(T["styles"]) - 1)])
         tag = style["name"]
@@ -345,28 +427,37 @@ def main():
         gate_widths(G, m, T, i == 0 or style is T["styles"][0])
         gate_kerning(G, face, T["tolerances"]["min_gap"])
         gate_coverage(G, f, T.get("scripts", ["latin"]))
-        yloc = None
-        if a.fit_log:
-            fl = L.load_json(a.fit_log)
-            yloc = next((s["y_location"] for s in fl["styles"] if s["style"]["name"] == tag), None)
-        gate_provenance(G, f, base_vf, a.reference, yloc)
-        gate_validity(G, path, f)
+        yloc = next((s["y_location"] for s in fit["styles"] if s["style"]["name"] == tag), None)
+        gate_provenance(G, f, subset_font, a.reference, yloc)
+        gate_validity(G, blob, f)
         gate_licence(G, f, base_vf, T["family"], a.package)
         if a.reference:
-            renders += overlay(L.Face(a.reference[0]), face, a.out_dir, tag)
+            renders += overlay(files, L.Face(a.reference[0]), face, a.out_dir, tag)
         elif a.reference_image and a.reference_text:
-            renders += stacked(a.reference_image, a.reference_text, face, a.out_dir, tag)
+            renders += stacked(files, a.reference_image, a.reference_text, face, a.out_dir, tag)
     for group, name, state, detail in G.rows:
         if not name:
             print(group)
         else:
-            print(f"  {state:4s}  {group:10s} {name:44s} {detail}")
+            print(f"  {state:7s}  {group:10s} {name:50s} {detail}")
     if renders:
         print("renders:", *renders, sep="\n  ")
     bad = G.failed()
-    print(f"\n{len(bad)} failed, {sum(1 for r in G.rows if r[2] == 'PASS')} passed")
-    L.save_json([{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows],
-                os.path.join(a.out_dir, "check-report.json"))
+    not_run = sorted({r[1] for r in G.rows if r[2] == "NOT RUN"})
+    print(f"\n{len(bad)} failed, {sum(1 for r in G.rows if r[2] == 'PASS')} passed"
+          + (f", not run: {'; '.join(not_run)}" if not_run else ""))
+    base, lic = rec["font"], rec["license"]
+    print(f"base {os.path.basename(base['file'])} sha256 {base['sha256']}, licence {lic['id']} sha256 {lic['sha256']}")
+    print(f"approved: Q {rec['approval']['question']!r} A {rec['approval']['answer']!r}")
+    # The record base.json keeps, as checked above, beside the gates: file names only, no builder paths.
+    files.write_json(report, {
+        "schema": "make-font/check-report@1",
+        "base": {"file": os.path.basename(base["file"]), "sha256": base["sha256"], "source": rec["source"],
+                 "license": {"id": lic["id"], "file": os.path.basename(lic["file"]), "sha256": lic["sha256"],
+                             "name_id_13": lic["name_id_13"], "reserved_font_names": lic["reserved_font_names"]}},
+        "approval": rec["approval"],
+        "package": {"outputs": pk.outputs},
+        "gates": [{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows]})
     sys.exit(1 if bad else 0)
 
 
