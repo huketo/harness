@@ -11,8 +11,15 @@ as is, mirrored, and turned up to 6° either way; every measure is taken at its 
 - `overlap`: intersection over union of the silhouettes.
 - `edges`: mean nearest distance between the outlines, both ways, in thousandths of the box.
 - `hash`: matching bits of a 63-bit DCT hash.
+- `negative`: intersection over union of the negative space, what the ink leaves empty inside its convex hull
+  (counters, notches, a carved letter); 1 when neither has any.
+- `skeleton`: mean nearest distance between the skeletons, both ways, in thousandths of the box.
+- `thickness`: earth mover's distance between the local thicknesses along the skeletons, in thousandths of the box.
 
-`score`, 0 to 1, is a logistic model on the three, fitted by `calibrate.py`.
+`score`, 0 to 1, is a logistic model on the features the calibration file lists, fitted by `calibrate.py`
+(`--features`, by default the shipped file's). The shipped file lists `overlap`, `edges` and `hash`; the other three
+are measured and printed, and stay out of it ("The shape measures" below). With no reference showing a mark,
+`distance.py` prints "not checked" and exits 2: nothing was compared, so nothing is clear.
 
 ## Calibration
 
@@ -45,6 +52,19 @@ little:
 The limit grows with the number of references, because more of them means a closer nearest one; the catch rate falls
 with it. With the person's own 30 or more, recalibrate on them.
 
+## The shape measures
+
+`negative`, `skeleton` and `thickness` are there for marks whose silhouettes meet: a coin with an L carved through it
+scores 0.90 against a ring-shaped reference (0.94 under a calibration fitted on 77 references). They do set such
+pairs apart: across eight of them `negative` is 0.26 to 0.42 and `skeleton` over 27, where the median edited copy is
+over 0.5 and under 15. Fitted with `calibrate.py`, they still leave those pairs over the limit. On 73 Are.na
+references (2026-11-20), every combination caught held-out copies at the three's rate, within half a point, or
+better (`negative`: three at once 82% to 97%). But the fit took the new measures as more evidence of a copy, the
+limit fell with them, and seven of the eight pairs stayed over it in every combination; the coin went under only with
+`skeleton` and without `negative` (0.67 against 0.75). The references hold almost no different marks with one
+silhouette (2 of 2628 pairs overlap over 0.6), so the fit never learns what such a pair looks like. The shipped
+model keeps the three silhouette measures.
+
 ## What it misses
 
 - The near copies come from these edits, not from real remixes. A remix that redraws a mark in a new style can keep
@@ -52,6 +72,9 @@ with it. With the person's own 30 or more, recalibrate on them.
 - Silhouettes stop telling dense, heavy marks apart: a row of rounded bars drawn from nothing scored 0.84 against a
   heavy wordmark. About 1 original mark in 10 is flagged; that's the cost of the limit, and it's why a flag means
   "look at the three nearest", then build another variant.
+- Marks that share only a silhouette score as copies: a disc with a letter carved through it against a ring, a tile
+  with an L against a tile with a round hole, 0.89 to 0.98 under the shipped calibration. `negative` and `skeleton` in
+  the output show the difference; the score doesn't.
 - It compares shapes, not ideas or names. Trademark risk comes from looking alike in a market, which needs the search
   sheet and, before filing, a clearance search.
 - Next, if the cheap measures miss real lookalikes: an image embedding (DINOv2 or DreamSim) as a fourth feature.

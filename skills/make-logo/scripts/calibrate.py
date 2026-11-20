@@ -4,7 +4,7 @@
 # ///
 """Set the distance limit from the references themselves (references/distance.md).
 
-    uv run calibrate.py measurements.json --out calibration.json [--false-alarm 0.10]
+    uv run calibrate.py measurements.json --out calibration.json [--false-alarm 0.10] [--features overlap,edges/100,hash]
 
 Two sets of pairs:
 - different: every pair of distinct references. Real, clearly different logos; the limit must pass almost all of them.
@@ -16,6 +16,9 @@ stricter and the one that counts: the value only `--false-alarm` of references r
 reference, because a variant is checked against all of them at once. The report says how many near copies each
 catches. Pairs of references that are the same logo uploaded twice show up as
 the most similar "different" pairs; they're listed and left out.
+
+The fused score is a logistic model on the features `--features` names (distance.FEATURES), by default the ones the
+shipped calibration.json uses; the file it writes lists them, and distance.fused() scores with those and no others.
 """
 from __future__ import annotations
 
@@ -82,14 +85,19 @@ def crop(m: np.ndarray) -> np.ndarray:
     return m[rows.min():rows.max() + 1, cols.min():cols.max() + 1]
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("measurements")
     ap.add_argument("--out", required=True)
     ap.add_argument("--false-alarm", type=float, default=0.10,
                     help="share of original marks the check may wrongly flag against their NEAREST reference (default 0.10)")
-    a = ap.parse_args()
-    refs = [r for r in json.load(open(a.measurements))["references"] if r["usable"]]
+    ap.add_argument("--features", default=",".join(D.load_calibration(None)["features"]),
+                    help=f"comma-separated features of the fused score, from {', '.join(D.FEATURES)}; default the "
+                         "shipped calibration's")
+    a = ap.parse_args(argv)
+    features = D.known_features(a.features.split(","), "--features")
+    with open(a.measurements) as f:
+        refs = [r for r in json.load(f)["references"] if r["usable"]]
     rng = np.random.default_rng(7)
     masks, prepared = [], []
     for r in refs:
@@ -124,10 +132,10 @@ def main():
         print(f"\n{mname}: limit {abs(limit):.3f} flags {a.false_alarm:.0%} of different pairs")
         for name, v in caught.items():
             print(f"  {v:6.1%}  {name}")
-    # A fused score: logistic regression on the three measures, fitted on half the references and tested on the other
-    # half, then refitted on all of them for use. Its limit is set the same way, on held-out different pairs.
+    # A fused score: logistic regression on the features, fitted on half the references and tested on the other half,
+    # then refitted on all of them for use. Its limit is set the same way, on held-out different pairs.
     def feats(d):
-        return [d["overlap"], d["edges"] / 100, d["hash"]]
+        return [d[key] / scale for key, scale in (D.FEATURES[n] for n in features)]
     half = set(rng.permutation(len(refs))[: len(refs) // 2].tolist())
     def rows(keep):
         X, y = [], []
@@ -153,7 +161,7 @@ def main():
     held = lambda i: i not in half
     lim = float(np.quantile(nearest(w, held), 1 - a.false_alarm))
     caught = {name: float(np.mean([sigmoid(np.array(feats(d)) @ w[:-1] + w[-1]) >= lim for i, d in ds if held(i)])) for name, ds in copies_by_ref.items()}
-    print(f"\nfused (held-out half): limit {lim:.3f} flags {a.false_alarm:.0%} of references against their nearest other")
+    print(f"\nfused on {', '.join(features)} (held-out half): limit {lim:.3f} flags {a.false_alarm:.0%} of references against their nearest other")
     for name, v in caught.items():
         print(f"  {v:6.1%}  {name}")
     Xall, yall = rows(lambda i: True)
@@ -164,7 +172,7 @@ def main():
     print(f"\nfused (all {len(refs)}, in sample): limit {lim_all:.3f}")
     for name, v in caught_all.items():
         print(f"  {v:6.1%}  {name}")
-    report["fused"] = {"weights": [round(float(v), 4) for v in w_all], "features": ["overlap", "edges/100", "hash"],
+    report["fused"] = {"weights": [round(float(v), 4) for v in w_all], "features": features,
                        "limit": round(float(np.quantile(near_all, 1 - a.false_alarm)), 4), "held_out_caught": {k: round(v, 3) for k, v in caught.items()},
                        "false_alarm": "share of references whose nearest other reference reaches the limit",
                        "nearest_median": round(float(np.median(near_all)), 4), "in_sample_caught": {k: round(v, 3) for k, v in caught_all.items()}}
@@ -175,7 +183,8 @@ def main():
     report["verdict"] = {"single edits caught": round(min(singles), 3), "three at once caught": sim["caught"].get("three at once")}
     worst = sorted(different, key=lambda t: -t[2]["similarity"])[:8]
     report["closest_different"] = [{"a": refs[i]["file"], "b": refs[j]["file"], **d} for i, j, d in worst]
-    json.dump(report, open(a.out, "w"), indent=1)
+    with open(a.out, "w") as f:
+        json.dump(report, f, indent=1)
     print(f"\nlimit {report['limit']:.3f}; weakest single edit caught {min(singles):.1%}; three at once {sim['caught'].get('three at once', 0):.1%}")
 
 
