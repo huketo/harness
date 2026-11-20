@@ -205,30 +205,54 @@ _OFL_PREAMBLE = re.compile(r"This Font Software is licensed under the SIL Open F
                            r"(?:https?://)?(?:scripts\.sil\.org/OFL|openfontlicense\.org)/?\s+-{10,}\s+")
 _OTHER_LICENCES = re.compile(r"Apache|GPL|MIT License|Creative Commons|Ubuntu Font Licen|Bitstream Vera", re.I)
 _QUOTES = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
+_COPYRIGHT_LINE = re.compile(r"\s*copyright\b", re.I)
+# A copyright line names holders, years, addresses and Reserved Font Names. One of these words on it states a
+# term, which the licence that follows does not have.
+_TERMS = re.compile(r"\b(?:not|no|nor|never|except|unless|only|without|prohibit\w*|forbid\w*|restrict\w*|"
+                    r"permi\w*|licen[cs]\w*|terms?|conditions?|may|must|shall|requir\w*)\b", re.I)
+_ADDRESSES = re.compile(r"\S+://\S+|\S+@\S+")
 
 
-def ofl_11_copyright(text):
-    """The copyright statement of an OFL.txt that is the OFL 1.1: whatever stands before the preamble, which must
-    hold at least one Copyright line. None when the text after it is not the licence word for word (white space
-    aside), so a title, a changed condition or another licence is not an OFL 1.1 text."""
+def ofl_11_text_problem(text):
+    """Why a licence file is not the SIL Open Font License 1.1, or None when it is. An OFL.txt is the copyright
+    statement (Copyright lines and blank lines, nothing else), the two-line preamble whose FAQ address varies
+    between files, then the licence word for word, white space aside. Any other line before the preamble, or a
+    copyright line that states a term, adds a condition the OFL does not have."""
     m = _OFL_PREAMBLE.search(text)
-    if not m or " ".join(text[m.end():].split()) != _OFL_11_WORDS:
-        return None
-    head = text[:m.start()]
-    return head if re.search(r"^\s*copyright\b", head, re.I | re.M) else None
+    if not m:
+        return "it has no OFL 1.1 preamble (\"This Font Software is licensed under the SIL Open Font License, " \
+               "Version 1.1. This license is copied below...\")"
+    if " ".join(text[m.end():].split()) != _OFL_11_WORDS:
+        return "the text after the preamble is not the SIL Open Font License 1.1 word for word"
+    lines = [ln.strip() for ln in text[:m.start()].splitlines() if ln.strip()]
+    for ln in lines:
+        if not _COPYRIGHT_LINE.match(ln):
+            return f"the line {ln!r} stands before the licence and is not a copyright line"
+        term = _TERMS.search(_ADDRESSES.sub(" ", ln))
+        if term:
+            return f"the copyright line {ln!r} states a term ({term.group(0)!r})"
+    if not lines:
+        return "it has no copyright line"
+    return None
 
 
 def is_ofl_11_text(text):
-    return ofl_11_copyright(text) is not None
+    return ofl_11_text_problem(text) is None
+
+
+# A notice that grants the OFL 1.1, and words that would take the grant back or narrow it.
+_GRANT = re.compile(r"\blicensed\s+under\s+the\s+SIL\s+Open\s+Font\s+License,?\s+(?:Version|v\.?)\s*1\.1\b", re.I)
+_DENIAL = re.compile(r"\b(?:not|no|nor|never|neither|except|excepting|excluding|unless|instead)\b|n['\u2019]t\b", re.I)
 
 
 def is_ofl_11_notice(notice):
-    """True when a name-table licence notice (name ID 13) names the SIL Open Font License, Version 1.1, and no
-    other version or licence. A notice with no version at all is not taken for 1.1."""
-    if not notice or not re.search(r"Open\s+Font\s+License|\bOFL\b", notice, re.I) or _OTHER_LICENCES.search(notice):
+    """True when a name-table licence notice (name ID 13) grants the SIL Open Font License, Version 1.1 ("This Font
+    Software is licensed under the SIL Open Font License, Version 1.1"), and names no other version or licence and
+    no denial or exception. A label alone ("OFL-1.1") grants nothing."""
+    if not notice or not _GRANT.search(notice) or _DENIAL.search(notice) or _OTHER_LICENCES.search(notice):
         return False
     versions = re.findall(r"(?:\bversion|\bv\.?|\bOFL[- ]?)\s*(\d+(?:\.\d+)*)", notice, re.I)
-    return bool(versions) and all(v == "1.1" for v in versions)
+    return all(v == "1.1" for v in versions)
 
 
 def _rfn_clause(rest):

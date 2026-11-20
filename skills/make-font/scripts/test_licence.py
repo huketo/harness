@@ -170,6 +170,27 @@ class RecordAndLoadCheckTheSameThings(unittest.TestCase):
         self.assertEqual(self.rec["license"]["reserved_font_names"], [])
         self.refused_at_load(self.base, "Reserved Font Name", license__reserved_font_names=["Lumen"])
 
+    def test_a_licence_head_with_a_line_that_is_not_a_copyright_line_is_refused_at_record(self):
+        head = T.ofl_text().replace("\n\n", "\nYou may not modify this Font Software.\n\n", 1)
+        self.refused_at_record(self.base, T.write(self.p("head.txt"), head), "OFL-1.1", "copyright")
+
+    def test_a_licence_head_with_a_line_that_is_not_a_copyright_line_is_refused_at_load(self):
+        head = T.ofl_text().replace("\n\n", "\nYou may not modify this Font Software.\n\n", 1)
+        self.refused_at_load(self.base, "OFL-1.1", license__file=T.write(self.p("head.txt"), head))
+
+    def test_a_copyright_line_that_adds_a_condition_is_refused(self):
+        line = "Copyright 2026 The Lumen Ledger Project Authors. Modified versions may not be distributed."
+        self.refused_at_record(self.base, T.write(self.p("cond.txt"), T.ofl_text(line)), "OFL-1.1", "copyright")
+
+    def test_a_name_id_13_that_does_not_affirm_the_ofl_1_1_is_refused_at_record(self):
+        for i, notice in enumerate(NOT_AN_OFL_11_NOTICE):
+            with self.subTest(notice=notice):
+                self.refused_at_record(T.glyf_vf(self.p(f"n13-{i}.ttf"), notice=notice), self.ofl, "name ID 13")
+
+    def test_a_name_id_13_that_denies_the_ofl_1_1_is_refused_at_load(self):
+        font = T.glyf_vf(self.p("denied.ttf"), notice=NOT_AN_OFL_11_NOTICE[0])
+        self.refused_at_load(font, "name ID 13", font__file=font, license__name_id_13=NOT_AN_OFL_11_NOTICE[0])
+
     def test_a_woff_or_woff2_base_is_refused_at_record(self):
         for flavor in ("woff", "woff2"):
             with self.subTest(flavor=flavor):
@@ -185,6 +206,39 @@ def sha(path):
     import hashlib
     with open(path, "rb") as fh:
         return hashlib.sha256(fh.read()).hexdigest()
+
+
+# Notices that mention the OFL 1.1 without granting it: a denial, an exception, a condition, a bare label.
+NOT_AN_OFL_11_NOTICE = [
+    "This font is not licensed under the SIL Open Font License, Version 1.1.",
+    "This Font Software is licensed under the SIL Open Font License, Version 1.1, except the figures.",
+    "This Font Software is licensed under the SIL Open Font License, Version 1.1 unless you sell it.",
+    "OFL-1.1",
+]
+
+
+class WhatRealOflFilesSay(unittest.TestCase):
+    """The stricter reading still takes the OFL files and notices published fonts carry."""
+
+    def test_published_notices_are_ofl_1_1_notices(self):
+        for notice in (T.OFL_NOTICE,
+                       "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is "
+                       "available with a FAQ at: http://scripts.sil.org/OFL",
+                       "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is "
+                       "available with a FAQ at: https://scripts.sil.org/OFL. The license for the Example Foundry's "
+                       "Modified Version is available at https://example.org/LICENSE.md.",
+                       "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font "
+                       "Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, "
+                       "either express or implied."):
+            with self.subTest(notice=notice):
+                self.assertTrue(L.is_ofl_11_notice(notice))
+
+    def test_copyright_lines_with_reserved_names_and_windows_line_ends_are_an_ofl_1_1_text(self):
+        head = ('Copyright © 2017 Lumen Type. with Reserved Font Name "Lumen"\r\n'
+                "Copyright 2026 The Lumen Ledger Project Authors (https://example.org/lumen-ledger)\r\n\r\n")
+        text = head + T.OFL_BODY.replace("\n", "\r\n")
+        self.assertTrue(L.is_ofl_11_text(text))
+        self.assertEqual(L.reserved_font_names(text), ["Lumen"])
 
 
 class EnglishNames(unittest.TestCase):
