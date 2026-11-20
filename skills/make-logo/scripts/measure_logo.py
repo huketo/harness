@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "scipy", "scikit-image", "pillow"]
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
 # ///
 """Measure reference logos as whole-mark numbers (references/measuring.md). Never writes an outline.
 

@@ -87,6 +87,24 @@ def mark_image(draw, side: int = 600) -> Image.Image:
     return im
 
 
+def badge_svg(side: int = 600) -> bytes:
+    """`badge` as an SVG file the way logo collections hold them: paths on a transparent ground."""
+    x = y = side / 6
+    s = side * 2 / 3
+    return (f'<?xml version="1.0" encoding="iso-8859-1"?>\n<svg xmlns="http://www.w3.org/2000/svg" '
+            f'viewBox="0 0 {side} {side}"><polygon points="{x},{y + s} {x + s / 2},{y} {x + s},{y + s}"/>'
+            f'<circle cx="{x + s / 2}" cy="{y + s * 0.62}" r="{s * 0.12}" fill="#ffffff"/></svg>\n').encode()
+
+
+def light_on_clear(im: Image.Image, grey: int = 226) -> Image.Image:
+    """A dark-on-white mark repainted light grey on a transparent ground: a logo meant for dark backgrounds, which
+    shows almost nothing once flattened onto white."""
+    ink = im.convert("L").point(lambda v: 255 if v < 128 else 0)
+    out = Image.new("RGBA", im.size, (grey, grey, grey, 0))
+    out.putalpha(ink)
+    return out
+
+
 def font_bytes(family: str) -> bytes:
     """A TrueType font whose letters are plain boxes: enough for HarfBuzz to shape and for outlines to exist."""
     from fontTools.fontBuilder import FontBuilder
@@ -163,14 +181,18 @@ class Workspace:
         im.save(p, fmt, **save)
         return p
 
-    def collection(self, name: str, files: dict[str, Image.Image]) -> str:
-        """A collection as fetch_arena.mjs leaves it: files under the cache and a manifest with every sha256."""
+    def collection(self, name: str, files: dict[str, Image.Image | bytes]) -> str:
+        """A collection as fetch_arena.mjs leaves it: files under the cache and a manifest with every sha256. A
+        picture is saved as PNG; bytes are written as they are."""
         d = os.path.join(R.cache_root(), name)
         items = []
         for rel, im in files.items():
             p = os.path.join(d, rel)
             os.makedirs(os.path.dirname(p), exist_ok=True)
-            im.save(p, "PNG")
+            if isinstance(im, bytes):
+                write(p, im)
+            else:
+                im.save(p, "PNG")
             items.append({"id": rel, "file": rel, "sha256": R.sha256_file(p)})
         write(os.path.join(d, "manifest.json"), json.dumps({"fetched": "2026-11-20T00:00:00Z", "items": items}).encode())
         return d

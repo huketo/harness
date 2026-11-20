@@ -120,18 +120,53 @@ class TraceGates(unittest.TestCase):
         e = self.refused("mask-too-close", copy, [self.ws.entry(copy)])
         self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("close-crop.png"), e.detail)
 
-    def test_names_each_reference_it_could_not_read_as_not_checked(self):
-        self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
-        R.write_bytes(self.ws.path("refs", "mine", "broken.png"), b"not an image")
-        brief = self.ws.brief([self.ws.entry(self.sketch)])
-        printed = io.StringIO()
-        with redirect_stdout(printed):
-            T.main([self.sketch, "--brief", brief, "--refs", self.mine, self.arena, "--out", self.out])
-        gate = R.read_json(self.out + ".provenance.json")["gate"]
-        self.assertIn("not_checked", gate)
-        self.assertEqual(sorted(os.path.basename(n["ref"]) for n in gate["not_checked"]), ["blank.png", "broken.png"])
-        for n in gate["not_checked"]:
-            self.assertIn(f"not checked: {n['ref']}", printed.getvalue())
+    def test_refuses_a_copy_of_a_16_px_reference(self):
+        im, d = G.canvas(16, 16)
+        G.badge(d, 4, 4, 8)  # a favicon: the mark 8 px across, padded
+        tiny = self.ws.image("refs/mine/favicon.png", im)
+        self.assertFalse(L.segment(L.load(tiny))["ok"], "the fixture must be too small to split at its own size")
+        copy = self.ws.image("sketches/favicon.bmp", Image.open(tiny), "BMP")
+        e = self.refused("mask-too-close", copy, [self.ws.entry(copy)])
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("favicon.png"), e.detail)
+
+    def test_refuses_a_rendering_of_a_collected_svg(self):
+        self.ws.collection("world", {"marks/70000001.svg": G.badge_svg()})
+        png = bytes(resvg_py.svg_to_bytes(svg_string=G.badge_svg().decode(), width=450, background="#ffffff"))
+        drawn = self.ws.image("sketches/drawn.png", Image.open(io.BytesIO(png)).convert("RGB"))
+        e = self.refused("mask-too-close", drawn, [self.ws.entry(drawn)])
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("70000001.svg"), e.detail)
+
+    def test_refuses_a_copy_of_a_light_mark_on_a_transparent_ground(self):
+        light = self.ws.image("refs/mine/light.png", G.light_on_clear(G.mark_image(G.badge)))
+        self.assertFalse(L.segment(L.load(light))["ok"], "the fixture must show no ink flattened onto white")
+        dark = self.ws.image("sketches/dark.jpg", reencoded(G.mark_image(G.badge)), "JPEG", quality=90)
+        e = self.refused("mask-too-close", dark, [self.ws.entry(dark)])
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("light.png"), e.detail)
+
+    def test_refuses_while_a_reference_cannot_be_compared(self):
+        blank = self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
+        broken = self.ws.path("refs", "mine", "broken.png")
+        R.write_bytes(broken, b"not an image")
+        e = self.refused("not-comparable", self.sketch, [self.ws.entry(self.sketch)])
+        for f in (blank, broken):
+            self.assertIn(f, str(e))
+        os.remove(blank)  # the person takes the files out, or replaces them, and the trace goes on
+        os.remove(broken)
+        self.assertEqual(self.trace(self.sketch, [self.ws.entry(self.sketch)])["svg"], self.out)
+
+    def test_compares_a_collected_original_the_brief_also_lists(self):
+        collected = os.path.join(self.arena, "logos", "50000001.png")
+        resaved = self.ws.image("sketches/resaved.jpg", reencoded(self.ext), "JPEG", quality=90)
+        e = self.refused("mask-too-close", resaved, [self.ws.entry(collected), self.ws.entry(resaved)])
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("50000001.png"), e.detail)
+
+    def test_refuses_a_collected_file_that_no_longer_has_its_manifest_hash(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
+        listed = os.path.join(world, "cafe", "60000001.png")
+        G.mark_image(G.badge).save(listed, "PNG")
+        self.refused("collection-changed", self.sketch, [self.ws.entry(self.sketch)])
+        os.remove(listed)
+        self.refused("collection-changed", self.sketch, [self.ws.entry(self.sketch)])
 
     def test_traces_the_bytes_it_hashed(self):
         entry = self.ws.entry(self.sketch)
@@ -188,6 +223,7 @@ class TraceGates(unittest.TestCase):
         self.assertEqual(rec["gate"]["refs_sha256"], R.refs_sha256([self.mine, self.arena]))
         self.assertEqual(rec["gate"]["collected_sha256"], R.collected_sha256())
         self.assertEqual(rec["gate"]["limit"], LIMIT)
+        self.assertNotIn("not_checked", rec["gate"])
         self.assertEqual(rec["potrace"]["sha256"], R.sha256_file(rec["potrace"]["path"]))
         said = subprocess.run([rec["potrace"]["path"], "--version"], capture_output=True, text=True, check=True).stdout
         self.assertEqual(rec["potrace"]["version"], said.strip().splitlines()[0])
@@ -332,6 +368,16 @@ class BuildGates(unittest.TestCase):
         other = self.ws.path("calibration.json")
         R.write_bytes(other, json.dumps(cal).encode())
         self.assert_check_refused(out, "--calibration", other)
+
+    def test_check_refuses_once_a_collected_file_changed(self):
+        photos = self.ws.collection("photos", {"p/80000001.png": G.mark_image(G.tee)})
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 0)
+        G.mark_image(G.badge).save(os.path.join(photos, "p", "80000001.png"), "PNG")
+        e = self.check_exit(out)
+        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
+        self.assertEqual(e.reason, "collection-changed", str(e))
+        self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
 
     def test_check_refuses_a_trace_gated_before_a_collection_was_added(self):
         out = self.assembled()

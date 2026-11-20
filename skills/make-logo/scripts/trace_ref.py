@@ -18,10 +18,13 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
 3. a mask, the exact pixels passed to potrace after the crop, threshold and invert, that scores at or over the
    calibrated limit against any collected image or --refs logo;
 4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3).
-In 3 and 4 a reference whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left out.
-Every other image whose ink can be told from its ground is compared, fit to measure or not; one that can't be read as
-a mark at all is printed as "not checked" and listed in the record. Each file, the source, every reference and the
-calibration, is read once, and the hashes recorded are of the bytes judged.
+In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
+out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
+fit to measure or not: an SVG rasterised, a raster too small to split enlarged, a light mark on a transparent ground
+set on black. It also refuses while any of them still can't be read as a mark ("not-comparable": take it out or
+replace it), and while a collected file is gone or no longer has the sha256 its manifest lists
+("collection-changed"). Each file, the source, every reference and the calibration, is read once, and the hashes
+recorded are of the bytes judged.
 Beside the SVG it writes <svg>.provenance.json: the source and its sha256, the person's statement, the brief's
 sha256, every raster and potrace argument, the scores, the potrace binary, and the SVG's sha256.
 """
@@ -125,47 +128,72 @@ _SEGMENT_WHY = {"blank image": "blank", "no ink found": "no-ink"}
 _PREPARED: dict[str, tuple[dict | None, str]] = {}  # sha256 -> (features, "") or (None, why)
 
 
+def gate_mask(data: bytes) -> tuple[np.ndarray | None, str]:
+    """A reference's ink for the distance gates, or (None, why) with why a rights.UNCOMPARABLE code. Split as
+    logolib.load() gives it first, as measuring sees it; then, while no ink is found, enlarged to logolib.WORK when
+    it is smaller (a favicon), and set on black when it has transparency (a light mark for dark grounds)."""
+    try:
+        im = L.open_image(data)
+    except Exception:  # neither Pillow nor resvg can read it
+        return None, "unreadable"
+    why = ""
+    for ground in [(255, 255, 255)] + ([(0, 0, 0)] if L.transparent(im) else []):
+        for side in (None, L.WORK) if max(im.size) < L.WORK else (None,):
+            seg = L.segment(L.flatten(im, ground, side))
+            if seg["ok"]:
+                return seg["mask"], ""
+            why = why or seg["why"]
+    return None, _SEGMENT_WHY.get(why, why)
+
+
 def _prepared(sha: str, data: bytes) -> tuple[dict | None, str]:
     if sha not in _PREPARED:
-        try:
-            seg = L.segment(L.load(io.BytesIO(data)))
-        except Exception:  # Pillow can't open or decode it
-            _PREPARED[sha] = (None, "unreadable")
-        else:
-            _PREPARED[sha] = ((D.prepare(seg["mask"], poses=False), "") if seg["ok"]
-                              else (None, _SEGMENT_WHY.get(seg["why"], seg["why"])))
+        mask, why = gate_mask(data)
+        _PREPARED[sha] = (D.prepare(mask, poses=False), "") if mask is not None else (None, why)
     return _PREPARED[sha]
 
 
 def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
     """What the distance checks compare with: every image in the --refs folders and every collected file, each read
-    once, so a sha256 recorded is of the bytes judged. A file whose ink can be told from its ground is compared
-    whether or not it is fit to measure (logolib.usable); one that can't be read as a mark at all goes in
-    `not_checked` with why, a rights.NOT_CHECKED code. Returns {"marks": [(file, sha256, features)], once per
-    sha256, "not_checked": [{"ref", "why"}], "refs_sha256": the --refs images' digest, as rights.refs_sha256()
-    computes it}."""
-    marks, not_checked, seen, ref_shas = [], [], set(), []
-    for f, is_ref in [(f, True) for f in L.images(refs)] + [(f, False) for f, _ in collected]:
-        if not os.path.isfile(f):
-            not_checked.append({"ref": f, "why": "gone"})
-            continue
-        data = R.read_bytes(f)
-        sha = R.sha256_bytes(data)
-        if is_ref:
+    once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, features)], once per sha256,
+    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+
+    Refuses ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest
+    lists, and ("not-comparable") while any image can't be read as a mark even by gate_mask()'s fallbacks: the gates
+    say nothing about a picture they could not compare."""
+    marks, uncomparable, changed, seen, ref_shas, read = [], [], [], set(), [], {}
+    for f, listed in [(f, None) for f in L.images(refs)] + list(collected):
+        if f not in read:
+            data = R.read_bytes(f) if os.path.isfile(f) else None
+            read[f] = (data, R.sha256_bytes(data) if data is not None else None)
+        data, sha = read[f]
+        if listed is None:
+            if data is None:  # gone since the folder was listed; the seal's refs_sha256 sees the difference
+                continue
             ref_shas.append(sha)
+        elif sha != listed:
+            changed.append(f"{f} ({'gone' if data is None else 'changed'})")
+            continue
         if sha in seen:
             continue
         seen.add(sha)
         feat, why = _prepared(sha, data)
         if feat is None:
-            not_checked.append({"ref": f, "why": why})
+            uncomparable.append(f"{f} ({R.UNCOMPARABLE.get(why, why)})")
         else:
             marks.append((f, sha, feat))
-    return {"marks": marks, "not_checked": not_checked, "refs_sha256": R.digest(ref_shas)}
-
-
-def not_checked_lines(entries: list[dict]) -> list[str]:
-    return [f"  not checked: {n['ref']} ({R.NOT_CHECKED['en'].get(n['why'], n['why'])})" for n in entries]
+    if changed:
+        raise R.Refused("collection-changed", "these collected files are gone or changed since their manifest listed "
+                                              f"them: {'; '.join(changed)}. Fetch the collection again, or list what "
+                                              "is in it now with `node scripts/collection.mjs <name>`, then run this "
+                                              "again.")
+    if uncomparable:
+        raise R.Refused("not-comparable", "the distance gates can't read a mark in "
+                                          f"{'; '.join(uncomparable)}, so they can't say the result is far from it. "
+                                          "Take each one out of the --refs folder (or out of its collection, then "
+                                          "`node scripts/collection.mjs <name>`), or replace it with a copy that "
+                                          "shows the mark on a plain ground, then run this again.")
+    return {"marks": marks, "refs_sha256": R.digest(ref_shas)}
 
 
 def calibration_snapshot(path: str | None) -> tuple[dict, str]:
@@ -230,7 +258,8 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
     if tight is None:
         raise SystemExit(f"no ink in {source} at --crop {crop} and --threshold {threshold}{' with --invert' if invert else ''}")
     refset = reference_set(refs, collected)
-    own = {e["sha256"] for e in b["trace_sources"]}
+    # The person's own sketches on the moodboard are left out; a collected file never is, whatever the brief says.
+    own = {e["sha256"] for e in b["trace_sources"]} - {sha for _, sha in collected}
     marks = [m for m in refset["marks"] if m[1] not in own]
     mask_near = nearest(tight, marks, cal)
     if mask_near["score"] >= cal["limit"]:
@@ -261,7 +290,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
         "mask_sha256": mask_sha,
         "gate": {"calibration_sha256": cal_sha, "limit": cal["limit"], "refs_sha256": refset["refs_sha256"],
                  "collected_sha256": R.digest(sha for _, sha in collected), "compared": len(marks),
-                 "not_checked": refset["not_checked"], "mask_nearest": mask_near, "vector_nearest": vector_near},
+                 "mask_nearest": mask_near, "vector_nearest": vector_near},
         "potrace": potrace,
         "svg_sha256": R.sha256_bytes(svg_bytes),
     }
@@ -287,8 +316,6 @@ def main(argv: list[str] | None = None) -> None:
     print(f"traced {os.path.basename(a.image)} into {a.out} ({r['provenance']['trace_source']['rights']}): nearest of "
           f"{g['compared']} images compared {g['mask_nearest']['score']:.3f} as a mask, {g['vector_nearest']['score']:.3f} "
           f"as a path, limit {g['limit']:.3f}; provenance in {r['record']}")
-    for line in not_checked_lines(g["not_checked"]):
-        print(line)
 
 
 if __name__ == "__main__":

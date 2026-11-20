@@ -11,11 +11,12 @@ svg/ (mark, wordmark, lockup, stacked; ink, reversed, accent, black), png/ (the 
 favicon.ico, LICENSES/ (each font's OFL.txt), trademark-search.md, brand.json.
 
 It goes on only while the build's check still holds: check.json exists and passed, and build.json, every file it
-lists, the --refs images and the calibration still have the sha256 check.json recorded. It reads only the verified
-bytes of the files build.json lists, and writes into a new folder. The trademark sheet is in the brief's language
-(Korean for a Korean brief) and says where a traced mark came from, in the person's own words, what the recipe did
-with the trace, and what check_logo.py compared: how many references, which it could not read, the nearest score,
-the limit and the calibration that set it.
+lists, the --refs images, the calibration and, for a traced build, its sources and the collections still have the
+sha256 check.json recorded. All of that is verified before it writes anything. It reads only the verified bytes of the
+files build.json lists, and writes into a new folder. The trademark sheet is in the brief's language (Korean for a
+Korean brief) and says where a traced mark came from, in the person's own words, which other shapes the recipe
+combines the trace with (and never that the trace kept its shape), and what check_logo.py compared: how many
+references, the nearest score, the limit and the calibration that set it.
 """
 from __future__ import annotations
 
@@ -78,21 +79,19 @@ def quote(text: str) -> str:
 
 
 def checked(lang: str, chk: dict, traced: bool) -> str:
-    """What check_logo.py compared, from check.json: how many references, which it could not read, the nearest score,
-    the limit and the calibration that set it."""
-    n, limit, missed = chk["refs_compared"], chk["limit"], chk["refs_not_checked"]
+    """What check_logo.py compared, from check.json: how many references, the nearest score, the limit and the
+    calibration that set it. check_logo.py refuses to run while a reference can't be read as a mark, so it read
+    every one."""
+    n, limit = chk["refs_compared"], chk["limit"]
     top = chk["nearest"][0]["score"] if chk["nearest"] else 0.0
     shipped = chk["calibration_sha256"] == R.sha256_file(R.SHIPPED_CALIBRATION)
-    names = ", ".join(f"`{os.path.basename(m['ref'])}` ({R.NOT_CHECKED[lang].get(m['why'], m['why'])})" for m in missed)
     if lang == "ko":
         cal = ("make-logo에 들어 있는 기본 보정" if shipped
                else f"check_logo.py에 준 보정 파일(sha256 `{chk['calibration_sha256']}`)")
         out = [f"check_logo.py는 이 마크를 --refs 폴더의 참고 이미지 {n}개와 비교했습니다. 가장 가까운 이미지와의 "
                f"점수({top:.3f})가 {cal}의 한도({limit:.3f})보다 낮았으므로, 거리 검사로는 이 마크가 그중 어느 것과도 "
-               "지나치게 가깝지 않습니다(`check.json`)." if n
+               "지나치게 가깝지 않습니다(`check.json`). 그 폴더의 모든 이미지에서 마크를 읽었습니다." if n
                else "check_logo.py가 비교할 참고 이미지가 없었으므로, 닮음은 검사하지 않았습니다."]
-        out.append(f"그 폴더의 다른 이미지 {len(missed)}개는 마크를 읽을 수 없어 비교하지 않았습니다: {names}." if missed
-                   else "그 폴더의 모든 이미지에서 마크를 읽었습니다.")
         if traced:
             out.append(TRACED_NOTE["ko"])
         out.append("이 결과는 그 이미지들에만 해당하며, 사용 중인 모든 상표를 확인한 것은 아닙니다.")
@@ -101,11 +100,8 @@ def checked(lang: str, chk: dict, traced: bool) -> str:
                else f"the calibration file given to check_logo.py (sha256 `{chk['calibration_sha256']}`)")
         out = [f"check_logo.py compared the mark with {n} reference image{'' if n == 1 else 's'} in the --refs folders. "
                f"The nearest scored {top:.3f}, under the limit of {limit:.3f} set by {cal}, so by the distance check the "
-               "mark is not a near copy of any of them (`check.json`)." if n
+               "mark is not a near copy of any of them (`check.json`). It read a mark in every image there." if n
                else "check_logo.py had no reference image to compare the mark with, so it checked no likeness."]
-        out.append(f"It could not read a mark in {len(missed)} more image{'' if len(missed) == 1 else 's'} there and did "
-                   f"not compare {'it' if len(missed) == 1 else 'them'}: {names}." if missed
-                   else "It read a mark in every image there.")
         if traced:
             out.append(TRACED_NOTE["en"])
         out.append("This covers those images only, not every mark in use.")
@@ -113,18 +109,18 @@ def checked(lang: str, chk: dict, traced: bool) -> str:
 
 
 def recipe_did(lang: str, shapes: list[dict]) -> str:
-    """What the recipe did with a trace, from build.json `shapes`: the other shapes it combines the trace with, or
-    that it has none."""
+    """What the recipe does with a trace, from build.json `shapes`: the other shapes it combines the trace with, or
+    that it has none. Never that the trace kept its shape: `rotate`, `mirror` and `repeat` change it too."""
     others = ", ".join(f"`{s['op']} {s['shape']}`" for s in shapes if s["shape"] != "trace")
     if lang == "ko":
         return (f"이 마크는 사용자가 권리를 가지고 있다고 답한 파일을 트레이싱한 것이며, 레시피는 그 트레이스를 다른 도형과 "
                 f"결합했습니다: {others}." if others else
-                "이 마크는 사용자가 권리를 가지고 있다고 답한 파일을 potrace가 그린 그대로 트레이싱한 것이며, 레시피는 "
-                "이 트레이스에 다른 도형을 더하지 않았습니다.")
+                "이 마크는 사용자가 권리를 가지고 있다고 답한 파일을 트레이싱한 것입니다. 레시피는 그 트레이스의 윤곽을 "
+                "쓰며 다른 도형은 쓰지 않았습니다.")
     return (f"The mark was traced from a file the person said they hold the rights to, and the recipe combines the "
             f"trace with other shapes: {others}." if others else
-            "The mark is a trace, as potrace drew it, of a file the person said they hold the rights to: the recipe "
-            "has no other shape.")
+            "The mark was traced from a file the person said they hold the rights to, and the recipe uses the trace's "
+            "outline and no other shape.")
 
 
 def provenance(lang: str, traces: list[dict], scores: dict[str, float], shapes: list[dict]) -> str:
@@ -239,7 +235,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--lang", choices=("en", "ko"), help="the sheet's language; default from --brief, else en")
     ap.add_argument("--classes", default="", help="Nice classes for the trademark search sheet, e.g. \"9, 42\"")
     a = ap.parse_args(argv)
-    info, chk, files = R.sealed(a.build, a.refs, a.calibration)
+    info, chk, files, traces = R.sealed(a.build, a.refs, a.calibration)  # everything verified before anything is written
     if "shapes" not in info:
         raise R.Refused("not-built", f"{a.build}/build.json lists no recipe shapes; build it again with build_logo.py")
     if os.path.isdir(a.out) and os.listdir(a.out):
@@ -267,7 +263,6 @@ def main(argv: list[str] | None = None) -> None:
     for family, rel in info.get("fonts", {}).items():
         R.write_bytes(os.path.join(a.out, "LICENSES", os.path.basename(rel)), files[rel])
 
-    traces = R.traces(a.build, info, files)
     name = info["name"]
     R.write_bytes(os.path.join(a.out, "trademark-search.md"), sheet(lang, name, a.classes, info, chk, traces).encode())
     brand = {"name": name, "direction": info.get("title"), "palette": pal, "fonts": list(info.get("fonts", {})),

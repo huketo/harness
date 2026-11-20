@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "scipy", "scikit-image", "pillow"]
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
 # ///
 """How close a logo is to each reference (references/distance.md). Used to keep every variant far from every reference.
 

@@ -253,17 +253,16 @@ class Seal(Project):
         self.assertIn("Synthetic Creator", self.pages(book)["credits"])
         self.assertNotIn("b.png", R.read_bytes(os.path.join(book, "index.html")).decode())
 
-    def test_sheet_counts_what_check_compared_and_names_what_it_could_not_read(self):
-        self.ws.image("refs/mine/blank.png", Image.new("RGB", (200, 200), "white"))
+    def test_sheet_counts_what_check_compared(self):
+        self.ws.image("refs/mine/tee.png", G.mark_image(G.tee))
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
         en, ko = self.sheet(b, "package-en", "--lang", "en"), self.sheet(b, "package-ko", "--lang", "ko")
         self.assertNotIn("every reference", en)
-        self.assertIn("compared the mark with 1 reference image", en)
+        self.assertIn("compared the mark with 2 reference images", en)
         self.assertNotIn("참고 로고 전부", ko)
-        self.assertIn("참고 이미지 1개", ko)
+        self.assertIn("참고 이미지 2개", ko)
         for sheet in (en, ko):
-            self.assertIn("blank.png", sheet)
             self.assertIn(f"{LIMIT:.3f}", sheet)
 
 
@@ -281,18 +280,28 @@ class CheckReferences(Project):
         chk = R.read_json(os.path.join(b, "check.json"))
         self.assertTrue(chk["nearest"][0]["ref"].endswith("close-crop.png"), chk["nearest"])
 
-    def test_check_names_each_reference_it_could_not_read(self):
-        self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
-        R.write_bytes(self.ws.path("refs", "mine", "broken.png"), b"not an image")
+    def test_check_compares_an_svg_reference(self):
         b = self.build(self.recipe())
-        printed = io.StringIO()
-        with redirect_stdout(printed):
-            self.assertEqual(self.check(b), 0)
+        self.assertEqual(self.check(b), 0)
+        R.write_bytes(self.ws.path("refs", "mine", "close.svg"), R.read_bytes(os.path.join(b, "mark.svg")))
+        self.assertEqual(self.check(b), 1)
         chk = R.read_json(os.path.join(b, "check.json"))
-        self.assertIn("refs_not_checked", chk)
-        self.assertEqual(sorted(os.path.basename(n["ref"]) for n in chk["refs_not_checked"]), ["blank.png", "broken.png"])
-        for n in chk["refs_not_checked"]:
-            self.assertIn(f"not checked: {n['ref']}", printed.getvalue())
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("close.svg"), chk["nearest"])
+
+    def test_check_refuses_while_a_reference_cannot_be_compared(self):
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        blank = self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
+        broken = self.ws.path("refs", "mine", "broken.png")
+        R.write_bytes(broken, b"not an image")
+        with self.assertRaises(SystemExit) as cm:
+            C.main([b, "--refs", *self.refs])
+        e = cm.exception
+        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
+        self.assertEqual(e.reason, "not-comparable", str(e))
+        for f in (blank, broken):
+            self.assertIn(f, str(e))
+        self.assertFalse(os.path.exists(os.path.join(b, "check.json")), "a refused check left its old check.json")
 
     def test_check_records_the_hashes_of_what_it_judged_with(self):
         fresh = self.ws.image("refs/mine/fresh.png", G.mark_image(G.tee))
@@ -348,15 +357,34 @@ class TracedDocuments(Project):
         self.assertIn(html.escape(self.entry["question"]), pages["d1-trace"])
 
     def test_sheet_claims_only_the_shapes_the_recipe_has(self):
-        en, ko = self.sheet(self.b, "package-en", "--lang", "en"), self.sheet(self.b, "package-ko", "--lang", "ko")
-        self.assertNotIn("then changed with grid shapes", en)
-        self.assertNotIn("격자 도형으로 고친", ko)
-        self.assertIn("no other shape", en)
-        self.assertIn("다른 도형을 더하지 않았습니다", ko)
+        turned = self.build(self.recipe(mark=[{"shape": "trace", "file": "trace/own.svg", "x": 2, "y": 2, "size": 44,
+                                               "rotate": 30}]), "build/turned")
+        self.assertEqual(self.check(turned), 0)
+        en, ko = self.sheet(turned, "package-en", "--lang", "en"), self.sheet(turned, "package-ko", "--lang", "ko")
+        for claim in ("as potrace drew it", "then changed with grid shapes"):
+            self.assertNotIn(claim, en)
+        for claim in ("그린 그대로", "격자 도형으로 고친"):
+            self.assertNotIn(claim, ko)
+        self.assertIn("the recipe uses the trace's outline and no other shape", en)
+        self.assertIn("레시피는 그 트레이스의 윤곽을 쓰며 다른 도형은 쓰지 않았습니다", ko)
         cut = self.build(self.recipe(mark=[{"shape": "trace", "file": "trace/own.svg", "x": 2, "y": 2, "size": 44},
                                            {"op": "cut", "shape": "rect", "x": 20, "y": 20, "w": 4, "h": 4}]), "build/cut")
         self.assertEqual(self.check(cut), 0)
         self.assertIn("`cut rect`", self.sheet(cut, "package-cut"))
+
+    def test_package_and_book_refuse_once_a_collection_holds_the_source(self):
+        chk = R.read_json(os.path.join(self.b, "check.json"))
+        self.assertEqual(chk.get("collected_sha256"), R.collected_sha256())
+        self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
+        self.refused("collections-changed", self.package, self.b)
+        self.refused("collections-changed", self.book, self.b)
+
+    def test_package_and_book_write_nothing_once_the_source_changed(self):
+        G.mark_image(G.own).rotate(90).save(self.sketch, "PNG")
+        self.refused("source-changed", self.package, self.b)
+        self.assertFalse(os.path.exists(os.path.join(self.ws.root, "package")), "package wrote files before refusing")
+        self.refused("source-changed", self.book, self.b)
+        self.assertFalse(os.path.exists(os.path.join(self.ws.root, "book")), "the book wrote files before refusing")
 
     def test_sheet_shows_the_statement_and_says_it_was_traced(self):
         sheet = R.read_bytes(os.path.join(self.package(self.b), "trademark-search.md")).decode()

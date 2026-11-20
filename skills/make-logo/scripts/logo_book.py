@@ -16,8 +16,9 @@ tab, a poster), a spread of its construction (a light lockup, the grid, a phone)
 colour, and its small sizes; then one page comparing them with their checks. No reference logos; photos only from
 --photos, credited at the end.
 
-Each build must still match its check.json (build.json, every file it lists, the --refs images, the calibration), and
-the book reads only the verified bytes of the files build.json lists: a build with no lockup shows its mark in the
+Each build must still match its check.json (build.json, every file it lists, the --refs images, the calibration and,
+for a traced build, its sources and the collections), all verified before the book writes anything, and the book reads
+only the verified bytes of the files build.json lists: a build with no lockup shows its mark in the
 lockup's place. A direction that failed check_logo.py is left out unless --include-failed, which shows it marked as
 failed. The book is written in the brief's language, Korean for a Korean brief, set in an OFL face from Google Fonts
 that has the script. A photo is used only when its manifest entry says who made it, under what licence and where it
@@ -325,13 +326,13 @@ def main(argv: list[str] | None = None) -> None:
     t = TEXT[lang]
     dirs = []
     for b in a.builds:
-        build, chk, verified = R.sealed(b, a.refs, a.calibration, require_ok=False)
+        build, chk, verified, traces = R.sealed(b, a.refs, a.calibration, require_ok=False)
         if not chk["ok"] and not a.include_failed:
             print(f"left out {b}: it failed check_logo.py (--include-failed shows it, marked)")
             continue
         scores = {sc["source_sha256"]: sc["score"] for sc in chk.get("source_scores", [])}
         files = {rel: data.decode() for rel, data in verified.items() if rel.endswith(".svg")}
-        dirs.append((build, chk, R.traces(b, build, verified), scores, files))
+        dirs.append((build, chk, traces, scores, files))
     if not dirs:
         raise SystemExit("no direction passed check_logo.py; fix the recipes, or pass --include-failed to show them marked")
     os.makedirs(os.path.join(a.out, "fonts"), exist_ok=True)

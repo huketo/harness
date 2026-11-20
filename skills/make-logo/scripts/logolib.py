@@ -1,18 +1,20 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "scipy", "scikit-image", "pillow"]
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
 # ///
 """Shared image handling for make-logo: load a reference, find its ink on any ground, and normalise it.
 
-A reference is a raster: a screenshot, a photo of a sign, a sheet of marks. Nothing here keeps an outline. The mask
-lives in memory long enough to be measured or compared, then it's gone (references/measuring.md).
+A reference is a raster (a screenshot, a photo of a sign, a sheet of marks) or an SVG, which is rasterised with resvg
+first. Nothing here keeps an outline. The mask lives in memory long enough to be measured or compared, then it's gone
+(references/measuring.md).
 """
 from __future__ import annotations
 
+import io
 import os
 
 import numpy as np
-from PIL import Image, ImageSequence
+from PIL import Image, ImageSequence, UnidentifiedImageError
 from scipy import ndimage as ndi
 from skimage import color, filters, measure, morphology, transform
 
@@ -20,19 +22,59 @@ WORK = 1024  # long side, in pixels, that every reference is measured at
 CANON = 256  # side of the square a mark is normalised into for comparing
 
 
-def load(path: str) -> np.ndarray:
-    """RGB floats 0-1, long side WORK, first frame of an animation, transparency flattened onto white."""
-    im = Image.open(path)
-    im = next(ImageSequence.Iterator(im))
-    if im.mode in ("RGBA", "LA", "P"):
-        im = im.convert("RGBA")
-        ground = Image.new("RGBA", im.size, (255, 255, 255, 255))
-        im = Image.alpha_composite(ground, im)
+def open_image(src) -> Image.Image:
+    """The picture in a path, bytes or open file: a raster's first frame, or an SVG rasterised by resvg to WORK on its
+    long side, transparent around its ink, with a margin of an eighth of WORK each side (an SVG's box is often its
+    ink's, and the ground is read from the border)."""
+    if isinstance(src, (bytes, bytearray)):
+        data = bytes(src)
+    elif hasattr(src, "read"):
+        data = src.read()
+    else:
+        with open(src, "rb") as f:
+            data = f.read()
+    try:
+        im = next(ImageSequence.Iterator(Image.open(io.BytesIO(data))))
+        im.load()
+        return im
+    except UnidentifiedImageError:
+        if b"<svg" not in data:
+            raise
+    import resvg_py  # only an SVG needs it
+
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("latin-1")
+    im = Image.open(io.BytesIO(bytes(resvg_py.svg_to_bytes(svg_string=text, width=WORK))))
+    if im.height > WORK:  # a tall mark: fit its height instead
+        im = Image.open(io.BytesIO(bytes(resvg_py.svg_to_bytes(svg_string=text, height=WORK))))
+    pad = WORK // 8
+    out = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
+    out.paste(im.convert("RGBA"), (pad, pad))
+    return out
+
+
+def transparent(im: Image.Image) -> bool:
+    return im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+
+
+def flatten(im: Image.Image, ground: tuple[int, int, int] = (255, 255, 255), side: int | None = None) -> np.ndarray:
+    """RGB floats 0-1 with any transparency flattened onto `ground`, the long side brought down to WORK, or, given
+    `side`, resized to it either way."""
+    if im.mode == "P" or transparent(im):
+        im = Image.alpha_composite(Image.new("RGBA", im.size, (*ground, 255)), im.convert("RGBA"))
     im = im.convert("RGB")
-    s = WORK / max(im.size)
-    if s < 1:
-        im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    s = (side or WORK) / max(im.size)
+    if s < 1 or (side and s != 1):
+        im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
     return np.asarray(im, dtype=np.float64) / 255
+
+
+def load(path) -> np.ndarray:
+    """RGB floats 0-1, long side at most WORK, first frame of an animation, transparency flattened onto white; an SVG
+    rasterised first (open_image)."""
+    return flatten(open_image(path))
 
 
 def segment(rgb: np.ndarray) -> dict:
@@ -138,7 +180,7 @@ def holes(mask: np.ndarray, min_share: float = 0.002) -> list[float]:
     return sorted([round(float(s), 4) for s in sizes if s >= min_share], reverse=True)
 
 
-IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".svg"}
 
 
 def images(paths: list[str]) -> list[str]:

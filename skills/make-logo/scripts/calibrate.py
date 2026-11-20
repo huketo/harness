@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "scipy", "scikit-image", "pillow"]
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
 # ///
 """Set the distance limit from the references themselves (references/distance.md).
 

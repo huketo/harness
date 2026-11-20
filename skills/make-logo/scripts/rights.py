@@ -11,8 +11,8 @@ collected material it must never be, and seals each step's output so the next st
   (own-drawing, own-brand, licensed), the question shown to them and their answer, both verbatim.
 - collections: every `manifest.json` under `${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/`, each listing every file
   with its sha256 (fetch_arena.mjs, fetch_photos.mjs).
-- build.json `files` and check.json `build_sha256`, `refs_sha256`, `calibration_sha256`: what package_logo.py and
-  logo_book.py recompute before they go on.
+- build.json `files` and check.json `build_sha256`, `refs_sha256`, `calibration_sha256`, and for a traced build
+  `collected_sha256`: what package_logo.py and logo_book.py recompute before they go on.
 """
 from __future__ import annotations
 
@@ -26,13 +26,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SHIPPED_CALIBRATION = os.path.join(HERE, "calibration.json")
 RIGHTS = ("own-drawing", "own-brand", "licensed")
 HEX64 = re.compile(r"[0-9a-f]{64}")
-# Why the distance checks could not compare a reference (trace_ref.reference_set), in each document language.
-NOT_CHECKED = {
-    "en": {"blank": "a blank image", "no-ink": "no ink found", "unreadable": "not readable as an image",
-           "gone": "listed in a collection manifest, but the file is gone"},
-    "ko": {"blank": "빈 이미지", "no-ink": "잉크를 찾지 못함", "unreadable": "이미지로 읽을 수 없음",
-           "gone": "수집 manifest에는 있지만 파일이 없음"},
-}
+# Why the distance gates could not read a mark in an image (trace_ref.gate_mask), for the refusal that names it.
+UNCOMPARABLE = {"blank": "a blank image", "no-ink": "no ink found, enlarged or on either ground",
+                "unreadable": "not readable as an image or an SVG"}
 
 
 class Refused(SystemExit):
@@ -96,8 +92,9 @@ def refs_sha256(folders: list[str]) -> str:
 
 # Collections ------------------------------------------------------------------------------------------------------
 
-def collected(root: str | None = None) -> list[tuple[str, str]]:
-    """(file, sha256 listed for it) for every item of every collection manifest under the cache."""
+def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, str]]:
+    """(file, sha256 listed for it) for every item of every collection manifest under the cache. With `verify`, it
+    refuses ("collection-changed") while a listed file is gone or its bytes no longer have that sha256."""
     root = root or cache_root()
     out = []
     for d, dirs, names in os.walk(root):
@@ -111,11 +108,18 @@ def collected(root: str | None = None) -> list[tuple[str, str]]:
                 raise Refused("manifest", f"{man} lists {it.get('file')!r} without a sha256. Fetch that collection "
                                           "again with this version of fetch_arena.mjs or fetch_photos.mjs.")
             out.append((os.path.join(d, it["file"]), sha))
+    if verify:
+        changed = [f for f, sha in out if not (os.path.isfile(f) and sha256_file(f) == sha)]
+        if changed:
+            raise Refused("collection-changed", f"these collected files are gone or changed since their manifest listed "
+                                                f"them: {', '.join(changed)}. Fetch the collection again, or list what is "
+                                                "in it now with `node scripts/collection.mjs <name>`.")
     return out
 
 
 def collected_sha256(root: str | None = None) -> str:
-    return digest(sha for _, sha in collected(root))
+    """The digest of every sha256 the collection manifests list, once each listed file is confirmed to have it."""
+    return digest(sha for _, sha in collected(root, verify=True))
 
 
 # The brief --------------------------------------------------------------------------------------------------------
@@ -237,9 +241,11 @@ def traces(build: str, info: dict, files: dict[str, bytes]) -> list[dict]:
 
 
 def sealed(build: str, refs: list[str], calibration: str | None,
-           require_ok: bool = True) -> tuple[dict, dict, dict[str, bytes]]:
-    """(build.json, check.json, verified_files()) of a build whose check still holds, or a refusal naming what
-    changed."""
+           require_ok: bool = True) -> tuple[dict, dict, dict[str, bytes], list[dict]]:
+    """(build.json, check.json, verified_files(), traces()) of a build whose check still holds, or a refusal naming
+    what changed. Everything is verified before it returns, so a step that writes calls this first and writes only
+    after: a traced build's sources, and the collections its traces were gated against (check.json
+    `collected_sha256`), must also be as they were."""
     bpath, cpath = os.path.join(build, "build.json"), os.path.join(build, "check.json")
     if not os.path.isfile(bpath):
         raise Refused("not-built", f"{build} has no build.json")
@@ -256,6 +262,11 @@ def sealed(build: str, refs: list[str], calibration: str | None,
     if chk.get("calibration_sha256") != sha256_file(calibration_file(calibration)):
         raise Refused("calibration-changed", f"{build} was checked with another calibration. Pass the same --calibration, "
                                              "or check again.")
+    found = traces(build, info, files)
+    if found and chk.get("collected_sha256") != collected_sha256():
+        raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a file "
+                                             "added or removed), and its trace was gated against the old ones. Build "
+                                             "it again, so the trace is gated against them, and check it.")
     if require_ok and not chk.get("ok"):
         raise Refused("check-failed", f"{build} failed check_logo.py. Change the recipe, build and check again.")
-    return info, chk, files
+    return info, chk, files, found

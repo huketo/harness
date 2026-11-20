@@ -2,10 +2,16 @@
 // cache, outside any project, at ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<name>/, and each collection's
 // manifest.json lists every file in it with its sha256. trace_ref.py refuses any file with one of those hashes, and
 // compares every trace against these images.
+//
+//   node collection.mjs <collection name>
+//
+// lists what a collection holds now, after files were deleted or replaced by hand: every file still there with its
+// sha256, each keeping its earlier details (a photo's credits). Nothing is downloaded.
 import {createHash} from 'node:crypto';
 import {readdir, readFile, stat, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
-import {isAbsolute, join, posix} from 'node:path';
+import {isAbsolute, join, posix, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 export function cacheRoot(env = process.env) {
   const base = env.XDG_CACHE_HOME && isAbsolute(env.XDG_CACHE_HOME) ? env.XDG_CACHE_HOME : join(homedir(), '.cache');
@@ -65,4 +71,22 @@ export async function writeManifest(dir, items, extra = {}) {
   }
   await writeFile(join(dir, 'manifest.json'), JSON.stringify({...extra, items: out}, null, 2));
   return out;
+}
+
+/** Rewrites <dir>/manifest.json from the files in the folder now, keeping its other fields and each file's details. */
+export async function refreshManifest(dir) {
+  const fields = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+  delete fields.items; // writeManifest reads them back with their details
+  return writeManifest(dir, [], fields);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const [, , name] = process.argv;
+  if (!name) {
+    console.error('Usage: node collection.mjs <collection name>');
+    process.exit(1);
+  }
+  const dir = collectionDir(name);
+  const items = await refreshManifest(dir);
+  console.log(`${items.length} files in ${dir}, each with its sha256 in manifest.json`);
 }

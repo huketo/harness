@@ -299,8 +299,6 @@ def admit_traces(spec: dict, out: str, recipe_dir: str, brief: str | None, refs:
                     long_side=raster["long_side"], reproduce=prov)
         traced[i] = r["d"]
         p = r["provenance"]
-        for line in T.not_checked_lines(p["gate"]["not_checked"]):
-            print(f"{rel}:{line}")
         entries.append({"source_sha256": p["source"]["sha256"], "rights": p["trace_source"]["rights"],
                         "answer": p["trace_source"]["answer"], "provenance_sha256": R.sha256_file(r["record"]),
                         "svg_sha256": p["svg_sha256"]})
