@@ -25,11 +25,14 @@ page is read from the font files or the logs when the book is written, never typ
 11. **Languages.** Latin, Cyrillic and Greek languages whose letters are all in the character map.
 12. **Licence and install.** The name table's copyright lines and OFL notice, files with sizes, the check
     summary (gates passed, the names of those failed and of those not run), a CSS snippet and desktop install.
+13. **Provenance.** From `check-report.json` (`--check-report` is required): the approved base's file name and
+    full sha256, its source, the licence's file name and sha256, the Reserved Font Names, and the approval
+    question, answer and decision verbatim.
 
 ## Rules for the book's text
 
-- No reference name, no base family name in prose. The copyright lines quoted on the licence page are the
-  only place the base is named, because the OFL requires them.
+- No reference name, no base family name in prose. The base is named only where the book quotes: the copyright
+  lines on the licence page, which the OFL requires, and the approval record on the provenance page.
 - Plain sentences, sentence case, no puffery. The sample text describes the font's own mechanics.
 - Typographic minus for negative numbers, real quotes and dashes in samples.
 

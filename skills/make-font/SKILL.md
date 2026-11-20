@@ -27,10 +27,14 @@ I don't trace or copy the outlines of the fonts you send." Then hold it.
   is copied into the output or committed anywhere.
 - The right to build on the base is the person's statement, not something code can prove. `record_base.py` binds
   their words to the base's and the licence's sha256 in `base.json`, every build step checks those hashes, and
-  `FONTLOG.txt` prints the statement as given.
+  `FONTLOG.txt`, `check-report.json` and the font book print the statement as given.
+- The chain proves that the files agree with each other and with the approved base, not who wrote them. Package
+  and check remake the fit's subset from the base instead of trusting a file, but an agent that hand-writes the
+  fonts and every log consistently is not stopped by code. Run every step with its script, and never edit a log.
 
-The base is one TrueType (glyf) variable font under the SIL Open Font License 1.1. Apache-2.0, static and CFF
-fonts are not bases; merging two fonts and splitting WOFF2 files are out of scope.
+The base is one TrueType (glyf) variable font in a plain `.ttf` file under the SIL Open Font License 1.1.
+Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not bases; merging two fonts and splitting WOFF2 files are out
+of scope.
 
 Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP 723), so run it with
 `uv run scripts/<name>.py`: uv installs Python 3.12, `fonttools`, `brotli`, `uharfbuzz`, `numpy`, `pillow` and
@@ -65,12 +69,17 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    Names, render each beside a reference if you can, recommend one, and ask which to build on.
    Done when the shortlist is shown and the question is asked.
 
-5. **Record the approval.** Only the person approves the base. Once they answer, record the question and their
-   answer word for word: `uv run scripts/record_base.py --shortlist shortlist.json --family "<their pick>"
-   --question "<your question, verbatim>" --answer "<their answer, verbatim>" --out base.json`. A font of their
-   own goes in with `--font`, `--licence <its OFL.txt>` and `--source local`. Name the base and its licence in
-   the question, never a reference. In an unattended run, stop before this step: report the shortlist and the
-   question, and leave `base.json` unwritten.
+5. **Record the approval.** Only the person approves the base. Once they pick one, print the question:
+   `uv run scripts/record_base.py --shortlist shortlist.json --family "<their pick>" --question-only
+   --out base.json` (a font of their own: `--font`, `--licence <its OFL.txt>` and `--source local` instead of
+   `--shortlist` and `--family`). It checks the files the same way every later step will, prints a question that
+   names the base, its licence and both sha256 values, and writes nothing. Ask that question as printed, never
+   with a reference's name in it. When they answer, run the same command without `--question-only`, with
+   `--question "<the printed question, verbatim>" --answer "<their answer, verbatim>" --font-sha256 <font hash
+   from the question> --license-sha256 <licence hash from the question>`, and `--decision approved` only if they
+   approved. Any other decision, or a file that changed since the question, writes nothing; ask again. In an
+   unattended run, stop after `--question-only`: report the shortlist and the question, and leave `base.json`
+   unwritten.
    Done when `base.json` exists. It is written once; a different base or answer needs a new build folder.
 
 6. **Fit.** `uv run scripts/fit_font.py <base-vf.ttf> targets.json --base-json base.json --out-dir build/
@@ -89,19 +98,22 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
 
 8. **Package and check.** `uv run scripts/package.py build/*.ttf --targets targets.json --base-json base.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --holder "<who owns the modifications>"
-   --out-dir dist/` (`references/licensing.md`). It builds the package in a temporary folder, checks every TTF
-   and WOFF2 against the chain, and only then writes `dist/` and `package-log.json` beside it. Then
+   --out-dir dist/` (`references/licensing.md`). It checks the chain, remaking the fit's subset from the base,
+   builds the package and its `package-log.json` in a temporary folder, checks every TTF and WOFF2 against the
+   chain, and only then moves the folder to `dist/`. `dist/` must lie outside `build/`. Then
    `uv run scripts/check_font.py dist/ttf/*.ttf --targets targets.json --base-json base.json
-   --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log package-log.json
-   --reference <ref file> --package dist/ --out-dir checks/` (`references/checks.md`). Look at every overlay
+   --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log dist/package-log.json
+   --reference <ref file> --package dist/ --out-dir checks/` (`references/checks.md`). It runs the same chain
+   check as the package step, then the package log's links. Look at every overlay
    render yourself, at the text and the display size. A failed gate goes back to the step that owns it; a
    refusal means a file left the chain, so rerun from the step that wrote it.
    Done when the check exits 0, or each failure is listed for the person with its number and the reason.
 
 9. **Font book.** `uv run scripts/font_book.py dist/ttf/*.ttf --webfonts dist/webfonts --targets targets.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --check-report checks/check-report.json
-   --out-dir book/`, then `node scripts/render_book.mjs book/`. It prints the pages as PNG and one PDF and fails
-   on a fallback glyph or an overflow (`references/font-book.md`). Open three pages and look before you hand it
+   --out-dir book/`, then `node scripts/render_book.mjs book/`. The check report is required: its provenance
+   page prints the approved base's sha256 and the approval verbatim. It prints the pages as PNG and one PDF and
+   fails on a fallback glyph or an overflow (`references/font-book.md`). Open three pages and look before you hand it
    over.
    Done when `book/fontbook.pdf` exists and render_book.mjs exits 0.
 
@@ -116,7 +128,7 @@ link the PDF. Name the fonts' provenance plainly: built on an open font they app
 
 - Copy, trace, auto-trace or convert outlines from a reference. Copy a reference's kerning or per-glyph widths.
 - Build on a font that is not an OFL-1.1 glyf variable font, or on one the person did not approve.
-- Write or edit `base.json` by hand, or answer the approval question for the person.
+- Write or edit `base.json` or a step's log by hand, or answer the approval question for the person.
 - Ship under any licence but the OFL, keep the base's name or a Reserved Font Name, or keep its trademark record.
 - Put a reference font's name in the output files, the font book or the package README.
 - Call a gate passed that was not run in this session. fontbakery not installed is "not run", not "passed".

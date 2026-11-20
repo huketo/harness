@@ -19,9 +19,10 @@ Kept: the SIL Open Font License 1.1 only, a TrueType variable font in `ofl/`, th
 script in its subsets, a main script that is one of them, an upright style, and no math, symbol or icon family.
 An Apache-2.0 family is not a base, even when named with `--families`.
 
-GitHub limits requests without a token to 60 an hour. With `GITHUB_TOKEN` set, the script sends it to
-`api.github.com` and `raw.githubusercontent.com` only (to curl through its standard input, never on the command
-line) and never prints it. A 403 or 429 stops the search with the requests left, the reset time and the way on:
+GitHub limits requests without a token to 60 an hour. With `GITHUB_TOKEN` set, the script sends it over HTTPS
+to `api.github.com` and `raw.githubusercontent.com` only (to curl through its standard input, never on the command
+line) and never prints it. Each hop of a redirect is checked again: urllib's redirect handler and the curl
+fallback, which follows every hop itself, both drop the token on a hop to any other origin. A 403 or 429 stops the search with the requests left, the reset time and the way on:
 a token, waiting, or `--offline`. `--offline` downloads nothing: it reads the catalogue, the tree and the font
 files from `--cache` and skips what is not there.
 
@@ -63,6 +64,7 @@ one) is the wrong base. Say why in one line per candidate and recommend one.
 Prefer, in order: the right skeleton, a weight axis, a width axis that moves the right way, an optical-size axis
 (it holds contrast), coverage of the scripts, then the score.
 
-Wait for the person's answer before fitting, and record it with `record_base.py` (SKILL.md step 5): the
-question you asked and their answer, verbatim, bound to the base's and its `OFL.txt`'s sha256 in `base.json`.
+Wait for the person's answer before fitting, and record it with `record_base.py` (SKILL.md step 5): ask the
+question `--question-only` prints, which names both files' sha256, then record it with their answer verbatim and
+`--decision approved` only if they approved.
 Keep the shortlist JSON: the approval step reads the chosen row from it.
