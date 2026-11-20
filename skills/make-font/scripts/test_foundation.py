@@ -38,6 +38,11 @@ class GitHubAuth(unittest.TestCase):
         argv, config = FF.curl_command(FF.CATALOG, "/tmp/out.json", "/tmp/headers.txt", {"GITHUB_TOKEN": TOKEN})
         self.assertNotIn(TOKEN, config)
 
+    def test_curl_reads_no_config_file_only_its_standard_input(self):
+        argv, _ = FF.curl_command(FF.TREE, "/tmp/out.json", "/tmp/headers.txt", {"GITHUB_TOKEN": TOKEN})
+        self.assertEqual(argv[:2], ["curl", "--disable"], "--disable works only as curl's first argument")
+        self.assertEqual(argv[argv.index("--config") + 1], "-")
+
 
 class Server:
     """A local HTTP server that records the headers of every request. With `to`, it redirects every request
@@ -105,6 +110,20 @@ class Redirects(unittest.TestCase):
         path = os.path.join(self.dir, "font.ttf")
         FF.curl_fetch(self.a.url("/start"), path)
         self.assert_token_stayed_home(path)
+
+    def test_curl_ignores_the_users_curlrc(self):
+        """A ~/.curlrc could log every header (trace-ascii) or send the token on (location-trusted)."""
+        if not shutil.which("curl"):
+            self.skipTest("curl is not on PATH, so the curl path cannot run here")
+        home = os.path.join(self.dir, "home")
+        os.makedirs(home)
+        for name in (".curlrc", "curlrc"):
+            with open(os.path.join(home, name), "w", encoding="utf-8") as fh:
+                fh.write('header = "X-From-Curlrc: read"\n')
+        with mock.patch.dict(os.environ, {"HOME": home, "CURL_HOME": home, "XDG_CONFIG_HOME": home}):
+            FF.curl_fetch(self.b.url("/file"), os.path.join(self.dir, "font.ttf"))
+        self.assertEqual(len(self.b.seen), 1)
+        self.assertNotIn("x-from-curlrc", self.b.seen[0], "curl read the user's config file")
 
     def test_urllib_keeps_the_token_on_a_redirect_within_the_origin(self):
         home = Server(self, to=lambda: home.url("/file"))

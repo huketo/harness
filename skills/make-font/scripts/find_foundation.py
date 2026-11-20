@@ -112,8 +112,10 @@ MAX_HOPS = 10
 
 def curl_command(url, path, header_file, env=os.environ):
     """curl arguments and the config it reads on stdin, for one hop: curl follows no redirect itself. Headers go
-    through the config, so a token never shows in the process list."""
-    argv = ["curl", "-sS", "--proto", "=http,https", "--config", "-", "-A", UA["User-Agent"], "-o", path,
+    through the config, so a token never shows in the process list. --disable, which curl honours only as its
+    first argument, keeps it from reading the user's .curlrc, where trace-ascii would log the token and
+    location-trusted would send it past the hop check: the config on stdin is the only one."""
+    argv = ["curl", "--disable", "-sS", "--proto", "=http,https", "--config", "-", "-A", UA["User-Agent"], "-o", path,
             "-D", header_file, "-w", "%{http_code} %{redirect_url}", url]
     config = "".join(f'header = "{k}: {v}"\n' for k, v in auth_headers(url, env).items())
     return argv, config
