@@ -59,8 +59,8 @@ grep -E '^(MemAvailable|SwapTotal|SwapFree):' /proc/meminfo
 
 ## 브리프에 적을 값
 
-워커 브리프의 "질문과 막힘"에는 이 슬라이스에 맞는 명령 대기 한도와 부하 임계값만 적고, 규칙 본문은 이 문서를 가리킨다. 값은 `run.md`에 정한 값을 쓴다.
+워커 브리프의 "질문과 막힘"은 [brief.md](brief.md)의 기존 문구를 그대로 두고, 그 뒤에 이 슬라이스의 명령 대기 한도와 부하 임계값, 그리고 이 문서로 가는 링크를 덧붙인다. 값은 `run.md`에 정한 값을 쓴다.
 
 ## 출처
 
-design.how(MIT, © 2026 Arlan Marat, 커밋 `1ce5304466db2ba47a7a7524603e86df77c702bd`)의 `skills/migrate-design-system/references/running-many-agents.md`, `skills/migrate-design-system/references/lessons.md`, `evals/incidents/verifier-dies-before-handback.json`에서 대기 한도, 권한 거부, 부하 밸브, 보고 없는 검증자의 처리만 가져왔다. 라이선스 전문은 [`LICENSE.design-how`](../LICENSE.design-how)다. 원문 문장은 옮기지 않았고, 실행기(셸 백그라운드, pid 파일)를 전제한 부분은 T3 용어로 바꾸거나 버렸다.
+design.how(MIT, © 2026 Arlan Marat, 커밋 `1ce5304466db2ba47a7a7524603e86df77c702bd`)의 `skills/migrate-design-system/references/running-many-agents.md`, `skills/migrate-design-system/references/lessons.md`, `evals/incidents/verifier-dies-before-handback.json`에서 대기 한도(검증자가 대기를 벗어나려고 실행 결과를 지운 사례 포함), 권한 거부, 부하 밸브만 가져왔다. 라이선스 전문은 [`LICENSE.design-how`](../LICENSE.design-how)다. 원문 문장은 옮기지 않았고, 실행기(셸 백그라운드, pid 파일)를 전제한 부분은 T3 용어로 바꾸거나 버렸다.
