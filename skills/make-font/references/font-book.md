@@ -14,18 +14,26 @@ page is read from the font files or the logs when the book is written, never typ
 4. **Weights.** One column per weight: Rag at 330 px, the alphabet and a sentence.
 5. **Waterfall.** 120 px down to 11 px, each line cut to fit.
 6. **Text settings.** 20/30, 16/24 and 13/19 columns, headings in the second weight.
-7. **Character set.** Every code point in the TTF's character map, grouped (basic, extended, other scripts,
-   figures, punctuation, currency, maths, symbols, marks), as many pages as it needs.
-8. **Figures and punctuation.** Every figure style the features allow, fractions, punctuation and currency.
-9. **Kerning and spacing.** Eighteen common pairs with their values, the spacing strings, kerning off and on,
-   and the guard's largest pair drawn without and with the guard.
-10. **OpenType features.** Every GSUB and GPOS feature, off in grey and on in black, 21 to a page (seven columns,
+7. **Hangul** (a font with Hangul syllables). The measuring syllables of the six classes drawn from the outlines,
+   each in its advance with the class's mean face box dashed over it; a table of each class's syllables and
+   held-out syllables, mean face, centre height and advance, and, from the fit log, its target and its own x and y
+   scale; and the coverage as counts: KS X 1001, the modern syllables, the compatibility jamo.
+8. **Korean text.** Korean paragraphs at 20/32, 16/26 and 13/21 px and three lines mixing Korean and Latin at 26 px.
+   The specimen is this fixed amount whatever the font covers; the counts go into `pages.json` under `coverage`
+   (`{"korean": {"KS X 1001": [have, 2350], "modern syllables": [have, 11172], "compatibility jamo": [have, 94]}}`).
+9. **Character set.** Every other code point in the TTF's character map, grouped (basic, extended, other scripts,
+   figures, punctuation, currency, maths, symbols, marks), as many pages as it needs. The Hangul syllables and
+   compatibility jamo are counted on the Hangul page instead of listed.
+10. **Figures and punctuation.** Every figure style the features allow, fractions, punctuation and currency.
+11. **Kerning and spacing.** Eighteen common pairs with their values, the spacing strings, kerning off and on,
+    and the guard's largest pair drawn without and with the guard.
+12. **OpenType features.** Every GSUB and GPOS feature, off in grey and on in black, 21 to a page (seven columns,
     three rows). Stylistic sets show the characters their lookups change, with the set's own name from the name
     table.
-11. **Languages.** Latin, Cyrillic and Greek languages whose letters are all in the character map.
-12. **Licence and install.** The name table's copyright lines and OFL notice, files with sizes, the check
+13. **Languages.** Latin, Cyrillic and Greek languages whose letters are all in the character map.
+14. **Licence and install.** The name table's copyright lines and OFL notice, files with sizes, the check
     summary (gates passed, the names of those failed and of those not run), a CSS snippet and desktop install.
-13. **Provenance.** From `check-report.json` (`--check-report` is required): the approved base's file name and
+15. **Provenance.** From `check-report.json` (`--check-report` is required): the approved base's file name and
     full sha256, its source, the licence's file name and sha256, the Reserved Font Names, and the approval
     question, answer and decision verbatim. Every TTF given and every WOFF2 taken from `--webfonts` must have a
     sha256 the report lists under `package.outputs`; a font from another build, or a report with no such list,

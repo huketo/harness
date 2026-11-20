@@ -210,3 +210,17 @@ p { font-size: 14px; }
 
 .qj svg.inset { border: 1px solid var(--rule); margin-top: 6px; }
 .fdemo.big .f { font-size: 46px; line-height: 1.1; }
+
+/* Hangul */
+.hg-cols { display: grid; grid-template-columns: 872px 1fr; gap: 48px; }
+.hg-grid { display: block; }
+.hg-grid path { fill: var(--ink); }
+.hg-grid .mv { font: 12px var(--sans); fill: var(--mute); }
+.hg-t td { padding: 6px 8px 6px 0; }
+.hg-syl { font-size: 15px; white-space: nowrap; }
+.ko-page { display: grid; grid-template-rows: auto auto; gap: 34px; }
+.ko-text .t20 p.f { font-size: 20px; line-height: 32px; word-break: keep-all; }
+.ko-text .t16 p.f { font-size: 16px; line-height: 26px; word-break: keep-all; }
+.ko-text .t13 p.f { font-size: 13px; line-height: 21px; word-break: keep-all; }
+.ko-mixed p.f { font-size: 26px; line-height: 1.5; margin-bottom: 6px; word-break: keep-all; }
+

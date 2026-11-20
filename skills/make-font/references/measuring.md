@@ -123,8 +123,8 @@ Each Hangul value is tagged: `{"value": 0.0887, "unit": "ratio", "confidence": "
 
 A key holds lengths (one entry per length unit the source has) or one ratio, never both. A ratio key's suffix
 names its denominator: `_cap` the Latin cap height, `_h1` the H1 class's mean face (height, or width for
-`face_w_h1`). `make_targets.py` merges values of one unit only; a value in another unit stays beside them as a
-target of its own. It refuses a reference whose number is anything but a non-empty list of tagged values, each with
+`face_w_h1`), `_n` the Latin n stem of the same source. `make_targets.py` merges values of one unit only; a value
+in another unit stays beside them as a target of its own. It refuses a reference whose number is anything but a non-empty list of tagged values, each with
 a numeric `value` and one of the units the table in [The `hangul` object](#the-hangul-object-targetsjson) gives
 its key, at most one per unit: a tag outside a list, a tag without a value, a bare number, a `ratio` under
 `face_w`. A key outside that table (`classes.H7`, `report.stem`) is refused too.
@@ -144,6 +144,7 @@ The face is the ink box of a syllable. Cuts are straight lines through the outli
 | `center_adv` | mean face centre over the advance | file |
 | `adv`, `adv_cap` | mean advance, per class when the Hangul is proportional, once when it is fixed-width | file |
 | `stem`, `stem_h1` | the last vertical run (ㅣ) across 이 니 미 at mid face height, median of the three (all three needed); over the H1 mean face height | file, any screenshot (`stem` with H) |
+| `stem_n` | the same stem over the Latin n stem of the same source, both at cap 700 | file or screenshot with H and n |
 | `report.overshoot` | top of 오 minus top of 고 | report only |
 | `report.hstroke` | the lowest run (ㅡ) at the face centre of 으 그 느, median | report only |
 | `report.contrast` | ㅇ of 으: top and bottom thickness over side thickness | report only |
@@ -204,6 +205,7 @@ only this table's fields. A *tagged list* is a list of tagged values, at most on
 | `classes.Hn.adv_cap` | tagged list, only when `fixed_width` is false | `ratio` | target |
 | `stem` | tagged list, from a reference that had all of 이 니 미 | `cap700`, `em1000` | target: the weight without a Latin stem, before `stem_h1` |
 | `stem_h1` | tagged list, the same | `ratio` | target: the weight without a Latin stem or a `stem` |
+| `stem_n` | tagged list, from a reference that had all of 이 니 미 and a Latin n | `ratio` | check: the Hangul stem over the Latin n stem each weight keeps |
 | `fixed_width` | true when every measured syllable has one advance (within 0.5 %): the commoner answer of the files, the first file's on a tie | | |
 | `adv` | tagged list, only when `fixed_width` is true | `cap700`, `em1000` | target |
 | `adv_cap` | tagged list, only when `fixed_width` is true | `ratio` | target |

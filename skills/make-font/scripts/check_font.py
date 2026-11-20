@@ -26,9 +26,15 @@ Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
 - widths: every class mean advance, and the shaped paragraph when the targets came from a file.
 - spacing: straight and round sidebearing means.
 - kerning: every pair of letters, figures and punctuation, shaped. The smallest ink gap must clear min_gap.
-- coverage: every character the targets' scripts need.
+- coverage: every character the targets' scripts need (for korean the 2,350 syllables of KS X 1001), and the
+  counts of what fontlib.COVERAGE_REPORTED adds (the modern syllables, the compatibility jamo), not gated.
 - provenance: glyph order and character map equal the subset's; every glyph is within 3 % of the height and
   40 % of the width of the subset's glyph at the fit's y location (y comes from there, x from the width classes).
+  The Hangul a fit moved is checked against fit-log.json instead (gate_hangul): its transform within the limits, and
+  every Hangul glyph a simple glyph where that transform puts the subset's glyph at the fit's Hangul location.
+- hangul: per weight, the Hangul stem over the n stem against the reference's ratio (±0.05) and every class's face
+  centre height against its target (±15 at cap 700), each NOT RUN without a reference that measured it; the
+  vertical strokes of the classes and the Hangul ink that leaves its advance, reported.
   With --reference files, a diagnostic only: our outlines that have curves or at least 16 points are compared
   with the reference's, and any that share point structure and shape are listed (INFO). A CFF reference cannot
   be compared and is reported NOT RUN.
@@ -38,7 +44,7 @@ Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
   OFL.txt and FONTLOG.txt must be there.
 Renders: <out-dir>/overlay-<style>-<size>.png sets the reference and the font on the same lines at a text and
 a display size, reference in red, ours in blue, overlap black, with that legend drawn above. With a screenshot
-reference, the two are stacked at the same cap height instead.
+reference, the two are stacked at the same cap height instead (a screenshot of Hangul alone: the same H1 face height).
 
 <out-dir>/check-report.json holds the approved base (file name, full sha256, source, licence and its sha256),
 the approval as base.json records it (question, answer and decision, verbatim), the package outputs verified
@@ -64,6 +70,8 @@ import fontlib as L  # noqa: E402
 
 COVERAGE = L.COVERAGE
 MIN_POINTS = 16  # a straight-sided outline with fewer points (a bar, a box, an L) matches too much to mean anything
+HARMONY_RATIO = 0.05  # how far a weight's Hangul stem over its n stem may land from the reference's ratio
+HARMONY_CENTRE = 15  # how far, at cap 700, a Hangul class's face centre may land from its target height
 TEXT_SAMPLE = "Hamburgefonstiv quick brown 1234"
 DISPLAY_SAMPLE = "Rag Gold"
 
@@ -139,6 +147,7 @@ def gate_kerning(G, face, min_gap):
 
 
 def gate_coverage(G, f, scripts):
+    """Every character of each script's COVERAGE list, gated; the characters COVERAGE_REPORTED adds, counted."""
     cm = f.getBestCmap()
     for s in scripts:
         need = COVERAGE.get(s)
@@ -146,11 +155,136 @@ def gate_coverage(G, f, scripts):
             G.add("coverage", s, None, "no character list for this script in check_font.py")
             continue
         miss = [c for c in need if ord(c) not in cm]
-        G.add("coverage", s, not miss, f"{len(need) - len(miss)} of {len(need)}" + (f", missing {''.join(miss[:30])}" if miss else ""))
+        G.add("coverage", s, not miss, (f"{L.COVERAGE_NAMES[s]}: " if s in L.COVERAGE_NAMES else "")
+              + f"{len(need) - len(miss)} of {len(need)}" + (f", missing {''.join(miss[:30])}" if miss else ""))
+        for what, chars in L.COVERAGE_REPORTED.get(s, {}).items():
+            G.add("coverage", f"{s}, {what}", None, f"{sum(ord(c) in cm for c in chars)} of {len(chars)}")
 
 
-def gate_provenance(G, f, base, refs, yloc=None):
-    """`base` is the subset of the approved base that fit_font.py made and fitted from."""
+HANGUL_TOL = 2  # units at 1000 per em a Hangul ink edge or advance may land from the logged transform: two roundings
+
+
+def style_record(fit, tag):
+    return next((s for s in fit["styles"] if s["style"]["name"] == tag), None)
+
+
+def gate_hangul(G, f, base, fitted, track=0):
+    """The Hangul against the fit log's transform. `base` is the subset fit_font.py fitted from, `fitted` the fit
+    log's record of this style, `track` the units space_font.py added to each side of every glyph with ink. The
+    transform must lie within the limits (fontlib.HANGUL_SCALE_LIMIT, HANGUL_CLASS_LIMIT), and every Hangul glyph
+    must be a simple glyph whose ink box and advance are where that transform puts the base's glyph at the fit's
+    Hangul location, times the em scale: within HANGUL_TOL units. Anything else moved it."""
+    import copy
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.varLib import instancer
+    h = fitted.get("hangul")
+    if not h:
+        return
+    xf, k = h["transform"], fitted["em_scale"]
+    s = xf["scale"]
+    over = [f"scale {s}"] if abs(s - 1) > L.HANGUL_SCALE_LIMIT + 1e-9 else []
+    for cls, t in [*xf["classes"].items(), ("jamo", xf["jamo"])]:
+        for name, v in (("x", t["sx"] / s), ("y", t["sy"] / s), ("x over y", t["sx"] / t["sy"])):
+            if abs(v - 1) > (0 if cls == "jamo" else L.HANGUL_CLASS_LIMIT) + 1e-6:
+                over.append(f"{cls} {name} {v - 1:+.2%}")
+    G.add("provenance", "Hangul transform within the limits", not over,
+          f"scale {s} (±{L.HANGUL_SCALE_LIMIT:.0%}); every class's x, y and x over y within "
+          f"±{L.HANGUL_CLASS_LIMIT:.0%} of it, the jamo at it" + (": " + ", ".join(over) if over else ""))
+    inst = instancer.instantiateVariableFont(copy.deepcopy(base), h["location"], updateFontNames=False)
+    igs, iglyf, ihm = inst.getGlyphSet(), inst["glyf"], inst["hmtx"].metrics
+    ogs, oglyf, ohm = f.getGlyphSet(), f["glyf"], f["hmtx"].metrics
+    far, n, sides = [], 0, {"fitted": [], "base": []}
+    for name, cls in L.hangul_glyphs(inst).items():
+        n += 1
+        t = xf["jamo"] if cls == "jamo" else xf["classes"][cls]
+        adv = ihm[name][0]
+        new_adv = round(adv * s + t["adv_add"])
+        p = BoundsPen(igs)
+        igs[name].draw(p)
+        want_adv = round(new_adv * k)
+        if p.bounds:
+            coords = iglyf[name].getCoordinates(iglyf)[0]
+            cx = (min(x for x, _ in coords) + max(x for x, _ in coords)) / 2
+            cy = (min(y for _, y in coords) + max(y for _, y in coords)) / 2
+            x0, y0, x1, y1 = p.bounds
+            ox, oy = cx + (new_adv - adv) / 2 + t["dx"], cy + t["dy"]
+            want = [k * (t["sx"] * (x0 - cx) + ox) + track, k * (t["sy"] * (y0 - cy) + oy),
+                    k * (t["sx"] * (x1 - cx) + ox) + track, k * (t["sy"] * (y1 - cy) + oy)]
+            if want_adv:
+                want_adv += 2 * track
+        else:
+            want = None
+        q = BoundsPen(ogs)
+        ogs[name].draw(q)
+        got = q.bounds
+        if got and p.bounds:
+            sides["fitted"].append(min(got[0], ohm[name][0] - got[2]))
+            sides["base"].append(min(p.bounds[0], adv - p.bounds[2]) * k)
+        if oglyf[name].isComposite():
+            far.append(f"{name} is a composite")
+        elif (want is None) != (got is None) or (want and max(abs(a - b) for a, b in zip(want, got)) > HANGUL_TOL):
+            far.append(f"{name} box {got and [round(v) for v in got]}, the transform puts it at "
+                       f"{want and [round(v) for v in want]}")
+        elif abs(ohm[name][0] - want_adv) > HANGUL_TOL:
+            far.append(f"{name} advance {ohm[name][0]}, the transform gives {want_adv}")
+    G.add("provenance", "every Hangul glyph where the logged transform puts it", not far,
+          f"{n - len(far)} of {n} simple and within {HANGUL_TOL} units of the base at {h['location']} moved by the "
+          "fit log's transform" + (": " + "; ".join(far[:4]) if far else ""))
+    if sides["fitted"]:  # a face grown past its sides runs into the next syllable (references/fitting.md, Limits)
+        G.add("hangul", "Hangul ink inside the advance", None, "; ".join(
+            f"{what}: {sum(v < 0 for v in vals)} of {len(vals)} glyphs leave it, smallest side {min(vals):.0f}"
+            for what, vals in sides.items()))
+    return inst
+
+
+def gate_harmony(G, face, T):
+    """Per weight, the Hangul stem over the Latin n stem against the reference's ratio, and every class's Hangul face
+    centre height against its target. NOT RUN without a reference that measured them: a screenshot of Hangul alone
+    gives neither."""
+    tg, h = T["targets"], T.get("hangul") or {}
+    want = L.tagged_value(h.get("stem_n"), "ratio")
+    geo = L.hangul_geometry(face)
+    cap = face.bounds("H")[3]
+    if not want or not tg.get("n_stem"):
+        G.add("hangul", "Hangul stem / Latin n stem", None, "no reference measured the Hangul stem beside a Latin n "
+              "(a reference without Latin)", state="NOT RUN")
+    elif geo["stem"]:
+        got = geo["stem"] / (L.stem_cap700(face) * cap / L.CAP)
+        G.add("hangul", "Hangul stem / Latin n stem", abs(got - want) <= HARMONY_RATIO,
+              f"{got:.3f} vs {want:.3f}, ±{HARMONY_RATIO}")
+    per = {"cap700": cap / L.CAP, "em1000": face.upm / 1000}
+    off = {}
+    for cls, w in (h.get("classes") or {}).items():
+        unit = next((u for u in per if L.tagged_value(w.get("cy"), u) is not None), None)
+        if unit and cls in geo["classes"]:
+            off[cls] = (geo["classes"][cls]["cy"] - L.tagged_value(w["cy"], unit) * per[unit]) * L.CAP / cap
+    if not off:
+        G.add("hangul", "Hangul face centre heights", None, "no reference gave a centre height (a screenshot has no "
+              "baseline under the Hangul)", state="NOT RUN")
+    else:
+        G.add("hangul", "Hangul face centre heights", all(abs(v) <= HARMONY_CENTRE for v in off.values()),
+              ", ".join(f"{c} {v:+.1f}" for c, v in off.items()) + f" from the targets, ±{HARMONY_CENTRE} (cap 700)")
+
+
+def gate_strokes(G, face, inst, k):
+    """Report only: each class's vertical strokes in the fitted font against the base's at the fit's Hangul
+    location (fontlib.hangul_class_strokes), and how far apart the classes are in each."""
+    got, was = L.hangul_class_strokes(face), L.hangul_class_strokes(L.Face(inst))
+    both = [c for c in got if c in was and was[c]]
+    if not both:
+        return
+
+    def spread(v):
+        return max(v) / min(v) - 1
+    ratio = {c: got[c] / (was[c] * k) for c in both}
+    G.add("hangul", "vertical strokes across the classes", None,
+          f"fitted {spread([got[c] for c in both]):.1%} apart, base {spread([was[c] for c in both]):.1%}; fitted over "
+          "base " + ", ".join(f"{c} {v:.3f}" for c, v in ratio.items()))
+
+
+def gate_provenance(G, f, base, refs, yloc=None, skip=()):
+    """`base` is the subset of the approved base that fit_font.py made and fitted from. Glyphs in `skip` (the Hangul
+    a fit moved, which gate_hangul checks) are left out of the 3 % and 40 % comparison."""
     G.add("provenance", "glyph order equals the subset's", f.getGlyphOrder() == base.getGlyphOrder(), "")
     G.add("provenance", "character map equals the subset's", f.getBestCmap() == base.getBestCmap(), "")
     # Every glyph is the base's glyph, fitted. Its y coordinates come from the base at the fit's y location, so
@@ -176,7 +310,7 @@ def gate_provenance(G, f, base, refs, yloc=None):
     far = []
     for n, b in ob.items():
         a = bb.get(n)
-        if not a or not b:
+        if not a or not b or n in skip:
             continue
         wa, wb = (a[2] - a[0]) / bc, (b[2] - b[0]) / oc
         ha, hb = (a[3] - a[1]) / bc, (b[3] - b[1]) / oc
@@ -365,13 +499,17 @@ def with_legend(img):
 
 
 def stacked(files, img_path, text, ours, out_dir, tag):
-    """The screenshot above our render of the same text at the same cap height, for a reference with no file."""
+    """The screenshot above our render of the same text at the same cap height, for a reference with no file; a
+    screenshot of Hangul alone has no cap height, so at the same H1 face height."""
     from PIL import Image
     shot = Image.open(img_path).convert("L")
     import measure_image as MI
     cov = MI.load_coverage(img_path)
-    cap_px = MI.measure_lines(cov, text.split("|"))["px_cap"]
-    px = cap_px * ours.upm / ours.bounds("H")[3]
+    read = MI.measure_lines(cov, text.split("|"))
+    if read["px_cap"]:
+        px = read["px_cap"] * ours.upm / ours.bounds("H")[3]
+    else:
+        px = read["px_h1"] * ours.upm / L.hangul_geometry(ours)["classes"]["H1"]["face_h"]
     ours_imgs = [L.rasterize(ours, t, px)[0] for t in text.split("|")]
     W = max([shot.width] + [o.shape[1] for o in ours_imgs])
     rows = [np.pad(1 - np.asarray(shot, dtype=float) / 255, ((0, 0), (0, W - shot.width)))]
@@ -427,8 +565,14 @@ def main():
         gate_widths(G, m, T, i == 0 or style is T["styles"][0])
         gate_kerning(G, face, T["tolerances"]["min_gap"])
         gate_coverage(G, f, T.get("scripts", ["latin"]))
-        yloc = next((s["y_location"] for s in fit["styles"] if s["style"]["name"] == tag), None)
-        gate_provenance(G, f, subset_font, a.reference, yloc)
+        fitted = style_record(fit, tag) or {}
+        hangul = L.hangul_glyphs(f) if fitted.get("hangul") else {}
+        gate_provenance(G, f, subset_font, a.reference, fitted.get("y_location"), skip=hangul)
+        if hangul:
+            track = next((sp.get("track", 0) for sp in b.spaces if sp.get("input") == fitted.get("file")), 0)
+            inst = gate_hangul(G, f, subset_font, fitted, track)
+            gate_harmony(G, face, T)
+            gate_strokes(G, face, inst, fitted["em_scale"])
         gate_validity(G, blob, f)
         gate_licence(G, f, base_vf, T["family"], a.package)
         if a.reference:

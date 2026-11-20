@@ -11,8 +11,8 @@ copy made elsewhere is refused. The base must be a TrueType variable font (glyf,
 file: `chain.read_base` checks it again here, as at the approval step.
 
 It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`, and
-`fontlib.SUBSET_ONLY` for `korean`, every modern syllable and the compatibility jamo, which `check_font.py` does
-not gate yet) plus ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
+`fontlib.COVERAGE_REPORTED` for `korean`: every modern syllable and the compatibility jamo beyond the KS X 1001
+syllables the check gates) plus ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
 `build/subset/base.subset.ttf`, and `fit-log.json` records it under `subset`: the base's sha256, the file, its
 sha256, the pyftsubset arguments in order and the fontTools version. `chain.build_subset` makes it, always with
 fontTools' own GSUB and GPOS serializer (HarfBuzz's repacker, used whenever uharfbuzz is installed, gives other
@@ -36,8 +36,9 @@ follow x.
 
 1. **y instance.** For each optical size tried (nine across the axis, unless `--loc` fixes it), solve the weight
    axis so the n stem meets the target (without a Latin n stem, the Hangul stem: see [Hangul](#hangul)), then
-   measure contrast, bar to stem and x-height to cap. Keep the size with the smallest error (for the Hangul stem,
-   among the sizes where the wght axis reaches it). With `--no-contrast` the opsz scan is skipped.
+   measure contrast, bar to stem and x-height to cap. Keep, among the sizes where the wght axis reaches the stem,
+   the one with the smallest error; when none reaches it, the size whose axis end comes nearest, and `fit-log.json`
+   records the miss (`weight_missed_pct`). With `--no-contrast` the opsz scan is skipped.
 2. **x instance per class.** For each width class: on a width axis, bisect wdth so the class's mean advance meets
    its target. At every wdth tried, solve wght again so the class's stem (n for lowercase, H for capitals and
    figures) meets its target, because width changes stems. Without a width axis, or where it runs out, scale the
@@ -78,25 +79,34 @@ follow x.
 
 ## Several weights
 
-The first style's stem comes from the measurement. Other styles take an explicit stem (`--style Medium:500:88`)
-or keep the base's own stem ratio between the two weights. Each style gets its own y instance and class instances.
-All styles share the vertical metrics, so they can mix in one line.
+The first style's stem comes from the measurement. Other styles take an explicit stem (`--style Medium:500:88`),
+solved like the first, or the first style's y location, its optical size included, with the wght moved by the
+weight-class difference (Bold 700 after Regular 400: +300) and clamped to the axis: no optical size of their own,
+so the weights stay as far apart on the axis as their classes and keep the base's own stem ratio between them.
+Each style gets its own class instances. All styles share the vertical metrics, so they can mix in one line.
 
 ## Hangul
 
 When `targets.json` has a `hangul` object (`references/measuring.md`, its last table), the targets' scripts
-must have `korean`, so the subset keeps the base's Hangul. This version fits the weight from Hangul and states
-every other Hangul target; it moves no Hangul glyph. The Hangul takes its outlines from the y instance, so it
-keeps the base's sizes, centres and spacing at the weight the fit chose.
+must have `korean`, so the subset keeps the base's Hangul. The fit moves every Hangul glyph by one transform per
+class, fitted only to the targets a reference measured. It cannot change what the base drew: square or open
+syllable shapes, the jamo's shapes, serifs or none, stroke endings. Report those as differences, never as fitted.
 
-**Weight.** A style with an n stem, or after a first style with one, solves the weight from Latin as above. When
-the targets have no Latin n stem, the first style's wght is solved from the Hangul stem (ㅣ in 이 니 미), taken in
-this order:
+**Weight.** A style with an n stem, or after a first style with one, solves the Latin weight from the n stem as
+above. Without a Latin n stem, the first style's wght comes from the Hangul stem (ㅣ in 이 니 미), taken in this
+order, and the Latin takes the same wght, which keeps the base's own balance between the two:
 
 1. `stem` at `cap700` (a reference with a Latin H): the base's stem times 700 over its cap height meets it.
 2. `stem` at `em1000` (a font file without an H): the base's stem per 1000 of the finished em meets it, the em
    being the cap height over `cap_em` when the targets have one, else the base's em.
 3. `stem_h1` (a screenshot of Hangul alone): the base's stem over its H1 mean face height meets the ratio.
+
+With both an n stem and a Hangul stem, the Hangul solves a wght of its own at the y location's other axes (its
+optical size included), and the check compares the two stems with the reference's ratio. The wght is one for the
+whole Hangul: the stem is read on H1 syllables only, so no class has a weight target of its own. It is solved for
+the stem over the transform's scale (below), because the transform scales the stem too: a stem length over the H1
+x scale, `stem_h1` times the H1 y scale over its x scale. The scale depends on the face sizes the wght draws, so
+the two are solved in turn on the measuring syllables until the wght moves less than half a unit.
 
 The cap height and the face height move a little with the weight, so each try reads them and the stem at the same
 wght. The wght is solved at every optical size the y instance is chosen from (step 1). At some sizes the wght axis
@@ -105,35 +115,77 @@ keeps a size where the axis reaches it, the one nearest the contrast, bar and x-
 size reaches it, the scan keeps the size whose axis end comes nearest, and `fit-log.json` records the miss
 (`weight_missed_pct`, and a line in the style's log).
 
-Each later style takes the first style's y location, its optical size included, with the wght moved by the
-weight-class difference (Bold 700 after Regular 400: +300) and clamped to the axis. It scans no optical size of its
-own, so the weight classes stay as far apart on the axis as their numbers. Targets with neither an n stem nor a
-Hangul stem are refused. Without a Latin target, the Latin takes the wght the Hangul chose, which keeps the base's
-own balance between the two.
+Each later style takes the first style's Hangul location, with the wght moved by the weight-class difference and
+clamped to the axis, and the first style's transform. The Bold so keeps the base's own Bold drawing, faces and
+centres included, moved the way the Regular moved.
 
-**Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
-there, and only then does `finish()` scale the em, once, at the end:
+**Transform.** Every number is in the units of the base's instance at the Hangul location, before `finish()`:
+
+1. One scale for the whole Hangul: the geometric mean, over every class's face width and height that a reference
+   gave as a length, of target over base, within ±6 %. Without a length (a screenshot of Hangul alone) it is 1,
+   so the base's Hangul scale, centre heights and advances stay.
+2. Each class's final x and y scale: that scale times the class's own, which is target over base over the one
+   scale on each axis, within ±3 %, and x over y within ±3 % too. A ratio past it moves both toward their
+   geometric mean. A class without a target takes the one scale.
+3. The ink of each glyph is scaled about the centre of its points' box, then moved up or down by the class's
+   shift, the target face centre height (`cy`) minus the base's class mean.
+4. The advance is the base's times the one scale, plus what makes the class mean (or the font-wide advance of a
+   fixed-width Hangul) meet `adv` when a reference gave one. Half the change goes to each side, so the glyph's own
+   optical asymmetry stays; only a class's mean centre moves, to `cx` when a reference gave it.
+5. The compatibility jamo (U+3131 to U+318E) take the one scale on both axes, no shift and no advance target.
+6. A composite glyph is decomposed into its own points first, so a component another glyph shares never moves twice.
+
+The limits apply to the final per-axis transform, not to each step, and `check_font.py` checks them in the log
+(`transform`) and on every glyph. The fit reads and moves the measuring syllables while it solves, and moves the
+whole Hangul once, when the wght has settled.
+
+**Units, before `finish()`.** Every Hangul target is stated in the units of the Hangul location, beside the base's
+value there, and only then does `finish()` scale the em, once, at the end:
 
 - `cap700`: value × the y instance's cap height / 700.
 - `em1000`: value × the finished font's em / 1000. That em is the y instance's cap height over `cap_em` when a
   file gave one, else the base's em.
-- `ratio`: never turned into a cap length. `face_h_h1` multiplies the base's own H1 face height at the y instance,
-  `aspect` that height, `stem_h1` the same H1 height. A screenshot of Hangul alone so keeps the base's Hangul
-  scale, centre heights and advances, and gives shapes and the weight only.
+- `ratio`: never turned into a cap length. `face_h_h1` multiplies the base's own H1 face height, `aspect` that
+  height, `stem_h1` the same H1 height. A screenshot of Hangul alone so keeps the base's Hangul scale, centre
+  heights and advances, and gives shapes and the weight only.
 
 A key with a length uses `cap700` first, then `em1000`; the ratios fill in where no length was measured.
 `finish()` scales x and y alike, so a ratio to the cap height survives it (checked by measuring the fitted font).
 The saved font rounds every point to a whole unit, so a stem lands up to a unit from the solve: about 1 % of an
 80-unit stem at 1000 units per em.
 
-`fit-log.json` records this under each style's `hangul`:
+`fit-log.json` records this under each style's `hangul`, and the style's `em_scale` is the factor `finish()`
+multiplied every length by:
 
 | Field | Value |
 |-|-|
 | `weight_from` | `n_stem`, `stem cap700`, `stem em1000` or `stem_h1`, with ", stepped from the first style" after the first |
 | `weight_missed_pct` | only when no optical size tried lets the wght axis reach the Hangul stem: the stem the base draws at the chosen location over the target, minus 1, in percent |
-| `units` | font units of the y instance per `cap700` and per `em1000` unit |
-| `classes.Hn.<key>` | `{"target", "base", "from"}` in font units of the y instance, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in |
+| `location` | the base location the Hangul outlines come from |
+| `units` | font units of that instance per `cap700` and per `em1000` unit |
+| `classes.Hn.<key>` | `{"target", "base", "from", "fitted"}` in those font units, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in, `fitted` what the moved glyphs measure |
 | `stem`, `adv` | the same, font-wide (`adv` for fixed-width Hangul) |
-| `stem_h1` | `{"target", "got"}`: the ratio aimed at, and the base's at the chosen wght |
+| `stem_h1` | `{"target", "got", "fitted"}`: the ratio aimed at, the base's at the chosen wght, the fitted font's |
+| `transform` | `scale` and `scale_wanted`; `classes.Hn` with `sx`, `sy`, `dx`, `dy`, `adv_add` and, where a limit held a class back, `wanted`; `jamo` |
+| `glyphs_moved`, `composites_decomposed` | how many Hangul glyphs the transform moved, and how many were composites in the base |
 
+For a later style the targets are the first style's: a Bold's `stem.target` is the Regular's, not a target missed.
+
+**Limits.** The one scale stays within ±6 % of the base's, and each class within ±3 % of it on each axis and between
+its axes. They were set by comparing the unchanged Noto Sans KR at wght 400 with transforms at and past them, on the
+held-out syllables (`HANGUL_HELD_OUT`) and a mixed Korean and Latin line:
+
+- The fixed candidates differ by less than that: Pretendard's mean face is 4.0 % smaller than Noto Sans KR's per
+  1000 em and 0.4 % at cap height 700; Noto Serif KR's is 6.1 % larger per em. A sans reference lands inside the
+  ±6 %; a serif one does not, and its class shapes differ well past 3 % (its H2 is 13 % wider over its height).
+- Spacing holds at the limits. The tightest gap between two syllables of 가나다라마바사 is 64 units in the base, 69
+  at one scale 1.06 with the advances scaled with it, 15 with the advances kept, and 40 at a 3 % stretch of one
+  axis. Past them the syllables touch: at 1.12 with the advances kept the gap is −35 units and seven of the
+  held-out syllables leave their advance; at a one-axis stretch of 8 % it is −2, and the H1 stem is 7 % heavier
+  while the horizontal strokes stay, which shifts the contrast.
+- Nothing is clipped: at 1.06 the held-out syllables reach 870 and −111 units, inside the line box of 1160 and −288.
+
+A face that grows to its limits while a reference keeps the advance narrow can still run into the next syllable:
+at the one scale 1.06 and a class 1.03 with the advance held, an H1 face is about 68 units wider, more than the 64
+units between two syllables of the base. The check reports how many Hangul glyphs leave their advance, fitted and
+base (**hangul** group); look at a Korean line before handing the font over.

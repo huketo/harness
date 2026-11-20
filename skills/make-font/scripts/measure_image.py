@@ -331,8 +331,9 @@ class ImageInk:
         return [(-b, -a) for a, b, _ in reversed(self.letters[ch].vruns(x))]
 
 
-def measure_hangul(lines, k, cut_at):
-    """The hangul object from the Hangul lines. k turns pixels into cap700 units when a Latin H set the scale. The
+def measure_hangul(lines, k, cut_at, n_stem=None):
+    """The hangul object from the Hangul lines. k turns pixels into cap700 units when a Latin H set the scale, and
+    n_stem, the Latin n stem at cap 700 read from the same screenshot, gives the Hangul stem's ratio to it. The
     distance from one anchor to the next is reported per class, never a target: it holds the pair's kerning."""
     a = L.HANGUL_ANCHOR
     seen, pitch = {}, {}
@@ -354,7 +355,7 @@ def measure_hangul(lines, k, cut_at):
         if kind == "edge":
             return "low" if face_px < 120 else "medium"
         return "high" if px >= 60 else "medium" if px >= 30 else "low"
-    h = L.hangul_measurement(geo, {"cap700": k} if k else {}, conf)
+    h = L.hangul_measurement(geo, {"cap700": k} if k else {}, conf, n_stem)
     h["cut_at"] = cut_at
     return h
 
@@ -414,8 +415,9 @@ def measure_lines(cov, texts):
             raise SystemExit(f"no Hangul class was read on two different syllables of its list "
                              f"(fontlib.HANGUL_CLASSES), and one syllable is never a target. Type the "
                              f"{L.HANGUL_ANCHOR} X {L.HANGUL_ANCHOR} lines (fontlib.SAMPLE_LINES_KO).")
-        return {"source": "image", "cap_em": None, "px_cap": None, "confidence": {}, "hangul": h,
-                "letters_read": len(every)}
+        h1 = [t.bottom() - t.top() for ls, _ in hangul for t in ls if t.ch in L.HANGUL_CLASSES["H1"]]
+        return {"source": "image", "cap_em": None, "px_cap": None, "px_h1": round(st.mean(h1), 1) if h1 else None,
+                "confidence": {}, "hangul": h, "letters_read": len(every)}
     if H is None:
         raise SystemExit("an H is needed to set the scale (cap height 700). Add one to the text.")
     cap_px = bH - H.top()
@@ -554,7 +556,7 @@ def measure_lines(cov, texts):
     if m.get("n_counter") and sides.get("lc_straight") is not None:
         put("rhythm", 2 * sides["lc_straight"] / m["n_counter"], "medium")
     if hangul:
-        h = measure_hangul(hangul, k, cut_at)
+        h = measure_hangul(hangul, k, cut_at, m.get("n_stem"))
         if h:
             m["hangul"] = h
         else:

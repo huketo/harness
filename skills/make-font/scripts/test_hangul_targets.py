@@ -5,7 +5,7 @@
 """Hangul targets: make_targets.py merges values of one unit only, and make_targets.py and fit_font.py run on
 Hangul measurements without any Latin number. The fit solves the weight from the Hangul stem as a length when a
 reference gave one, else from the stem ratio, steps the second weight from it, and states each Hangul target in
-the y instance's own units."""
+the y instance's own units. test_hangul_fit.py covers the transform the fit then applies."""
 import hashlib
 import json
 import os
@@ -304,10 +304,13 @@ class Fit(Scratch):
         self.assertAlmostEqual(want, 96, delta=96 * 0.02)
         s = self.style("build-cap", 0)
         self.assertEqual(s["hangul"]["weight_from"], "stem cap700")
-        self.assertAlmostEqual(s["y_location"]["wght"], 500, delta=15)  # the stem ratio alone would give 400
-        stem = s["hangul"]["stem"]
+        # The reference's Hangul is 1.2 times larger: the transform scales the H1 by 1.06 x 1.03 at most, and the wght
+        # is solved for the stem over that scale, above the 400 the stem ratio alone would give and below the 500 the
+        # unscaled length would.
+        self.assertTrue(415 < s["y_location"]["wght"] < 485, s["y_location"])
+        stem, sx = s["hangul"]["stem"], s["hangul"]["transform"]["classes"]["H1"]["sx"]
         self.assertEqual(stem["from"], "cap700")
-        self.assertAlmostEqual(stem["base"] / stem["target"], 1, delta=0.01)
+        self.assertAlmostEqual(stem["base"] * sx / stem["target"], 1, delta=0.01)
         fitted = L.tagged_value(load(self.p("m-cap-fitted.json"))["hangul"]["stem"], "cap700")
         self.assertAlmostEqual(fitted / want, 1, delta=0.015)
 

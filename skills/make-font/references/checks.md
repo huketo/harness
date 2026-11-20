@@ -46,16 +46,37 @@ that leads to an input, through a link or not, is refused.
 - **kerning**: every pair of letters, figures and punctuation, shaped, f on the left skipped. Fails if any gap is
   more than a unit under `min_gap`.
 - **coverage**: the characters each script needs (`COVERAGE` in `fontlib.py`: latin, latin-ext, vietnamese,
-  cyrillic, greek). Add a list there before claiming a script that is not in it; the fit subsets to it too.
+  cyrillic, greek, and korean, the 2,350 syllables of KS X 1001). Add a list there before claiming a script that is
+  not in it; the fit subsets to it too. For korean the fit also keeps every modern syllable and the compatibility
+  jamo (`COVERAGE_REPORTED`), which the check counts as INFO rows (`korean, modern syllables`: "n of 11172") and
+  does not gate.
 - **provenance**: glyph order and character map equal the subset `fit_font.py` recorded. Every glyph is compared
   with the subset's glyph at the fit's y location, at the same cap height: its ink must be within 3 % as tall
-  (all y coordinates come from there) and within 40 % as wide (x comes from the width classes). With
+  (all y coordinates come from there) and within 40 % as wide (x comes from the width classes). The Hangul a fit
+  moved is checked against its own record instead: the transform in `fit-log.json` must lie within the limits
+  (one scale within ±6 %, each class's x, y and x over y within ±3 % of it, the jamo at it), and every Hangul glyph
+  must be a simple glyph whose ink box and advance are where that transform, the style's `em_scale` and the
+  space log's track put the subset's glyph at the fit's Hangul location, within 2 units. So the class scales the
+  log records are the allowance, and any other outline change, a composite left or made included, fails. With
   `--reference` files there is one diagnostic, INFO only: our outlines that have a curve or at least 16 points
   are compared with the reference's, and any that share point structure and lie within 2 % in
   bounding-box-normalised shape are listed. Simpler shapes are left out, since a straight bar matches every
   straight bar. A match is a reason to look, not a verdict: the chain already shows the build never opened the
   reference, and a reference built on the same open base matches by design. A CFF reference cannot be compared
   with TrueType outlines, so the comparison is NOT RUN, and the report and the font book say so.
+- **hangul** (a fit with Hangul targets), per weight:
+  - `Hangul stem / Latin n stem`: the fitted font's ratio within ±0.05 of `hangul.stem_n`, the ratio a reference
+    measured with its own Latin n. NOT RUN when no reference measured both (a screenshot of Hangul alone, or Hangul
+    and Latin from different references).
+  - `Hangul face centre heights`: every class's mean face centre within ±15 units at cap 700 of its `cy` target.
+    NOT RUN without one (a screenshot has no baseline under the Hangul).
+  - `vertical strokes across the classes` (INFO): each class's vertical strokes, read on its measuring syllables
+    (`fontlib.hangul_class_strokes`), fitted against the base at the fit's Hangul location, and how far apart the
+    classes are in each. The fit promises no stem balance between classes: their x scales may differ by 6 %.
+  - `Hangul ink inside the advance` (INFO): how many Hangul glyphs leave their advance, fitted and base, and the
+    smallest side.
+  The two tolerances are provisional. Without a Latin reference the Latin follows the wght the Hangul chose and
+  only the measured Hangul targets apply.
 - **validity**: a ttx dump-and-reload (dump, compile, dump, compare), win ascent and descent covering every glyph,
   no variation tables left, and `fontbakery check-universal` when it is installed. Not installed is NOT RUN.
 - **licence**: see `licensing.md`.

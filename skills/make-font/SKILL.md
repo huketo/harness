@@ -39,7 +39,8 @@ The base is one TrueType (glyf) variable font in a plain `.ttf` file under the S
 grant ("This Font Software is licensed under the SIL Open Font License, Version 1.1") followed only by the
 sentences published fonts add to it. The check reads forms, not terms: a licence file with any other line, a
 copyright line or notice with a clause of its own, and Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not
-bases (`references/licensing.md`); merging two fonts and splitting WOFF2 files are out of scope.
+bases (`references/licensing.md`); merging two fonts and splitting WOFF2 files are out of scope. For Hangul the
+base also has Latin and all 11,172 modern syllables, and comes from the pinned list in `scripts/bases.json`.
 
 Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP 723), so run it with
 `uv run scripts/<name>.py`: uv installs Python 3.12, `fonttools`, `brotli`, `uharfbuzz`, `numpy`, `pillow` and
@@ -72,14 +73,16 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    `--category` to set it). With Hangul, add `korean` to `--scripts` (`latin,korean`): the Hangul targets go in
    one `hangul` object, and only values of one unit are merged. No Latin number is needed; without an n stem, the
    fit solves the weight from the Hangul stem, as a length when a reference gave one, else as its ratio to the H1
-   face. Where references disagree, the script lists the spread. Ask which way to lean instead of averaging a serif
-   with a sans.
+   face, and the Latin follows that weight. Where references disagree, the script lists the spread. Ask which way to
+   lean instead of averaging a serif with a sans.
    Done when `targets.json` exists and every spread has an answer or a stated default.
 
 4. **Find the foundation.** `uv run scripts/find_foundation.py targets.json --cache <dir> --out shortlist.json`.
    It ranks OFL variable families from the Google Fonts catalogue by distance to the targets
-   (`references/foundation.md`). Show the person the top three to five with their deltas, axes and Reserved Font
-   Names, render each beside a reference if you can, recommend one, and ask which to build on.
+   (`references/foundation.md`). With `korean` in the scripts it ranks only the bases pinned in `scripts/bases.json`,
+   each checked by sha256, and prints what each covers of every script asked (Noto Sans KR lacks Š š Ž ž Ÿ). Show
+   the person the top three to five with their deltas, axes and Reserved Font Names, render each beside a reference
+   if you can, recommend one, and ask which to build on.
    Done when the shortlist is shown and the question is asked.
 
 5. **Record the approval.** Only the person approves the base. Once they pick one, print the question:
@@ -101,8 +104,14 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    scripts, solves a y instance for stems and contrast, an x instance per width class for widths, merges them
    into one static per weight, and iterates until every class mean is within 0.3 percent, never stretching more
    than 3 percent (`references/fitting.md`). If a class hits the stretch limit, tell the person what that letter
-   class will be and offer a base with a width axis.
-   Done when every style is written and `fit-log.json` shows each class within tolerance or explained.
+   class will be and offer a base with a width axis. With Hangul targets it moves every Hangul glyph by one scale
+   for the whole Hangul (within 6 percent) and a final x and y scale per class (within 3 percent of it and of each
+   other), shifts each class to its centre height and advance when a file gave them, scales the compatibility jamo
+   by the one scale alone, and decomposes composites first; the Hangul wght is solved for the stem over that scale.
+   A later weight steps the wght from the first one's location by the weight-class difference. Square or open
+   syllable shapes, jamo shapes and stroke endings stay the base's: report them, never call them fitted.
+   Done when every style is written and `fit-log.json` shows each class within tolerance or explained, and, with
+   Hangul, the classes a limit held back (`transform.classes.Hn.wanted`) are told to the person.
 
 7. **Space.** `uv run scripts/space_font.py build/X-Regular.fit.ttf targets.json --out build/X-Regular.ttf
    --base-json base.json --fit-log build/fit-log.json [--track -4]`. Class sidebearings to the targets, an optional
@@ -114,13 +123,16 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    --fit-log build/fit-log.json --space-log build/*.space-log.json --holder "<who owns the modifications>"
    --out-dir dist/` (`references/licensing.md`). It checks the chain, remaking the fit's subset from the base,
    builds the package and its `package-log.json` in a private (0700) temporary folder, checks every TTF and WOFF2
-   against the chain, and only then moves the folder to `dist/`. Give one spaced font per style. `dist/` must lie
-   outside `build/` and hold no input, nor a link to one. Then
+   against the chain, and only then moves the folder to `dist/`. Give one spaced font per style; each gets one WOFF2,
+   whose size and build seconds `package-log.json` records. `dist/` must lie outside `build/` and hold no input,
+   nor a link to one. Then
    `uv run scripts/check_font.py dist/ttf/*.ttf --targets targets.json --base-json base.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log dist/package-log.json
    --reference <ref file> --package dist/ --out-dir checks/` (`references/checks.md`). It runs the same chain
-   check as the package step, then the package log's links. Look at every overlay
-   render yourself, at the text and the display size. A failed gate goes back to the step that owns it; a
+   check as the package step, then the package log's links. With Hangul it gates KS X 1001 and counts the modern
+   syllables, checks every Hangul glyph against the transform the fit log records, and compares each weight's Hangul
+   stem with its n stem and the class centre heights with the targets (not run without a Latin reference). Look at
+   every overlay render yourself, at the text and the display size. A failed gate goes back to the step that owns it; a
    refusal means a file left the chain, so rerun from the step that wrote it.
    Done when the check exits 0, or each failure is listed for the person with its number and the reason.
 
@@ -130,7 +142,8 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    WOFF2 given must be a package output it lists by sha256; anything else is refused, so the provenance page,
    which prints the approved base's sha256 and the approval verbatim, belongs to the fonts the book shows. It
    prints the pages as PNG and one PDF and fails on a fallback glyph or an overflow (`references/font-book.md`).
-   Open three pages and look before you hand it over.
+   A font with Hangul gets a fixed Hangul specimen (the class grid, Korean text, Korean and Latin mixed) and its
+   coverage as counts in `pages.json`. Open three pages and look before you hand it over.
    Done when `book/fontbook.pdf` exists and render_book.mjs exits 0.
 
 ## Hand-off
@@ -157,7 +170,8 @@ link the PDF. Name the fonts' provenance plainly: built on an open font they app
   Names, sample lines, rasteriser.
 - `scripts/chain.py` `base.json` and the chain each step's log carries.
 - `scripts/measure_font.py`, `measure_image.py`, `make_targets.py`: steps 2 and 3.
-- `scripts/find_foundation.py`: step 4. `record_base.py`: step 5. `fit_font.py`: step 6. `space_font.py`: step 7.
+- `scripts/find_foundation.py`, `bases.json` (the pinned Hangul bases): step 4. `record_base.py`: step 5.
+  `fit_font.py`: step 6. `space_font.py`: step 7.
 - `scripts/package.py`, `check_font.py`: step 8. `font_book.py`, `book.css`, `render_book.mjs`: step 9.
 - `scripts/test_*.py` gate tests on synthetic fonts (`testfonts.py`).
 - `references/`: measuring, foundation, fitting, spacing, checks, licensing, font-book.

@@ -90,6 +90,10 @@ HANGUL_OVERSHOOT = ("오", "고")  # a round top against a flat one
 HANGUL_TEXT = HANGUL_ANCHOR + "".join(HANGUL_CLASSES.values()) + "".join(HANGUL_HELD_OUT.values())
 # One line per class, each syllable between two anchors, so a screenshot splits into syllables at the anchors.
 SAMPLE_LINES_KO = [HANGUL_ANCHOR + "".join(c + HANGUL_ANCHOR for c in chars) for chars in HANGUL_CLASSES.values()]
+# How far fit_font.py may move the Hangul: one scale for the whole Hangul within HANGUL_SCALE_LIMIT of the base's, and
+# each class's final x and y scale within HANGUL_CLASS_LIMIT of that scale and of each other (references/fitting.md).
+HANGUL_SCALE_LIMIT = 0.06
+HANGUL_CLASS_LIMIT = 0.03
 # The units a Hangul number carries: lengths at cap height 700 (a Latin H measured with it), lengths per 1000 em
 # (a font file), and ratios, which need neither. make_targets.py merges values of one unit only.
 UNITS = ("cap700", "em1000", "ratio")
@@ -105,6 +109,24 @@ def hangul_class(ch):
     return f"H{shape + (3 if final else 0)}"
 
 
+COMPAT_JAMO = (0x3131, 0x318E)  # the Hangul compatibility jamo: a fit scales them by the Hangul's one scale only
+# The 2,350 syllables of KS X 1001 (EUC-KR rows 0xB0 to 0xC8), read from Python's own codec.
+KS_X_1001 = "".join(bytes([r, c]).decode("euc_kr") for r in range(0xB0, 0xC9) for c in range(0xA1, 0xFF))
+MODERN_SYLLABLES = "".join(map(chr, range(SYLLABLES[0], SYLLABLES[1] + 1)))
+
+
+def hangul_glyphs(font):
+    """glyph name -> its Hangul class (H1 to H6) for every precomposed syllable in the character map, and "jamo" for
+    every compatibility jamo."""
+    out = {}
+    for cp, name in font.getBestCmap().items():
+        if COMPAT_JAMO[0] <= cp <= COMPAT_JAMO[1]:
+            out[name] = "jamo"
+        elif cls := hangul_class(chr(cp)):
+            out[name] = cls
+    return out
+
+
 # The characters each script needs. check_font.py gates coverage on them, and fit_font.py subsets the base to them.
 COVERAGE = {
     "latin": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -114,13 +136,14 @@ COVERAGE = {
     "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
     "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
     "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
+    "korean": KS_X_1001,
 }
-# Scripts fit_font.py keeps in its subset that check_font.py has no coverage list for: which of their characters a
-# build must have is not settled here, so the subset keeps all of them and check_font.py reports the script as
-# unchecked.
-SUBSET_ONLY = {
-    # every modern syllable, then the compatibility jamo
-    "korean": "".join(map(chr, range(SYLLABLES[0], SYLLABLES[1] + 1))) + "".join(map(chr, range(0x3131, 0x318F))),
+COVERAGE_NAMES = {"korean": "KS X 1001"}  # what a COVERAGE list is, where it is a standard's
+# Characters fit_font.py keeps in its subset beyond a script's COVERAGE list, which check_font.py counts and reports
+# without gating: every modern syllable and the compatibility jamo.
+COVERAGE_REPORTED = {
+    "korean": {"modern syllables": MODERN_SYLLABLES,
+               "compatibility jamo": "".join(map(chr, range(COMPAT_JAMO[0], COMPAT_JAMO[1] + 1)))},
 }
 # Kept for every script: printable ASCII, Latin-1, and the typographic marks the font book and plain text use
 # (dashes, quotes, ellipsis, primes, fraction slash, minus).
@@ -129,14 +152,13 @@ COMMON_UNICODES = [(0x20, 0x7E), (0xA0, 0xFF), (0x2010, 0x2027), (0x2030, 0x203A
 
 
 def charset_unicodes(scripts):
-    """The code points a build for these scripts keeps, as pyftsubset's --unicodes value. Raises on a script
-    with no list in COVERAGE or SUBSET_ONLY, since a subset would silently drop it."""
-    lists = {**COVERAGE, **SUBSET_ONLY}
+    """The code points a build for these scripts keeps, as pyftsubset's --unicodes value: COVERAGE and
+    COVERAGE_REPORTED. Raises on a script with no list in COVERAGE, since a subset would silently drop it."""
     cps = {c for lo, hi in COMMON_UNICODES for c in range(lo, hi + 1)}
     for s in scripts:
-        if s not in lists:
-            raise ValueError(f"no character list for script {s!r} (known: {', '.join(lists)})")
-        cps |= {ord(c) for c in lists[s]}
+        if s not in COVERAGE:
+            raise ValueError(f"no character list for script {s!r} (known: {', '.join(COVERAGE)})")
+        cps |= {ord(c) for c in COVERAGE[s] + "".join(COVERAGE_REPORTED.get(s, {}).values())}
     runs, start, prev = [], None, None
     for c in sorted(cps):
         if start is None:
@@ -774,6 +796,22 @@ def hangul_stem_h1(ink):
     return stem / st.mean(b[3] - b[1] for _, b in h1) if stem and h1 else None
 
 
+def hangul_class_strokes(ink):
+    """Per class, the median width of the vertical strokes of its measuring syllables: every run across the face at
+    20, 35, 50, 65 and 80 % of its height that is narrower than a fifth of that height (a cut along a horizontal
+    stroke is longer, so it is left out)."""
+    out = {}
+    for cls, chars in HANGUL_CLASSES.items():
+        runs = []
+        for c, b in _boxes(ink, chars):
+            h = b[3] - b[1]
+            for t in (0.2, 0.35, 0.5, 0.65, 0.8):
+                runs += [r[1] - r[0] for r in ink.hspans(c, b[1] + h * t + 0.37) if r[1] - r[0] < h / 5]
+        if runs:
+            out[cls] = st.median(runs)
+    return out
+
+
 def _contrast(ink):
     """ㅇ in the anchor: its top and bottom thickness over its side thickness."""
     got = _boxes(ink, HANGUL_ANCHOR)
@@ -841,12 +879,13 @@ def hangul_geometry(ink, font=True):
     return out
 
 
-def hangul_measurement(geo, lengths, conf=None):
+def hangul_measurement(geo, lengths, conf=None, n_stem=None):
     """The `hangul` object of a measurement file: hangul_geometry's numbers, each tagged with its unit. lengths maps
     each length unit the source can give to the factor from its own units: cap700 when a Latin H was measured with
     it, em1000 in a font file. A key holds lengths or one ratio, never both, and a ratio key's suffix names its
-    denominator: _cap the Latin cap height, _h1 the H1 class's face. conf(kind, raw) is the confidence of a value
-    read from a raw size ("size", "stroke" or "edge"); a font file's values are all high."""
+    denominator: _cap the Latin cap height, _h1 the H1 class's face, _n the Latin n stem (n_stem, at cap 700, read
+    from the same source). conf(kind, raw) is the confidence of a value read from a raw size ("size", "stroke" or
+    "edge"); a font file's values are all high."""
     def tag(v, unit, kind, raw):
         return {"value": round(v, 4 if unit == "ratio" else 1), "unit": unit,
                 "confidence": conf(kind, raw) if conf else "high"}
@@ -881,6 +920,8 @@ def hangul_measurement(geo, lengths, conf=None):
         out["stem"] = length(geo["stem"], "stroke")
         if h1:
             out["stem_h1"] = ratio(geo["stem"] / h1["face_h"], "stroke", geo["stem"])
+        if cap and n_stem:
+            out["stem_n"] = ratio(geo["stem"] * cap / n_stem, "stroke", geo["stem"])
     if "fixed_width" in geo:
         out["fixed_width"] = geo["fixed_width"]
         if geo["fixed_width"]:
@@ -946,6 +987,32 @@ DISTANCE = {
     "n_stem": (6, 1.0),
 }
 WIDTH_SCALE = 0.025  # 2.5 % of a class mean advance is one unit
+# The Hangul ratios find_foundation.py compares, per class where the key is a class's: a relative gap of `scale`
+# (candidate over target, minus 1) is one unit of distance, times the weight.
+HANGUL_DISTANCE = {"aspect": (0.02, 1.0), "face_h_h1": (0.02, 1.0), "face_h_cap": (0.03, 1.0), "stem_h1": (0.05, 1.0)}
+
+
+def hangul_distance(target, cand, skip=()):
+    """Weighted distance and per-key relative deltas between two hangul objects (targets.json's, and a candidate's
+    hangul_measurement), on the ratio keys of HANGUL_DISTANCE that both have. Keys in skip are left out."""
+    total, deltas = 0.0, {}
+
+    def add(path, want, got, scale, w):
+        nonlocal total
+        a, b = tagged_value(want, "ratio"), tagged_value(got, "ratio")
+        if a and b:
+            d = b / a - 1
+            deltas[path] = round(d, 4)
+            total += w * (d / scale) ** 2
+    for key, (scale, w) in HANGUL_DISTANCE.items():
+        if key in skip:
+            continue
+        if key in target:
+            add(key, target[key], cand.get(key), scale, w)
+        for cls, c in (target.get("classes") or {}).items():
+            if key in c:
+                add(f"{cls}.{key}", c[key], ((cand.get("classes") or {}).get(cls) or {}).get(key), scale, w)
+    return round(total ** 0.5, 3), deltas
 
 
 def distance(target, cand, width_weight=1.0, skip=()):

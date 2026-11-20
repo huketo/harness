@@ -252,32 +252,71 @@ def _hangul_rects(cls, s, t, top_extra=0, inset=0):
     }[cls]
 
 
-def _hangul_glyphs(stem, chars, adv, scale=1.0, thin=None):
+def _jamo_rects(ch, s, t):
+    """A compatibility jamo: a consonant (ㄱ to ㅎ) as a ring, a vowel as a stem with a short bar."""
+    if ord(ch) < 0x314F:
+        return [(140, 100, 640, 600, False), (140 + s, 100 + t, 640 - s, 600 - t, True)]
+    return [(420, -40, 420 + s, 700 + round(s * 1.25), False), (420 + s, 300, 640, 300 + t, False)]
+
+
+COMPONENT_SHIFT = 50  # how far right a composite syllable places its second component (testfonts.hangul_vf)
+
+
+def _composite(parts):
+    """A composite glyph of (component name, x offset) pairs."""
+    from fontTools.ttLib.tables._g_l_y_f import Glyph, GlyphComponent
+    g = Glyph()
+    g.numberOfContours = -1
+    g.components = []
+    for name, dx in parts:
+        c = GlyphComponent()
+        c.glyphName, c.x, c.y, c.flags = name, dx, 0, 0x4  # ROUND_XY_TO_GRID, as fontTools' pens set it
+        g.components.append(c)
+    return g
+
+
+def _hangul_glyphs(stem, chars, adv, scale=1.0, thin=None, composite=""):
+    """name -> (glyph, advance) for each syllable or compatibility jamo. A syllable in `composite` is two components
+    instead, its first rectangles and the rest, the second drawn COMPONENT_SHIFT to the left and placed that far right,
+    so its outline is the simple syllable's."""
     s, t = stem, round(stem * 0.8) if thin is None else thin
     out = {}
-    for ch in chars:
-        cls = fontlib.hangul_class(ch)
-        rects = _hangul_rects(cls, s, t, top_extra=12 if ch == fontlib.HANGUL_OVERSHOOT[0] else 0,
-                              inset=60 if ch == fontlib.HANGUL_ANCHOR else 0)
+
+    def draw(rects, dx=0):
         pen = TTGlyphPen(None)
         for r in rects:
-            _rect(pen, *(round(c * scale) for c in r[:4]), r[4])
-        out[f"uni{ord(ch):04X}"] = (pen.glyph(), round(adv * scale))
+            _rect(pen, *(round(c * scale) + (dx if i % 2 == 0 else 0) for i, c in enumerate(r[:4])), r[4])
+        return pen.glyph()
+    for ch in chars:
+        cls = fontlib.hangul_class(ch)
+        rects = _jamo_rects(ch, s, t) if cls is None else _hangul_rects(
+            cls, s, t, top_extra=12 if ch == fontlib.HANGUL_OVERSHOOT[0] else 0,
+            inset=60 if ch == fontlib.HANGUL_ANCHOR else 0)
+        name = f"uni{ord(ch):04X}"
+        if ch in composite:
+            out[name + ".a"] = (draw(rects[:2]), 0)
+            out[name + ".b"] = (draw(rects[2:], -COMPONENT_SHIFT), 0)
+            out[name] = (_composite([(name + ".a", 0), (name + ".b", COMPONENT_SHIFT)]), round(adv * scale))
+        else:
+            out[name] = (draw(rects), round(adv * scale))
     return out
 
 
 OPSZ_STEM = 32  # how much thicker every vertical stroke of hangul_vf is at the top of its optical-size axis
 
 
-def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0, opsz=False):
+def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0, opsz=False, syllables="", jamo="",
+              composite="", alphabet=False):
     """A TrueType variable font with a weight axis 100-900 (stems 40, 80 at 400, 160), Latin glyphs of glyf_vf
     (all of them when latin is true, none when false, or the ones a string names, such as "H"), and every syllable
     fontlib measures, drawn from rectangles by class (the anchor 으 with a shorter ㅡ). Its em is HANGUL_UPM, its cap
     height 700, and every syllable `adv` units wide. At wght 400 the H1 face is 640 wide and 860 tall, the stem 80. `scale` draws the Hangul, its
     advance included, that many times larger against the Latin. With `opsz` it has an optical-size axis 10-90 too,
     10 by default: at 90 every vertical stroke is OPSZ_STEM units thicker and the horizontal ones are not, so the
-    contrast falls as the size rises."""
-    chars = sorted(set(fontlib.HANGUL_TEXT))
+    contrast falls as the size rises. `syllables` adds more syllables, drawn by their class; `jamo` adds compatibility
+    jamo; the syllables in `composite` are drawn as two components each (_hangul_glyphs). With `alphabet`, every
+    other basic Latin letter and figure maps to the n, the H or the O, so the font has the Latin a base needs."""
+    chars = sorted(set(fontlib.HANGUL_TEXT) | set(syllables) | set(jamo))
     keep = set(_shapes(80)) if latin is True else {".notdef", "space", *(latin or "")}
 
     def master(stem, thin=None):
@@ -288,17 +327,25 @@ def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0, opsz=Fa
                 for r in rects:
                     _rect(pen, *r)
                 glyphs[name], advs[name] = pen.glyph(), a
-        for name, (g, a) in _hangul_glyphs(stem, chars, adv, scale, thin).items():
+        for name, (g, a) in _hangul_glyphs(stem, chars, adv, scale, thin, composite).items():
             glyphs[name], advs[name] = g, a
         return glyphs, advs
     glyphs, advs = master(80)
     order = [n for n in ORDER if n in glyphs] + [f"uni{ord(c):04X}" for c in chars]
+    order += sorted(n for n in glyphs if n not in order)
     cmap = {cp: n for cp, n in CMAP.items() if n in glyphs}
     cmap.update({ord(c): f"uni{ord(c):04X}" for c in chars})
+    if alphabet:
+        for c in fontlib.LETTERS + "0123456789":
+            cmap.setdefault(ord(c), "O" if c.isdigit() else "H" if c.isupper() else "n")
     fb = FontBuilder(HANGUL_UPM, isTTF=True)
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap(cmap)
     fb.setupGlyf(glyphs)
+    glyf = fb.font["glyf"]
+    for n in order:
+        if glyphs[n].isComposite():
+            glyphs[n].recalcBounds(glyf)
     fb.setupHorizontalMetrics({n: (advs[n], glyphs[n].xMin if glyphs[n].numberOfContours else 0) for n in order})
     _finish(fb, family, "Copyright 2026 The Lumen Ledger Project Authors", OFL_NOTICE, None)
     axes = [("wght", 100, 400, 900, "Weight")] + ([("opsz", 10, 10, 90, "Optical size")] if opsz else [])
@@ -308,7 +355,7 @@ def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0, opsz=Fa
         masters.append((master(80 + OPSZ_STEM, thin=round(80 * 0.8))[0], {"opsz": (0, 1.0, 1.0)}))
     variations = {}
     for n in order:
-        if not glyphs[n].numberOfContours:
+        if glyphs[n].numberOfContours <= 0:  # empty, or a composite, whose component offsets do not vary
             continue
         base = list(glyphs[n].coordinates)
         tv = []
