@@ -17,20 +17,24 @@ const PLAIN_SCALAR_TRAP = /: | #|^[\[{&*!|>%@`"']/;
 const QUOTED = /^"(?:[^"\\]|\\.)*"$|^'(?:[^']|'')*'$/;
 const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 
-/** One top-level frontmatter key: the text after the colon, the block scalar's joined lines, and its 1-based line. */
+/** One top-level frontmatter key line: the key, the text after the colon, the block scalar's joined lines, and its 1-based line. */
 export interface FrontmatterField {
+	key: string;
 	raw: string;
 	block: string | null;
 	line: number;
 }
 
-/** The top-level keys of a SKILL.md frontmatter block, or a problem when the block is missing or not closed. */
-export function frontmatterFields(text: string): Map<string, FrontmatterField> | Omit<Problem, "path"> {
+/**
+ * The top-level key lines of a SKILL.md frontmatter block in file order, a repeated key once per line, or a problem
+ * when the block is missing or not closed. YAML loaders keep a repeated key's last value.
+ */
+export function frontmatterFields(text: string): FrontmatterField[] | Omit<Problem, "path"> {
 	const lines = text.split("\n");
 	if (lines[0] !== "---") return { line: 1, message: "SKILL.md must start with a `---` frontmatter block." };
 	const end = lines.indexOf("---", 1);
 	if (end < 0) return { line: 1, message: "The frontmatter block is not closed. Add a `---` line after the last key." };
-	const fields = new Map<string, FrontmatterField>();
+	const fields: FrontmatterField[] = [];
 	for (let i = 1; i < end; i++) {
 		const match = /^([A-Za-z][\w-]*):(?: (.*))?$/.exec(lines[i] ?? "");
 		if (!match) continue; // nested or continuation lines belong to the key above
@@ -41,7 +45,7 @@ export function frontmatterFields(text: string): Map<string, FrontmatterField> |
 			const body = lines.slice(i + 1, end).findIndex((line) => !/^(\s+\S|\s*$)/.test(line));
 			block = lines.slice(i + 1, body < 0 ? end : i + 1 + body).map((line) => line.trim()).filter(Boolean).join(" ");
 		}
-		fields.set(match[1] ?? "", { raw, block, line: i + 1 });
+		fields.push({ key: match[1] ?? "", raw, block, line: i + 1 });
 	}
 	return fields;
 }
@@ -49,10 +53,10 @@ export function frontmatterFields(text: string): Map<string, FrontmatterField> |
 /** Problems in one SKILL.md frontmatter block. `dir` is the skill's directory name. */
 export function checkFrontmatter(text: string, dir: string): Omit<Problem, "path">[] {
 	const fields = frontmatterFields(text);
-	if (!(fields instanceof Map)) return [fields];
+	if (!Array.isArray(fields)) return [fields];
 	const problems: Omit<Problem, "path">[] = [];
 	const seen = new Map<string, string>();
-	for (const [key, { raw, block, line }] of fields) {
+	for (const { key, raw, block, line } of fields) {
 		seen.set(key, block ?? raw);
 		if (block === null && raw !== "" && !QUOTED.test(raw) && PLAIN_SCALAR_TRAP.test(raw)) {
 			problems.push({ line, message: `\`${key}\` holds a colon-space, a space-hash, a leading YAML indicator, or unbalanced quotes. Wrap the whole value in double quotes and escape inner double quotes.` });

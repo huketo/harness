@@ -8,7 +8,7 @@ import { checkFrontmatter } from "../check-repo.ts";
 import type { AgentInvocation } from "./lib/run/agent.ts";
 import { gitText } from "./lib/run/skills.ts";
 import { parseRouting } from "./lib/route/cases.ts";
-import { descriptionOf, readDescriptions, ROUTE_SCOPE } from "./lib/route/classify.ts";
+import { descriptionOf, readDescriptions, ROUTE_SCOPE, ROUTE_SETTINGS, ROUTER_SYSTEM, routeArgs, routeRequest } from "./lib/route/classify.ts";
 import { main, type RouteResults } from "./lib/route/runner.ts";
 
 const roots: string[] = [];
@@ -121,16 +121,45 @@ describe("description-based routing run", () => {
 			assert.match(request, /- alpha: Draw alpha things\. Not for beta things\.\n/);
 			assert.match(request, /- beta: Write beta documents from a brief\.\n/);
 			assert.doesNotMatch(request, /UNCOMMITTED/);
-			assert.ok(call.args.includes("--disable-slash-commands"));
-			assert.deepEqual(call.args.slice(call.args.indexOf("--tools"), call.args.indexOf("--tools") + 2), ["--tools", ""]);
-			assert.equal(call.args[call.args.indexOf("--model") + 1], "test-model");
+			assert.deepEqual(call.args, routeArgs({ request, model: "test-model", effort: null }));
 		}
 		assert.deepEqual(t.cwdEntries, [0, 0, 0, 0, 0], "each call runs in an empty directory");
-		assert.ok(!existsSync(join(t.deps.tmpRoot, "route")) || readdirSync(join(t.deps.tmpRoot, "route", "demo-routing")).length === 0);
+		assert.deepEqual(readdirSync(t.deps.tmpRoot), [], "the run removes its work directory");
 		const r = t.results();
 		assert.equal(r.descriptionsCommit, t.sha);
 		assert.equal(r.totals.correct, 5);
 		assert.equal(r.prompts.find((p) => p.prompt === "Write the beta doc.")?.expected, "beta");
+	});
+
+	test("two runs that start in the same second keep their own work directories", async () => {
+		const t = setup({ "Draw an alpha.": "alpha" });
+		const otherOut = tmp();
+		const fake = t.deps.runAgent;
+		const cwdLeft: boolean[] = [];
+		let other: Promise<number> | null = null;
+		t.deps.runAgent = async (inv: AgentInvocation) => {
+			// The first call of the outer run lets a whole second run start and finish before it goes on.
+			if (!other) {
+				other = main(["--cases", t.casesFile, "--out-root", otherOut], { ...t.deps, runAgent: fake });
+				await other;
+			}
+			cwdLeft.push(existsSync(inv.cwd));
+			return fake(inv);
+		};
+		await t.run();
+		assert.ok(other);
+		assert.equal(cwdLeft.length, 5);
+		assert.ok(cwdLeft.every(Boolean), "the second run removed the first run's work directory");
+		assert.ok(existsSync(join(otherOut, "demo-routing", "run-2026-01-02T03-04-05Z", "results.json")));
+		assert.deepEqual(readdirSync(t.deps.tmpRoot), []);
+	});
+
+	test("refuses a run directory that already exists", async () => {
+		const t = setup();
+		mkdirSync(t.runDir, { recursive: true });
+		assert.equal(await t.run(), 1);
+		assert.ok(t.lines.some((l) => l.includes(`${t.runDir} already exists`)));
+		assert.equal(t.calls.length, 0);
 	});
 
 	test("grades a correct answer, another skill, none, a malformed answer, and a failed call separately", async () => {
@@ -192,6 +221,7 @@ describe("description-based routing run", () => {
 		assert.match(out, /5 prompts, 5 classification calls/);
 		assert.match(out, /p04 expect none +\| Fix the build\./);
 		assert.match(out, /claude -p <request> --model claude-opus-5-5 /);
+		assert.ok(out.includes(` --safe-mode --setting-sources "" --settings ${JSON.stringify(ROUTE_SETTINGS)} --max-turns 1 `));
 		assert.deepEqual(readdirSync(join(t.runDir, "..", "..")), [], "a dry run writes nothing");
 	});
 
@@ -224,6 +254,44 @@ describe("description parsing", () => {
 		assert.equal(descriptionOf(skillMd("a", "'It''s single.'")), "It's single.");
 		assert.equal(descriptionOf(skillMd("a", "Plain text, no traps.")), "Plain text, no traps.");
 		assert.equal(descriptionOf("---\nname: a\ndescription: >\n  Folded line one\n  and two.\nlicense: MIT\n---\n"), "Folded line one and two.");
+	});
+
+	test("reads a double-quoted description with YAML's escapes, not JSON's", () => {
+		const yaml = String.raw`"\x41\u00e9\U0001F600 \/ \t \\ \"q\" \ \_\N\L\P\0\a\b\e\v\f\r\n"`;
+		assert.equal(descriptionOf(skillMd("a", yaml)), 'A\u00e9\u{1F600} / \t \\ "q"  \u00a0\u0085\u2028\u2029\0\x07\b\x1b\v\f\r\n');
+		assert.throws(() => descriptionOf(skillMd("a", String.raw`"bad \q escape"`)), /\\q/);
+	});
+
+	test("reads the last line of a repeated description key", () => {
+		assert.equal(descriptionOf("---\nname: a\ndescription: First.\ndescription: Second.\n---\n"), "Second.");
+	});
+
+	test("the one-turn classification call keeps settings files, hooks, and automatic context out", () => {
+		assert.deepEqual(routeArgs({ request: "R", model: "m", effort: "low" }), [
+			"-p",
+			"R",
+			"--model",
+			"m",
+			"--effort",
+			"low",
+			"--output-format",
+			"stream-json",
+			"--verbose",
+			"--safe-mode",
+			"--setting-sources",
+			"",
+			"--settings",
+			'{"enabledPlugins":{"cc-plugin-agents-md@builtin":false}}',
+			"--max-turns",
+			"1",
+			"--disable-slash-commands",
+			"--no-session-persistence",
+			"--strict-mcp-config",
+			"--tools",
+			"",
+			"--system-prompt",
+			ROUTER_SYSTEM,
+		]);
 	});
 });
 
@@ -261,7 +329,13 @@ describe("routing case file", () => {
 		assert.match(problems((f) => (f.skills.a.should_not_fire[0]!.goes_to = "a")), /goes_to its own skill/);
 		assert.match(problems((f) => f.skills.b.should_fire.push("one")), /"one" expects both a and b/);
 		assert.match(problems((f) => (f.skills.a.should_fire = [])), /a\.should_fire must be a non-empty list/);
-		assert.match(problems((f) => (f.skills.b.should_not_fire[0]!.prompt = "-x")), /starts with "-"/);
+	});
+
+	test("accepts a prompt that starts with a dash: the request around it starts with fixed text", () => {
+		const f = valid();
+		f.skills.b.should_not_fire[0]!.prompt = "-x";
+		assert.equal(parseRouting(JSON.stringify(f), "f.json").prompts.at(-1)?.prompt, "-x");
+		assert.match(routeRequest([{ name: "a", description: "d" }], "-x"), /^An agent /);
 	});
 });
 

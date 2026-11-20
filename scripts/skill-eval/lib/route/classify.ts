@@ -22,17 +22,49 @@ export interface SkillDescription {
 	description: string;
 }
 
+/** YAML 1.2 double-quoted escapes other than `\x`, `\u`, and `\U`, which take 2, 4, and 8 hex digits. */
+const YAML_ESCAPES: Record<string, string> = {
+	"0": "\0",
+	a: "\x07",
+	b: "\b",
+	t: "\t",
+	"\t": "\t",
+	n: "\n",
+	v: "\v",
+	f: "\f",
+	r: "\r",
+	e: "\x1b",
+	" ": " ",
+	'"': '"',
+	"/": "/",
+	"\\": "\\",
+	N: "\u0085",
+	_: "\u00a0",
+	L: "\u2028",
+	P: "\u2029",
+};
+
+/** The text of a one-line YAML double-quoted scalar, quotes included. */
+function yamlDoubleQuoted(raw: string): string {
+	return raw.slice(1, -1).replace(/\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|.)/g, (whole, escape: string) => {
+		if (escape.length > 1) return String.fromCodePoint(Number.parseInt(escape.slice(1), 16));
+		const value = YAML_ESCAPES[escape];
+		if (value === undefined) throw new Error(`invalid YAML escape ${whole} in ${raw}`);
+		return value;
+	});
+}
+
 /**
  * The `description` value of a SKILL.md whose frontmatter `checkFrontmatter`
- * accepted: a double-quoted, single-quoted, plain, or block scalar.
+ * accepted: a double-quoted, single-quoted, plain, or block scalar. A repeated
+ * key reads its last line, as YAML loaders do.
  */
 export function descriptionOf(skillMd: string): string {
 	const fields = frontmatterFields(skillMd);
-	const field = fields instanceof Map ? fields.get("description") : undefined;
+	const field = Array.isArray(fields) ? fields.findLast((f) => f.key === "description") : undefined;
 	if (!field) throw new Error("no description key in the frontmatter");
 	if (field.block !== null) return field.block;
-	// YAML double-quoted escapes used in this repository (\" \\ \n \uXXXX) read the same as JSON's.
-	if (field.raw.startsWith('"')) return JSON.parse(field.raw) as string;
+	if (field.raw.startsWith('"')) return yamlDoubleQuoted(field.raw);
 	if (field.raw.startsWith("'")) return field.raw.slice(1, -1).replaceAll("''", "'");
 	return field.raw;
 }
@@ -57,7 +89,12 @@ export function readDescriptions(repoRoot: string, ref: string, names: string[])
 		}
 		const found = checkFrontmatter(text, name);
 		for (const p of found) problems.push(`${path}:${p.line}: ${p.message}`);
-		if (!found.length) skills.push({ name, description: descriptionOf(text) });
+		if (found.length) continue;
+		try {
+			skills.push({ name, description: descriptionOf(text) });
+		} catch (e) {
+			problems.push(`${path}: ${(e as Error).message}`);
+		}
 	}
 	if (problems.length) throw new Error(`skill descriptions at ${sha} are unusable\n  ${problems.join("\n  ")}`);
 	return { sha, skills };
@@ -79,7 +116,18 @@ export function routeRequest(skills: SkillDescription[], prompt: string): string
 	].join("\n");
 }
 
-/** `claude -p` arguments for one classification call: no tools, no skills, no slash commands, the router system prompt. */
+/**
+ * `claude -p` arguments for one classification call, checked against Claude
+ * Code 2.1.329: one turn, the router system prompt, and no tools, skills, slash
+ * commands, or MCP servers. `--safe-mode` drops CLAUDE.md, auto-memory, hooks,
+ * installed plugins, and other customizations while keeping the login, and an
+ * empty `--setting-sources` loads no user, project, or local settings file.
+ * Safe mode keeps the built-in plugins, so `ROUTE_SETTINGS` turns off the one
+ * that loads AGENTS.md files. Managed (policy) settings and the hooks of
+ * managed plugins still apply.
+ */
+export const ROUTE_SETTINGS = JSON.stringify({ enabledPlugins: { "cc-plugin-agents-md@builtin": false } });
+
 export function routeArgs(opts: { request: string; model: string; effort: string | null }): string[] {
 	const args = ["-p", opts.request, "--model", opts.model];
 	if (opts.effort) args.push("--effort", opts.effort);
@@ -87,6 +135,13 @@ export function routeArgs(opts: { request: string; model: string; effort: string
 		"--output-format",
 		"stream-json",
 		"--verbose",
+		"--safe-mode",
+		"--setting-sources",
+		"",
+		"--settings",
+		ROUTE_SETTINGS,
+		"--max-turns",
+		"1",
 		"--disable-slash-commands",
 		"--no-session-persistence",
 		"--strict-mcp-config",

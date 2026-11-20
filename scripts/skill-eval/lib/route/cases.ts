@@ -53,7 +53,6 @@ export function parseRouting(text: string, where: string): Routing {
 	const byText = new Map<string, RoutePrompt>();
 	const add = (prompt: unknown, expected: string, skill: string, fires: boolean, at: string) => {
 		if (!isText(prompt)) return problems.push(`${at} must be a non-empty string`);
-		if (prompt.startsWith("-")) return problems.push(`${at} starts with "-" and would be read as a flag`);
 		const seen = byText.get(prompt);
 		if (!seen) {
 			const id = `p${String(byText.size + 1).padStart(2, "0")}`;

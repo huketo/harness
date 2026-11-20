@@ -6,7 +6,7 @@
  * fake `runAgent` and call no model.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { parseTranscript } from "../run/agent.ts";
@@ -141,10 +141,18 @@ async function execute(opts: RouteOptions, deps: Deps): Promise<number> {
 	const runId = `run-${startedAt.toISOString().replace(/\.\d+Z$/, "Z").replaceAll(":", "-")}`;
 	const outRoot = opts.outRoot ? resolve(deps.cwd, opts.outRoot) : join(deps.repoRoot, "var", "skill-eval", "route");
 	const runDir = join(outRoot, routing.suite, runId);
-	if (existsSync(runDir)) throw new Error(`${runDir} already exists`);
+	mkdirSync(join(runDir, ".."), { recursive: true });
+	try {
+		// Not recursive, so a second run that picked the same directory fails here instead of sharing it.
+		mkdirSync(runDir);
+	} catch (e) {
+		if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`${runDir} already exists`);
+		throw e;
+	}
 	const transcripts = join(runDir, "transcripts");
-	mkdirSync(transcripts, { recursive: true });
-	const workRoot = join(deps.tmpRoot, "route", routing.suite, runId);
+	mkdirSync(transcripts);
+	mkdirSync(deps.tmpRoot, { recursive: true });
+	const workRoot = mkdtempSync(join(deps.tmpRoot, `route-${routing.suite}-`));
 
 	const routed: RoutedPrompt[] = [];
 	const classify = async (p: RoutePrompt) => {

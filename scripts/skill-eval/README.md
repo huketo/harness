@@ -38,7 +38,12 @@ node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interfac
 
 - 사례 파일은 [`routing/`](routing/)에 둡니다. 첫 파일 [`routing/design.json`](routing/design.json)은 디자인 스킬 여덟 개(`awesome-interface`, `design-md`, `make-font`, `make-logo`, `imagegen`, `image-to-code`, `diagram-design`, `awesome-slides`) 사이의 충돌 사례를 한국어와 영어 프롬프트로 담습니다. 스킬마다 `should_fire`(그 스킬로 가야 할 프롬프트)와 `should_not_fire`(`goes_to`에 적은 다른 스킬이나 `none`으로 가야 할 프롬프트)를 둡니다. 같은 프롬프트를 여러 곳에 적으면 기대값이 모두 같아야 하며, 분류 호출은 한 번만 합니다.
 - 설명은 작업 트리가 아니라 커밋(`--ref`, 기본값 `HEAD`)에서 읽고, `scripts/check-repo.ts`의 `checkFrontmatter`가 거부하는 frontmatter는 같은 메시지로 거부합니다.
-- 분류 호출은 빈 임시 디렉터리에서 도구, 스킬, 슬래시 명령 없이 `claude -p`로 보내며, 시스템 프롬프트는 라우터 지시 한 문장으로 바꿉니다. 사용자 전역 `CLAUDE.md`처럼 Claude Code가 늘 넣는 맥락은 그대로 들어갑니다.
+- 분류 호출은 실행마다 새로 만든 빈 임시 디렉터리에서 도구, 스킬, 슬래시 명령, MCP 서버 없이 `claude -p`로 보내며, 시스템 프롬프트는 라우터 지시 한 문장으로 바꿉니다. 인자는 Claude Code 2.1.329의 `claude --help`와 실행 파일로 확인했습니다.
+  - `--safe-mode`는 로그인을 유지한 채 `CLAUDE.md`, 자동 메모리, hook, 플러그인 같은 사용자 맞춤 설정을 끕니다. 따라서 전역 `CLAUDE.md`의 import가 작업 트리 텍스트를 분류 맥락에 넣지 못하고, Stop hook이 턴을 더 요청하지 못합니다.
+  - `--setting-sources ""`는 사용자, 프로젝트, 로컬 설정 파일을 읽지 않게 합니다.
+  - safe mode에서도 내장 플러그인은 남습니다. 그중 `AGENTS.md`를 맥락에 넣는 `cc-plugin-agents-md`는 `--settings`의 `enabledPlugins`로 끕니다. 스킬만 제공하는 내장 플러그인은 `--disable-slash-commands`로 스킬이 꺼지므로 그대로 둡니다.
+  - `--max-turns 1`은 호출을 한 턴으로 제한합니다. 이 플래그는 2.1.329의 `--help`에 나오지 않지만 실행 파일이 받아들이므로, Claude Code를 올린 뒤에는 `--dry-run`으로 보낼 인자를 다시 확인합니다.
+  - 한계: 관리자가 배포한 정책 설정(managed settings)과 관리 플러그인의 hook은 `--safe-mode`에서도 적용되며, 이를 끄는 플래그는 없습니다. `--bare`는 이것까지 줄이지만 OAuth 로그인을 읽지 않으므로 쓰지 않습니다.
 - 답은 다섯 가지로 채점합니다: `correct`(기대한 답), `wrong`(다른 후보 스킬), `none`(스킬을 기대했는데 `none`), `malformed`(후보 이름이나 `none`이 아닌 답), `failed`(호출이 답 없이 끝남). 모두 `correct`일 때만 종료 코드가 0입니다.
 
 ```bash
@@ -50,7 +55,7 @@ mise run skill-route
 mise run skill-route -- --model claude-opus-5-5 --ref HEAD~1
 ```
 
-결과 디렉터리에는 `report.md`(기대 답별 정답 수, 한국어와 그 밖의 프롬프트별 정답 수, 기대와 다르게 간 프롬프트 표), `results.json`, 호출별 `transcripts/`가 남습니다. 이 task는 `mise run check`와 CI에 들어 있지 않습니다. 설명을 고친 전후를 비교하려면 같은 모델로 `--ref`만 바꿔 두 번 실행하고 두 `report.md`를 나란히 봅니다.
+같은 출력 위치와 같은 시각(초 단위)으로 실행 디렉터리가 이미 있으면 그 실행은 시작하지 않고 실패합니다. 결과 디렉터리에는 `report.md`(기대 답별 정답 수, 한국어와 그 밖의 프롬프트별 정답 수, 기대와 다르게 간 프롬프트 표), `results.json`, 호출별 `transcripts/`가 남습니다. 이 task는 `mise run check`와 CI에 들어 있지 않습니다. 설명을 고친 전후를 비교하려면 같은 모델로 `--ref`만 바꿔 두 번 실행하고 두 `report.md`를 나란히 봅니다.
 
 ## 테스트
 
