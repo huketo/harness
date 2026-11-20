@@ -68,6 +68,11 @@ arguments `fit-log.json` records and compare its sha256, so a subset from anothe
 log names it. They cannot tell who wrote a file: one agent that hand-writes the fonts and every log so they agree
 is not stopped by code. The guarantee rests on running each step with its script and never editing its output.
 
+The checks assume no one else can write where the build runs. `package.py` stages the package in an owner-only
+folder beside `--out-dir` and publishes it by that folder's descriptor, but it writes the staged files by path, so
+another account that can write to the parent of `--out-dir` could still interfere before the package is published.
+Package into a folder whose parent only you can write.
+
 ## What this skill adds
 
 - **A new family name**, chosen by the person, that contains neither the base's family name nor any word from

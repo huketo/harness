@@ -768,6 +768,34 @@ class Publish(unittest.TestCase):
         self.assertEqual(text(os.path.join(out, "old.txt")), "the package already published")
         self.assertEqual(sorted(os.listdir(private)), [P.STAGED])
 
+    def test_replace_keeps_the_backup_when_neither_package_gets_back_in_place(self):
+        """Installing the new package and moving the old one back both fail: the old one is kept, not cleaned up."""
+        import package as P
+        d = tempfile.mkdtemp(prefix="mf-publish-")
+        self.addCleanup(shutil.rmtree, d, True)
+        out, private = os.path.join(d, "dist"), os.path.join(d, ".package-new")
+        os.makedirs(out)
+        os.makedirs(os.path.join(private, P.STAGED))
+        T.write(os.path.join(out, "old.txt"), "the package already published")
+        real = os.rename
+
+        def rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None):
+            if src in (P.STAGED, "old") and src_dir_fd is not None:
+                raise OSError("synthetic failure")
+            return real(src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
+        fd = os.open(private, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            with mock.patch("os.rename", rename), self.assertRaises(OSError):
+                P.publish(fd, out, True)
+        finally:
+            os.close(fd)
+        self.assertFalse(os.path.exists(out))
+        self.assertEqual(P.discard_staging(private, out), os.path.join(private, "old"))
+        self.assertEqual(text(os.path.join(private, "old", "old.txt")), "the package already published")
+        os.makedirs(out)
+        self.assertIsNone(P.discard_staging(private, out))
+        self.assertFalse(os.path.exists(private))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -312,6 +312,16 @@ def publish(private_fd, out_dir, replace):
 STAGED = "package"
 
 
+def discard_staging(private, out_dir):
+    """Delete the private staging folder, unless --replace moved the previous package into it and neither package
+    got back to out_dir (both renames failed, or the run stopped between them). Returns the kept backup's path."""
+    backup = os.path.join(private, "old")
+    if os.path.lexists(backup) and not os.path.lexists(out_dir):
+        return backup
+    shutil.rmtree(private, ignore_errors=True)
+    return None
+
+
 def inside(path, folder):
     """True when path is folder or lies in it, read every way --replace could reach it: the path as given, its
     folder's links resolved (where its own entry is), and every link resolved (the file it leads to). The folder is
@@ -466,7 +476,9 @@ a larger work. A modified version keeps this licence and the copyright lines, an
         publish(private_fd, out_dir, a.replace)
     finally:
         os.close(private_fd)
-        shutil.rmtree(private, ignore_errors=True)
+        kept = discard_staging(private, out_dir)
+        if kept:
+            print(f"the previous package was kept at {kept}; move it back to {out_dir}", file=sys.stderr)
     print(f"verified against the chain, wrote {a.out_dir}: " + ", ".join(listed))
 
 
