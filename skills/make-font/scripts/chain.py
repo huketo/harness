@@ -506,8 +506,8 @@ def verify_package_log(files, b, package_log, fonts):
     ins = pkg["chain"].get("inputs") or []
     if not ins or any(e.get("sha256") not in outputs(*b.spaces) for e in ins):
         raise Refused(f"{package_log}: package.py took a font that is not an output of the space logs")
-    # "from" names the spaced font an output came from. Packages made before it was recorded have none; the Hangul
-    # outline check, which needs it, fails without it (check_font.space_track).
+    # "from" names the spaced font an output came from. Packages made before it was recorded have none; on a Hangul
+    # font the row "Hangul spacing from the space log that made this font" fails without it (check_font.space_track).
     if any("from" in e and e["from"] not in {i.get("sha256") for i in ins} for e in pkg["chain"]["outputs"]):
         raise Refused(f"{package_log}: an output names a spaced font it came from that is not among the inputs")
     checked = [require_output(files, p, [pkg], "--package-log", "package.py") for p in fonts]

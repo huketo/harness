@@ -27,7 +27,8 @@ with the arguments `fit-log.json` records does not have the recorded sha256 (the
 `space_font.py` read anything but fitted fonts and this `targets.json`. Then the package log: it must record
 this `targets.json` and exactly the fit and space logs given (by sha256), have taken only spaced fonts, list
 every font checked here as an output, name for each output the spaced font (one of its inputs) it came from when
-it names one (package logs written before this record have none, and then the Hangul outline gate fails), and find
+it names one (package logs written before this record have none, and then the row "Hangul spacing from the
+space log that made this font" fails), and find
 every output it lists (each TTF and WOFF2) in its own folder with
 the recorded sha256. Each input is read once, so the gates run on the bytes the chain checked. When every link
 holds, the **chain** group lists them as PASS. That
