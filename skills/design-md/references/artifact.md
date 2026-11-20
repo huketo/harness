@@ -74,6 +74,8 @@ List shared component owners and the semantic contract for components in scope. 
 
 Describe shape, surface, icon, and feedback behavior with source-backed tokens. Keep local exceptions explicit. A static reference proves only the state shown; keyboard behavior, state transitions, data behavior, and recovery paths require implementation or runtime evidence.
 
+An in-depth entry for one component follows [the component entry format](component.md); link it from this section instead of repeating its contents.
+
 ### Motion and reduced motion
 
 Separate three evidence layers:

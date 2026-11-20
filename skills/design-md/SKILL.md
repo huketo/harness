@@ -10,11 +10,15 @@ Produce one truthful, agent-friendly design-system artifact at the repository-ow
 
 ## 1. Confirm scope and destination
 
-Use this workflow only when design-system documentation is explicitly requested. An ordinary UI fix, implementation, or review stays in [awesome-interface](../awesome-interface/SKILL.md) and does not require a `DESIGN.md`.
+Use this workflow only when design-system documentation or a token mapping report is explicitly requested. An ordinary UI fix, implementation, or review stays in [awesome-interface](../awesome-interface/SKILL.md) and does not require a `DESIGN.md`.
 
-Identify the product or surface, audiences, source inputs, requested output, and whether the user wants extraction, creation, maintenance, an intentional design update, or rules learned from corrections. Inspect repository guidance and search narrowly for the existing design-system document and its inbound links.
+Identify the product or surface, audiences, source inputs, requested output, and whether the user wants extraction, creation, maintenance, an intentional design update, rules learned from corrections, one component's entry, or a token mapping report. Inspect repository guidance and search narrowly for the existing design-system document and its inbound links.
 
 To learn rules from the user's corrections, settle the destination here, then follow [learning from corrections](references/corrections.md) in place of sections 2–4; section 5's completion checks still apply to whatever it writes.
+
+To report how values in an existing implementation map onto the project's own tokens, follow [the token mapping report](references/mapping-rules.md) in place of sections 2–5. That mode is read-only: it writes no file, edits no code, token definition, or artifact, and delivers its report in the reply, so the destination rules below do not apply to it.
+
+To document one shared component and nothing else, follow [the component entry format](references/component.md) in place of sections 2–4; section 5's completion checks still apply to the entry. Link the entry from the existing design-system artifact when there is one. When there is none, the entry stands on its own: the rule below that creates an artifact applies to artifact requests, not to a link for one entry.
 
 - Honor an explicit output location.
 - Otherwise update the existing repository-owned artifact in place, even when it is not named `DESIGN.md`.
@@ -53,6 +57,8 @@ Load deeper guidance only for a domain being documented or changed:
 - [accessibility](../awesome-interface/references/accessibility.md) for semantics, focus, reduced motion, reflow, and evidence limits.
 
 These references guide documentation quality; they do not authorize a redesign or a full interface audit.
+
+When the artifact you are writing needs one shared component documented in depth, write its entry in [the component entry format](references/component.md) and link it from the artifact's Components and states section.
 
 ## 4. Apply deliberate updates
 
