@@ -5,7 +5,7 @@
  * loads a skill or watches an agent decide to use one.
  */
 
-import { checkFrontmatter } from "../../../check-repo.ts";
+import { checkFrontmatter, frontmatterFields } from "../../../check-repo.ts";
 import { git, resolveRef } from "../run/skills.ts";
 import { NONE } from "./cases.ts";
 
@@ -27,23 +27,14 @@ export interface SkillDescription {
  * accepted: a double-quoted, single-quoted, plain, or block scalar.
  */
 export function descriptionOf(skillMd: string): string {
-	const lines = skillMd.split("\n");
-	const end = lines.indexOf("---", 1);
-	const at = lines.findIndex((line, i) => i > 0 && i < end && /^description:/.test(line));
-	if (at < 0) throw new Error("no description key in the frontmatter");
-	const value = (lines[at] ?? "").slice("description:".length).trim();
-	if (/^[|>][+-]?\d*$/.test(value)) {
-		const body: string[] = [];
-		for (const line of lines.slice(at + 1, end)) {
-			if (!/^(\s+\S|\s*$)/.test(line)) break;
-			if (line.trim()) body.push(line.trim());
-		}
-		return body.join(" ");
-	}
+	const fields = frontmatterFields(skillMd);
+	const field = fields instanceof Map ? fields.get("description") : undefined;
+	if (!field) throw new Error("no description key in the frontmatter");
+	if (field.block !== null) return field.block;
 	// YAML double-quoted escapes used in this repository (\" \\ \n \uXXXX) read the same as JSON's.
-	if (value.startsWith('"')) return JSON.parse(value) as string;
-	if (value.startsWith("'")) return value.slice(1, -1).replaceAll("''", "'");
-	return value;
+	if (field.raw.startsWith('"')) return JSON.parse(field.raw) as string;
+	if (field.raw.startsWith("'")) return field.raw.slice(1, -1).replaceAll("''", "'");
+	return field.raw;
 }
 
 /**
