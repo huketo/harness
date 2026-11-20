@@ -125,8 +125,9 @@ A key holds lengths (one entry per length unit the source has) or one ratio, nev
 names its denominator: `_cap` the Latin cap height, `_h1` the H1 class's mean face (height, or width for
 `face_w_h1`). `make_targets.py` merges values of one unit only; a value in another unit stays beside them as a
 target of its own. It refuses a reference whose number is anything but a non-empty list of tagged values, each with
-a numeric `value` and one of the three units, at most one per unit: a tag outside a list, a tag without a value,
-a bare number.
+a numeric `value` and one of the units the table in [The `hangul` object](#the-hangul-object-targetsjson) gives
+its key, at most one per unit: a tag outside a list, a tag without a value, a bare number, a `ratio` under
+`face_w`. A key outside that table (`classes.H7`, `report.stem`) is refused too.
 
 ### What is measured
 
@@ -167,10 +168,12 @@ per em), and its sides differ by at most 0.5 % of the advance. Without anchors, 
 fit the text, the line is cut at its N − 1 widest gaps (N characters), and only when the narrowest of those is at
 least 1.5 times, and 2 px more than, the widest gap left inside a syllable. Otherwise the script stops, because
 the gap between ㅇ and ㅣ in 이 can be as wide as the gap between two syllables. A line with exactly N groups of
-ink leaves no gap inside a syllable to compare, so it stops too: 이이 drawn tight is four groups. A screenshot of
-Hangul alone in which no class was read on two different syllables stops as well. `cut_at` records which way each
-line was cut. A line whose syllables all have blank rows at one height (a final under the vowel) reads as two
-bands of ink; bands are joined across the narrowest gaps when those stand as far apart from the line gaps.
+ink leaves no gap inside a syllable to compare, so it stops too: 이이 drawn tight is four groups. A line of one
+character without anchors has no gap between two syllables to check, so it stops as well: 이이 drawn tight and
+typed as 이 would read as one wide syllable. A screenshot of Hangul alone in which no class was read on two
+different syllables stops as well. `cut_at` records which way each line was cut. A line whose syllables all have
+blank rows at one height (a final under the vowel) reads as two bands of ink; bands are joined across the narrowest
+gaps when those stand as far apart from the line gaps.
 
 Confidence: a face is high from 60 px tall, medium from 30 px; strokes as for Latin; the overshoot is low under a
 120 px face.

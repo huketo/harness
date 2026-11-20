@@ -40,12 +40,13 @@ For each style:
 Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Without a Latin n stem to aim at,
 the weight comes from the Hangul stem: as a length when a reference gave one (`stem` at cap 700, else per 1000 em),
 else as the ratio `stem_h1`. wght is solved so the base's vertical stem, in that unit or over its H1 face height,
-meets it, the stem and the cap height or H1 face read at the same wght; each later style steps from that wght by
-its weight-class difference. Before step 5, every Hangul target is stated in the y instance's own units beside
-what the base draws there: a length at cap 700 against the y instance's cap height, a length per 1000 em against
-the finished font's em, a ratio by the base's own H1 face. fit-log.json records them under each style's `hangul`.
-No Hangul glyph is moved yet: the base keeps its Hangul sizes, centres and spacing, and the Hangul follows the y
-instance.
+meets it, the stem and the cap height or H1 face read at the same wght, at every location step 1 tries. Each later
+style steps by its weight-class difference from the wght where the first style's y instance landed, and the stem
+the base draws there is its own aim at the other locations tried. Before step 5, every Hangul target is stated in
+the y instance's own units beside what the base draws there: a length at cap 700 against the y instance's cap
+height, a length per 1000 em against the finished font's em, a ratio by the base's own H1 face. fit-log.json
+records them under each style's `hangul`. No Hangul glyph is moved yet: the base keeps its Hangul sizes, centres
+and spacing, and the Hangul follows the y instance.
 
 Output: <DIR>/<Family>-<Style>.fit.ttf and fit-log.json. The fonts still carry the base's names: package.py
 renames them. Run space_font.py next.
@@ -171,11 +172,35 @@ def hangul_weight_aim(T):
 
 
 def solve_hangul_wght(B, loc, aim):
-    """The wght where the base's Hangul stem meets `aim` (hangul_weight_aim), each try read at its own wght."""
+    """loc with the wght where the base's Hangul stem meets `aim` (hangul_weight_aim), each try read at its own
+    wght."""
     lo, _, hi = B.axes["wght"]
     _, target, measure = aim
     w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), measure, target, lo, hi)
-    return round(w, 2)
+    return {**loc, "wght": round(w, 2)}
+
+
+def y_tries(B, fixed, args, tg):
+    """The locations the y instance is chosen from: nine optical sizes across the axis when the base has one, --loc
+    leaves it free and the targets have a contrast, else the --loc location alone."""
+    if "opsz" in B.axes and "opsz" not in fixed and not args.no_contrast and tg.get("contrast"):
+        lo, de, hi = B.axes["opsz"]
+        return [{**fixed, "opsz": round(lo + (hi - lo) * i / 8, 2)} for i in range(9)]
+    return [dict(fixed)]
+
+
+def pick_y(B, tries, weigh, tg):
+    """The y instance: each location tried takes its wght from weigh(loc), and the one whose contrast, bar to stem
+    and x-height to cap come closest to the targets wins. Returns (location, its measurements)."""
+    best = None
+    for loc in tries:
+        loc = weigh(loc)
+        m = L.measure_face(B.tiny(loc))
+        err = sum(((m.get(k) or 0) - tg[k]) ** 2 / s ** 2 for k, s in (("contrast", 0.04), ("bar_stem", 0.06), ("xh_cap", 0.01))
+                  if tg.get(k) is not None)
+        if best is None or err < best[0]:
+            best = (err, loc, m)
+    return best[1], best[2]
 
 
 HANGUL_LENGTHS = ("face_w", "face_h", "cx", "cy", "side", "side_asym", "adv")
@@ -388,29 +413,43 @@ def fit_style(B, T, style, args, log):
     fixed = parse_loc(args.loc)
     first = T["styles"][0]
     step = style["weight"] - first["weight"]
-    hangul_aim = hangul_weight_aim(T)
-    # Stem target: the style's own. Else find the base weight that draws the first style's stem (the Latin n stem,
-    # or without one the Hangul stem: a length, else its ratio to the H1 face), step it by the difference in weight
-    # class (500 - 400 = +100), and take the stem the base draws there.
-    stem_t, hangul_w, weight_from = style.get("n_stem"), None, "n_stem"
-    if stem_t is None and "wght" in B.axes and (first.get("n_stem") or hangul_aim):
+    tries = y_tries(B, fixed, args, tg)
+    aim = hangul_weight_aim(T)
+    # Stem target: the style's own. Else find the base weight that draws the first style's stem, step it by the
+    # difference in weight class (500 - 400 = +100), and take the stem the base draws there. The Latin n stem gives
+    # an n stem to solve. Without one the Hangul stem does (a length, else its ratio to the H1 face): solved at every
+    # location the y instance is chosen from, and stepped from where the first style's y instance landed.
+    stem_t, weigh, weight_from = style.get("n_stem"), None, "n_stem"
+    if stem_t is None and "wght" in B.axes and first.get("n_stem"):
         lo, _, hi = B.axes["wght"]
-        if first.get("n_stem"):
-            cap = B.tiny(fixed, "nHx").bounds("H")[3]
-            w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
-            source = "the n stem"
-        else:
-            w1 = solve_hangul_wght(B, fixed, hangul_aim)
-            weight_from = hangul_aim[0]
-            source = f"the Hangul {hangul_aim[0]} {hangul_aim[1]}"
+        cap = B.tiny(fixed, "nHx").bounds("H")[3]
+        w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
         w2 = round(min(max(w1 + step, lo), hi), 2)
         stem_t = L.stem_cap700(B.tiny({**fixed, "wght": w2}, "nHx"))
-        if weight_from != "n_stem":
-            hangul_w = w2
         if step:
             weight_from += ", stepped from the first style"
         log.append(f"{style['name']}: n stem target {stem_t:.1f}: the first style sits at wght {w1:.0f} on the base "
-                   f"(solved from {source}), this one {step:+d} from it at wght {w2:.0f}")
+                   f"(solved from the n stem), this one {step:+d} from it at wght {w2:.0f}")
+    elif stem_t is None and "wght" in B.axes and aim:
+        weight_from = aim[0]
+        if step:
+            lo, _, hi = B.axes["wght"]
+            first_y, _ = pick_y(B, tries, lambda loc: solve_hangul_wght(B, loc, aim), tg)
+            stepped = {**first_y, "wght": round(min(max(first_y["wght"] + step, lo), hi), 2)}
+            log.append(f"{style['name']}: the first style's y instance sits at {first_y} (solved from the Hangul "
+                       f"{aim[0]} {aim[1]}), this one {step:+d} from it at wght {stepped['wght']:.0f}")
+            # The stem the base draws there is this style's aim. At the first style's own location the stepped wght
+            # draws it, at another one the wght that draws the same stem.
+            aim = (aim[0], aim[2](B.hangul(stepped)), aim[2])
+            weight_from += ", stepped from the first style"
+
+            def weigh(loc):
+                return stepped if {**loc, "wght": stepped["wght"]} == stepped else solve_hangul_wght(B, loc, aim)
+        else:
+            def weigh(loc):
+                return solve_hangul_wght(B, loc, aim)
+        log.append(f"{style['name']}: wght solved from the Hangul {aim[0]} {aim[1]:.4g} at each location the y "
+                   "instance is chosen from")
     elif stem_t is None and "wght" not in B.axes:
         stem_t = first.get("n_stem") or L.stem_cap700(B.tiny(fixed, "nHx"))
         weight_from = "the base, which has no weight axis"
@@ -421,23 +460,13 @@ def fit_style(B, T, style, args, log):
     else:
         log.append(f"{style['name']}: n stem target {stem_t:.1f}")
     # 1. y instance
-    tries = [dict(fixed)]
-    if "opsz" in B.axes and "opsz" not in fixed and not args.no_contrast and tg.get("contrast"):
-        lo, de, hi = B.axes["opsz"]
-        tries = [{**fixed, "opsz": round(lo + (hi - lo) * i / 8, 2)} for i in range(9)]
-    best = None
-    for loc in tries:
-        if hangul_w is None:
-            cap = B.tiny(loc, "nHx").bounds("H")[3]
-            loc = solve_wght(B, loc, "n", stem_t * cap / L.CAP)
-        else:
-            loc = {**loc, "wght": hangul_w}
-        m = L.measure_face(B.tiny(loc))
-        err = sum(((m.get(k) or 0) - tg[k]) ** 2 / s ** 2 for k, s in (("contrast", 0.04), ("bar_stem", 0.06), ("xh_cap", 0.01))
-                  if tg.get(k) is not None)
-        if best is None or err < best[0]:
-            best = (err, loc, m)
-    _, yloc, ym = best
+    if weigh is None:
+        def weigh(loc):
+            return solve_wght(B, loc, "n", stem_t * B.tiny(loc, "nHx").bounds("H")[3] / L.CAP)
+    yloc, ym = pick_y(B, tries, weigh, tg)
+    if stem_t is None:  # the weight came from the Hangul: the Latin keeps the stem the base draws there
+        stem_t = L.stem_cap700(B.tiny(yloc, "nHx"))
+        log.append(f"{style['name']}: n stem target {stem_t:.1f}, the base's at the y instance")
     log.append(f"{style['name']}: y instance {yloc}: contrast {ym['contrast']} (target {tg.get('contrast')}), "
                f"bar/stem {ym['bar_stem']} (target {tg.get('bar_stem')}), x-height/cap {ym['xh_cap']} (target {tg.get('xh_cap')})")
     cap_y = B.tiny(yloc, "nHx").bounds("H")[3]

@@ -150,9 +150,10 @@ def _rect(pen, x0, y0, x1, y1, hole=False):
     pen.closePath()
 
 
-def _shapes(stem):
-    """Rectangles per glyph at one stem thickness: (advance, [(x0, y0, x1, y1, hole)])."""
-    s, t = stem, round(stem * 0.8)
+def _shapes(stem, thin=None):
+    """Rectangles per glyph at one stem thickness: (advance, [(x0, y0, x1, y1, hole)]). The horizontal strokes are
+    0.8 of the stem, or `thin` units thick."""
+    s, t = stem, round(stem * 0.8) if thin is None else thin
     S = round(stem * 1.05)
     return {
         ".notdef": (500, [(50, 0, 450, 700, False), (100, 50, 400, 650, True)]),
@@ -251,8 +252,8 @@ def _hangul_rects(cls, s, t, top_extra=0, inset=0):
     }[cls]
 
 
-def _hangul_glyphs(stem, chars, adv, scale=1.0):
-    s, t = stem, round(stem * 0.8)
+def _hangul_glyphs(stem, chars, adv, scale=1.0, thin=None):
+    s, t = stem, round(stem * 0.8) if thin is None else thin
     out = {}
     for ch in chars:
         cls = fontlib.hangul_class(ch)
@@ -265,24 +266,29 @@ def _hangul_glyphs(stem, chars, adv, scale=1.0):
     return out
 
 
-def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0):
+OPSZ_STEM = 32  # how much thicker every vertical stroke of hangul_vf is at the top of its optical-size axis
+
+
+def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0, opsz=False):
     """A TrueType variable font with a weight axis 100-900 (stems 40, 80 at 400, 160), Latin glyphs of glyf_vf
     (all of them when latin is true, none when false, or the ones a string names, such as "H"), and every syllable
     fontlib measures, drawn from rectangles by class (the anchor 으 with a shorter ㅡ). Its em is HANGUL_UPM, its cap
     height 700, and every syllable `adv` units wide. At wght 400 the H1 face is 640 wide and 860 tall, the stem 80. `scale` draws the Hangul, its
-    advance included, that many times larger against the Latin."""
+    advance included, that many times larger against the Latin. With `opsz` it has an optical-size axis 10-90 too,
+    10 by default: at 90 every vertical stroke is OPSZ_STEM units thicker and the horizontal ones are not, so the
+    contrast falls as the size rises."""
     chars = sorted(set(fontlib.HANGUL_TEXT))
     keep = set(_shapes(80)) if latin is True else {".notdef", "space", *(latin or "")}
 
-    def master(stem):
+    def master(stem, thin=None):
         glyphs, advs = {}, {}
-        for name, (a, rects) in _shapes(stem).items():
+        for name, (a, rects) in _shapes(stem, thin).items():
             if name in keep:
                 pen = TTGlyphPen(None)
                 for r in rects:
                     _rect(pen, *r)
                 glyphs[name], advs[name] = pen.glyph(), a
-        for name, (g, a) in _hangul_glyphs(stem, chars, adv, scale).items():
+        for name, (g, a) in _hangul_glyphs(stem, chars, adv, scale, thin).items():
             glyphs[name], advs[name] = g, a
         return glyphs, advs
     glyphs, advs = master(80)
@@ -295,16 +301,18 @@ def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0):
     fb.setupGlyf(glyphs)
     fb.setupHorizontalMetrics({n: (advs[n], glyphs[n].xMin if glyphs[n].numberOfContours else 0) for n in order})
     _finish(fb, family, "Copyright 2026 The Lumen Ledger Project Authors", OFL_NOTICE, None)
-    fb.setupFvar(axes=[("wght", 100, 400, 900, "Weight")], instances=[])
-    heavy, _ = master(160)
-    light, _ = master(40)
+    axes = [("wght", 100, 400, 900, "Weight")] + ([("opsz", 10, 10, 90, "Optical size")] if opsz else [])
+    fb.setupFvar(axes=axes, instances=[])
+    masters = [(master(160)[0], {"wght": (0, 1.0, 1.0)}), (master(40)[0], {"wght": (-1.0, -1.0, 0)})]
+    if opsz:
+        masters.append((master(80 + OPSZ_STEM, thin=round(80 * 0.8))[0], {"opsz": (0, 1.0, 1.0)}))
     variations = {}
     for n in order:
         if not glyphs[n].numberOfContours:
             continue
         base = list(glyphs[n].coordinates)
         tv = []
-        for other, region in ((heavy[n], {"wght": (0, 1.0, 1.0)}), (light[n], {"wght": (-1.0, -1.0, 0)})):
+        for other, region in ((m[n], region) for m, region in masters):
             d = [(q[0] - p[0], q[1] - p[1]) for p, q in zip(base, other.coordinates)] + [(0, 0)] * 4
             tv.append(TupleVariation(region, d))
         variations[n] = tv
@@ -313,11 +321,11 @@ def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0):
     return path
 
 
-def instance(src, dst, wght):
-    """The static font of a variable font at one weight."""
+def instance(src, dst, wght, **axes):
+    """The static font of a variable font at one weight, and at `axes` when it has more."""
     from fontTools.ttLib import TTFont
     from fontTools.varLib import instancer
-    instancer.instantiateVariableFont(TTFont(src), {"wght": wght}).save(dst)
+    instancer.instantiateVariableFont(TTFont(src), {"wght": wght, **axes}).save(dst)
     return dst
 
 

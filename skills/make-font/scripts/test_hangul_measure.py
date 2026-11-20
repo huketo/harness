@@ -217,6 +217,17 @@ class Segmentation(Lines):
         self.assertIn("gap", r.stderr)
         self.assertIn(L.HANGUL_ANCHOR, r.stderr)
 
+    def test_refuses_lines_of_one_character_without_anchors(self):
+        # Three lines of 이이 set tight, read as 이, 니 and 미: one character to a line leaves no gap between two
+        # syllables to check, so 이이 would read as one wide syllable.
+        png = self.p("tight-one-per-line.png")
+        sheet(self.p("tight.ttf"), ["이이"] * 3, png)
+        r = T.run("measure_image.py", png, "--text", "이|니|미", "--out", png + ".json")
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+        self.assertIn("one character", r.stderr)
+        self.assertIn(L.HANGUL_ANCHOR, r.stderr)
+        self.assertFalse(os.path.exists(png + ".json"))
+
     def test_cuts_a_line_without_anchors_at_its_widest_gaps_when_they_stand_apart(self):
         r = self.measure(self.p("loose.ttf"), "가나이니")
         self.assertEqual(r.returncode, 0, r.stderr)

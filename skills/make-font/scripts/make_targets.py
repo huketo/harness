@@ -21,7 +21,8 @@ category, and the package's CSS example falls back to sans-serif, serif or monos
 Hangul: when --scripts has korean, the references' `hangul` objects merge into one `hangul` object of the same
 shape. Every value is tagged with its unit (cap700, em1000 or ratio), and only values of one unit merge, by the
 same weights; a value in another unit stays beside them as its own target. A number that is not a list of tagged
-values, each with a value and one of the three units, is refused. The advances take the form the merged
+values, each with a value and one of the units its key takes, is refused, and so is a key outside the table in
+references/measuring.md (HANGUL_SCHEMA). The advances take the form the merged
 fixed_width names (one font-wide advance, or one per class), and a reference of the other form is left out of
 them. No Latin number is needed: a screenshot of Hangul alone makes targets from its ratios.
 """
@@ -43,7 +44,22 @@ SCALARS = ["xh", "xh_cap", "asc", "desc", "overshoot_lc", "overshoot_uc", "n_ste
 DISAGREE = {"xh_cap": 0.02, "contrast": 0.08, "n_stem": 8, "serif_ext": 20, "rhythm": 0.08}
 HANGUL_DISAGREE = 0.04  # references whose values of one unit differ by more than this share are listed
 HANGUL_PER_REFERENCE = ("units", "held_out", "cut_at", "left_out")  # how one reference was read, not a target
-HANGUL_NAMES = {"syllables": str, "fixed_width": bool}  # the keys whose value is a name or a flag, not a number
+# The table of the hangul object in references/measuring.md, the contract the later steps read: per key, the units
+# of its tagged list, the type of a name or a flag, or the keys of a group.
+LENGTHS, RATIO = ("cap700", "em1000"), ("ratio",)
+HANGUL_CLASS_SCHEMA = {
+    "syllables": str, "face_w": LENGTHS, "face_h": LENGTHS, "face_w_cap": RATIO, "face_h_cap": RATIO,
+    "face_w_h1": RATIO, "face_h_h1": RATIO, "aspect": RATIO, "cx": LENGTHS, "cy": LENGTHS, "side": LENGTHS,
+    "side_asym": LENGTHS, "center_adv": RATIO, "adv": LENGTHS, "adv_cap": RATIO,
+}
+HANGUL_SCHEMA = {
+    "classes": {cls: HANGUL_CLASS_SCHEMA for cls in L.HANGUL_CLASSES},
+    "stem": LENGTHS, "stem_h1": RATIO, "fixed_width": bool, "adv": LENGTHS, "adv_cap": RATIO,
+    "report": {
+        "overshoot": LENGTHS, "hstroke": LENGTHS, "overshoot_h1": RATIO, "hstroke_h1": RATIO, "contrast": RATIO,
+        "pitch": {cls: ("cap700",) for cls in L.HANGUL_CLASSES}, "pitch_h1": {cls: RATIO for cls in L.HANGUL_CLASSES},
+    },
+}
 ADVANCES = ("adv", "adv_cap")  # font-wide for fixed-width Hangul, per class for proportional Hangul, never both
 TOLERANCES = {
     "text": {"stem": 3, "width_pct": 1.5, "para_pct": 1.5, "contrast": 0.05, "xh": 6, "side": 4, "min_gap": 6},
@@ -96,22 +112,30 @@ def is_tag(e):
             and e.get("unit") in L.UNITS and e.get("confidence", "high") in RANK)
 
 
-def check_hangul(tree, where):
-    """Refuses a reference's hangul object unless every number in it is a list of tagged values, each with a value
-    and one of the three units, at most one per unit: anything else cannot be merged by unit. An object is a group
-    of keys; one that holds a value or a unit is a tag out of its list, and refused."""
+def check_hangul(tree, where, schema=HANGUL_SCHEMA):
+    """Refuses a reference's hangul object unless it holds only the keys of HANGUL_SCHEMA, and every number in it is
+    a list of tagged values, each with a value and one of the units its key takes, at most one per unit: anything
+    else cannot be merged by unit, or is not a target the later steps read."""
     for key, val in tree.items():
         at = f"{where}.{key}"
-        if key in HANGUL_PER_REFERENCE:
+        if schema is HANGUL_SCHEMA and key in HANGUL_PER_REFERENCE:
             continue
-        if key in HANGUL_NAMES:
-            if not isinstance(val, HANGUL_NAMES[key]):
-                raise SystemExit(f"{at}: {val!r} is not a {HANGUL_NAMES[key].__name__}")
-        elif isinstance(val, dict) and not {"value", "unit"} & set(val):
-            check_hangul(val, at)
+        want = schema.get(key)
+        if want is None:
+            raise SystemExit(f"{at}: the hangul object has no such key; here it takes {', '.join(schema)} "
+                             "(references/measuring.md)")
+        if isinstance(want, type):
+            if not isinstance(val, want):
+                raise SystemExit(f"{at}: {val!r} is not a {want.__name__}")
+        elif isinstance(want, dict):
+            if not isinstance(val, dict):
+                raise SystemExit(f"{at}: {val!r} is not an object of {', '.join(want)}")
+            check_hangul(val, at, want)
         elif not (isinstance(val, list) and val and all(is_tag(e) for e in val)):
             raise SystemExit(f"{at}: {val!r} is not a list of values tagged with a unit, "
-                             f'[{{"value": <number>, "unit": "<unit>"}}, ...]; the units are {", ".join(L.UNITS)}')
+                             f'[{{"value": <number>, "unit": "<unit>"}}, ...]; its units are {", ".join(want)}')
+        elif bad := sorted({e["unit"] for e in val} - set(want)):
+            raise SystemExit(f"{at}: {', '.join(bad)} is not a unit of this key; its units are {', '.join(want)}")
         elif len({e["unit"] for e in val}) < len(val):
             raise SystemExit(f"{at}: {val!r} has two values in one unit")
 

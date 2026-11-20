@@ -9,6 +9,7 @@ the y instance's own units."""
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -16,8 +17,11 @@ import unittest
 from fontTools.ttLib import TTFont
 
 import fontlib as L
+import make_targets
 import measure_image
 import testfonts as T
+
+MEASURING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references", "measuring.md")
 
 
 def load(path):
@@ -93,6 +97,57 @@ class Merge(Scratch):
         self.assertNotEqual(r.returncode, 0, r.stdout)
         self.assertIn("px", r.stderr)
         self.assertFalse(os.path.exists(out))
+
+    def test_a_key_or_a_unit_outside_the_hangul_table_is_refused(self):
+        cases = {  # the hangul object, and the path the refusal names
+            "a class outside H1 to H6": (measurement("image", {"H7": {"aspect": [v(0.9, "ratio")]}}), "classes.H7"),
+            "a ratio where lengths belong": (measurement("file", {"H1": {"face_w": [v(0.9, "ratio")]}}),
+                                             "classes.H1.face_w"),
+            "a length where a ratio belongs": (measurement("file", {"H1": {"aspect": [v(560.0, "em1000")]}}),
+                                               "classes.H1.aspect"),
+            "a key outside the table": (measurement("file", {"H1": {"aspect": [v(0.9, "ratio")]}},
+                                                    stem_cap=[v(0.1, "ratio")]), "hangul.stem_cap"),
+            "a class key outside the table": (measurement("file", {"H1": {"stem": [v(80.0, "em1000")]}}),
+                                              "classes.H1.stem"),
+            "a pitch per 1000 em": (measurement("image", {"H1": {"aspect": [v(0.9, "ratio")]}},
+                                                report={"pitch": {"H1": [v(2000.0, "em1000")]}}),
+                                    "report.pitch.H1"),
+            "a report key outside the table": (measurement("image", {"H1": {"aspect": [v(0.9, "ratio")]}},
+                                                           report={"stem": [v(80.0, "cap700")]}), "report.stem"),
+            "a class that is not an object": (measurement("image", {"H1": [v(0.9, "ratio")]}), "classes.H1"),
+        }
+        for case, (m, where) in cases.items():
+            with self.subTest(case=case):
+                r, out = self.targets(m)
+                self.assertNotEqual(r.returncode, 0, r.stdout)
+                self.assertIn(where, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+                self.assertFalse(os.path.exists(out))
+
+    def test_the_check_takes_the_keys_and_units_of_the_table_in_measuring_md(self):
+        with open(MEASURING, encoding="utf-8") as fh:
+            table = fh.read().split("### The `hangul` object (targets.json)")[1]
+        doc = {}  # path -> units, from the table's rows
+        for row in (r for r in table.splitlines() if r.startswith("| `")):
+            cells = [c.strip() for c in row.strip("|").split("|")]
+            names = re.findall(r"`([^`]+)`", cells[0])
+            parent = names[0].rpartition(".")[0]
+            for name in names:
+                path = name if "." in name or not parent else f"{parent}.{name}"
+                for cls in L.HANGUL_CLASSES:
+                    doc[path.replace("Hn", cls)] = tuple(re.findall(r"`([^`]+)`", cells[2]))
+
+        def leaves(schema, prefix=""):
+            for key, want in schema.items():
+                if isinstance(want, dict):
+                    yield from leaves(want, f"{prefix}{key}.")
+                else:
+                    yield prefix + key, want
+        schema = dict(leaves(make_targets.HANGUL_SCHEMA))
+        self.assertEqual({p: u for p, u in doc.items() if u}, {p: u for p, u in schema.items() if isinstance(u, tuple)})
+        # without units: the names and the flag, the classes group, and the spread make_targets.py adds
+        self.assertEqual({p for p, u in doc.items() if not u},
+                         {p for p, u in schema.items() if isinstance(u, type)} | {"classes", "spread"})
 
     def test_hangul_measurements_without_latin_make_targets(self):
         m = measurement("image", {"H1": {"aspect": [v(0.75, "ratio")]}}, stem_h1=[v(0.1, "ratio")])
@@ -300,6 +355,60 @@ class Fit(Scratch):
             with self.subTest(cls=cls):
                 self.assertAlmostEqual(got[cls]["face_h_cap"][0]["value"], want[cls]["face_h_cap"][0]["value"],
                                        delta=0.003)
+
+
+class OpticalSize(Scratch):
+    """A base with an optical-size axis whose vertical strokes thicken as the size rises (testfonts.OPSZ_STEM), and
+    a screenshot of the same face at opsz 90 and wght 400 with H, o and the Korean lines, so the targets have a
+    Hangul stem at cap 700 and a contrast. The opsz scan picks 90 for the contrast; the weight must be solved there."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        p = cls.p
+        cls.base = T.hangul_vf(p("LumenLedger[opsz,wght].ttf"), latin=True, opsz=True)
+        assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
+        T.instance(cls.base, p("ref-90.ttf"), 400, opsz=90)
+        lines = ["HoH", *L.SAMPLE_LINES_KO]
+        measure_image.render_sheet(L.Face(p("ref-90.ttf"), subset_text=L.MEASURE_TEXT + L.HANGUL_TEXT), lines,
+                                   SHOT_PX, p("shot.png"))
+        cls.runs = {
+            "measure": T.run("measure_image.py", p("shot.png"), "--text", "|".join(lines), "--out", p("m.json")),
+            "targets": T.run("make_targets.py", p("m.json"), "--family", T.NEW_FAMILY, "--scripts", "latin,korean",
+                             "--style", "Regular:400", "--style", "Bold:700", "--out", p("targets.json")),
+            "fit": T.run("fit_font.py", cls.base, p("targets.json"), "--base-json", p("base.json"), "--out-dir",
+                         p("build")),
+        }
+        cls.runs["measure fitted"] = T.run("measure_font.py", p("build", "TesseraSans-Regular.fit.ttf"), "--out",
+                                           p("m-fitted.json"))
+
+    def test_every_step_ran(self):
+        for step, r in self.runs.items():
+            with self.subTest(step=step):
+                ok(self, r)
+
+    def style(self, i):
+        return load(self.p("build", "fit-log.json"))["styles"][i]
+
+    def test_the_first_weight_is_solved_at_the_optical_size_the_scan_picks(self):
+        t = load(self.p("targets.json"))
+        self.assertIsNotNone(t["targets"].get("contrast"))
+        want = L.tagged_value(t["hangul"]["stem"], "cap700")
+        self.assertAlmostEqual(want, 80 + T.OPSZ_STEM, delta=2)
+        s = self.style(0)
+        self.assertEqual(s["y_location"]["opsz"], 90)
+        self.assertAlmostEqual(s["y_location"]["wght"], 400, delta=15)  # solved at opsz 10 it would be 600
+        stem = s["hangul"]["stem"]
+        self.assertEqual(stem["from"], "cap700")
+        self.assertAlmostEqual(stem["base"] / stem["target"], 1, delta=0.01)
+        fitted = L.tagged_value(load(self.p("m-fitted.json"))["hangul"]["stem"], "cap700")
+        self.assertAlmostEqual(fitted / want, 1, delta=0.015)
+
+    def test_the_second_weight_steps_from_where_the_first_landed(self):
+        first, second = self.style(0), self.style(1)
+        self.assertEqual(second["hangul"]["weight_from"], "stem cap700, stepped from the first style")
+        self.assertEqual(second["y_location"]["opsz"], first["y_location"]["opsz"])
+        self.assertAlmostEqual(second["y_location"]["wght"], first["y_location"]["wght"] + 300, delta=0.01)
 
 
 if __name__ == "__main__":

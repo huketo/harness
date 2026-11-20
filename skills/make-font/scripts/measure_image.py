@@ -269,7 +269,8 @@ def hangul_letters(cov, chars, text):
     two anchors is one syllable, whatever its gaps. Otherwise, or when the anchors found do not fit the text, the
     line is cut at its len(chars) - 1 widest gaps, and refused unless those stand clearly apart from the gaps left
     inside a syllable. A line with one group per character leaves no gap inside a syllable to compare, so it is
-    refused too: its groups may as well be the parts of fewer syllables."""
+    refused too: its groups may as well be the parts of fewer syllables. So is a line of one character: it has no
+    gap between two syllables to check, and its ink may be more than one syllable."""
     comps = components(cov > 0.15)
     if comps:
         med = st.median(len(c[0]) for c in comps)
@@ -293,17 +294,20 @@ def hangul_letters(cov, chars, text):
     order = sorted(range(len(gaps)), key=lambda i: -gaps[i])
     cut, inner = sorted(order[:n - 1]), [gaps[i] for i in order[n - 1:]]
     why = f"its {a} anchors were not found" if anchored else f"it has no {a} anchors"
-    if cut and not inner:
+    if not cut:
+        raise SystemExit(f"line {text!r}: {why}, and it has one character, so no gap between two syllables is left to "
+                         "show where one ends: its ink may be more than one syllable. Type the "
+                         f"{a} X {a} lines (fontlib.SAMPLE_LINES_KO).")
+    if not inner:
         raise SystemExit(f"line {text!r}: {why}, and it has one group of ink per character ({n}), so no gap is left "
                          "inside a syllable to show that the gaps between them stand apart: the groups may be the "
                          f"parts of fewer syllables. Type the {a} X {a} lines (fontlib.SAMPLE_LINES_KO).")
-    if cut:
-        narrow, wide = min(gaps[i] for i in cut), max(inner)
-        if narrow < max(GAP_APART * wide, wide + 2):
-            raise SystemExit(f"line {text!r}: {why}, and its gaps do not fall in two groups: the "
-                             f"narrowest gap between syllables would be {narrow} px and the widest inside one "
-                             f"{wide} px, so the syllables cannot be told apart. Type the {a} X {a} lines "
-                             "(fontlib.SAMPLE_LINES_KO), or set the text looser.")
+    narrow, wide = min(gaps[i] for i in cut), max(inner)
+    if narrow < max(GAP_APART * wide, wide + 2):
+        raise SystemExit(f"line {text!r}: {why}, and its gaps do not fall in two groups: the "
+                         f"narrowest gap between syllables would be {narrow} px and the widest inside one "
+                         f"{wide} px, so the syllables cannot be told apart. Type the {a} X {a} lines "
+                         "(fontlib.SAMPLE_LINES_KO), or set the text looser.")
     return letters([0, *(i + 1 for i in cut), len(groups)]), "gaps"
 
 

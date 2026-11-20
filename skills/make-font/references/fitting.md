@@ -35,8 +35,9 @@ follow x.
 ## The steps
 
 1. **y instance.** For each optical size tried (nine across the axis, unless `--loc` fixes it), solve the weight
-   axis so the n stem meets the target, then measure contrast, bar to stem and x-height to cap. Keep the size
-   with the smallest error. With `--no-contrast` the opsz scan is skipped.
+   axis so the n stem meets the target (without a Latin n stem, the Hangul stem: see [Hangul](#hangul)), then
+   measure contrast, bar to stem and x-height to cap. Keep the size with the smallest error. With
+   `--no-contrast` the opsz scan is skipped.
 2. **x instance per class.** For each width class: on a width axis, bisect wdth so the class's mean advance meets
    its target. At every wdth tried, solve wght again so the class's stem (n for lowercase, H for capitals and
    figures) meets its target, because width changes stems. Without a width axis, or where it runs out, scale the
@@ -98,9 +99,12 @@ this order:
 3. `stem_h1` (a screenshot of Hangul alone): the base's stem over its H1 mean face height meets the ratio.
 
 The cap height and the face height move a little with the weight, so each try reads them and the stem at the same
-wght. Each later style starts from that wght and moves by its weight-class difference (Bold 700 after Regular 400:
-+300), clamped to the axis. Targets with neither an n stem nor a Hangul stem are refused. Without a Latin target,
-the Latin takes the wght the Hangul chose, which keeps the base's own balance between the two.
+wght. The wght is solved at every optical size the y instance is chosen from (step 1), so the stem holds at the
+size the contrast scan keeps. Each later style starts from the wght where the first style's y instance landed and
+moves by its weight-class difference (Bold 700 after Regular 400: +300), clamped to the axis. The stem the base
+draws there is that style's own: at the first style's optical size the stepped wght draws it, at the other sizes
+tried the wght that draws the same stem. Targets with neither an n stem nor a Hangul stem are refused. Without a
+Latin target, the Latin takes the wght the Hangul chose, which keeps the base's own balance between the two.
 
 **Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
 there, and only then does `finish()` scale the em, once, at the end:
