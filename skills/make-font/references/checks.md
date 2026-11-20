@@ -25,14 +25,18 @@ refuses to go on when a link is broken. `chain.verify_build` is the same check `
 `fit_font.py` read anything but the approved base and this `targets.json`; the subset made again from the base
 with the arguments `fit-log.json` records does not have the recorded sha256 (the subset file is never read);
 `space_font.py` read anything but fitted fonts and this `targets.json`. Then the package log: it must record
-this `targets.json` and exactly the fit and space logs given (by sha256), have taken only spaced fonts, and list
-every font checked here as an output. When every link holds, the **chain** group lists them as PASS. That
+this `targets.json` and exactly the fit and space logs given (by sha256), have taken only spaced fonts, list
+every font checked here as an output, and find every output it lists (each TTF and WOFF2) in its own folder with
+the recorded sha256. Each input is read once, so the gates run on the bytes the chain checked. When every link
+holds, the **chain** group lists them as PASS. That
 structure is the provenance guarantee: the steps that draw the font never opened a reference. It cannot rule
 out one agent hand-writing the fonts and every log consistently (`licensing.md`).
 
 `checks/check-report.json` holds `base` (the base's file name, full sha256, source, and its licence's id, file
 name, sha256, name ID 13 and Reserved Font Names), `approval` (question, answer, decision and time, verbatim from
-`base.json`) and `gates`, one row per gate. The font book reads it.
+`base.json`), `package.outputs` (the TTF and WOFF2 files verified above, by name inside the package and sha256)
+and `gates`, one row per gate. The font book reads it and shows only fonts it lists. A report or render path
+that leads to an input, through a link or not, is refused.
 
 ## The groups
 

@@ -14,6 +14,12 @@ languages, licence and install, where the check summary lists the gates that fai
 provenance: the approved base's file name and full sha256, its licence's sha256, and the approval question and
 answer verbatim, all from check-report.json.
 Every number on a page is read from the font files or the logs when the book is written.
+
+The book is written only for fonts check_font.py verified: every TTF given, and every WOFF2 taken from
+--webfonts, must have a sha256 that check-report.json lists among the package outputs ("package": {"outputs"}).
+Anything else, or a report that lists none, is refused, so the provenance page always belongs to the fonts the
+book shows. Each file is read once (chain.Files) and the fonts copied beside the book are those bytes. An output
+path that leads to an input, through a link or not, is refused.
 The book's own text names no reference and no base family. The licence page quotes the copyright lines from
 the font's name table, which is what the OFL requires, and the provenance page quotes the approval record,
 which names the base.
@@ -25,14 +31,13 @@ import argparse
 import datetime
 import html
 import os
-import shutil
 import sys
 import unicodedata
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fontTools.ttLib import TTFont  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
 esc = html.escape
@@ -222,41 +227,56 @@ def main():
     ap.add_argument("--tagline")
     ap.add_argument("--version")
     a = ap.parse_args()
-    os.makedirs(a.out_dir, exist_ok=True)
+    files = C.Files()
+    check = files.read(a.check_report, "check-report.json").json("check-report.json")
+    outputs = (check.get("package") or {}).get("outputs") if isinstance(check, dict) else None
+    verified = {e.get("sha256") for e in outputs or [] if isinstance(e, dict)}
+    if not verified:
+        raise C.Refused(f"{a.check_report} lists no package output, so it is not a check-report.json that "
+                        "check_font.py wrote for a package. The font book prints the provenance of the fonts the check "
+                        "verified; run check_font.py on the package again.")
+    font_files = [files.read(p, "font") for p in a.fonts]
+    web_files = []
+    for p in a.fonts:
+        cand = os.path.join(a.webfonts, os.path.splitext(os.path.basename(p))[0] + ".woff2") if a.webfonts else None
+        web_files.append(files.read(cand, "web font") if cand and os.path.exists(cand) else None)
+    for blob in font_files + [w for w in web_files if w]:
+        if blob.sha256 not in verified:
+            raise C.Refused(f"{blob.path} (sha256 {blob.sha256}) is not a package output {a.check_report} lists. The "
+                            "font book shows only the fonts check_font.py verified, so that its provenance page "
+                            "belongs to them. Give the package's own files, with the check report made for them.")
+    T = files.read(a.targets, "targets.json").json("targets.json") if a.targets else None
+    fit = files.read(a.fit_log, "--fit-log").json("--fit-log") if a.fit_log else None
+    space = [files.read(p, "--space-log").json("--space-log") for p in a.space_log]
     fdir = os.path.join(a.out_dir, "fonts")
-    os.makedirs(fdir, exist_ok=True)
+    copies = [(os.path.join(fdir, os.path.basename(b.path)), b) for b in font_files + [w for w in web_files if w]]
+    for path in [c for c, _ in copies] + [os.path.join(a.out_dir, n) for n in ("index.html", "pages.json")]:
+        files.check_output(path)
 
-    fonts = [TTFont(p) for p in a.fonts]
+    fonts = [b.font() for b in font_files]
     reg = fonts[0]
     nm = L.english_names(reg)
     family = nm.get(16) or nm.get(1)
     styles = [(L.english_names(f).get(17) or "Regular", f["OS/2"].usWeightClass) for f in fonts]
     version = a.version or f"{reg['head'].fontRevision:.3f}"
-    T = L.load_json(a.targets) if a.targets else None
-    fit = L.load_json(a.fit_log) if a.fit_log else None
-    space = [L.load_json(p) for p in a.space_log]
-    check = L.load_json(a.check_report)
     face = L.Face(reg)
     cm = face.cmap
     upm = face.upm
     FEATS = feats(reg)
 
-    # Copy the fonts beside the book so the HTML works wherever the folder goes.
+    # Copy the fonts beside the book, the bytes checked above, so the HTML works wherever the folder goes.
+    for path, blob in copies:
+        files.write(path, blob.data)
     font_css = ""
     web = []
-    for p, (sty, w) in zip(a.fonts, styles):
-        shutil.copy(p, os.path.join(fdir, os.path.basename(p)))
-        wp = None
-        if a.webfonts:
-            cand = os.path.join(a.webfonts, os.path.splitext(os.path.basename(p))[0] + ".woff2")
-            if os.path.exists(cand):
-                shutil.copy(cand, os.path.join(fdir, os.path.basename(cand)))
-                wp = os.path.basename(cand)
+    for p, (sty, w), wb in zip(a.fonts, styles, web_files):
+        wp = os.path.basename(wb.path) if wb else None
         src = f'url("fonts/{wp}") format("woff2")' if wp else f'url("fonts/{os.path.basename(p)}") format("truetype")'
         font_css += f'@font-face {{ font-family: "{family} Book"; src: {src}; font-weight: {w}; font-style: normal; }}\n'
         web.append(wp)
     font_css += (f'@font-face {{ font-family: "{family} Book Full"; src: url("fonts/{os.path.basename(a.fonts[0])}") '
                  f'format("truetype"); font-weight: {styles[0][1]}; font-style: normal; }}\n')
+    sizes = {os.path.basename(b.path): len(b.data) for _, b in copies}
 
     # metrics of the Regular, in font units
     def top(c):
@@ -562,9 +582,9 @@ def main():
     copyright_lines = esc(names.get(0, "")).replace("\n", "<br>")
     rows = ""
     for p, (s, w), wp in zip(a.fonts, styles, web):
-        rows += f"<tr><td class='mono'>{esc(os.path.basename(p))}</td><td>{esc(s)}, desktop</td><td class='n'>{os.path.getsize(p) / 1024:.0f} KB</td></tr>"
+        rows += f"<tr><td class='mono'>{esc(os.path.basename(p))}</td><td>{esc(s)}, desktop</td><td class='n'>{sizes[os.path.basename(p)] / 1024:.0f} KB</td></tr>"
         if wp:
-            rows += f"<tr><td class='mono'>{esc(wp)}</td><td>{esc(s)}, web</td><td class='n'>{os.path.getsize(os.path.join(fdir, wp)) / 1024:.0f} KB</td></tr>"
+            rows += f"<tr><td class='mono'>{esc(wp)}</td><td>{esc(s)}, web</td><td class='n'>{sizes[wp] / 1024:.0f} KB</td></tr>"
     css_snip = "\n".join(f'@font-face {{\n  font-family: "{family}";\n  src: url("webfonts/{(wp or os.path.basename(p))}");\n  font-weight: {w};\n  font-display: swap;\n}}'
                          for p, (s, w), wp in zip(a.fonts, styles, web))
     checks = ""
@@ -622,9 +642,9 @@ def main():
 <body>
 {''.join(p for _, _, p in B.pages)}
 </body></html>"""
-    with open(os.path.join(a.out_dir, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(doc)
-    L.save_json({"family": family, "pages": [[n, s] for n, s, _ in B.pages]}, os.path.join(a.out_dir, "pages.json"))
+    files.write(os.path.join(a.out_dir, "index.html"), doc.encode("utf-8"))
+    files.write_json(os.path.join(a.out_dir, "pages.json"),
+                     {"family": family, "pages": [[n, s] for n, s, _ in B.pages]})
     print(f"{len(B.pages)} pages: {os.path.join(a.out_dir, 'index.html')}")
     print("next: node render_book.mjs " + a.out_dir)
 

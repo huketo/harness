@@ -4,8 +4,12 @@
 # ///
 """The provenance chain, end to end on a synthetic base: base.json, fit, space, package and check, and every way
 of stepping around it."""
+import builtins
+import contextlib
 import hashlib
 import html
+import importlib
+import io
 import json
 import os
 import shutil
@@ -52,6 +56,78 @@ def refused(test, r, *words):
     for w in ("refused",) + words:
         test.assertIn(w, r.stderr)
     return r
+
+
+def in_process(script, *args):
+    """Run one skill script's main() in this process, so a test can watch the files it opens. Returns (exit
+    status, stdout, stderr); a refusal's status is its message."""
+    mod = importlib.import_module(script[:-3])
+    out, err, code = io.StringIO(), io.StringIO(), 0
+    with mock.patch.object(sys, "argv", [script, *map(str, args)]), contextlib.redirect_stdout(out), \
+            contextlib.redirect_stderr(err):
+        try:
+            mod.main()
+        except SystemExit as e:
+            code = e.code
+    return code, out.getvalue(), err.getvalue()
+
+
+class _SwapOnClose:
+    def __init__(self, fh, after):
+        self._fh, self._after = fh, after
+
+    def __getattr__(self, name):
+        return getattr(self._fh, name)
+
+    def __iter__(self):
+        return iter(self._fh)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def close(self):
+        if not self._fh.closed:
+            self._fh.close()
+            self._after()
+
+
+@contextlib.contextmanager
+def watched(*paths, swap=None):
+    """Count how often each of these files is opened for reading. With swap={path: bytes}, that file holds those
+    bytes from the moment its first reader closes it, as a process racing the step could arrange: a step that
+    reads it again, by any means, reads the other bytes."""
+    real = builtins.open
+    keys = {os.path.realpath(p): p for p in paths}
+    count = dict.fromkeys(paths, 0)
+
+    def put(p):
+        with real(p, "wb") as fh:
+            fh.write(swap[p])
+
+    def fake(file, mode="r", *a, **k):
+        p = keys.get(os.path.realpath(file)) if isinstance(file, (str, os.PathLike)) else None
+        fh = real(file, mode, *a, **k)
+        if p is None or any(c in mode for c in "wax+"):
+            return fh
+        count[p] += 1
+        if swap and p in swap and count[p] == 1:
+            return _SwapOnClose(fh, lambda: put(p))
+        return fh
+    with mock.patch("builtins.open", fake):
+        yield count
+
+
+def outlines_moved(path):
+    """The font's bytes with one outline moved: the same glyph order and character map, other ink."""
+    f = TTFont(path)
+    g = f["glyf"]["n"]
+    g.coordinates[0] = (g.coordinates[0][0] + 7, g.coordinates[0][1])
+    buf = io.BytesIO()
+    f.save(buf)
+    return buf.getvalue()
 
 
 class Pipeline(unittest.TestCase):
@@ -402,6 +478,145 @@ class Pipeline(unittest.TestCase):
                   "--out-dir", q("checks"))
         refused(self, r, "package")
 
+    # ---------------------------------------------------------------- what is checked is what is used
+    def test_each_step_reads_every_input_once(self):
+        q = self.scratch()
+        common = [self.base_json, self.base, self.ofl, self.targets]
+        logs = ["--base-json", self.base_json, "--fit-log", self.fit_log]
+        steps = [
+            ("fit_font.py", [self.base, self.targets, "--base-json", self.base_json, "--out-dir", q("fit")], common),
+            ("space_font.py", [self.fit, self.targets, "--out", q(STYLE + ".ttf"), *logs],
+             common + [self.fit_log, self.fit]),
+            ("package.py", [self.spaced, "--targets", self.targets, *logs, "--space-log", self.space_log,
+                            "--holder", "Fixture Holder", "--out-dir", q("dist")],
+             common + [self.fit_log, self.space_log, self.spaced]),
+            ("check_font.py", [self.ttf, "--targets", self.targets, *logs, "--space-log", self.space_log,
+                               "--package-log", self.package_log, "--out-dir", q("checks")],
+             common + [self.fit_log, self.space_log, self.package_log, self.ttf]),
+        ]
+        for script, args, inputs in steps:
+            with self.subTest(step=script):
+                with watched(*inputs) as count:
+                    code, _, err = in_process(script, *args)
+                self.assertIn(code, (0, 1) if script == "check_font.py" else (0,), err)
+                again = {os.path.basename(p): n for p, n in count.items() if n > 1}
+                self.assertEqual(again, {}, f"{script} opened these inputs again after reading them")
+
+    def test_space_spaces_the_bytes_it_checked(self):
+        import package as P
+        q = self.scratch()
+        font, out = shutil.copy(self.fit, q(STYLE + ".fit.ttf")), q(STYLE + ".ttf")
+        with watched(font, swap={font: outlines_moved(self.fit)}):
+            code, _, err = in_process("space_font.py", font, self.targets, "--out", out, "--track", "4",
+                                      "--base-json", self.base_json, "--fit-log", self.fit_log)
+        self.assertEqual(code, 0, err)
+        self.assertEqual([e["sha256"] for e in load(out + ".space-log.json")["chain"]["inputs"]], [sha(self.fit)])
+        self.assertEqual(P.drawings(TTFont(out))["n"], P.drawings(TTFont(self.spaced))["n"],
+                         "space_font.py spaced the file it found after checking another")
+
+    def test_package_publishes_the_bytes_it_checked(self):
+        import package as P
+        q = self.scratch()
+        font = shutil.copy(self.spaced, q(STYLE + ".ttf"))
+        with watched(font, swap={font: outlines_moved(self.spaced)}):
+            code, _, err = in_process("package.py", font, "--targets", self.targets, "--base-json", self.base_json,
+                                      "--fit-log", self.fit_log, "--space-log", self.space_log,
+                                      "--holder", "Fixture Holder", "--out-dir", q("dist"))
+        self.assertEqual(code, 0, err)
+        self.assertEqual([e["sha256"] for e in load(q("dist", "package-log.json"))["chain"]["inputs"]],
+                         [sha(self.spaced)])
+        published = P.drawings(TTFont(q("dist", "ttf", STYLE + ".ttf")))["n"]
+        self.assertEqual(published, P.drawings(TTFont(self.spaced))["n"], "package.py published outlines it never checked")
+
+    # ---------------------------------------------------------------- an output never lands on an input
+    def assert_kept(self, r, target, before, script):
+        self.assertEqual(raw(target), before, f"{script} wrote over {target}")
+        refused(self, r, "input")
+
+    def test_fit_refuses_an_output_path_that_leads_to_an_input(self):
+        for name, which, link in [("subset/base.subset.ttf", "base.json", os.symlink),
+                                  ("subset/base.subset.ttf", "base.json", os.link),
+                                  ("fit-log.json", "OFL.txt", os.symlink),
+                                  (STYLE + ".fit.ttf", "base.ttf", os.symlink),
+                                  ("fit-log.json", "targets.json", os.symlink)]:
+            with self.subTest(output=name, input=which, link=link.__name__):
+                q = self.scratch()
+                base, ofl = shutil.copy(self.base, q("base.ttf")), shutil.copy(self.ofl, q("OFL.txt"))
+                targets = shutil.copy(self.targets, q("targets.json"))
+                ok(self, T.approve(base, ofl, q("base.json")))
+                os.makedirs(os.path.dirname(q("build", name)), exist_ok=True)
+                link(q(which), q("build", name))
+                before = raw(q(which))
+                r = T.run("fit_font.py", base, targets, "--base-json", q("base.json"), "--out-dir", q("build"))
+                self.assert_kept(r, q(which), before, "fit_font.py")
+
+    def test_space_refuses_an_output_path_that_leads_to_an_input(self):
+        for out, linked, which in [("out.ttf", "out.ttf", "base.json"),
+                                   ("out.ttf", "out.ttf.space-log.json", "fit-log.json"),
+                                   ("fit-log.json", None, "fit-log.json")]:
+            with self.subTest(out=out, linked=linked, input=which):
+                q = self.scratch()
+                base_json = shutil.copy(self.base_json, q("base.json"))
+                fit_log = shutil.copy(self.fit_log, q("fit-log.json"))
+                if linked:
+                    os.symlink(q(which), q(linked))
+                before = raw(q(which))
+                r = T.run("space_font.py", self.fit, self.targets, "--out", q(out), "--base-json", base_json,
+                          "--fit-log", fit_log)
+                self.assert_kept(r, q(which), before, "space_font.py")
+
+    def test_check_refuses_a_report_path_that_leads_to_an_input(self):
+        q = self.scratch()
+        base_json = shutil.copy(self.base_json, q("base.json"))
+        os.makedirs(q("checks"))
+        os.symlink(base_json, q("checks", "check-report.json"))
+        before = raw(base_json)
+        r = T.run("check_font.py", self.ttf, "--targets", self.targets, "--base-json", base_json,
+                  "--fit-log", self.fit_log, "--space-log", self.space_log, "--package-log", self.package_log,
+                  "--out-dir", q("checks"))
+        self.assert_kept(r, base_json, before, "check_font.py")
+
+    def test_the_font_book_refuses_an_output_path_that_leads_to_an_input(self):
+        for linked in (os.path.join("fonts", STYLE + ".ttf"), "index.html"):
+            with self.subTest(linked=linked):
+                q = self.scratch()
+                report = shutil.copy(self.p("checks", "check-report.json"), q("check-report.json"))
+                os.makedirs(os.path.dirname(q("book", linked)), exist_ok=True)
+                os.symlink(report, q("book", linked))
+                before = raw(report)
+                r = T.run("font_book.py", self.ttf, "--check-report", report, "--out-dir", q("book"))
+                self.assert_kept(r, report, before, "font_book.py")
+
+    # ---------------------------------------------------------------- the font book and the check report
+    def test_the_check_report_lists_the_package_outputs_it_verified(self):
+        rep = load(self.p("checks", "check-report.json"))
+        listed = {(e["file"], e["sha256"]) for e in (rep.get("package") or {}).get("outputs") or []}
+        logged = {(e["file"], e["sha256"]) for e in load(self.package_log)["chain"]["outputs"]}
+        self.assertEqual(listed, logged)
+        self.assertEqual({f for f, _ in listed}, {f"ttf/{STYLE}.ttf", f"webfonts/{STYLE}.woff2"})
+        for f, h in listed:
+            self.assertEqual(h, sha(self.p("dist", f)))
+
+    def test_the_font_book_refuses_fonts_the_check_report_does_not_list(self):
+        q = self.scratch()
+        report = self.p("checks", "check-report.json")
+        os.makedirs(q("webfonts"))
+        w = TTFont(self.ttf)
+        w.flavor = "woff2"
+        w.save(q("webfonts", STYLE + ".woff2"))
+        self.assertNotEqual(sha(q("webfonts", STYLE + ".woff2")), sha(self.p("dist", "webfonts", STYLE + ".woff2")))
+        old = load(report)
+        old.pop("package", None)
+        T.write(q("old-report.json"), json.dumps(old))
+        cases = {"a spaced font from the build folder": [self.spaced, "--check-report", report],
+                 "a WOFF2 the package did not write": [self.ttf, "--webfonts", q("webfonts"), "--check-report", report],
+                 "a report that lists no package output": [self.ttf, "--check-report", q("old-report.json")]}
+        for i, (what, args) in enumerate(cases.items()):
+            with self.subTest(what):
+                r = T.run("font_book.py", *args, "--out-dir", q(f"book{i}"))
+                refused(self, r, "check-report")
+                self.assertFalse(os.path.exists(q(f"book{i}", "index.html")), "the book was written anyway")
+
 
 class SubsetBytes(unittest.TestCase):
     """package.py and check_font.py make the fit's subset again and compare bytes, each in its own uv
@@ -419,9 +634,9 @@ class SubsetBytes(unittest.TestCase):
         self.addCleanup(shutil.rmtree, d, True)
         base = T.with_kerning(T.glyf_vf(os.path.join(d, "base.ttf")))
         args = C.subset_args(L.charset_unicodes(["latin"]))
-        here = hashlib.sha256(C.build_subset(base, args)).hexdigest()
+        here = hashlib.sha256(C.build_subset(raw(base), args)).hexdigest()
         code = ("import sys, hashlib; sys.modules['uharfbuzz'] = None; sys.path.insert(0, %r); import chain as C;"
-                "print(hashlib.sha256(C.build_subset(%r, %r)).hexdigest())" % (T.HERE, base, args))
+                "print(hashlib.sha256(C.build_subset(open(%r, 'rb').read(), %r)).hexdigest())" % (T.HERE, base, args))
         r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), here, "the subset differs when uharfbuzz cannot be imported")

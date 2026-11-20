@@ -10,14 +10,16 @@
       [--out-dir DIR]
 
 First the chain, which refuses to go on (exit 1) when any link is broken. chain.verify_build is the check
-package.py ran: base.json matches the base and its OFL text; every log was made from that base.json;
-fit_font.py read only the base and this targets.json, and its subset is what the base gives again with the
-recorded arguments, byte for byte (the glyph order and character map gates compare with that remade subset);
-space_font.py read only fitted fonts and this targets.json. Then the package log: it records this targets.json
-and exactly these fit and space logs, package.py took only spaced fonts, and every font checked here is one of
-its outputs. That structure is the provenance guarantee: the build steps never opened a reference font. What it
-cannot rule out: one agent that writes both the fonts and every log by hand, consistently. The chain shows the
-files agree with each other and with the approved base, not who made them.
+package.py ran: base.json matches the base and its OFL text; every log was made from that base.json; fit_font.py
+read only the base and this targets.json, and its subset is what the base gives again with the recorded arguments,
+byte for byte (the glyph order and character map gates compare with that remade subset); space_font.py read only
+fitted fonts and this targets.json. Then the package log: it records this targets.json and exactly these fit and
+space logs, package.py took only spaced fonts, every font checked here is one of its outputs, and every output it
+lists (each TTF and WOFF2) is in the package log's folder with the sha256 it records. Each input is read once
+(chain.Files), so the gates run on the bytes the chain checked. That structure is the provenance guarantee: the
+build steps never opened a reference font. What it cannot rule out: one agent that writes both the fonts and every
+log by hand, consistently. The chain shows the files agree with each other and with the approved base, not who made
+them.
 
 Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
 - metrics: x-height to cap, n stem, contrast, within the targets' tolerances (targets.json "tolerances").
@@ -39,9 +41,12 @@ a display size, reference in red, ours in blue, overlap black, with that legend 
 reference, the two are stacked at the same cap height instead.
 
 <out-dir>/check-report.json holds the approved base (file name, full sha256, source, licence and its sha256),
-the approval as base.json records it (question, answer and decision, verbatim), and every gate row.
+the approval as base.json records it (question, answer and decision, verbatim), the package outputs verified
+above ("package": {"outputs": [{"file", "sha256"}]}, which font_book.py matches the fonts it copies against), and
+every gate row. A report or render path that leads to an input, through a link or not, is refused.
 """
 import argparse
+import io
 import os
 import re
 import shutil
@@ -225,11 +230,12 @@ def gate_provenance(G, f, base, refs, yloc=None):
                  if close else ""))
 
 
-def gate_validity(G, path, f):
+def gate_validity(G, blob, f):
+    """`blob` is the font as read; the tools that need a file get a copy of those bytes."""
     tmp = tempfile.mkdtemp()
     try:
         x1, x2, rt = (os.path.join(tmp, n) for n in ("a.ttx", "b.ttx", "rt.ttf"))
-        TTFont(path).saveXML(x1)
+        blob.font().saveXML(x1)
         g = TTFont()
         g.importXML(x1)
         g.save(rt)
@@ -250,7 +256,14 @@ def gate_validity(G, path, f):
     G.add("validity", "no variation data left", not left, ", ".join(left))
     fb = shutil.which("fontbakery")
     if fb:
-        r = subprocess.run([fb, "check-universal", "-l", "FAIL", path], capture_output=True, text=True)
+        tmp = tempfile.mkdtemp()
+        try:
+            local = os.path.join(tmp, os.path.basename(blob.path))
+            with open(local, "wb") as fh:
+                fh.write(blob.data)
+            r = subprocess.run([fb, "check-universal", "-l", "FAIL", local], capture_output=True, text=True)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
         out = r.stdout + r.stderr
         fails = [ln.strip() for ln in out.splitlines() if ln.strip().startswith("FAIL ")]
         tail = ("; ".join(fails[:4]) or "no FAIL lines")[:300]
@@ -297,7 +310,14 @@ def gate_licence(G, f, base, family, package):
             G.add("licence", "new name avoids every Reserved Font Name", not clash, f"RFN {rfn or 'none'}")
 
 
-def overlay(ref_face, ours, out_dir, tag):
+def save_image(files, img, path):
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    files.write(path, buf.getvalue())
+    return path
+
+
+def overlay(files, ref_face, ours, out_dir, tag):
     """Red reference, blue ours, black where both have ink. Both at the same cap height, baselines aligned."""
     from PIL import Image
     paths = []
@@ -318,8 +338,7 @@ def overlay(ref_face, ours, out_dir, tag):
         A, B = layers
         rgb = np.clip(np.stack([1 - B, 1 - np.maximum(A, B), 1 - A], axis=-1), 0, 1)
         p = os.path.join(out_dir, f"overlay-{tag}-{name}.png")
-        with_legend(Image.fromarray((rgb * 255).astype(np.uint8))).save(p)
-        paths.append(p)
+        paths.append(save_image(files, with_legend(Image.fromarray((rgb * 255).astype(np.uint8))), p))
     return paths
 
 
@@ -345,7 +364,7 @@ def with_legend(img):
     return out
 
 
-def stacked(img_path, text, ours, out_dir, tag):
+def stacked(files, img_path, text, ours, out_dir, tag):
     """The screenshot above our render of the same text at the same cap height, for a reference with no file."""
     from PIL import Image
     shot = Image.open(img_path).convert("L")
@@ -359,15 +378,15 @@ def stacked(img_path, text, ours, out_dir, tag):
     rows += [np.pad(o, ((0, 0), (0, W - o.shape[1]))) for o in ours_imgs]
     sheet = np.vstack(rows)
     p = os.path.join(out_dir, f"stacked-{tag}.png")
-    L.save_png(sheet, p)
-    return [p]
+    return [save_image(files, Image.fromarray((255 - sheet * 255).clip(0, 255).astype(np.uint8)), p)]
 
 
-def verify_chain(a):
+def verify_chain(files, a):
     """Every link from base.json to the fonts given, by the same chain.verify_build package.py ran, then the package
-    log. Returns (the build, rows) or refuses."""
-    b = C.verify_build(a.base_json, a.targets, a.fit_log, a.space_log)
-    return b, b.rows + C.verify_package_log(b, a.package_log, a.fonts)
+    log. Returns (the build, the package log's links, rows) or refuses."""
+    b = C.verify_build(files, a.base_json, a.targets, a.fit_log, a.space_log)
+    pk = C.verify_package_log(files, b, a.package_log, a.fonts)
+    return b, pk, b.rows + pk.rows
 
 
 def main():
@@ -385,17 +404,19 @@ def main():
     ap.add_argument("--package")
     ap.add_argument("--out-dir", default=".")
     a = ap.parse_args()
-    b, chain_rows = verify_chain(a)
+    files = C.Files()
+    b, pk, chain_rows = verify_chain(files, a)
     rec, fit, subset_font = b.rec, b.fit, b.subset
-    T = L.load_json(a.targets)
-    base_vf = TTFont(rec["font"]["file"])
-    os.makedirs(a.out_dir, exist_ok=True)
+    T = b.T
+    base_vf = b.approved.font.font()
+    report = os.path.join(a.out_dir, "check-report.json")
+    files.check_output(report)
     G = Gates()
     for name, detail in chain_rows:
         G.add("chain", name, True, detail)
     renders = []
-    for i, path in enumerate(a.fonts):
-        f = TTFont(path)
+    for i, (path, blob) in enumerate(zip(a.fonts, pk.fonts)):
+        f = blob.font()
         sub = f["name"].getDebugName(17) or f["name"].getDebugName(2) or ""
         style = next((s for s in T["styles"] if s["name"] == sub), T["styles"][min(i, len(T["styles"]) - 1)])
         tag = style["name"]
@@ -408,12 +429,12 @@ def main():
         gate_coverage(G, f, T.get("scripts", ["latin"]))
         yloc = next((s["y_location"] for s in fit["styles"] if s["style"]["name"] == tag), None)
         gate_provenance(G, f, subset_font, a.reference, yloc)
-        gate_validity(G, path, f)
+        gate_validity(G, blob, f)
         gate_licence(G, f, base_vf, T["family"], a.package)
         if a.reference:
-            renders += overlay(L.Face(a.reference[0]), face, a.out_dir, tag)
+            renders += overlay(files, L.Face(a.reference[0]), face, a.out_dir, tag)
         elif a.reference_image and a.reference_text:
-            renders += stacked(a.reference_image, a.reference_text, face, a.out_dir, tag)
+            renders += stacked(files, a.reference_image, a.reference_text, face, a.out_dir, tag)
     for group, name, state, detail in G.rows:
         if not name:
             print(group)
@@ -429,14 +450,14 @@ def main():
     print(f"base {os.path.basename(base['file'])} sha256 {base['sha256']}, licence {lic['id']} sha256 {lic['sha256']}")
     print(f"approved: Q {rec['approval']['question']!r} A {rec['approval']['answer']!r}")
     # The record base.json keeps, as checked above, beside the gates: file names only, no builder paths.
-    L.save_json({"schema": "make-font/check-report@1",
-                 "base": {"file": os.path.basename(base["file"]), "sha256": base["sha256"], "source": rec["source"],
-                          "license": {"id": lic["id"], "file": os.path.basename(lic["file"]), "sha256": lic["sha256"],
-                                      "name_id_13": lic["name_id_13"],
-                                      "reserved_font_names": lic["reserved_font_names"]}},
-                 "approval": rec["approval"],
-                 "gates": [{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows]},
-                os.path.join(a.out_dir, "check-report.json"))
+    files.write_json(report, {
+        "schema": "make-font/check-report@1",
+        "base": {"file": os.path.basename(base["file"]), "sha256": base["sha256"], "source": rec["source"],
+                 "license": {"id": lic["id"], "file": os.path.basename(lic["file"]), "sha256": lic["sha256"],
+                             "name_id_13": lic["name_id_13"], "reserved_font_names": lic["reserved_font_names"]}},
+        "approval": rec["approval"],
+        "package": {"outputs": pk.outputs},
+        "gates": [{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows]})
     sys.exit(1 if bad else 0)
 
 

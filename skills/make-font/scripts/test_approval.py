@@ -91,6 +91,32 @@ class ApprovalIsBoundToTheFilesAsked(unittest.TestCase):
         _, font_sha, licence_sha = self.ask()
         self.refused(self.record(T.SYNTHETIC_QUESTION, font_sha, licence_sha), "question")
 
+    def test_a_question_other_than_the_one_these_files_give_is_refused_even_with_both_hashes(self):
+        question, font_sha, licence_sha = self.ask()
+        for other in (f"Synthetic: may I build on any font I like? Font {font_sha}, licence {licence_sha}.",
+                      question + " Any other base is fine too."):
+            with self.subTest(question=other):
+                self.refused(self.record(other, font_sha, licence_sha), "question", "--question-only")
+
+    def test_a_source_url_changed_in_the_shortlist_while_the_question_waited_is_refused(self):
+        shortlist = self.p("shortlist.json")
+
+        def rows(url):
+            T.write(shortlist, json.dumps({"rows": [{"family": T.BASE_FAMILY, "file": self.base,
+                                                     "licence_path": self.ofl, "origin": "google/fonts/ofl/lumen",
+                                                     "url": url}]}))
+        rows("https://example.org/fonts/lumen-ledger.ttf")
+        src = ["--shortlist", shortlist, "--family", T.BASE_FAMILY]
+        ask = T.run("record_base.py", *src, "--question-only", "--out", self.out)
+        self.assertEqual(ask.returncode, 0, ask.stderr)
+        question = ask.stdout.strip()
+        self.assertIn("https://example.org/fonts/lumen-ledger.ttf", question)
+        rows("https://example.org/elsewhere/lumen-ledger.ttf")
+        r = T.run("record_base.py", *src, "--question", question, "--answer", T.SYNTHETIC_ANSWER,
+                  "--decision", "approved", "--font-sha256", sha(self.base), "--license-sha256", sha(self.ofl),
+                  "--out", self.out)
+        self.refused(r, "question")
+
     def test_only_an_approved_decision_records_a_base(self):
         question, font_sha, licence_sha = self.ask()
         for decision in (None, "declined", "yes", "Approved "):
@@ -104,8 +130,9 @@ class ApprovalIsBoundToTheFilesAsked(unittest.TestCase):
         self.assertEqual(self.record(question, font_sha, licence_sha).returncode, 0)
         with open(self.out, encoding="utf-8") as fh:
             rec = json.load(fh)
-        for field, value in (("decision", "declined"), ("question", T.SYNTHETIC_QUESTION)):
-            with self.subTest(field=field):
+        for field, value in (("decision", "declined"), ("question", T.SYNTHETIC_QUESTION),
+                             ("question", question + " Any other base is fine too.")):
+            with self.subTest(field=field, value=value[-40:]):
                 edited = json.loads(json.dumps(rec))
                 edited["approval"][field] = value
                 T.write(self.p("edited.json"), json.dumps(edited))

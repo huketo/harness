@@ -15,7 +15,9 @@ first: base.json against the base and its OFL text; the fit log made from that b
 and this targets.json, with a subset that the base gives again, byte for byte, with the recorded arguments; and
 every space log made from that base.json and this targets.json, from fonts the fit log wrote. Then every font
 given here must be an output of a space log. Unspaced fits (.fit.ttf) are skipped, and nothing left is a
-refusal. --space-log takes one or more files, and may repeat.
+refusal. --space-log takes one or more files, and may repeat. Each input is read once (chain.Files): the bytes
+whose sha256 is checked are the bytes renamed, converted and compared, and the package log's sha256 values are of
+those bytes and of the TTF and WOFF2 bytes written.
 
 DIR may not be, or hold, any input (base.json, targets.json, a log, a font, the base or its licence). The package
 is built in a temporary folder beside DIR. Each TTF and WOFF2 there is checked against the chain: a plain
@@ -39,6 +41,7 @@ source, and the person's approval in their own words.
 """
 import argparse
 import datetime
+import io
 import os
 import re
 import shutil
@@ -224,27 +227,24 @@ def drawings(font):
 
 def verify(built, subset_font):
     """Each packaged TTF and WOFF2 against the chain: the subset's glyph order and character map, and the spaced
-    font's outlines and advances. built: [(spaced font, packaged TTF, packaged WOFF2)]."""
+    font's outlines and advances. built: [(spaced font as read, TTF name, TTF bytes, WOFF2 name, WOFF2 bytes)]."""
     order, cmap = subset_font.getGlyphOrder(), subset_font.getBestCmap()
-    for src_p, ttf_p, woff_p in built:
-        src, ttf, woff = TTFont(src_p), TTFont(ttf_p), TTFont(woff_p)
-        name = os.path.basename(ttf_p)
-        with open(ttf_p, "rb") as fh:
-            magic = fh.read(4)
-        if ttf.flavor is not None or magic not in C.TRUETYPE:
-            raise C.Refused(f"{name} is not a plain TrueType file (flavor {ttf.flavor!r})")
+    for src_b, ttf_name, ttf_data, woff_name, woff_data in built:
+        src, ttf, woff = src_b.font(), TTFont(io.BytesIO(ttf_data)), TTFont(io.BytesIO(woff_data))
+        if ttf.flavor is not None or ttf_data[:4] not in C.TRUETYPE:
+            raise C.Refused(f"{ttf_name} is not a plain TrueType file (flavor {ttf.flavor!r})")
         if ttf.getGlyphOrder() != order or ttf.getBestCmap() != cmap:
-            raise C.Refused(f"{name}: glyph order or character map differs from the subset fit_font.py recorded")
+            raise C.Refused(f"{ttf_name}: glyph order or character map differs from the subset fit_font.py recorded")
         ds, dt = drawings(src), drawings(ttf)
         diff = [n for n in order if ds.get(n) != dt.get(n)]
         if diff:
-            raise C.Refused(f"{name}: {len(diff)} glyphs differ from {src_p} ({', '.join(diff[:6])})")
+            raise C.Refused(f"{ttf_name}: {len(diff)} glyphs differ from {src_b.path} ({', '.join(diff[:6])})")
         if woff.flavor != "woff2":
-            raise C.Refused(f"{os.path.basename(woff_p)} is not WOFF2")
+            raise C.Refused(f"{woff_name} is not WOFF2")
         dw, wcmap = drawings(woff), woff.getBestCmap()
         bad = [u for u, g in wcmap.items() if cmap.get(u) is None or dw[g] != dt[cmap[u]]]
         if bad:
-            raise C.Refused(f"{os.path.basename(woff_p)}: {len(bad)} characters differ from the TTF "
+            raise C.Refused(f"{woff_name}: {len(bad)} characters differ from the TTF "
                             f"({', '.join(f'U+{u:04X}' for u in bad[:6])})")
 
 
@@ -289,7 +289,8 @@ def main():
     ap.add_argument("--url")
     ap.add_argument("--web-unicodes", help="subset the WOFF2 files to these ranges; default keeps every glyph")
     a = ap.parse_args()
-    b = C.verify_build(a.base_json, a.targets, a.fit_log, a.space_log)
+    files = C.Files()
+    b = C.verify_build(files, a.base_json, a.targets, a.fit_log, a.space_log)
     rec, base_sha = b.rec, b.base_sha
     fonts = [p for p in a.fonts if not p.endswith(".fit.ttf")]
     for p in [p for p in a.fonts if p.endswith(".fit.ttf")]:
@@ -297,11 +298,9 @@ def main():
     if not fonts:
         raise C.Refused("no spaced font to package: every file given is an unspaced fit (.fit.ttf). Give the "
                         "fonts space_font.py wrote.")
-    for p in fonts:
-        C.require_output(p, b.spaces, "--space-log", "space_font.py")
+    spaced = [C.require_output(files, p, b.spaces, "--space-log", "space_font.py") for p in fonts]
     out_dir = os.path.abspath(a.out_dir)
-    inputs = [a.base_json, a.targets, a.fit_log, *a.space_log, *a.fonts, rec["font"]["file"], rec["license"]["file"]]
-    held = [p for p in inputs if inside(p, out_dir)]
+    held = [p for p in [*a.fonts, *files.paths()] if inside(p, out_dir)]
     if held:
         raise C.Refused(f"--out-dir {a.out_dir} is or holds an input, {held[0]}; publishing there would replace it. "
                         "Pick an --out-dir outside the build folder.")
@@ -311,12 +310,11 @@ def main():
         raise C.Refused(f"--out-dir {a.out_dir} already holds files. Remove it, pick a new --out-dir, or pass "
                         "--replace.")
 
-    T = L.load_json(a.targets)
-    base = TTFont(rec["font"]["file"])
+    T = b.T
+    base = b.approved.font.font()
     bn = L.english_names(base)
     bfam = bn.get(16) or bn.get(1)
-    with open(rec["license"]["file"], "rb") as fh:
-        licence = fh.read()
+    licence = b.approved.licence.data
     rfn = list(dict.fromkeys(rec["license"]["reserved_font_names"] + L.reserved_font_names(bn.get(0) or "")))
     check_name(T["family"], bfam, rfn)
 
@@ -324,24 +322,21 @@ def main():
     os.makedirs(parent, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix=".package-", dir=parent)
     try:
-        os.makedirs(os.path.join(tmp, "ttf"))
-        os.makedirs(os.path.join(tmp, "webfonts"))
-        faces, files, built = [], [], []
-        for p in fonts:
+        faces, listed, built = [], [], []
+        for p, src in zip(fonts, spaced):
             # Match a font to its style by the -<Style> its filename ends in, never by the order a glob gives.
             stem = os.path.splitext(os.path.basename(p))[0]
             style = next((s for s in T["styles"] if stem.lower().endswith("-" + re.sub(r"[^A-Za-z0-9]", "", s["name"]).lower())), None)
             if style is None:
                 raise SystemExit(f"{p}: its name does not end in -<Style> for any style in targets.json ({[s['name'] for s in T['styles']]})")
-            f = TTFont(p)
+            f = src.font()
             ps = set_names(f, bn, T["family"], style["name"], style["weight"], a, a.version)
             fixed = fix_legacy_accents(f)
             if fixed:
                 print(f"{style['name']}: {len(fixed)} spacing accents reclassed from mark to base in GDEF")
-            ttf = os.path.join(tmp, "ttf", ps + ".ttf")
-            f.flavor = None
-            f.save(ttf)
-            w = TTFont(ttf)
+            ttf_name, woff_name = f"ttf/{ps}.ttf", f"webfonts/{ps}.woff2"
+            ttf_data = C.font_bytes(f)
+            w = TTFont(io.BytesIO(ttf_data))
             opts = subset.Options()
             opts.layout_features = ["*"]
             opts.name_IDs = ["*"]
@@ -355,21 +350,21 @@ def main():
             else:
                 sub_.populate(glyphs=w.getGlyphOrder())
             sub_.subset(w)
-            w.flavor = "woff2"
-            woff = os.path.join(tmp, "webfonts", ps + ".woff2")
-            w.save(woff)
-            built.append((p, ttf, woff))
+            woff_data = C.font_bytes(w, "woff2")
+            for name, data in ((ttf_name, ttf_data), (woff_name, woff_data)):
+                files.write(os.path.join(tmp, name), data)
+            built.append((src, ttf_name, ttf_data, woff_name, woff_data))
             faces.append((ps, style["weight"]))
-            files += [f"ttf/{ps}.ttf", f"webfonts/{ps}.woff2"]
-            print(f"{style['name']}: ttf/{ps}.ttf ({len(f.getGlyphOrder())} glyphs), webfonts/{ps}.woff2 "
+            listed += [ttf_name, woff_name]
+            print(f"{style['name']}: {ttf_name} ({len(f.getGlyphOrder())} glyphs), {woff_name} "
                   f"({len(w.getGlyphOrder())} glyphs)")
         verify(built, b.subset)
         year = datetime.date.today().year
         with open(os.path.join(tmp, "OFL.txt"), "wb") as fh:
             fh.write(f"Copyright {year} {a.holder} (modifications)\n".encode("utf-8") + licence)
-        files += ["OFL.txt", "FONTLOG.txt", "fonts.css", "README.md", "package-log.json"]
+        listed += ["OFL.txt", "FONTLOG.txt", "fonts.css", "README.md", "package-log.json"]
         with open(os.path.join(tmp, "FONTLOG.txt"), "w", encoding="utf-8") as fh:
-            fh.write(fontlog(T, bn, base, rec, b.fit, b.spaces, a.version, a, files))
+            fh.write(fontlog(T, bn, base, rec, b.fit, b.spaces, a.version, a, listed))
         with open(os.path.join(tmp, "fonts.css"), "w", encoding="utf-8") as fh:
             fh.write(css(T["family"], faces))
         category = T.get("category") or ("serif" if T["targets"].get("serif") else "sans")
@@ -407,17 +402,19 @@ a larger work. A modified version keeps this licence and the copyright lines, an
         with open(os.path.join(tmp, "README.md"), "w", encoding="utf-8") as fh:
             fh.write(readme)
         # The log goes in the package, by file name and sha256 (no builder paths), so one rename publishes both.
+        # Every sha256 is of the bytes this run read or wrote.
         name = os.path.basename
-        chain = {"base_json_sha256": base_sha, "inputs": [C.entry(p, name(p)) for p in fonts],
-                 "outputs": [C.entry(x, os.path.relpath(x, tmp)) for _, ttf, woff in built for x in (ttf, woff)],
-                 "targets": C.entry(a.targets, name(a.targets))}
-        L.save_json({"chain": chain, "fit_log": C.entry(a.fit_log, name(a.fit_log)),
-                     "space_logs": [C.entry(p, name(p)) for p in a.space_log], "files": files},
-                    os.path.join(tmp, "package-log.json"))
+        chain = {"base_json_sha256": base_sha, "inputs": [s.entry(name(s.path)) for s in spaced],
+                 "outputs": [{"file": n, "sha256": C.sha256_bytes(d)} for _, tn, td, wn, wd in built
+                             for n, d in ((tn, td), (wn, wd))],
+                 "targets": b.targets.entry(name(a.targets))}
+        L.save_json({"chain": chain, "fit_log": b.fit.blob.entry(name(a.fit_log)),
+                     "space_logs": [sp.blob.entry(name(p)) for p, sp in zip(a.space_log, b.spaces)],
+                     "files": listed}, os.path.join(tmp, "package-log.json"))
         publish(tmp, out_dir, a.replace)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    print(f"verified against the chain, wrote {a.out_dir}: " + ", ".join(files))
+    print(f"verified against the chain, wrote {a.out_dir}: " + ", ".join(listed))
 
 
 if __name__ == "__main__":

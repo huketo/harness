@@ -28,13 +28,17 @@ I don't trace or copy the outlines of the fonts you send." Then hold it.
 - The right to build on the base is the person's statement, not something code can prove. `record_base.py` binds
   their words to the base's and the licence's sha256 in `base.json`, every build step checks those hashes, and
   `FONTLOG.txt`, `check-report.json` and the font book print the statement as given.
-- The chain proves that the files agree with each other and with the approved base, not who wrote them. Package
-  and check remake the fit's subset from the base instead of trusting a file, but an agent that hand-writes the
-  fonts and every log consistently is not stopped by code. Run every step with its script, and never edit a log.
+- The chain proves that the files agree with each other and with the approved base, not who wrote them. Each
+  step reads every file once, so what it checked is what it uses, and refuses an output path that leads to a file
+  it read, through a link or not. Package and check remake the fit's subset from the base instead of trusting a
+  file, but an agent that hand-writes the fonts and every log consistently is not stopped by code. Run every step
+  with its script, and never edit a log.
 
-The base is one TrueType (glyf) variable font in a plain `.ttf` file under the SIL Open Font License 1.1.
-Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not bases; merging two fonts and splitting WOFF2 files are out
-of scope.
+The base is one TrueType (glyf) variable font in a plain `.ttf` file under the SIL Open Font License 1.1: its
+`OFL.txt` is copyright lines, then the licence word for word, and its name ID 13 grants the OFL 1.1 ("This Font
+Software is licensed under the SIL Open Font License, Version 1.1"). A licence file with any other line or an
+added term, a notice that denies or narrows the grant, and Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not
+bases; merging two fonts and splitting WOFF2 files are out of scope.
 
 Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP 723), so run it with
 `uv run scripts/<name>.py`: uv installs Python 3.12, `fonttools`, `brotli`, `uharfbuzz`, `numpy`, `pillow` and
@@ -77,9 +81,10 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    with a reference's name in it. When they answer, run the same command without `--question-only`, with
    `--question "<the printed question, verbatim>" --answer "<their answer, verbatim>" --font-sha256 <font hash
    from the question> --license-sha256 <licence hash from the question>`, and `--decision approved` only if they
-   approved. Any other decision, or a file that changed since the question, writes nothing; ask again. In an
-   unattended run, stop after `--question-only`: report the shortlist and the question, and leave `base.json`
-   unwritten.
+   approved. That run makes the question again from the same arguments and writes only if the one passed is
+   that question word for word. Any other decision, a file or a shortlist source URL that changed since the
+   question, or an edited question writes nothing; ask again. In an unattended run, stop after `--question-only`:
+   report the shortlist and the question, and leave `base.json` unwritten.
    Done when `base.json` exists. It is written once; a different base or answer needs a new build folder.
 
 6. **Fit.** `uv run scripts/fit_font.py <base-vf.ttf> targets.json --base-json base.json --out-dir build/
@@ -111,10 +116,11 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
 
 9. **Font book.** `uv run scripts/font_book.py dist/ttf/*.ttf --webfonts dist/webfonts --targets targets.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --check-report checks/check-report.json
-   --out-dir book/`, then `node scripts/render_book.mjs book/`. The check report is required: its provenance
-   page prints the approved base's sha256 and the approval verbatim. It prints the pages as PNG and one PDF and
-   fails on a fallback glyph or an overflow (`references/font-book.md`). Open three pages and look before you hand it
-   over.
+   --out-dir book/`, then `node scripts/render_book.mjs book/`. The check report is required, and every TTF and
+   WOFF2 given must be a package output it lists by sha256; anything else is refused, so the provenance page,
+   which prints the approved base's sha256 and the approval verbatim, belongs to the fonts the book shows. It
+   prints the pages as PNG and one PDF and fails on a fallback glyph or an overflow (`references/font-book.md`).
+   Open three pages and look before you hand it over.
    Done when `book/fontbook.pdf` exists and render_book.mjs exits 0.
 
 ## Hand-off

@@ -27,7 +27,9 @@ page is read from the font files or the logs when the book is written, never typ
     summary (gates passed, the names of those failed and of those not run), a CSS snippet and desktop install.
 13. **Provenance.** From `check-report.json` (`--check-report` is required): the approved base's file name and
     full sha256, its source, the licence's file name and sha256, the Reserved Font Names, and the approval
-    question, answer and decision verbatim.
+    question, answer and decision verbatim. Every TTF given and every WOFF2 taken from `--webfonts` must have a
+    sha256 the report lists under `package.outputs`; a font from another build, or a report with no such list,
+    is refused, so the provenance always belongs to the fonts the book shows and copies.
 
 ## Rules for the book's text
 
