@@ -10,16 +10,17 @@
 This script opens the base font and targets.json. It never opens a reference font: the references reach it
 only as the numbers in targets.json.
 
-Before anything else it checks base.json (record_base.py wrote it when the person approved the base): the font
-and OFL text must still have the sha256 recorded there, and <base-vf.ttf> must be that font, byte for byte. A
-subset made elsewhere is refused. With korean in the targets' scripts, the base must be a pinned manifest entry's
-files too (chain.require_pinned_base): base.json records that entry, and bases.json still pins both sha256 values. The script subsets the verified base itself, to the characters of the
-targets' scripts (fontlib.COVERAGE and COVERAGE_REPORTED, plus ASCII, Latin-1 and common punctuation), writes
-<DIR>/subset/base.subset.ttf, and fits from that subset. fit-log.json records the subset (source sha256, file,
-sha256, pyftsubset arguments) and the chain: base.json's sha256, the base as input, every font written as output.
-Each input is read once (chain.Files), so the base it subsets is the base it checked, and each sha256 it logs is
-of the bytes it wrote. An output path that leads to an input (base.json, the base, its licence, targets.json),
-through a link or not, is refused before anything is written.
+Before anything else it checks base.json (record_base.py wrote it when the person approved the base): the font and
+OFL text must still have the sha256 recorded there, and <base-vf.ttf> must be that font, byte for byte. A subset
+made elsewhere is refused. With korean in the targets' scripts, the base must be a pinned manifest entry's files
+too (chain.require_pinned_base): base.json records that entry, and bases.json still pins both sha256 values. The
+script subsets the verified base itself, to the characters of the targets' scripts (fontlib.COVERAGE and
+COVERAGE_REPORTED, plus ASCII, Latin-1 and common punctuation), writes <DIR>/subset/base.subset.ttf, and fits from
+that subset. fit-log.json records the subset (source sha256, file, sha256, pyftsubset arguments) and the chain:
+base.json's sha256, the base as input, every font written as output. Each input is read once (chain.Files), so the
+base it subsets is the base it checked, and each sha256 it logs is of the bytes it wrote. An output path that leads
+to an input (base.json, the base, its licence, targets.json), through a link or not, is refused before anything is
+written.
 
 For each style:
 1. The y instance. The weight axis is solved so the n stem meets the target. If the base has an optical-size

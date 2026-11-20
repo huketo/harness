@@ -66,8 +66,9 @@ that leads to an input, through a link or not, is refused.
   must be simple, with the same contours and points, and each point and the advance within 1 unit; the report gives
   the largest distance found (0 on the end-to-end runs). So the class scales the log records are the allowance, and
   any other outline change fails, inside the ink box or not, a composite left or made included. Remaking the
-  overlap removal needs skia-pathops, which `check_font.py` lists; without it the gate fails. On Noto Sans KR the
-  gate adds about 25 s per weight to the check (11,266 glyphs). With
+  overlap removal needs skia-pathops, which `check_font.py` lists; without it the gate fails. On Noto Sans KR
+  (11,266 Hangul glyphs) the gate takes 9.5 to 11.3 s a weight, against 5 s for the ink-box comparison it replaced;
+  the ttx round trip is still the larger cost. With
   `--reference` files there is one diagnostic, INFO only: our outlines that have a curve or at least 16 points
   are compared with the reference's, and any that share point structure and lie within 2 % in
   bounding-box-normalised shape are listed. Simpler shapes are left out, since a straight bar matches every
