@@ -21,9 +21,11 @@ the base, its licence, targets.json, the fit log, the fitted font), through a li
 3. Kerning. The base's pair kerning came through the fit, scaled with the em. --kern-scale multiplies every
    pair value, for a font tracked much tighter or looser than its base.
 4. Collision guard. Every pair of letters, figures and common punctuation, plus a list of known traps
-   (q j, f ), g y, r . and others) is shaped with kerning. Any pair whose ink comes closer than --min-gap units
-   is opened by a new kerning lookup. The guard only opens pairs, never closes them. f on the left is skipped
-   unless --guard-f: its hood is meant to overhang, and the f ligatures cover most of those pairs.
+   (q j, f ), g y, r . and others) is shaped with kerning (fontlib.Face.pair_gap, which check_font.py reads too).
+   Any pair whose ink comes closer than --min-gap units is opened by a new kerning lookup on the two glyphs
+   shaping set: where a contextual alternate replaces a character (a figure after a letter, say), the kerning
+   goes on the alternate. The guard only opens pairs, never closes them. f on the left is skipped unless
+   --guard-f: its hood is meant to overhang, and the f ligatures cover most of those pairs.
 
 Writes the font and <out>.space-log.json with the moves, every pair the guard opened, and the chain: base.json's
 sha256, the fitted font as input, the spaced font as output.
@@ -193,19 +195,14 @@ def guard(f, min_gap, guard_f, log):
     cm = face.cmap
     chars = [c for c in GUARD_CHARS if ord(c) in cm]
     pairs = {(a, b) for a in chars for b in chars} | {(p[0], p[1]) for p in TRAPS if all(ord(c) in cm for c in p)}
-    prof = {c: face.profile(c, step=4) for c in set(chars) | {c for p in TRAPS for c in p if ord(c) in cm}}
     fixes = {}
     for a, b in sorted(pairs):
         if a == "f" and not guard_f:
             continue
-        k = face.kern(a + b)
-        if k is None:
-            continue
-        ra, rb = prof[a], prof[b]
-        off = face.adv(a) + k
-        gaps = [rb[y][0] + off - ra[y][1] for y in ra if y in rb]
-        if gaps and min(gaps) < min_gap:
-            fixes[(cm[ord(a)], cm[ord(b)])] = (a + b, round(min_gap - min(gaps)), round(min(gaps), 1))
+        g = face.pair_gap(a + b)  # the glyphs shaping sets, a contextual alternate included: the fix goes on them
+        if g is not None and g.gap < min_gap:
+            fix = (a + b, round(min_gap - g.gap), round(g.gap, 1))
+            fixes[(g.left, g.right)] = max(fixes.get((g.left, g.right), fix), fix, key=lambda v: v[1])
     log["guard"] = [{"pair": v[0], "open": v[1], "gap_before": v[2]} for v in sorted(fixes.values(), key=lambda x: -x[1])]
     if not fixes:
         return

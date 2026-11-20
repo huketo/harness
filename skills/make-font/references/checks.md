@@ -44,7 +44,9 @@ that leads to an input, through a link or not, is refused.
   information, because the fit does not aim at them.
 - **widths** and **spacing**: every class mean, the paragraph, the four side means.
 - **kerning**: every pair of letters, figures and punctuation, shaped, f on the left skipped. Fails if any gap is
-  more than a unit under `min_gap`.
+  more than a unit under `min_gap`. The gap is read between the two glyphs HarfBuzz sets (`fontlib.Face.pair_gap`),
+  so where a contextual alternate replaces a character (Noto Sans KR's `calt` sets another 9 after a letter), the
+  alternate is measured, and the collision guard reads and kerns the same glyphs.
 - **coverage**: the characters each script needs (`COVERAGE` in `fontlib.py`: latin, latin-ext, vietnamese,
   cyrillic, greek, and korean, the 2,350 syllables of KS X 1001). Add a list there before claiming a script that is
   not in it; the fit subsets to it too. For korean the fit also keeps every modern syllable and the compatibility
@@ -53,11 +55,19 @@ that leads to an input, through a link or not, is refused.
 - **provenance**: glyph order and character map equal the subset `fit_font.py` recorded. Every glyph is compared
   with the subset's glyph at the fit's y location, at the same cap height: its ink must be within 3 % as tall
   (all y coordinates come from there) and within 40 % as wide (x comes from the width classes). The Hangul a fit
-  moved is checked against its own record instead: the transform in `fit-log.json` must lie within the limits
-  (one scale within ±6 %, each class's x, y and x over y within ±3 % of it, the jamo at it), and every Hangul glyph
-  must be a simple glyph whose ink box and advance are where that transform, the style's `em_scale` and the
-  space log's track put the subset's glyph at the fit's Hangul location, within 2 units. So the class scales the
-  log records are the allowance, and any other outline change, a composite left or made included, fails. With
+  moved is checked against its own record instead. With Hangul targets every style needs one (`Hangul transform
+  recorded` fails without it). The transform in `fit-log.json` must lie within the limits
+  (`fontlib.hangul_transform_over`, the check `fit_font.py` runs before it logs one): one scale within ±6 %; each
+  class's x and y within ±3 % of it, and its larger axis within 3 % of its smaller, whichever is larger; the
+  compatibility jamo at the one scale, with no shift and no advance added. And every Hangul glyph must be the glyph
+  the build makes from the subset's glyph at the fit's Hangul location, point by point: the logged transform
+  (`fontlib.transform_hangul`, the fit's own function), overlap removal when the fit removed overlaps, the em scale
+  (`em_scale`, each coordinate rounded once, as fontTools' `scale_upem` does) and the space log's track. The glyph
+  must be simple, with the same contours and points, and each point and the advance within 1 unit; the report gives
+  the largest distance found (0 on the end-to-end runs). So the class scales the log records are the allowance, and
+  any other outline change fails, inside the ink box or not, a composite left or made included. Remaking the
+  overlap removal needs skia-pathops, which `check_font.py` lists; without it the gate fails. On Noto Sans KR the
+  gate adds about 25 s per weight to the check (11,266 glyphs). With
   `--reference` files there is one diagnostic, INFO only: our outlines that have a curve or at least 16 points
   are compared with the reference's, and any that share point structure and lie within 2 % in
   bounding-box-normalised shape are listed. Simpler shapes are left out, since a straight bar matches every

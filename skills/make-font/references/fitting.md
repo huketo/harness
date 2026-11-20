@@ -36,7 +36,8 @@ follow x.
 
 1. **y instance.** For each optical size tried (nine across the axis, unless `--loc` fixes it), solve the weight
    axis so the n stem meets the target (without a Latin n stem, the Hangul stem: see [Hangul](#hangul)), then
-   measure contrast, bar to stem and x-height to cap. Keep, among the sizes where the wght axis reaches the stem,
+   measure contrast, bar to stem and x-height to cap. Each wght tried reads its n stem at cap 700 against the cap
+   height that wght draws, since the cap can grow with the weight. Keep, among the sizes where the wght axis reaches the stem,
    the one with the smallest error; when none reaches it, the size whose axis end comes nearest, and `fit-log.json`
    records the miss (`weight_missed_pct`). With `--no-contrast` the opsz scan is skipped.
 2. **x instance per class.** For each width class: on a width axis, bisect wdth so the class's mean advance meets
@@ -49,9 +50,13 @@ follow x.
    (by Unicode decomposition and name suffix). Composites made of one class join it, and their marks stay centred.
    Mark-to-base anchors take x from the class instance and y from the y instance. Everything else (punctuation,
    symbols, small capitals, figures variants) keeps the y instance's own x.
-4. **Iterate.** Measure the assembled font, correct each factor by the class's error, assemble again. Stop when
-   every class is within `--tol` (0.3 % by default) or six passes have run. Rounding and overlap removal move
-   means a little, which is why one pass is not enough.
+4. **Iterate.** Assemble the measuring subset (the letters, figures and space, every class mean and side needs)
+   the same way, set the class sides, measure it, correct each factor by the class's error, assemble again. Stop
+   when every class is within `--tol` (0.3 % by default) or six passes have run. Rounding and overlap removal move
+   means a little, which is why one pass is not enough. Then the whole font is assembled once, with the factors
+   found: it has the class means the last pass measured. On Noto Sans KR (11,879 glyphs) a weight takes about 25 s
+   this way, against about 39 s when every pass assembled the whole font; `fit-log.json` records each style's
+   `seconds`.
 5. **Finish.** Remove overlaps (skia-pathops), scale the em so cap height per 1000 em matches the reference file,
    set the line box from the reference's vertical metrics when a file gave them, make the win metrics cover
    every glyph, and drop the variation tables.
@@ -125,8 +130,10 @@ centres included, moved the way the Regular moved.
    gave as a length, of target over base, within ±6 %. Without a length (a screenshot of Hangul alone) it is 1,
    so the base's Hangul scale, centre heights and advances stay.
 2. Each class's final x and y scale: that scale times the class's own, which is target over base over the one
-   scale on each axis, within ±3 %, and x over y within ±3 % too. A ratio past it moves both toward their
-   geometric mean. A class without a target takes the one scale.
+   scale on each axis, within ±3 %, and the larger axis within 3 % of the smaller too. A ratio past it moves both
+   toward their geometric mean. A class without a target takes the one scale. Every scale is logged, and applied,
+   at five decimals, each rounded to the nearest five-decimal value inside its limits (`fit_font.class_axes`), so
+   rounding never carries one past a limit.
 3. The ink of each glyph is scaled about the centre of its points' box, then moved up or down by the class's
    shift, the target face centre height (`cy`) minus the base's class mean.
 4. The advance is the base's times the one scale, plus what makes the class mean (or the font-wide advance of a
@@ -135,8 +142,9 @@ centres included, moved the way the Regular moved.
 5. The compatibility jamo (U+3131 to U+318E) take the one scale on both axes, no shift and no advance target.
 6. A composite glyph is decomposed into its own points first, so a component another glyph shares never moves twice.
 
-The limits apply to the final per-axis transform, not to each step, and `check_font.py` checks them in the log
-(`transform`) and on every glyph. The fit reads and moves the measuring syllables while it solves, and moves the
+The limits apply to the final per-axis transform, not to each step. `fontlib.hangul_transform_over` is the one
+check of them: `fit_font.py` runs it before it logs a transform, and `check_font.py` on the transform in the log,
+then checks every glyph against it point by point (`references/checks.md`, provenance). The fit reads and moves the measuring syllables while it solves, and moves the
 whole Hangul once, when the wght has settled.
 
 **Units, before `finish()`.** Every Hangul target is stated in the units of the Hangul location, beside the base's
@@ -154,12 +162,14 @@ A key with a length uses `cap700` first, then `em1000`; the ratios fill in where
 The saved font rounds every point to a whole unit, so a stem lands up to a unit from the solve: about 1 % of an
 80-unit stem at 1000 units per em.
 
-`fit-log.json` records this under each style's `hangul`, and the style's `em_scale` is the factor `finish()`
-multiplied every length by:
+`fit-log.json` records this under each style's `hangul`. Beside it, the style's `em_scale` is the factor `finish()`
+multiplied every length by (1000 over the em it scaled from), and `overlaps_removed` says whether `finish()`
+removed overlaps; the check makes the Hangul again from both:
 
 | Field | Value |
 |-|-|
-| `weight_from` | `n_stem`, `stem cap700`, `stem em1000` or `stem_h1`, with ", stepped from the first style" after the first |
+| `weight_from` | what the Hangul wght came from: `stem cap700`, `stem em1000` or `stem_h1` when the Hangul stem set it (alone, or beside a Latin n stem that set the y), else `n_stem` (the Hangul follows the y instance); after the first style, with ", stepped from the first style's Hangul location" |
+| `stepped_from` | after the first style, when the Hangul location was stepped: `{"style", "location"}`, the first style's Hangul location |
 | `weight_missed_pct` | only when no optical size tried lets the wght axis reach the Hangul stem: the stem the base draws at the chosen location over the target, minus 1, in percent |
 | `location` | the base location the Hangul outlines come from |
 | `units` | font units of that instance per `cap700` and per `em1000` unit |

@@ -43,6 +43,14 @@ the stem over the H1 face height when the weight is not solved from it), and eac
 script the font covers. `--local` and `--families` are refused there. A row from the manifest records its entry, so
 the approval question names "the pinned manifest entry" and its URL.
 
+The manifest is checked again on the bytes each later step reads (`chain.pinned_entry`), never on what a shortlist
+or a cache says. `record_base.py` asks about, and records, a manifest source only when the font and the `OFL.txt` it
+reads have the sha256 the entry pins and the URL is the one it pins for that font: a cached file that changed after
+the ranking is refused. A build with `korean` in its scripts (`fit_font.py`, `package.py`, `check_font.py`) takes
+only a base that `base.json` records as a manifest entry, and only while `bases.json` still pins both sha256 values
+of the files it read; a base approved as `local` or from Google Fonts is refused there, and `check_font.py` lists
+the entry among its chain rows.
+
 The manifest holds one base, `noto-sans-kr`: Noto Sans KR 2.004, `NotoSansKR[wght].ttf` from google/fonts at commit
 24ddc1f324ca, OFL-1.1, Reserved Font Name Source, wght 100 to 900 with its default at 100. Its Latin lacks Š š Ž ž
 Ÿ, so `latin` coverage is 180 of 185. Pretendard Variable has the format and the syllables, but its `OFL.txt` (a

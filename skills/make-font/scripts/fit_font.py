@@ -35,9 +35,10 @@ For each style:
    Glyphs in no class take the y instance's own x.
 3. Assembly. Every location of one variable font has the same points, so each glyph takes x from its class
    instance and y from the y instance. Advances, components and mark anchors follow.
-4. Iteration. The class sidebearings are set (space_font.respace), because an advance is ink plus sides.
-   Then the assembled font is measured and each class's factor corrected, until every class mean is
-   within --tol percent of its target (or the stretch limit is reached, which the log reports).
+4. Iteration, on the measuring subset (the letters, figures and space, assembled the same way). The class
+   sidebearings are set (space_font.respace), because an advance is ink plus sides. Then the subset is measured
+   and each class's factor corrected, until every class mean is within --tol percent of its target (or the
+   stretch limit is reached, which the log reports). The whole font is assembled once, with the factors found.
 5. Overlaps are removed (needs skia-pathops), the font is scaled so its cap height per em matches the target
    (or the base's), and the variation tables are dropped.
 
@@ -67,6 +68,7 @@ import math
 import os
 import statistics as st
 import sys
+import time
 import unicodedata
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
@@ -138,6 +140,14 @@ class Base:
             self.cache[key] = instancer.instantiateVariableFont(copy.deepcopy(self.vf), dict(key), updateFontNames=False)
         return self.cache[key]
 
+    def measuring(self, loc):
+        """The instance at loc of the solving subset (the letters, figures and space a class mean and the sides need),
+        cached: the width iteration assembles and measures it, and the whole font is assembled once, after."""
+        key = ("measuring",) + tuple(sorted((k, round(v, 2)) for k, v in self.clamp(loc).items()))
+        if key not in self.cache:
+            self.cache[key] = self.tiny(dict(key[1:])).font
+        return self.cache[key]
+
 
 def raw_stem(face, ch):
     xh = face.bounds("x")[3]
@@ -170,11 +180,10 @@ def reach_wght(B, loc, face, measure, target, iters=12):
 
 
 def latin_weigh(B, stem_t):
-    """weigh(loc) for pick_y: the wght where the n stem meets stem_t (at cap 700, over the location's cap height), and
-    the miss where the wght axis does not reach it there."""
+    """weigh(loc) for pick_y: the wght where the n stem meets stem_t at cap 700, each wght's stem read against the cap
+    height that wght draws (the cap may grow with the weight), and the miss where the wght axis does not reach it."""
     def weigh(loc):
-        raw = stem_t * B.tiny(loc, "nHx").bounds("H")[3] / L.CAP
-        return reach_wght(B, loc, lambda at: B.tiny(at, "nHx"), lambda f: raw_stem(f, "n"), raw, iters=10)
+        return reach_wght(B, loc, lambda at: B.tiny(at, "nHx"), L.stem_cap700, stem_t, iters=10)
     return weigh
 
 
@@ -698,13 +707,14 @@ def fit_style(B, T, style, args, log, first_at):
             continue
         aim[cls] = widths[cls] / to_cap
         xloc[cls], factor[cls] = solve_class(cls, aim[cls])
-    # 3 and 4. assemble, measure, correct the factors
+    # 3 and 4. assemble the measuring subset, measure, correct the factors; then assemble the whole font once
     fy = B.full(yloc)
     cls_of = class_map(fy)
-    src = {cls: B.full(xloc[cls]) for cls in L.CLASSES}
+    my = B.measuring(yloc)
+    src = {cls: B.measuring(xloc[cls]) for cls in L.CLASSES}
     hist = []
     for it in range(args.iters):
-        f = mix(fy, src, cls_of, factor, [])
+        f = mix(my, src, cls_of, factor, [])
         if tg.get("sides") or tg.get("rhythm"):
             space_font.respace(f, tg, {})  # widths include the sides, so set the sides before measuring widths
         face = L.Face(f)
@@ -724,11 +734,11 @@ def fit_style(B, T, style, args, log, first_at):
                 # and take a new instance, instead of stretching.
                 aim[cls] /= (1 + e)
                 xloc[cls], factor[cls] = solve_class(cls, aim[cls])
-                src[cls] = B.full(xloc[cls])
+                src[cls] = B.measuring(xloc[cls])
                 continue
             factor[cls] = round(min(max(new, 1 - args.max_stretch), 1 + args.max_stretch), 4)
     alog = []
-    f = mix(fy, src, cls_of, factor, alog)
+    f = mix(fy, {cls: B.full(xloc[cls]) for cls in L.CLASSES}, cls_of, factor, alog)
     if tg.get("sides") or tg.get("rhythm"):
         slog = {}
         space_font.respace(f, tg, slog)
@@ -794,13 +804,15 @@ def main():
     first_at = locate_first(B, T, a)
     for style, p in zip(styles, style_paths):
         log = []
+        started = time.perf_counter()
         f, info = fit_style(B, T, style, a, log, first_at)
+        info["seconds"] = round(time.perf_counter() - started, 1)
         # a plain TrueType file, whatever container the instances came through
         written.append(files.write(p, C.font_bytes(f)))
         info["file"] = os.path.basename(p)
         info["log"] = log
         out["styles"].append(info)
-        print(f"{style['name']}: wrote {p}")
+        print(f"{style['name']}: wrote {p} ({info['seconds']} s)")
         for line in log:
             print("  " + line)
         last = info["iterations"][-1]

@@ -40,10 +40,14 @@ for a font tracked far from its base. Kerning is never taken from a reference.
 ## Collision guard
 
 After all moves, every pair of letters, figures and common punctuation, plus known traps (q j, g j, y j, f ),
-f ], f ?, g y, r . and quotes before A), is shaped with HarfBuzz with kerning on. Each glyph's ink edge is read
-in rows 4 units apart, and the smallest gap between the left glyph's right edge and the right glyph's left
-edge is the pair's gap. A pair under `min_gap` (6 units for text, 4 for display, 8 for UI) gets a kerning value
-that opens it to `min_gap`, in a new lookup added to the kern feature. The guard only opens, never closes.
+f ], f ?, g y, r . and quotes before A), is shaped with HarfBuzz with kerning on (`fontlib.Face.pair_gap`). The
+pair is read as shaping sets it: where a contextual alternate replaces a character (Noto Sans KR's `calt` sets
+another 9 after a letter), the alternate's ink is read and the kerning goes on the alternate, since a pair kerned
+on the character's own glyph never applies there. Each glyph's ink edge is read in rows 4 units apart, and the
+smallest gap between the left glyph's right edge and the right glyph's left edge is the pair's gap. A pair under
+`min_gap` (6 units for text, 4 for display, 8 for UI) gets a kerning value that opens it to `min_gap`, in a new
+lookup added to the kern feature. The guard only opens, never closes. `check_font.py`'s kerning gate reads the
+same gaps.
 
 f on the left is skipped unless `--guard-f`: its hood is meant to overhang the next letter, and the f ligatures
 cover most of the pairs where that would touch.

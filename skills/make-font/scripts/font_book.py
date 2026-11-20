@@ -592,15 +592,14 @@ def main():
     if space and space[0].get("guard"):
         g0 = space[0]["guard"][0]
         l, r = g0["pair"][0], g0["pair"][1]
-        if face.has(l) and face.has(r):
+        if face.has(l) and face.has(r) and (gap := face.pair_gap(l + r)):
             total = face.kern(l + r) or 0
 
-            def pair_svg(extra, title):
-                gap = face.ink_gap(l, r)
-                gv = (gap[0] + extra) if gap else 0
+            def pair_svg(extra, title):  # the glyphs shaping sets, as the guard read them
+                gv = gap.gap + extra
                 s2 = 0.3
-                off = face.adv(l) + total + extra
-                sv = f'<svg viewBox="0 0 420 380" width="100%" height="auto"><g transform="translate(60 280) scale({s2} {-s2})"><path d="{face.svg_path(l)}"/><path transform="translate({off} 0)" d="{face.svg_path(r)}"/></g>'
+                off = gap.offset + extra
+                sv = f'<svg viewBox="0 0 420 380" width="100%" height="auto"><g transform="translate(60 280) scale({s2} {-s2})"><path d="{face.svg_path(gap.left)}"/><path transform="translate({off} 0)" d="{face.svg_path(gap.right)}"/></g>'
                 for v in (xh, 0, desc):
                     sv += f'<line x1="0" x2="420" y1="{280 - v * s2:.1f}" y2="{280 - v * s2:.1f}" stroke="{ACCENT}" opacity=".35"/>'
                 sv += "</svg>"

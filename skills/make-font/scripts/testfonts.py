@@ -207,8 +207,9 @@ def _finish(fb, family, copyright_line, notice, extra_names):
 
 
 def glyf_vf(path, family=BASE_FAMILY, copyright_line="Copyright 2026 The Lumen Ledger Project Authors",
-            notice=OFL_NOTICE, extra_names=None):
-    """A TrueType variable font with a weight axis 100-900: the stems are 40 units at 100, 80 at 400, 160 at 900."""
+            notice=OFL_NOTICE, extra_names=None, heavy_cap=700):
+    """A TrueType variable font with a weight axis 100-900: the stems are 40 units at 100, 80 at 400, 160 at 900.
+    `heavy_cap` is the cap height at 900: every glyph's height grows with the weight from 700 at 400 to it."""
     glyphs, adv = _ttglyphs(80)
     fb = FontBuilder(1000, isTTF=True)
     fb.setupGlyphOrder(ORDER)
@@ -219,6 +220,9 @@ def glyf_vf(path, family=BASE_FAMILY, copyright_line="Copyright 2026 The Lumen L
     fb.setupFvar(axes=[("wght", 100, 400, 900, "Weight")], instances=[])
     heavy, _ = _ttglyphs(160)
     light, _ = _ttglyphs(40)
+    for g in heavy.values():
+        if g.numberOfContours > 0:
+            g.coordinates = type(g.coordinates)([(x, round(y * heavy_cap / 700)) for x, y in g.coordinates])
     variations = {}
     for n in ORDER:
         if not glyphs[n].numberOfContours:
@@ -387,6 +391,32 @@ def glyf_static(path, family=BASE_FAMILY, notice=OFL_NOTICE):
     fb.setupGlyf(glyphs)
     fb.setupHorizontalMetrics({n: (adv[n], glyphs[n].xMin if glyphs[n].numberOfContours else 0) for n in ORDER})
     _finish(fb, family, "Copyright 2026 The Lumen Ledger Project Authors", notice, None)
+    fb.save(path)
+    return path
+
+
+ALTERNATE_SHIFT = 150  # how far left contextual_alternate's o.alt draws the o
+
+
+def contextual_alternate(path):
+    """A static font of glyf_static's glyphs and o.alt, the o drawn ALTERNATE_SHIFT units to the left, which a calt
+    lookup sets after an n: in "no" the alternate runs 40 units into the n's right stem, where the o would leave a
+    110-unit gap. No kerning."""
+    from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+    glyphs, adv = _ttglyphs(80)
+    pen = TTGlyphPen(None)
+    for x0, y0, x1, y1, hole in _shapes(80)["o"][1]:
+        _rect(pen, x0 - ALTERNATE_SHIFT, y0, x1 - ALTERNATE_SHIFT, y1, hole)
+    glyphs["o.alt"], adv["o.alt"] = pen.glyph(), adv["o"]
+    order = ORDER + ["o.alt"]
+    fb = FontBuilder(1000, isTTF=True)
+    fb.setupGlyphOrder(order)
+    fb.setupCharacterMap(CMAP)
+    fb.setupGlyf(glyphs)
+    fb.setupHorizontalMetrics({n: (adv[n], glyphs[n].xMin if glyphs[n].numberOfContours else 0) for n in order})
+    _finish(fb, BASE_FAMILY, "Copyright 2026 The Lumen Ledger Project Authors", OFL_NOTICE, None)
+    addOpenTypeFeaturesFromString(fb.font, "languagesystem DFLT dflt; languagesystem latn dflt;\n"
+                                           "feature calt { sub n o' by o.alt; } calt;\n")
     fb.save(path)
     return path
 

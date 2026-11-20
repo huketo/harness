@@ -125,23 +125,17 @@ def gate_widths(G, m, T, first_style):
 
 
 def gate_kerning(G, face, min_gap):
+    """Every guarded pair as HarfBuzz sets it (fontlib.Face.pair_gap, the reading space_font.py's guard fixes)."""
     import space_font as S
-    cm = face.cmap
-    chars = [c for c in S.GUARD_CHARS if ord(c) in cm]
-    prof = {c: face.profile(c) for c in chars}
+    chars = [c for c in S.GUARD_CHARS if ord(c) in face.cmap]
     worst = []
     for a in chars:
         if a == "f":
             continue
         for b in chars:
-            k = face.kern(a + b)
-            if k is None:
-                continue
-            off = face.adv(a) + k
-            ra, rb = prof[a], prof[b]
-            gaps = [rb[y][0] + off - ra[y][1] for y in ra if y in rb]
-            if gaps:
-                worst.append((min(gaps), a + b))
+            g = face.pair_gap(a + b)
+            if g is not None:
+                worst.append((g.gap, a + b))
     worst.sort()
     bad = [w for w in worst if w[0] < min_gap - 1]
     G.add("kerning", "collisions", not bad, f"{len(bad)} pairs under {min_gap} units; closest " +

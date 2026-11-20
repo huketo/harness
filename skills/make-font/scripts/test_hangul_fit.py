@@ -458,5 +458,29 @@ class LatinOpticalSize(StepsRan, Scratch):
         self.assertTrue(any("reaches the n stem 30.0 at no location" in line for line in first["log"]), first["log"])
 
 
+
+class LatinCapGrowsWithWeight(StepsRan, Scratch):
+    """A Latin base whose cap height grows with the weight, from 700 at wght 400 to 840 at 900, and an n stem target of
+    150 at cap 700. At 900 the n stem is 160 units under a cap of 840, 133.3 at cap 700: no wght reaches 150. The cap
+    the stem is measured against is the one each wght draws."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        p = cls.p
+        cls.base = T.glyf_vf(p("LumenLedger[wght].ttf"), heavy_cap=840)
+        assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
+        T.write(p("m.json"), json.dumps({"source": "image", "cap_em": None, "confidence": {}, "n_stem": 150.0}))
+        cls.runs["targets"] = T.run("make_targets.py", p("m.json"), "--family", T.NEW_FAMILY, "--scripts", "latin",
+                                    "--out", p("targets.json"))
+        cls.runs["fit"] = T.run("fit_font.py", cls.base, p("targets.json"), "--base-json", p("base.json"), "--out-dir",
+                                p("build"))
+
+    def test_a_stem_no_wght_reaches_at_its_own_cap_is_logged_as_missed(self):
+        first = load(self.p("build", "fit-log.json"))["styles"][0]
+        self.assertEqual(first["y_location"], {"wght": 900})
+        self.assertAlmostEqual(first["weight_missed_pct"], (160 * 700 / 840 / 150 - 1) * 100, delta=0.3)
+
+
 if __name__ == "__main__":
     unittest.main()

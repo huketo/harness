@@ -16,6 +16,7 @@ import io
 import json
 import re
 import statistics as st
+from collections import namedtuple
 
 from fontTools.pens.basePen import BasePen
 from fontTools.pens.boundsPen import BoundsPen
@@ -627,6 +628,9 @@ def _spans(polys, v, axis):
     return runs
 
 
+PairGap = namedtuple("PairGap", "gap row left right offset")  # Face.pair_gap: the right glyph's origin at offset
+
+
 class Face:
     """A font, or one location of a variable font, with the questions the scripts ask of it."""
 
@@ -645,7 +649,7 @@ class Face:
         self.cmap = f.getBestCmap()
         self.gs = f.getGlyphSet()
         self.hmtx = f["hmtx"].metrics
-        self._polys, self._hb = {}, None
+        self._polys, self._profiles, self._hb = {}, {}, None
 
     def has(self, ch):
         return ord(ch) in self.cmap
@@ -654,12 +658,15 @@ class Face:
         return self.cmap[ord(ch)] if len(ch) == 1 else ch
 
     def polys(self, ch):
-        n = self.gname(ch)
-        if n not in self._polys:
+        return self.glyph_polys(self.gname(ch))
+
+    def glyph_polys(self, name):
+        """The glyph's outline as polygons, by glyph name."""
+        if name not in self._polys:
             p = FlatPen(self.gs)
-            self.gs[n].draw(p)
-            self._polys[n] = p.polys
-        return self._polys[n]
+            self.gs[name].draw(p)
+            self._polys[name] = p.polys
+        return self._polys[name]
 
     def bounds(self, ch):
         p = BoundsPen(self.gs)
@@ -703,35 +710,44 @@ class Face:
         return sum(a for _, _, a in self.shape(text, features))
 
     def kern(self, pair):
-        """Kerning HarfBuzz applies between two characters, or None when they form a ligature."""
+        """Kerning HarfBuzz applies between two characters (over the advance of the glyph it sets first), or None
+        when they form a ligature."""
         on = self.shape(pair, {"kern": True, "liga": False})
         if len(on) != 2:
             return None
-        return on[0][2] - self.adv(pair[0])
+        return on[0][2] - self.hmtx[on[0][0]][0]
 
     def profile(self, ch, step=4, lo=-400, hi=1200):
-        """Leftmost and rightmost ink per row, rows `step` units apart."""
-        rows = {}
-        for y in range(lo, hi, step):
-            s = self.hspans(ch, y + 0.5)
-            if s:
-                rows[y] = (s[0][0], s[-1][1])
-        return rows
+        return self.glyph_profile(self.gname(ch), step, lo, hi)
 
-    def ink_gap(self, left, right, step=4):
-        """Smallest horizontal ink gap in a kerned pair, and the row where it is."""
-        k = self.kern(left + right)
-        if k is None:
+    def glyph_profile(self, name, step=4, lo=-400, hi=1200):
+        """Leftmost and rightmost ink per row, rows `step` units apart, by glyph name."""
+        key = (name, step, lo, hi)
+        if key not in self._profiles:
+            rows = {}
+            for y in range(lo, hi, step):
+                s = _spans(self.glyph_polys(name), y + 0.5, 1)
+                if s:
+                    rows[y] = (s[0][0], s[-1][1])
+            self._profiles[key] = rows
+        return self._profiles[key]
+
+    def pair_gap(self, pair, step=4):
+        """Two characters as HarfBuzz sets them, kerning on and ligatures off, contextual alternates and all: the
+        smallest horizontal ink gap between them, its row, the two glyphs shaping chose, and where the second glyph's
+        origin sits from the first's. None when they shape to one glyph or share no row of ink. The collision guard
+        (space_font.py) kerns these glyphs, and check_font.py and the font book read the same gap."""
+        on = self.shape(pair, {"kern": True, "liga": False})
+        if len(on) != 2:
             return None
-        a, b = self.profile(left, step), self.profile(right, step)
-        off = self.adv(left) + k
-        best = None
-        for y in a:
-            if y in b:
-                g = b[y][0] + off - a[y][1]
-                if best is None or g < best[0]:
-                    best = (g, y)
-        return best
+        (left, x_left, advance), (right, x_right, _) = on
+        a, b = self.glyph_profile(left, step), self.glyph_profile(right, step)
+        off = advance + x_right - x_left
+        gaps = [(b[y][0] + off - a[y][1], y) for y in a if y in b]
+        if not gaps:
+            return None
+        gap, y = min(gaps)
+        return PairGap(gap, y, left, right, off)
 
 
 def subset_font(f, text, layout=True):
