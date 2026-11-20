@@ -74,6 +74,29 @@ test("prove refuses a malformed row with its line number", () => {
 	assert.doesNotMatch(r.stdout, /blocked/);
 });
 
+// A GraphQL POST is judged by its body, so a row without one would read as blocked whatever the app sends.
+test("prove refuses a GraphQL POST row without its body", () => {
+	assert.throws(() => prove([`POST ${base}/graphql`]), /line 1: a GraphQL POST needs its body/);
+	assert.throws(() => prove([`POST ${base}/api/q`], { graphqlPaths: ["/api/q"] }), /line 1: a GraphQL POST needs its body/);
+});
+
+// A row can carry a request body, so a refusal names the line and the reason, never the row itself.
+test("a refused row is not echoed", () => {
+	const file = join(dir, "secret-row.txt");
+	writeFileSync(file, `POST /graphql {"query":"mutation { setToken(value: \\"s3cret\\") }"}\n`);
+	const r = spawnSync(process.execPath, [GUARD, "prove", "--writes", file], { encoding: "utf8" });
+	assert.equal(r.status, 2, r.stdout + r.stderr);
+	assert.match(r.stderr, /line 1: the URL is not absolute/);
+	assert.doesNotMatch(r.stderr + r.stdout, /s3cret/);
+});
+
+// Imported from stdin, the first argument is "-", which is not a file and must not throw.
+test("the module imports from stdin", () => {
+	const r = spawnSync(process.execPath, ["--input-type=module", "-"], { input: `import { prove } from ${JSON.stringify(GUARD)}; console.log(typeof prove);`, encoding: "utf8" });
+	assert.equal(r.status, 0, r.stderr);
+	assert.equal(r.stdout.trim(), "function");
+});
+
 test("GraphQL is judged by its body, never by its path", () => {
 	const gq = `${base}/graphql`;
 	const body = (query, operationName) => JSON.stringify({ query, operationName, variables: {} });

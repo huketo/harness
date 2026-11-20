@@ -125,7 +125,9 @@ export async function launchChromium(options = {}, { root } = {}) {
 }
 
 // The installer links the skill folder into place, so the path the script was started by can be a link.
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+// A first argument that is not a file (`node --input-type=module -`) means this module was imported, not run.
+const isMain = () => { try { return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h") || argv.some((a) => a.startsWith("--") && a !== "--root" && a !== "--self-test")) {
     console.log("usage: node find-chromium.mjs [--root <dir>] [--self-test]\nPrints where Playwright and a launchable Chromium come from, after launching and closing it. Exit 0 when one launches, 2 when none does.\n--self-test is the same run: it passes only when a browser really launched.");

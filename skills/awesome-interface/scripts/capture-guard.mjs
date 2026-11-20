@@ -256,7 +256,7 @@ export function decide(req, opts = {}) {
 
 // target: a Playwright Page or BrowserContext, or anything with route(pattern, handler).
 // The handler's route object needs request() with method(), url(), postData(), and fulfill, continue, abort.
-// Pure. The lines of a writes file in, {writes: [{line, method, url, body}], bad: [{line, text, why}]} out, with
+// Pure. The lines of a writes file in, {writes: [{line, method, url, body}], bad: [{line, why}]} out, with
 // 1-based line numbers. Blank lines and lines starting with # are skipped; any other line must be
 // "METHOD URL" or "METHOD URL BODY" with an absolute URL, or it is bad.
 export function parseWrites(lines) {
@@ -265,10 +265,10 @@ export function parseWrites(lines) {
 		const line = i + 1;
 		if (!text.trim() || text.trimStart().startsWith("#")) return;
 		const m = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(text);
-		if (!m) return bad.push({ line, text, why: "needs METHOD URL" });
+		if (!m) return bad.push({ line, why: "needs METHOD URL" });
 		const [, method, url, body] = m;
-		if (!/^[A-Za-z]+$/.test(method)) return bad.push({ line, text, why: `${method} is not an HTTP method` });
-		try { new URL(url); } catch { return bad.push({ line, text, why: `${url} is not an absolute URL` }); }
+		if (!/^[A-Za-z]+$/.test(method)) return bad.push({ line, why: "the method is not an HTTP method" });
+		try { new URL(url); } catch { return bad.push({ line, why: "the URL is not absolute" }); }
 		writes.push({ line, method: method.toUpperCase(), url, body });
 	});
 	return { writes, bad };
@@ -279,7 +279,11 @@ export function parseWrites(lines) {
 // a line it cannot read is a write it never judged.
 export function prove(lines, opts = {}) {
 	const { writes, bad } = parseWrites(lines);
-	if (bad.length) throw new Error(bad.map((b) => `line ${b.line}: ${b.why}: ${JSON.stringify(b.text)}`).join("\n"));
+	// A GraphQL POST is judged by its body, so a row without one would read as blocked and prove nothing.
+	for (const w of writes) if (w.method === "POST" && !w.body && isGraphqlPath(w.url, opts)) bad.push({ line: w.line, why: "a GraphQL POST needs its body" });
+	bad.sort((a, b) => a.line - b.line);
+	// Reasons only: a row can carry a request body, which is not printed unless --bodies asks for it.
+	if (bad.length) throw new Error(bad.map((b) => `line ${b.line}: ${b.why}`).join("\n"));
 	// An empty list proves nothing; a surface that sends no writes is captured with --no-backend instead.
 	if (!writes.length) throw new Error("no write is listed, so nothing was judged; list the surface's writes, or capture with --no-backend if it sends none");
 	return writes.map(({ method, url, body }) => ({ method, url, ...decide({ method, url, postData: body }, opts) })).filter((d) => d.action === "continue");
@@ -338,6 +342,12 @@ export function installGuard(target, opts = {}) {
 }
 
 // ---- CLI ----
+// The installer links the skill folder into place, so the path the script was started by can be a link. A first
+// argument that is not a file (`node --input-type=module -`) means this module was imported, not run.
+function isMain() {
+	try { return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); }
+	catch { return false; }
+}
 function parse(argv) {
 	const o = { _: [], appOrigins: [], allowHosts: [], graphqlPaths: [] };
 	for (let i = 0; i < argv.length; i++) {
@@ -361,8 +371,7 @@ function parse(argv) {
 	return o;
 }
 
-// The installer links the skill folder into place, so the path the script was started by can be a link.
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+if (isMain()) {
 	const o = parse(process.argv.slice(2));
 	if (o.help) console.log(HELP);
 	else if (o._[0] === "names") {
