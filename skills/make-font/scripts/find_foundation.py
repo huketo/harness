@@ -442,8 +442,9 @@ def main():
               " ".join(f"{dl.get(k, ''):>9}" for k in keys) + f"  {ws}  {r.get('licence')}{wd}"
               + (f" RFN {r['reserved_font_names']}" if r.get("reserved_font_names") else ""))
     print(f"\nwrote {a.out}")
-    print("next: show the person the top rows and ask which to build on. Record the answer, verbatim, with "
-          f"record_base.py --shortlist {a.out} --family ... --question ... --answer ... --out base.json")
+    print("next: show the person the top rows and ask which to build on. For their pick, print the approval "
+          f"question with record_base.py --shortlist {a.out} --family ... --question-only --out base.json, ask it "
+          "as printed, then record their answer verbatim (SKILL.md step 5).")
 
 
 if __name__ == "__main__":
