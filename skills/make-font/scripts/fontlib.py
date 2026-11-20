@@ -1,4 +1,8 @@
-"""Shared geometry for the make-font scripts. Python 3.9+, fontTools, uharfbuzz, numpy.
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz", "numpy", "pillow"]
+# ///
+"""Shared geometry, licence reading and character sets for the make-font scripts.
 
 Every length a measurement returns is in cap-normalised units: the font is scaled so its cap height is 700.
 That puts a screenshot (no em size) and a font file on the same scale. `cap_em` keeps the file's real cap
@@ -8,6 +12,7 @@ Nothing here copies an outline. A measurement is a font-wide number or a class m
 """
 import io
 import json
+import re
 import statistics as st
 
 from fontTools.pens.basePen import BasePen
@@ -64,6 +69,120 @@ SAMPLE_LINES = [
     "HAHBHCHDHEHFHGHIHJHKHLHMHNHOHPHQHRHSHTHUHVHWHXHYHZH",
     "H0H1H2H3H4H5H6H7H8H9H",
 ]
+
+
+# The characters each script needs. check_font.py gates coverage on them, and fit_font.py subsets the base to them.
+COVERAGE = {
+    "latin": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+             "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœŠšŽžŸ"
+             ".,:;!?¡¿'\"()[]{}-–—‘’“”‚„‹›«»…•·/\\&@#*§¶©®™°%‰$€£¥¢+−×÷=<>",
+    "latin-ext": "ĀāĂăĄąĆćČčĎďĐđĒēĖėĘęĚěĞğĢģĪīĮįİıĶķĹĺĻļĽľŁłŃńŅņŇňŌōŐőŔŕŘřŚśŞşȘșŤťŢţȚțŪūŮůŰűŲųŹźŻż",
+    "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
+    "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
+    "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
+}
+# Kept for every script: printable ASCII, Latin-1, and the typographic marks the font book and plain text use
+# (dashes, quotes, ellipsis, primes, fraction slash, minus).
+COMMON_UNICODES = [(0x20, 0x7E), (0xA0, 0xFF), (0x2010, 0x2027), (0x2030, 0x203A), (0x2044, 0x2044),
+                   (0x20AC, 0x20AC), (0x2122, 0x2122), (0x2212, 0x2212)]
+
+
+def charset_unicodes(scripts):
+    """The code points a build for these scripts keeps, as pyftsubset's --unicodes value. Raises on a script
+    with no list in COVERAGE, since a subset would silently drop it."""
+    cps = {c for lo, hi in COMMON_UNICODES for c in range(lo, hi + 1)}
+    for s in scripts:
+        if s not in COVERAGE:
+            raise ValueError(f"no character list for script {s!r} (known: {', '.join(COVERAGE)})")
+        cps |= {ord(c) for c in COVERAGE[s]}
+    runs, start, prev = [], None, None
+    for c in sorted(cps):
+        if start is None:
+            start = prev = c
+        elif c == prev + 1:
+            prev = c
+        else:
+            runs.append((start, prev))
+            start = prev = c
+    if start is not None:
+        runs.append((start, prev))
+    return ",".join(f"U+{a:04X}" if a == b else f"U+{a:04X}-{b:04X}" for a, b in runs)
+
+
+# ------------------------------------------------------------------ licences and names
+OFL_NOTICE_RE = re.compile(r"Open Font License|openfontlicense\.org|scripts\.sil\.org/OFL", re.I)
+_QUOTES = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
+
+
+def is_ofl_11_text(text):
+    """True for the SIL Open Font License 1.1 text: its title with the version, and its conditions."""
+    return bool(re.search(r"SIL\s+OPEN\s+FONT\s+LICENSE\s*,?\s*Version\s+1\.1\b", text, re.I)
+                and re.search(r"PERMISSION\s*&\s*CONDITIONS", text) and re.search(r"\bTERMINATION\b", text))
+
+
+def names_ofl(notice):
+    """True when a name-table licence notice (name ID 13) names the OFL and no other licence."""
+    return bool(notice and OFL_NOTICE_RE.search(notice) and not re.search(r"Apache|GPL|MIT License", notice))
+
+
+def _rfn_clause(rest):
+    """Names from the text after `with Reserved Font Name(s)`, up to the end of that sentence."""
+    rest = rest.lstrip(" :")
+    if rest[:1] in _QUOTES:
+        names, i = [], 0
+        while i < len(rest):
+            ch = rest[i]
+            if ch in _QUOTES:
+                end = rest.find(_QUOTES[ch], i + 1)
+                if end < 0:
+                    break
+                names.append(rest[i + 1:end].strip())
+                i = end + 1
+            elif ch == "." or ch == ";":
+                break
+            else:
+                i += 1
+        return [n for n in names if n]
+    m = re.match(r"(.*?)(?:\.(?:\s|$)|;|$)", rest)
+    return [n.strip() for n in re.split(r"\s*,\s*(?:and\s+)?|\s+and\s+", m.group(1)) if n.strip()]
+
+
+def reserved_font_names(ofl_text):
+    """Reserved Font Names declared in an OFL text, in order. Only copyright notice lines count (lines that start
+    with Copyright), from `with Reserved Font Name(s)` to the end of that sentence. The OFL body's own definition
+    of the term is not a declaration."""
+    out = []
+    for line in ofl_text.splitlines():
+        if not re.match(r"\s*copyright\b", line, re.I):
+            continue
+        m = re.search(r"\bwith\s+Reserved\s+Font\s+Names?\b(.*)", line, re.I)
+        if m:
+            out += [n for n in _rfn_clause(m.group(1)) if n not in out]
+    return out
+
+
+def english_names(font):
+    """name ID -> string, the English record first: Windows US English, other Windows English, Mac English,
+    then anything else. A plain dict over the records would let a later language overwrite the English one."""
+    def rank(r):
+        if r.platformID == 3 and r.langID == 0x409:
+            return 0
+        if r.platformID == 3 and r.langID & 0x3FF == 0x09:
+            return 1
+        if r.platformID == 1 and r.langID == 0:
+            return 2
+        return 3
+    best = {}
+    for r in font["name"].names:
+        try:
+            s = r.toUnicode()
+        except UnicodeDecodeError:
+            continue
+        k = rank(r)
+        if r.nameID not in best or k < best[r.nameID][0]:
+            best[r.nameID] = (k, s)
+    return {nid: s for nid, (_, s) in best.items()}
+
 
 
 # ------------------------------------------------------------------ outlines
@@ -377,7 +496,8 @@ WIDTH_SCALE = 0.025  # 2.5 % of a class mean advance is one unit
 
 
 def distance(target, cand, width_weight=1.0, skip=()):
-    """Weighted distance and per-key deltas (candidate minus target). Missing keys are left out."""
+    """Weighted distance and per-key deltas (candidate minus target). Missing keys are left out.
+    width_weight is a number, or a function (class, relative delta) -> number."""
     total, deltas = 0.0, {}
     for key, (scale, w) in DISTANCE.items():
         if key in skip:
@@ -396,7 +516,8 @@ def distance(target, cand, width_weight=1.0, skip=()):
         if tv and cv:
             d = cv / tv - 1
             deltas["w_" + cls] = round(d, 4)
-            total += width_weight * 0.5 * (d / WIDTH_SCALE) ** 2
+            w = width_weight(cls, d) if callable(width_weight) else width_weight
+            total += w * 0.5 * (d / WIDTH_SCALE) ** 2
     return round(total ** 0.5, 3), deltas
 
 

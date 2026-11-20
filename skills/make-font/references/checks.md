@@ -1,6 +1,7 @@
 # Checks
 
-`check_font.py` gates each style and exits 1 on any failure. Its tolerances come from `targets.json`, set by use:
+`check_font.py` first checks the chain, then gates each style, and exits 1 on any failure. Each gate is PASS,
+FAIL, INFO or NOT RUN. Its tolerances come from `targets.json`, set by use:
 
 | Gate | text | display | ui |
 |-|-|-|-|
@@ -16,6 +17,16 @@ Units are cap-normalised (cap 700). The width gates are the fit's own objective,
 construction. The paragraph gate is the independent one: it has spaces, punctuation, figures and kerning, which
 the fit never saw. Read it as the real test of width. It only runs when the targets came from a font file.
 
+## The chain
+
+It takes `--base-json`, `--fit-log`, every `--space-log` and `--package-log`, and refuses to go on when a link is
+broken: the base or its `OFL.txt` no longer has the recorded sha256; a log was made from another `base.json`;
+`fit_font.py` read anything but the approved base and this `targets.json`, or its subset is missing, changed or
+not made from the base; `space_font.py` read anything but fitted fonts and this `targets.json`; `package.py`
+took a font no space log wrote; or a font checked here is not one `package.py` wrote. When every link holds, the
+**chain** group lists them as PASS. That structure is the provenance guarantee: the steps that draw the font
+never opened a reference.
+
 ## The groups
 
 - **metrics**: stem, x-height, contrast gated. Ascender, descender, bar, serif and overshoot printed for
@@ -23,24 +34,26 @@ the fit never saw. Read it as the real test of width. It only runs when the targ
 - **widths** and **spacing**: every class mean, the paragraph, the four side means.
 - **kerning**: every pair of letters, figures and punctuation, shaped, f on the left skipped. Fails if any gap is
   more than a unit under `min_gap`.
-- **coverage**: the characters each script needs (`COVERAGE` in the script: latin, latin-ext, vietnamese,
-  cyrillic, greek). Add a list there before claiming a script that is not in it.
-- **provenance**: glyph order and character map equal the base's. With `--fit-log`, every glyph is compared with
-  the base glyph at the fit's y location, at the same cap height: its ink must be within 3 % as tall (all y
-  coordinates come from there) and within 40 % as wide (x comes from the width classes). With `--reference`
-  files, no outline of ours may share point structure with a reference outline and lie within 2 % of it in
-  bounding-box-normalised shape. Shapes under nine points are left out, since a rectangle matches every
-  rectangle. A CFF reference cannot match a TrueType outline by construction, and the gate says so. If the
-  reference is itself built on the same open base, this gate fails by design: say so, it is not a copy.
+- **coverage**: the characters each script needs (`COVERAGE` in `fontlib.py`: latin, latin-ext, vietnamese,
+  cyrillic, greek). Add a list there before claiming a script that is not in it; the fit subsets to it too.
+- **provenance**: glyph order and character map equal the subset `fit_font.py` recorded. Every glyph is compared
+  with the subset's glyph at the fit's y location, at the same cap height: its ink must be within 3 % as tall
+  (all y coordinates come from there) and within 40 % as wide (x comes from the width classes). With
+  `--reference` files there is one diagnostic, INFO only: our outlines that have a curve or at least 16 points
+  are compared with the reference's, and any that share point structure and lie within 2 % in
+  bounding-box-normalised shape are listed. Simpler shapes are left out, since a straight bar matches every
+  straight bar. A match is a reason to look, not a verdict: the chain already shows the build never opened the
+  reference, and a reference built on the same open base matches by design. A CFF reference cannot be compared
+  with TrueType outlines, so the comparison is NOT RUN, and the report and the font book say so.
 - **validity**: a ttx dump-and-reload (dump, compile, dump, compare), win ascent and descent covering every glyph,
-  no variation tables left, and `fontbakery check-universal` when it is installed. Not installed is reported as
-  not run.
+  no variation tables left, and `fontbakery check-universal` when it is installed. Not installed is NOT RUN.
 - **licence**: see `licensing.md`.
 
 ## Renders
 
 With a reference font file, `overlay-<style>-text.png` and `-display.png` set the same words in both fonts at the
-same cap height: reference red, ours blue, both black. Black shapes with thin coloured fringes mean a close match.
+same cap height: reference red, ours blue, both black, with that legend drawn above the words. Black shapes
+with thin coloured fringes mean a close match.
 A coloured shadow along one side of every letter means a width or spacing drift. With a screenshot,
 `stacked-<style>.png` puts the screenshot above our render of the same lines at the same cap height.
 

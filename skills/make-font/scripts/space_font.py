@@ -1,7 +1,14 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz"]
+# ///
 """Space a fitted font: class sidebearings, a global track, kerning carried over, and a collision guard.
 
-  python3 -I space_font.py <in.fit.ttf> targets.json --out <out.ttf> [--track -4] [--kern-scale 1.0]
-      [--min-gap 6] [--guard-f] [--no-sides]
+  uv run space_font.py <in.fit.ttf> targets.json --out <out.ttf> --base-json base.json
+      --fit-log fit-log.json [--track -4] [--kern-scale 1.0] [--min-gap 6] [--guard-f] [--no-sides]
+
+The input must be a font fit_font.py wrote from the approved base: base.json is checked against its files, and
+the input's sha256 must be an output in --fit-log. Anything else is refused before the font is opened.
 
 1. Sides. Every side of a basic letter is straight, round or other (fontlib.SIDES). Straight and round sides
    move so their class means meet the targets' sidebearings. Other sides (diagonals, open terminals) take
@@ -16,7 +23,8 @@
    is opened by a new kerning lookup. The guard only opens pairs, never closes them. f on the left is skipped
    unless --guard-f: its hood is meant to overhang, and the f ligatures cover most of those pairs.
 
-Writes the font and <out>.space-log.json with the moves and every pair the guard opened.
+Writes the font and <out>.space-log.json with the moves, every pair the guard opened, and the chain: base.json's
+sha256, the fitted font as input, the spaced font as output.
 """
 import argparse
 import os
@@ -28,6 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fontTools.ttLib import TTFont  # noqa: E402
 from fontTools.ttLib.tables import otBase  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
 GUARD_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:;!?\"'()[]{}-&/"
@@ -222,12 +231,17 @@ def main():
     ap.add_argument("font")
     ap.add_argument("targets")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--base-json", help="base.json from record_base.py (required)")
+    ap.add_argument("--fit-log", help="fit-log.json from fit_font.py, which lists the input as an output (required)")
     ap.add_argument("--track", type=int, default=0)
     ap.add_argument("--kern-scale", type=float, default=1.0)
     ap.add_argument("--min-gap", type=float)
     ap.add_argument("--guard-f", action="store_true")
     ap.add_argument("--no-sides", action="store_true")
     a = ap.parse_args()
+    _, base_sha = C.load_base(a.base_json)
+    fit_log = C.load_log(a.fit_log, base_sha, "--fit-log", "fit_font.py")
+    C.require_output(a.font, [fit_log], "--fit-log", "fit_font.py")
     T = L.load_json(a.targets)
     f = TTFont(a.font)
     log = {"input": os.path.basename(a.font)}
@@ -243,6 +257,7 @@ def main():
     after = L.measure_face(L.Face(TTFont(a.out)))
     log["sides_before"], log["sides_after"] = before, after["sides"]
     log["min_gap"] = min_gap
+    log["chain"] = C.make_chain(base_sha, [a.font], [a.out], a.targets)
     L.save_json(log, a.out + ".space-log.json")
     print(f"wrote {a.out}")
     print(f"  side means before {before}")

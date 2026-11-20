@@ -19,11 +19,12 @@ page is read from the font files or the logs when the book is written, never typ
 8. **Figures and punctuation.** Every figure style the features allow, fractions, punctuation and currency.
 9. **Kerning and spacing.** Eighteen common pairs with their values, the spacing strings, kerning off and on,
    and the guard's largest pair drawn without and with the guard.
-10. **OpenType features.** Every GSUB and GPOS feature, off in grey and on in black. Stylistic sets show the
-    characters their lookups change, with the set's own name from the name table.
+10. **OpenType features.** Every GSUB and GPOS feature, off in grey and on in black, 21 to a page (seven columns,
+    three rows). Stylistic sets show the characters their lookups change, with the set's own name from the name
+    table.
 11. **Languages.** Latin, Cyrillic and Greek languages whose letters are all in the character map.
 12. **Licence and install.** The name table's copyright lines and OFL notice, files with sizes, the check
-    summary, a CSS snippet and desktop install.
+    summary (gates passed, the names of those failed and of those not run), a CSS snippet and desktop install.
 
 ## Rules for the book's text
 
@@ -40,6 +41,10 @@ page is read from the font files or the logs when the book is written, never typ
   drew its glyphs. Any system font means a glyph is missing from ours and a stand-in drew it. That fails.
 - **Overflow check.** Any element past a page's margins fails.
 - Writes `pages/NN-slug.png` at 2x and `fontbook.pdf`.
+
+Playwright and a browser come from `awesome-interface/scripts/find-chromium.mjs` when that skill is installed
+beside this one. Without it, the script looks in `--root <dir>`, the current folder and the global install, and
+`PW_CHROMIUM` may name any Chrome or Chromium executable.
 
 Then open the cover, the kerning page and one character-set page and look. The standard is a sheet a type
 designer would send: aligned columns, one accent colour for guides only, nothing clipped, nothing overlapping.

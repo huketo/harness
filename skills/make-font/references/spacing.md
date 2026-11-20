@@ -1,7 +1,8 @@
 # Spacing
 
 Widths come from the fit. Spacing decides how the widths divide into ink and air. `space_font.py` runs on each
-fitted style.
+fitted style, and only on one: it checks `base.json`, and the input's sha256 must be an output in the
+`--fit-log` it is given. Its `.space-log.json` lists that font as input and the spaced font as output.
 
 ## Class sidebearings
 

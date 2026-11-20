@@ -3,6 +3,19 @@
 `fit_font.py` turns one variable font into one static per weight. It reads the base and `targets.json`, and
 nothing else.
 
+## Before the fit
+
+The script starts from `base.json`. The base font and its `OFL.txt` must still have the sha256 recorded when the
+person approved them, and the font given on the command line must be that file, byte for byte: a subset or a
+copy made elsewhere is refused. The base must be a TrueType variable font (glyf, fvar, gvar).
+
+It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`) plus
+ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
+`build/subset/base.subset.ttf`, and `fit-log.json` records it under `subset`: the base's sha256, the file, its
+sha256 and the pyftsubset arguments in order. Everything below runs on that subset, and the check compares the
+output's glyph order and character map with it. `fit-log.json` also carries the chain: `base.json`'s sha256, the
+base as the only input, every fitted font as an output, and `targets.json`.
+
 ## Why x and y come from different places
 
 Every location of one variable font has the same points in the same order. So a glyph can take its x

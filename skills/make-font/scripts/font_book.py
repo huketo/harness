@@ -1,12 +1,17 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz"]
+# ///
 """Write the font book: one HTML page per sheet, 1600 x 1000 px, ready for render_book.mjs to print as PDF.
 
-  python3 -I font_book.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --out-dir DIR
-      [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log x.space-log.json]
+  uv run font_book.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --out-dir DIR
+      [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log a.space-log.json ...]
       [--check-report check-report.json] [--licence OFL.txt] [--tagline "..."] [--version 1.000]
 
 Pages: cover, how it was made (with --targets), vertical metrics, weights, waterfall, text settings, character
-set (as many pages as it needs), figures, kerning and the collision guard, OpenType features, languages, and
-licence and install. Every number on a page is read from the font files or the logs when the book is written.
+set (as many pages as it needs), figures, kerning and the collision guard, OpenType features (21 to a page),
+languages, and licence and install, where the check summary lists the gates that failed and those not run.
+Every number on a page is read from the font files or the logs when the book is written.
 The book's own text names no reference and no base family: the licence page quotes the copyright lines from
 the font's name table, which is what the OFL requires.
 
@@ -29,6 +34,7 @@ import fontlib as L  # noqa: E402
 
 esc = html.escape
 ACCENT = "#0a84ff"
+FEATURES_PER_PAGE = 21  # 7 columns by 3 rows of .fcell fit inside one page
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -206,7 +212,7 @@ def main():
     ap.add_argument("--webfonts")
     ap.add_argument("--targets")
     ap.add_argument("--fit-log")
-    ap.add_argument("--space-log", action="append", default=[])
+    ap.add_argument("--space-log", action="extend", nargs="+", default=[])
     ap.add_argument("--check-report")
     ap.add_argument("--licence")
     ap.add_argument("--tagline")
@@ -218,10 +224,9 @@ def main():
 
     fonts = [TTFont(p) for p in a.fonts]
     reg = fonts[0]
-    nm = {r.nameID: r.toUnicode() for r in reg["name"].names if r.platformID == 3}
+    nm = L.english_names(reg)
     family = nm.get(16) or nm.get(1)
-    styles = [({r.nameID: r.toUnicode() for r in f["name"].names if r.platformID == 3}.get(17) or "Regular",
-               f["OS/2"].usWeightClass) for f in fonts]
+    styles = [(L.english_names(f).get(17) or "Regular", f["OS/2"].usWeightClass) for f in fonts]
     version = a.version or f"{reg['head'].fontRevision:.3f}"
     T = L.load_json(a.targets) if a.targets else None
     fit = L.load_json(a.fit_log) if a.fit_log else None
@@ -503,20 +508,20 @@ def main():
 </div>""")
 
     # features ----------------------------------------------------------------
-    names = {r.nameID: r.toUnicode() for r in reg["name"].names if r.platformID == 3}
+    names = nm
     ssname = {}
     if "GSUB" in reg:
         for fr in reg["GSUB"].table.FeatureList.FeatureRecord:
             p = fr.Feature.FeatureParams
             if p is not None and hasattr(p, "UINameID"):
                 ssname[fr.FeatureTag] = names.get(p.UINameID)
-    fcells = ""
+    fcells = []
     for tag in FEATS:
         label, sample = FEATURE_DEMO.get(tag, (ssname.get(tag) or ("Stylistic set " + tag[2:] if tag.startswith("ss") else tag), None))
         if tag not in FEATURE_DEMO or tag == "salt":
             sample = feature_chars(reg, tag) or sample
         if sample is None:
-            fcells += f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="fnote">Always on, applied by the shaper</div></div></div>'
+            fcells.append(f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="fnote">Always on, applied by the shaper</div></div></div>')
             continue
         if tag == "kern":
             off, on = "font-kerning:none", ""
@@ -524,10 +529,13 @@ def main():
             off, on = "font-variant-ligatures:none", ""
         else:
             off, on = f"font-feature-settings:'{tag}' 0", f"font-feature-settings:'{tag}' 1"
-        fcells += f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="f off" style="{off}">{esc(sample)}</div><div class="f on" style="{on}">{esc(sample)}</div></div></div>'
-    B.page("features", "OpenType features", f"""
-<div class="feat-page"><div class="cs-head"><h2 class="f h2">OpenType features</h2><p class="lede">{len(FEATS)} features, read from the GSUB and GPOS tables. Each pair shows the feature off in grey and on in black.</p></div>
-  <div class="fgrid">{fcells}</div></div>""")
+        fcells.append(f'<div class="fcell"><div class="ftag"><span>{tag}</span><span>{esc(label)}</span></div><div class="fdemo"><div class="f off" style="{off}">{esc(sample)}</div><div class="f on" style="{on}">{esc(sample)}</div></div></div>')
+    fpages = [fcells[i:i + FEATURES_PER_PAGE] for i in range(0, len(fcells), FEATURES_PER_PAGE)] or [[]]
+    for i, cells_ in enumerate(fpages):
+        of = f", {i + 1} of {len(fpages)}" if len(fpages) > 1 else ""
+        B.page(f"features-{i + 1}" if len(fpages) > 1 else "features", "OpenType features", f"""
+<div class="feat-page"><div class="cs-head"><h2 class="f h2">OpenType features{of}</h2><p class="lede">{len(FEATS)} features, read from the GSUB and GPOS tables. Each pair shows the feature off in grey and on in black.</p></div>
+  <div class="fgrid">{''.join(cells_)}</div></div>""")
 
     # languages -------------------------------------------------------------
     def missing(chars):
@@ -560,7 +568,10 @@ def main():
         passed = sum(1 for r in check if r["state"] == "PASS")
         failed = [r for r in check if r["state"] == "FAIL"]
         failed_names = list(dict.fromkeys(r["gate"] for r in failed))  # gate names only: details may name a reference
-        checks = f"<h3 class='sec' style='margin-top:26px'>Checks</h3><p>{passed} gates passed, {len(failed)} failed{': ' + esc(', '.join(failed_names[:6])) if failed else ''}.</p>"
+        not_run = list(dict.fromkeys(r["gate"] for r in check if r["state"] == "NOT RUN"))
+        checks = (f"<h3 class='sec' style='margin-top:26px'>Checks</h3><p>{passed} gates passed, {len(failed)} failed"
+                  f"{': ' + esc(', '.join(failed_names[:6])) if failed else ''}."
+                  f"{' Not run: ' + esc('; '.join(not_run)) + '.' if not_run else ''}</p>")
     B.page("licence", "Licence and install", f"""
 <div class="lic-page">
   <div class="lic-left"><h2 class="f h2">Licence</h2>

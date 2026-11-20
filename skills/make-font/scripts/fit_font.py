@@ -1,10 +1,21 @@
-"""Bend an open variable font to targets.json: one static TTF per style.
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "uharfbuzz", "skia-pathops"]
+# ///
+"""Bend the approved OFL variable font to targets.json: one static TTF per style.
 
-  python3 -I fit_font.py <base-vf.ttf> targets.json --out-dir DIR [--loc opsz=14] [--style Regular]
-      [--max-stretch 0.03] [--tol 0.3] [--no-contrast]
+  uv run fit_font.py <base-vf.ttf> targets.json --base-json base.json --out-dir DIR [--loc opsz=14]
+      [--style Regular] [--max-stretch 0.03] [--tol 0.3] [--no-contrast]
 
 This script opens the base font and targets.json. It never opens a reference font: the references reach it
 only as the numbers in targets.json.
+
+Before anything else it checks base.json (record_base.py wrote it when the person approved the base): the font
+and OFL text must still have the sha256 recorded there, and <base-vf.ttf> must be that font, byte for byte. A
+subset made elsewhere is refused. The script subsets the verified base itself, to the characters of the
+targets' scripts (fontlib.COVERAGE, plus ASCII, Latin-1 and common punctuation), writes
+<DIR>/subset/base.subset.ttf, and fits from that subset. fit-log.json records the subset (source sha256, file, sha256, pyftsubset arguments)
+and the chain: base.json's sha256, the base as input, every font written as output.
 
 For each style:
 1. The y instance. The weight axis is solved so the n stem meets the target. If the base has an optical-size
@@ -39,6 +50,7 @@ from fontTools.ttLib import TTFont  # noqa: E402
 from fontTools.ttLib.scaleUpem import scale_upem  # noqa: E402
 from fontTools.varLib import instancer  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 import space_font  # noqa: E402
 
@@ -49,17 +61,40 @@ def parse_loc(s):
     return {k.strip(): float(v) for k, v in (p.split("=") for p in s.split(",") if p.strip())} if s else {}
 
 
-class Base:
-    """The variable font, a small subset of it for fast solving, and a cache of full instances."""
+def check_glyf_vf(f, path):
+    if "glyf" not in f:
+        raise C.Refused(f"{path}: the base must be a TrueType-flavoured variable font (glyf/gvar). CFF is not handled.")
+    if "fvar" not in f or "gvar" not in f:
+        raise C.Refused(f"{path} is not a variable font. Pick a variable candidate from the shortlist.")
 
-    def __init__(self, path):
-        self.path = path
-        self.vf = TTFont(path)
-        if "glyf" not in self.vf:
-            raise SystemExit("the base must be a TrueType-flavoured variable font (glyf/gvar). CFF2 is not handled.")
-        if "fvar" not in self.vf:
-            raise SystemExit("the base is not a variable font. Use a static only with --max-stretch, through a VF "
-                             "made from it, or pick a variable candidate from the shortlist.")
+
+def make_subset(base_path, base_sha, scripts, out_dir):
+    """Subset the verified base to the scripts' characters, with its layout closure. Returns the subset, reread
+    from the file it was written to, and the record fit-log.json keeps of it."""
+    from fontTools import subset
+    args = [f"--unicodes={L.charset_unicodes(scripts)}", "--layout-features=*", "--glyph-names", "--notdef-outline",
+            "--name-IDs=*", "--name-languages=*", "--legacy-kern"]
+    opts = subset.Options()
+    rest = opts.parse_opts(args, ignore_unknown=["unicodes"])
+    unicodes = [u for r in rest for u in subset.parse_unicodes(r.split("=", 1)[1])]
+    f = TTFont(base_path, recalcTimestamp=False)
+    s = subset.Subsetter(opts)
+    s.populate(unicodes=unicodes)
+    s.subset(f)
+    # A folder of its own, so a glob over the build folder (build/*.ttf) never picks the subset up as a style.
+    os.makedirs(os.path.join(out_dir, "subset"), exist_ok=True)
+    path = os.path.join(out_dir, "subset", "base.subset.ttf")
+    f.save(path)
+    rec = {"source_sha256": base_sha, "file": os.path.abspath(path), "sha256": C.sha256_file(path), "args": args}
+    return TTFont(path), rec
+
+
+class Base:
+    """The variable font (the subset of the approved base), a smaller subset of it for fast solving, and a cache
+    of full instances."""
+
+    def __init__(self, font):
+        self.vf = font
         self.axes = L.axes_of(self.vf)
         self.small = L.subset_font(self.vf, L.SOLVE_TEXT, layout=False)
         self.cache, self.subsets = {}, {}
@@ -377,8 +412,9 @@ def fit_style(B, T, style, args, log):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("base")
+    ap.add_argument("base", help="the approved base font, the file base.json names")
     ap.add_argument("targets")
+    ap.add_argument("--base-json", help="base.json from record_base.py (required)")
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--loc", default="", help="axes to hold fixed, e.g. opsz=14,GRAD=0")
     ap.add_argument("--style", action="append", help="build only these styles (names from targets.json)")
@@ -387,11 +423,22 @@ def main():
     ap.add_argument("--iters", type=int, default=6)
     ap.add_argument("--no-contrast", action="store_true", help="do not scan opsz for contrast")
     a = ap.parse_args()
+    rec, base_sha = C.load_base(a.base_json)
+    font_sha = C.require_base_font(a.base, rec, a.base_json)
+    check_glyf_vf(TTFont(a.base, lazy=True), a.base)
     T = L.load_json(a.targets)
-    B = Base(a.base)
+    try:
+        L.charset_unicodes(T.get("scripts", ["latin"]))
+    except ValueError as e:
+        raise C.Refused(f"{a.targets}: {e}")
     os.makedirs(a.out_dir, exist_ok=True)
+    sub, sub_rec = make_subset(a.base, font_sha, T.get("scripts", ["latin"]), a.out_dir)
+    print(f"subset of the approved base: {len(sub.getGlyphOrder())} glyphs, {sub_rec['file']}")
+    B = Base(sub)
     fam = T["family"].replace(" ", "")
-    out = {"base": os.path.basename(a.base), "base_axes": B.axes, "targets": os.path.basename(a.targets), "styles": []}
+    out = {"base": os.path.basename(a.base), "base_axes": B.axes, "targets": os.path.basename(a.targets),
+           "subset": sub_rec, "styles": []}
+    written = []
     for style in T["styles"]:
         if a.style and style["name"] not in a.style:
             continue
@@ -399,6 +446,7 @@ def main():
         f, info = fit_style(B, T, style, a, log)
         p = os.path.join(a.out_dir, f"{fam}-{style['name']}.fit.ttf")
         f.save(p)
+        written.append(p)
         info["file"] = os.path.basename(p)
         info["log"] = log
         out["styles"].append(info)
@@ -411,6 +459,7 @@ def main():
         if info["stretch_limit_hit"]:
             print(f"  stretch limit reached for {info['stretch_limit_hit']}: the base cannot reach these widths "
                   f"within {a.max_stretch * 100:.0f} %. Say so, or pick a base with a width axis.")
+    out["chain"] = C.make_chain(base_sha, [a.base], written, a.targets)
     L.save_json(out, os.path.join(a.out_dir, "fit-log.json"))
 
 

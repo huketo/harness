@@ -1,6 +1,10 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "brotli", "uharfbuzz"]
+# ///
 """Measure a font file: proportions, stems, contrast, serifs, class-mean widths and sidebearings.
 
-  python3 -I measure_font.py <font.ttf|otf|woff2> [--loc wght=400,opsz=14] [--stem 76] [--out m.json]
+  uv run measure_font.py <font.ttf|otf|woff2> [--loc wght=400,opsz=14] [--stem 76] [--out m.json]
 
 --loc     a location in a variable font (defaults to its default instance).
 --stem    solve the weight axis so the n stem, at cap 700, equals this value first. Use it to compare a

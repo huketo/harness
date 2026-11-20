@@ -1,31 +1,45 @@
-"""Find the open-licence font closest to targets.json, to build on.
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["fonttools", "brotli", "uharfbuzz"]
+# ///
+"""Find the OFL-1.1 variable font closest to targets.json, to build on.
 
-  python3 -I find_foundation.py targets.json --cache DIR --out shortlist.json
+  uv run find_foundation.py targets.json --cache DIR --out shortlist.json
       [--category serif] [--shortlist 8] [--families "Family A,Family B"] [--local DIR ...] [--offline]
 
 Two passes.
 1. Coarse: the Fontsource catalogue (api.fontsource.org) lists every Google Fonts family with its category,
-   licence and scripts. Families that are OFL or Apache, in the category, and cover every script in targets.json
-   are kept. One small Latin WOFF2 per family, near weight 400, is measured and ranked.
+   licence and scripts. Families under the OFL, in the category, that cover every script in targets.json and
+   have a variable font in google/fonts are kept. One small Latin WOFF2 per family, near weight 400, is measured
+   and ranked.
 2. Fine: the best --shortlist families are downloaded whole from the google/fonts GitHub repository, with their
-   licence file. A variable font is solved on its weight axis so the n stem meets the target, and sampled across
-   its optical-size axis. A width axis makes width gaps cheap, since the fit can close them, so they count less.
+   OFL.txt. A variable font is solved on its weight axis so the n stem meets the target, and sampled across
+   its optical-size axis. A width axis makes width gaps cheap, but only in the direction it can move: an axis
+   that only narrows does not help a font that is too narrow.
 
---local adds font files you already have (each is checked for an open licence in its name table).
---families skips the coarse pass and measures only those families.
---offline uses only --local and the cache.
+Only the SIL Open Font License 1.1 is kept, and only TrueType (glyf) variable fonts: the fit needs both.
+--local adds font files you already have; each needs the OFL notice in name ID 13 and is a candidate only. Put
+its OFL.txt beside it, since the approval step records that file.
+--families skips the coarse pass and measures only those families (still OFL only).
+--offline reads only the cache and --local: nothing is downloaded, and a file missing from the cache is skipped.
+GITHUB_TOKEN, when set, is sent to api.github.com and raw.githubusercontent.com only, never printed. A 403 or 429
+from GitHub stops the search with the remaining limit, the reset time and what to do.
 Downloads go to --cache and are only read, never run. The ranking is a distance: each number's gap to the
 target, divided by what counts as a small gap, squared, weighted, summed, square-rooted. The score adds a
-penalty for missing axes: 0 with wdth and wght, 0.5 to 0.75 with wght alone, 1.5 for a static font. Lower is
-closer. Math, symbol and icon families are skipped, and so are families whose main script is not one asked for.
+penalty for missing axes: 0 with wdth and wght, 0.5 to 0.75 with wght alone. Lower is closer. Math, symbol and
+icon families are skipped, and so are families whose main script is not one asked for.
+
+The shortlist is for the person to choose from. Record their answer with record_base.py before fitting.
 """
 import argparse
 import glob
 import json
 import os
 import re
-import sys
 import subprocess
+import sys
+import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,30 +55,87 @@ CATALOG = "https://api.fontsource.org/v1/fonts"
 TREE = "https://api.github.com/repos/google/fonts/git/trees/main?recursive=1"
 RAW = "https://raw.githubusercontent.com/google/fonts/main/"
 COARSE = "https://cdn.jsdelivr.net/fontsource/fonts/{id}@latest/latin-{w}-normal.woff2"
-OPEN = ("OFL-1.1", "Apache-2.0", "OFL", "Apache License, Version 2.0")
+GITHUB_HOSTS = ("api.github.com", "raw.githubusercontent.com")
+OPEN = ("OFL-1.1", "OFL")
 USEFUL_AXES = ("wdth", "wght", "opsz", "GRAD")
 SKIP_WORDS = ("Math", "Symbols", "Icons", "Emoji", "Barcode")
+STRETCH = 0.03  # fit_font.py's default --max-stretch: a width gap beyond it needs the axis
+LICENCE_FILES = ("OFL.txt", "OFL-1.1.txt", "LICENSE.txt", "LICENSE", "OFL")
 
+
+class FetchError(Exception):
+    pass
 
 
 def safe(name):
     """A catalogue id or family as a cache file name: letters, digits, _ and - only, so no entry can leave --cache."""
     return re.sub(r"[^A-Za-z0-9_-]", "_", str(name))
 
-def axis_penalty(axes):
-    """A static font can only be scaled, so it ranks behind a close variable one. wdth matters most."""
-    useful = [a for a in USEFUL_AXES if a in axes]
-    if "wdth" in useful and "wght" in useful:
-        return 0.0
-    if "wght" in useful:
-        return 0.5 if len(useful) > 1 else 0.75
-    return 1.5
+
+# ------------------------------------------------------------------ downloads
+def auth_headers(url, env=os.environ):
+    """The GitHub token, for GitHub hosts only."""
+    token = env.get("GITHUB_TOKEN")
+    host = urllib.parse.urlsplit(url).hostname or ""
+    return {"Authorization": f"Bearer {token}"} if token and host in GITHUB_HOSTS else {}
 
 
-def fetch(url, path):
+def limit_advice(status, headers, env=os.environ):
+    """What a 403 or 429 means and what to do. Reads the rate-limit headers; never the token."""
+    def get(k):
+        v = headers.get(k) if headers is not None else None
+        return v.strip() if isinstance(v, str) and v.strip() else None
+    parts = [f"HTTP {status}"]
+    lim, rem, reset, retry = (get(k) for k in ("X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+                                               "Retry-After"))
+    if rem is not None:
+        parts.append(f"{rem} of {lim or '?'} requests left")
+    if reset and reset.isdigit():
+        parts.append("the limit resets at " + time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(int(reset))))
+    if retry:
+        parts.append(f"retry after {retry} s")
+    fix = ("GITHUB_TOKEN is set, so this is that token's limit: wait for the reset" if env.get("GITHUB_TOKEN") else
+           "set GITHUB_TOKEN to a GitHub token (no scopes needed) for 5,000 requests an hour")
+    return "; ".join(parts) + f". To go on: {fix}, or run with --offline on a filled --cache."
+
+
+def curl_command(url, path, header_file, env=os.environ):
+    """curl arguments and the config it reads on stdin. Headers go through the config, so a token never shows in
+    the process list."""
+    argv = ["curl", "-sSL", "--config", "-", "-A", UA["User-Agent"], "-o", path, "-D", header_file,
+            "-w", "%{http_code}", url]
+    config = "".join(f'header = "{k}: {v}"\n' for k, v in auth_headers(url, env).items())
+    return argv, config
+
+
+def _curl(url, path):
+    with tempfile.TemporaryDirectory() as td:
+        hdr = os.path.join(td, "headers")
+        argv, config = curl_command(url, path, hdr)
+        r = subprocess.run(argv, input=config, capture_output=True, text=True)
+        code = int(r.stdout.strip() or 0) if r.stdout.strip().isdigit() else 0
+        if code == 200:
+            return
+        headers = {}
+        if os.path.exists(hdr):
+            for line in open(hdr, encoding="latin-1"):
+                k, _, v = line.partition(":")
+                if v:
+                    headers[k.strip()] = v.strip()
+        if os.path.exists(path):
+            os.remove(path)
+        if code in (403, 429):
+            raise FetchError(f"{url}: refused, " + limit_advice(code, {k.title(): v for k, v in headers.items()}))
+        raise FetchError(f"{url}: HTTP {code or 'error'} {r.stderr.strip()[:200]}")
+
+
+def fetch(url, path, offline=False):
     if os.path.exists(path) and os.path.getsize(path) > 0:
         return path
+    if offline:
+        raise FetchError(f"{url}: not in the cache, and --offline downloads nothing")
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    part = path + ".part"
     try:
         ctx = None
         try:
@@ -73,24 +144,90 @@ def fetch(url, path):
             ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             pass
-        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60, context=ctx) as r:
+        req = urllib.request.Request(url, headers={**UA, **auth_headers(url)})
+        with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
             data = r.read()
-        with open(path, "wb") as fh:
+        with open(part, "wb") as fh:
             fh.write(data)
+    except urllib.error.HTTPError as e:
+        e.close()
+        if e.code in (403, 429):
+            raise FetchError(f"{url}: refused, " + limit_advice(e.code, e.headers))
+        raise FetchError(f"{url}: HTTP {e.code}")
     except urllib.error.URLError:
         # Some Python installs ship without CA certificates. curl uses the system's.
-        subprocess.run(["curl", "-fsSL", "-A", UA["User-Agent"], "-o", path, url], check=True)
+        _curl(url, part)
+    os.replace(part, path)
     return path
 
 
+# ------------------------------------------------------------------ licences and candidates
 def licence_of(font, ofl_text=None):
-    n = font["name"]
-    txt = " ".join(filter(None, [n.getDebugName(13), n.getDebugName(14), ofl_text or ""]))
-    kind = "OFL-1.1" if re.search(r"Open Font License|openfontlicense|scripts\.sil\.org/OFL", txt, re.I) else \
-        "Apache-2.0" if re.search(r"Apache License", txt, re.I) else None
-    rfn = re.findall(r"Reserved Font Names? \"?([^\".\n]+)", ofl_text or "")
-    return {"licence": kind, "reserved_font_names": [r.strip() for r in rfn],
-            "copyright": n.getDebugName(0), "trademark": n.getDebugName(7)}
+    """OFL-1.1 when name ID 13 carries the OFL notice and the licence text, if given, is the OFL 1.1. Anything else
+    (Apache-2.0 included) is None: not a base."""
+    n = L.english_names(font)
+    ok = L.names_ofl(n.get(13)) and (ofl_text is None or L.is_ofl_11_text(ofl_text))
+    return {"licence": "OFL-1.1" if ok else None,
+            "reserved_font_names": L.reserved_font_names(ofl_text or ""),
+            "copyright": n.get(0), "trademark": n.get(7)}
+
+
+def candidates(catalog, category, scripts, wanted=()):
+    """Catalogue families that may be a base: Google Fonts, OFL, and either asked for by name or in the category
+    with every script."""
+    ofl = [c for c in catalog if c.get("type") == "google" and c.get("license") in OPEN]
+    if wanted:
+        return [c for c in ofl if c["family"].lower() in wanted]
+    return [c for c in ofl if c.get("category") == category and scripts <= set(c.get("subsets", []))
+            and "normal" in c.get("styles", []) and c.get("defSubset") in scripts
+            and not any(w in c["family"] for w in SKIP_WORDS)]
+
+
+def licence_beside(path):
+    for name in LICENCE_FILES:
+        p = os.path.join(os.path.dirname(path), name)
+        if os.path.isfile(p):
+            with open(p, encoding="utf-8", errors="replace") as fh:
+                if L.is_ofl_11_text(fh.read()):
+                    return os.path.abspath(p)
+    return None
+
+
+# ------------------------------------------------------------------ the width axis
+def wdth_room(axes, loc):
+    """Which way the width axis can still move from the location measured."""
+    w = axes.get("wdth")
+    if not isinstance(w, (tuple, list)):
+        return {"narrow": False, "widen": False}
+    lo, de, hi = w
+    at = loc.get("wdth", de)
+    return {"narrow": lo < at, "widen": hi > at}
+
+
+def width_weight(axes, loc):
+    """A class width gap counts a quarter when the width axis can move toward the target, else in full."""
+    room = wdth_room(axes, loc)
+
+    def weight(cls, d):
+        return 0.25 if (d > 0 and room["narrow"]) or (d < 0 and room["widen"]) else 1.0
+    return weight
+
+
+def axis_penalty(axes, deltas=None):
+    """A font with fewer useful axes ranks behind a close one that has them. wdth matters most, and counts only
+    when it can move the way the widths beyond the stretch limit need (deltas, when known)."""
+    useful = [a for a in USEFUL_AXES if a in axes]
+    if "wdth" in useful and deltas and isinstance(axes.get("wdth"), (tuple, list)):
+        room = wdth_room(axes, {})
+        need = {"widen" if v < 0 else "narrow" for k, v in deltas.items()
+                if k.startswith("w_") and isinstance(v, (int, float)) and abs(v) > STRETCH}
+        if need and not all(room[n] for n in need):
+            useful.remove("wdth")
+    if "wdth" in useful and "wght" in useful:
+        return 0.0
+    if "wght" in useful:
+        return 0.5 if len(useful) > 1 else 0.75
+    return 1.5
 
 
 def evaluate(path, tg, styles, use, quick=False):
@@ -106,7 +243,6 @@ def evaluate(path, tg, styles, use, quick=False):
                 "ui": [de, lo + (de - lo) * 0.5],
                 "display": [de, de + (hi - de) * 0.35, hi]}[use]
         opsz_try = sorted({round(min(max(v, lo), hi), 1) for v in pref})
-    width_weight = 0.25 if "wdth" in axes else 1.0
     best = None
     for opsz in opsz_try:
         loc = {} if opsz is None else {"opsz": opsz}
@@ -119,13 +255,18 @@ def evaluate(path, tg, styles, use, quick=False):
         except Exception as e:  # a font without the letters the measurement needs
             return {"error": f"{type(e).__name__}: {e}"}
         skip = ("n_stem",) if quick or "wght" not in axes else ()
-        d, deltas = L.distance(tg, m, width_weight, skip)
+        d, deltas = L.distance(tg, m, width_weight(axes, loc), skip)
         if best is None or d < best["distance"]:
             best = {"distance": d, "deltas": deltas, "loc": loc, "measured": m}
     best["axes"] = axes
     best["useful_axes"] = [a for a in USEFUL_AXES if a in axes]
+    best["wdth_room"] = wdth_room(axes, best["loc"])
     best["glyphs"] = len(f.getGlyphOrder())
     return best
+
+
+def glyf_vf(f):
+    return "glyf" in f and "fvar" in f and "gvar" in f
 
 
 def main():
@@ -133,7 +274,7 @@ def main():
     ap.add_argument("targets")
     ap.add_argument("--cache", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--category")
+    ap.add_argument("--category", help="a Fontsource category; default from targets.json's category")
     ap.add_argument("--shortlist", type=int, default=8)
     ap.add_argument("--families", default="")
     ap.add_argument("--local", action="append", default=[])
@@ -142,74 +283,109 @@ def main():
     T = L.load_json(a.targets)
     tg, styles, use = T["targets"], T["styles"], T.get("use", "text")
     scripts = set(T.get("scripts", ["latin"]))
-    category = a.category or ("serif" if tg.get("serif") else "sans-serif")
+    cat = T.get("category") or ("serif" if tg.get("serif") else "sans")
+    category = a.category or {"sans": "sans-serif", "serif": "serif", "mono": "monospace"}.get(cat, "sans-serif")
     rows = []
 
     for d in a.local:
         for p in sorted(glob.glob(os.path.join(d, "*.[ot]tf")) + glob.glob(os.path.join(d, "*.woff2"))):
             f = TTFont(p)
-            lic = licence_of(f)
+            lic_path = licence_beside(p)
+            lic = licence_of(f, open(lic_path, encoding="utf-8").read() if lic_path else None)
             name = f["name"].getDebugName(16) or f["name"].getDebugName(1)
             if not lic["licence"]:
-                print(f"skip {os.path.basename(p)}: no open licence in its name table, so it cannot be a base")
+                print(f"skip {os.path.basename(p)}: no OFL-1.1 notice in its name table, so it cannot be a base")
+                continue
+            if not glyf_vf(f):
+                print(f"skip {os.path.basename(p)}: not a TrueType variable font, so the fit cannot use it")
                 continue
             r = evaluate(p, tg, styles, use)
-            rows.append({"family": name, "file": p, "origin": "local", **lic, **r})
-            print(f"local  {name:28s} distance {r.get('distance')}", flush=True)
+            rows.append({"family": name, "file": os.path.abspath(p), "origin": "local", "url": None,
+                         "licence_path": lic_path, **lic, **r})
+            print(f"local  {name:28s} distance {r.get('distance')}"
+                  + ("" if lic_path else "  (no OFL.txt beside it: the approval step will need --licence)"), flush=True)
 
-    if not a.offline:
-        tree_path = fetch(TREE, os.path.join(a.cache, "google-fonts-tree.json"))
-        tree = [t["path"] for t in json.load(open(tree_path))["tree"]]
-        catalog = json.load(open(fetch(CATALOG, os.path.join(a.cache, "fontsource-catalog.json"))))
+    try:
+        tree_path = fetch(TREE, os.path.join(a.cache, "google-fonts-tree.json"), a.offline)
+        catalog_path = fetch(CATALOG, os.path.join(a.cache, "fontsource-catalog.json"), a.offline)
+    except FetchError as e:
+        if not a.offline:
+            raise SystemExit(f"cannot list the Google Fonts families: {e}")
+        print(f"offline, and the catalogue is not cached ({e}): only --local fonts are searched")
+        tree_path = None
+    if tree_path:
+        with open(tree_path, encoding="utf-8") as fh:
+            tree = [t["path"] for t in json.load(fh)["tree"]]
+        with open(catalog_path, encoding="utf-8") as fh:
+            catalog = json.load(fh)
         wanted = [s.strip().lower() for s in a.families.split(",") if s.strip()]
-        fams = [c for c in catalog if c.get("type") == "google" and c.get("license") in OPEN
-                and c.get("category") == category and scripts <= set(c.get("subsets", []))
-                and "normal" in c.get("styles", []) and c.get("defSubset") in scripts
-                and not any(w in c["family"] for w in SKIP_WORDS)]
-        if wanted:
-            fams = [c for c in catalog if c["family"].lower() in wanted]
-        print(f"catalogue: {len(fams)} {category} families, open licence, covering {sorted(scripts)}", flush=True)
+        fams = candidates(catalog, category, scripts, wanted)
+        for w in wanted:
+            if not any(c["family"].lower() == w for c in fams):
+                print(f"skip {w}: not an OFL family in the catalogue")
+        print(f"catalogue: {len(fams)} {category} families under the OFL, covering {sorted(scripts)}", flush=True)
+
+        def variable_files(folder):
+            return [p for p in tree if p.startswith(f"ofl/{folder}/") and p.endswith(".ttf") and "[" in p
+                    and "Italic" not in p]
         coarse = []
         if not wanted:
             for c in fams:
+                folder = c["family"].lower().replace(" ", "").replace("-", "")
+                vf = variable_files(folder)
+                if not vf:
+                    continue  # a static family: the fit needs a variable font
                 w = min(c.get("weights") or [400], key=lambda x: abs(x - styles[0].get("weight", 400)))
                 p = os.path.join(a.cache, "coarse", f"{safe(c['id'])}-{w}.woff2")
                 try:
-                    fetch(COARSE.format(id=c["id"], w=w), p)
+                    fetch(COARSE.format(id=c["id"], w=w), p, a.offline)
                     r = evaluate(p, tg, styles, use, quick=True)
                 except Exception as e:
                     r = {"error": str(e)}
                 if "distance" in r:
-                    folder = c["family"].lower().replace(" ", "").replace("-", "")
-                    vf = [p for p in tree if p.split("/")[1:2] == [folder] and "[" in p and "Italic" not in p]
-                    axes = dict.fromkeys(vf[0].split("[")[1].split("]")[0].split(",")) if vf else {}
+                    axes = dict.fromkeys(vf[0].split("[")[1].split("]")[0].split(","))
                     coarse.append((r["distance"] + axis_penalty(axes), c))
             coarse.sort(key=lambda x: x[0])
             print("coarse ranking, top 15:", ", ".join(f"{c['family']} {d:.1f}" for d, c in coarse[:15]), flush=True)
             fams = [c for _, c in coarse[:a.shortlist]]
         for c in fams:
             folder = c["family"].lower().replace(" ", "").replace("-", "")
-            files = [p for lic in ("ofl", "apache") for p in tree
-                     if p.startswith(f"{lic}/{folder}/") and p.endswith(".ttf") and "Italic" not in p]
-            if not files:
-                print(f"skip {c['family']}: no files found in google/fonts/{folder}")
+            vf = variable_files(folder)
+            if not vf:
+                print(f"skip {c['family']}: no variable font in google/fonts/ofl/{folder}")
                 continue
-            vf = [p for p in files if "[" in p]
-            path = vf[0] if vf else next((p for p in files if p.endswith("-Regular.ttf")), files[0])
-            local = fetch(RAW + urllib.parse.quote(path), os.path.join(a.cache, "full", safe(folder), os.path.basename(path)))
+            path = vf[0]
             lic_file = next((p for p in tree if p.startswith(os.path.dirname(path) + "/") and
-                             os.path.basename(p) in ("OFL.txt", "LICENSE.txt")), None)
-            ofl_text = open(fetch(RAW + urllib.parse.quote(lic_file), os.path.join(a.cache, "full", safe(folder), os.path.basename(lic_file))),
-                            encoding="utf-8", errors="replace").read() if lic_file else None
+                             os.path.basename(p) == "OFL.txt"), None)
+            if not lic_file:
+                print(f"skip {c['family']}: no OFL.txt beside {path}")
+                continue
+            cache_dir = os.path.join(a.cache, "full", safe(folder))
+            try:
+                local = fetch(RAW + urllib.parse.quote(path), os.path.join(cache_dir, os.path.basename(path)),
+                              a.offline)
+                lic_path = fetch(RAW + urllib.parse.quote(lic_file), os.path.join(cache_dir, "OFL.txt"), a.offline)
+            except FetchError as e:
+                if not a.offline and "refused" in str(e):
+                    raise SystemExit(str(e))
+                print(f"skip {c['family']}: {e}")
+                continue
+            with open(lic_path, encoding="utf-8", errors="replace") as fh:
+                ofl_text = fh.read()
+            f = TTFont(local)
+            lic = licence_of(f, ofl_text)
+            if not lic["licence"] or not glyf_vf(f):
+                print(f"skip {c['family']}: {'not OFL-1.1' if not lic['licence'] else 'not a TrueType variable font'}")
+                continue
             r = evaluate(local, tg, styles, use)
-            lic = licence_of(TTFont(local), ofl_text)
-            rows.append({"family": c["family"], "file": local, "origin": "google/fonts/" + path,
-                         "licence_file": lic_file, **lic, **r})
+            rows.append({"family": c["family"], "file": os.path.abspath(local), "origin": "google/fonts/" + path,
+                         "url": RAW + urllib.parse.quote(path), "licence_file": lic_file,
+                         "licence_path": os.path.abspath(lic_path), **lic, **r})
             print(f"fine   {c['family']:28s} distance {r.get('distance')} at {r.get('loc')}", flush=True)
 
     rows = [r for r in rows if "distance" in r]
     for r in rows:
-        r["score"] = round(r["distance"] + axis_penalty(r["axes"]), 3)
+        r["score"] = round(r["distance"] + axis_penalty(r["axes"], r["deltas"]), 3)
     rows.sort(key=lambda r: r["score"])
     L.save_json({"targets": a.targets, "category": category, "rows": rows}, a.out)
     print(f"\nshortlist ({len(rows)}), closest first. Deltas are candidate minus target, widths in percent:")
@@ -220,10 +396,15 @@ def main():
         wl = [v for k, v in dl.items() if k.startswith("w_lc")]
         wu = [v for k, v in dl.items() if k.startswith("w_uc")]
         ws = f"{sum(wl) / len(wl) * 100:+.1f}% / {sum(wu) / len(wu) * 100:+.1f}%" if wl and wu else ""
+        room = r.get("wdth_room") or {}
+        moves = "+".join(k for k in ("narrow", "widen") if room.get(k)) or "fixed"
+        wd = f" wdth {moves}" if "wdth" in r["axes"] else ""
         print(f"  {r['family'][:26]:26s} {r['score']:6.2f} {','.join(r['useful_axes']):16s} " +
-              " ".join(f"{dl.get(k, ''):>9}" for k in keys) + f"  {ws}  {r.get('licence')}"
+              " ".join(f"{dl.get(k, ''):>9}" for k in keys) + f"  {ws}  {r.get('licence')}{wd}"
               + (f" RFN {r['reserved_font_names']}" if r.get("reserved_font_names") else ""))
     print(f"\nwrote {a.out}")
+    print("next: show the person the top rows and ask which to build on. Record the answer, verbatim, with "
+          f"record_base.py --shortlist {a.out} --family ... --question ... --answer ... --out base.json")
 
 
 if __name__ == "__main__":

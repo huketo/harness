@@ -139,7 +139,7 @@ p { font-size: 14px; }
 .qjtext { font-size: 44px; margin-top: 18px; }
 
 /* features */
-.fgrid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.fgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
 .fcell { border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 10px 12px 12px; min-height: 160px; display: flex; flex-direction: column; }
 .ftag { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--mute); }
 .ftag span:first-child { font-family: var(--mono); color: var(--ink); }
@@ -182,7 +182,7 @@ p { font-size: 14px; }
 .cs-page.dense .cs-group { margin-bottom: 10px; }
 .cs-page.dense .cell { height: 38px; }
 .kp { font-size: 64px; }
-.fgrid { grid-template-columns: repeat(7, 1fr); }
+.fgrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .fcell { min-height: 236px; padding: 10px 10px 12px; }
 .ftag { flex-direction: column; gap: 2px; }
 .ftag span:last-child { text-align: left; }

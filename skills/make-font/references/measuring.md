@@ -41,13 +41,13 @@ reference glyph by glyph.
 
 ## From a font file
 
-`measure_font.py file --out m.json`. It reads TTF, OTF and WOFF2. For a variable font, `--loc` picks a location
-and `--stem 76` solves the weight axis so the n stem is 76 first, which is how candidates are compared at equal
-colour. Confidence is high for everything.
+`uv run scripts/measure_font.py file --out m.json`. It reads TTF, OTF and WOFF2. For a variable font, `--loc`
+picks a location and `--stem 76` solves the weight axis so the n stem is 76 first, which is how candidates are
+compared at equal colour. Confidence is high for everything.
 
 ## From a screenshot
 
-`measure_image.py shot.png --text "line one|line two" --out m.json`.
+`uv run scripts/measure_image.py shot.png --text "line one|line two" --out m.json`.
 
 The image is split into lines at blank rows, and each line into letters by connected ink. A dot or accent joins
 the letter under it. A letter drawn in two parts (a k whose arm does not touch the stem) is joined to its
