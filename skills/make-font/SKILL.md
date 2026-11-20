@@ -87,12 +87,12 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    if you can, recommend one, and ask which to build on.
    Done when the shortlist is shown and the question is asked.
 
-5. **Record the approval.** Only the person approves the base. Once they pick one, print the question: `uv run
-   scripts/record_base.py --shortlist shortlist.json --family "<their pick>" --question-only --out base.json` (a font
-   of their own: `--font`, `--licence <its OFL.txt>` and `--source local` instead of `--shortlist` and `--family`;
-   never for Hangul, which takes a manifest row). It checks the files the same way every later step will (for a
-   manifest row, the font and `OFL.txt` read must be the files `bases.json` pins), prints a question that names the
-   base, its licence and both sha256 values, and writes nothing. Ask that question as printed, never with a
+5. **Record the approval.** Only the person approves the base. Once they pick one, print the question:
+   `uv run scripts/record_base.py --shortlist shortlist.json --family "<their pick>" --question-only --out base.json`
+   (a font of their own: `--font`, `--licence <its OFL.txt>` and `--source local` instead of `--shortlist` and
+   `--family`; never for Hangul, which takes a manifest row). It checks the files the same way every later step will
+   (for a manifest row, the font and `OFL.txt` read must be the files `bases.json` pins), prints a question that
+   names the base, its licence and both sha256 values, and writes nothing. Ask that question as printed, never with a
    reference's name in it. When they answer, run the same command without `--question-only`, with `--question "<the
    printed question, verbatim>" --answer "<their answer, verbatim>" --font-sha256 <font hash from the question>
    --license-sha256 <licence hash from the question>`, and `--decision approved` only if they approved. That run
