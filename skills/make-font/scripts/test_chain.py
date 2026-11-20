@@ -9,6 +9,8 @@ import html
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -399,6 +401,30 @@ class Pipeline(unittest.TestCase):
                   "--fit-log", self.fit_log, "--space-log", self.space_log, "--package-log", self.package_log,
                   "--out-dir", q("checks"))
         refused(self, r, "package")
+
+
+class SubsetBytes(unittest.TestCase):
+    """package.py and check_font.py make the fit's subset again and compare bytes, each in its own uv
+    environment. The bytes may depend only on the base, the arguments and fontTools, not on whether an optional
+    package (uharfbuzz, whose repacker fontTools uses for GSUB and GPOS when it can import it) is installed."""
+
+    def test_the_subset_bytes_do_not_depend_on_uharfbuzz_being_installed(self):
+        try:
+            import uharfbuzz  # noqa: F401
+        except ImportError:
+            self.skipTest("uharfbuzz is not installed here, so there is no second serializer to compare with")
+        import chain as C
+        import fontlib as L
+        d = tempfile.mkdtemp(prefix="mf-subset-")
+        self.addCleanup(shutil.rmtree, d, True)
+        base = T.with_kerning(T.glyf_vf(os.path.join(d, "base.ttf")))
+        args = C.subset_args(L.charset_unicodes(["latin"]))
+        here = hashlib.sha256(C.build_subset(base, args)).hexdigest()
+        code = ("import sys, hashlib; sys.modules['uharfbuzz'] = None; sys.path.insert(0, %r); import chain as C;"
+                "print(hashlib.sha256(C.build_subset(%r, %r)).hexdigest())" % (T.HERE, base, args))
+        r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), here, "the subset differs when uharfbuzz cannot be imported")
 
 
 class Publish(unittest.TestCase):

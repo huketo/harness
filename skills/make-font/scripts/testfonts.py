@@ -257,6 +257,29 @@ def cff_static(path, family=BASE_FAMILY, notice=OFL_NOTICE):
     return path
 
 
+KERN_FEA = """
+languagesystem DFLT dflt; languagesystem latn dflt;
+@L = [n o x b p]; @R = [H O n o];
+lookup K1 { pos n o -20; pos o n -10; pos H O -30; pos b o -5; } K1;
+lookup K2 { pos @L @R -7; } K2;
+lookup M1 { pos [n o] [x b] -3; } M1;
+feature kern { lookup K1; lookup K2; } kern;
+feature dist { lookup K1; lookup M1; } dist;
+feature cpsp { lookup M1; } cpsp;
+"""
+
+
+def with_kerning(path):
+    """Add a small GPOS (pair kerning in three shared lookups) to a font, in place. Its bytes depend on which
+    serializer fontTools uses, which is what the subset determinism test needs."""
+    from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+    from fontTools.ttLib import TTFont
+    f = TTFont(path)
+    addOpenTypeFeaturesFromString(f, KERN_FEA)
+    f.save(path)
+    return path
+
+
 def flavoured(src, dst, flavor):
     """The same font in a WOFF ("woff") or WOFF2 ("woff2") container."""
     from fontTools.ttLib import TTFont

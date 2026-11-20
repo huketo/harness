@@ -13,9 +13,10 @@ file: `chain.read_base` checks it again here, as at the approval step.
 It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`) plus
 ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
 `build/subset/base.subset.ttf`, and `fit-log.json` records it under `subset`: the base's sha256, the file, its
-sha256, the pyftsubset arguments in order and the fontTools version. `chain.build_subset` makes it; the same
-base, arguments and fontTools give the same bytes, so `package.py` and `check_font.py` make it again from the
-base and compare the sha256 instead of reading the file. Everything below runs on that subset, and the check
+sha256, the pyftsubset arguments in order and the fontTools version. `chain.build_subset` makes it, always with
+fontTools' own GSUB and GPOS serializer (HarfBuzz's repacker, used whenever uharfbuzz is installed, gives other
+bytes, and each script has its own environment). The same base, arguments and fontTools give the same bytes, so
+`package.py` and `check_font.py` make it again from the base and compare the sha256 instead of reading the file. Everything below runs on that subset, and the check
 compares the output's glyph order and character map with it. Every font the fit writes is a plain TrueType file. `fit-log.json` also carries the chain: `base.json`'s sha256, the
 base as the only input, every fitted font as an output, and `targets.json`.
 

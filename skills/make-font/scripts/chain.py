@@ -236,17 +236,23 @@ def subset_args(unicodes):
             "--name-languages=*", "--legacy-kern"]
 
 
+# fontTools serializes GSUB and GPOS with HarfBuzz's repacker whenever it can import uharfbuzz, and with its own
+# serializer otherwise; the two give different bytes. Each script runs in its own uv environment, and not all of
+# them install uharfbuzz, so the subset is always written with fontTools' own serializer.
+PURE_SERIALIZER = {"fontTools.ttLib.tables.otBase:USE_HARFBUZZ_REPACKER": False}
+
+
 def build_subset(base_path, args):
     """The subset of the base these arguments give, as the bytes of a plain TrueType file. The same base,
-    arguments and fontTools version give the same bytes, which is what lets package.py and check_font.py make it
-    again instead of trusting a file."""
+    arguments and fontTools version give the same bytes, whatever optional packages are installed, which is what
+    lets package.py and check_font.py make it again instead of trusting a file."""
     from fontTools import subset
     opts = subset.Options()
     rest = opts.parse_opts(list(args), ignore_unknown=["unicodes"])
     if not rest or any(not r.startswith("--unicodes=") for r in rest):
         raise ValueError(f"expected pyftsubset options and one --unicodes=, got {list(args)!r}")
     unicodes = [u for r in rest for u in subset.parse_unicodes(r.split("=", 1)[1])]
-    f = TTFont(base_path, recalcTimestamp=False)
+    f = TTFont(base_path, recalcTimestamp=False, cfg=PURE_SERIALIZER)
     s = subset.Subsetter(opts)
     s.populate(unicodes=unicodes)
     s.subset(f)
