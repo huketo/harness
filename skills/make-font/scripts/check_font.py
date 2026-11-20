@@ -164,10 +164,6 @@ def gate_coverage(G, f, scripts):
 HANGUL_TOL = 2  # units at 1000 per em a Hangul ink edge or advance may land from the logged transform: two roundings
 
 
-def style_record(fit, tag):
-    return next((s for s in fit["styles"] if s["style"]["name"] == tag), None)
-
-
 def gate_hangul(G, f, base, fitted, track=0):
     """The Hangul against the fit log's transform. `base` is the subset fit_font.py fitted from, `fitted` the fit
     log's record of this style, `track` the units space_font.py added to each side of every glyph with ink. The
@@ -565,7 +561,7 @@ def main():
         gate_widths(G, m, T, i == 0 or style is T["styles"][0])
         gate_kerning(G, face, T["tolerances"]["min_gap"])
         gate_coverage(G, f, T.get("scripts", ["latin"]))
-        fitted = style_record(fit, tag) or {}
+        fitted = next((s for s in fit["styles"] if s["style"]["name"] == tag), {})
         hangul = L.hangul_glyphs(f) if fitted.get("hangul") else {}
         gate_provenance(G, f, subset_font, a.reference, fitted.get("y_location"), skip=hangul)
         if hangul:
