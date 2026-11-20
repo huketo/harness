@@ -1,6 +1,6 @@
 ---
 name: imagegen
-description: "Generate inspectable design-reference images for web sections, native mobile screens and flows, responsive website comps, standalone logos (wordmark, symbol, mascot, combination mark, emblem), and brand identity concept boards. Use when the deliverable is UI imagery, logo concepts, or a brand-system board. Not for generic photos, illustrations, diagrams, slide decks, arbitrary image editing, production vector assets, or frontend implementation."
+description: "Generate inspectable design-reference images for web sections, native mobile screens and flows, responsive website comps, standalone logo concept images (wordmark, symbol, mascot, combination mark, emblem), and brand identity concept boards. Use when the deliverable is generated images: UI imagery, logo concepts, or a brand-system board. Not for generic photos, illustrations, diagrams, slide decks, arbitrary image editing, production vector assets or finished logo files, or frontend implementation."
 license: MIT
 ---
 

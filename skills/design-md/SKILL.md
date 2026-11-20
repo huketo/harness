@@ -1,6 +1,6 @@
 ---
 name: design-md
-description: "Create or maintain design-system documentation when the user explicitly requests a DESIGN.md, design-system brief, or documented design update from a brief, existing implementation, or supplied UI references, or asks to turn the session's design corrections into documented rules. Not for ordinary UI fixes, reviews, implementation, or runtime token definitions."
+description: "Create or maintain design-system documentation when the user explicitly requests a DESIGN.md, design-system brief, one component's documentation entry, or documented design update from a brief, existing implementation, or supplied UI references; asks to turn the session's design corrections into documented rules; or asks for a read-only report of how implementation values map onto the project's existing tokens. Not for ordinary UI fixes, reviews, implementation, or runtime token definitions."
 license: MIT
 ---
 

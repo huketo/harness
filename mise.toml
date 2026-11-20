@@ -31,6 +31,10 @@ run = "uv run --no-project --python 3.12 --with numpy --with scipy --with scikit
 description = "Run every Python gate test for make-font and make-logo; run before integrating a slice that touches either skill"
 depends = ["test-font-gates", "test-logo-gates"]
 
+[tasks.skill-route]
+description = "Description-based routing check for the design skills: one paid model call per prompt asks which skill the descriptions alone select; it does not observe actual activation. Pass -- --dry-run to print the requests without calling a model; not part of check or CI"
+run = "node scripts/skill-eval/route.ts --cases scripts/skill-eval/routing/design.json"
+
 [tasks.rules]
 description = "Enforce the repository rules AGENTS.md pairs with scripts/check-repo.ts"
 run = "node scripts/check-repo.ts"

@@ -42,6 +42,13 @@ test("rejects quotes that do not close around the whole value", () => {
 	assert.deepEqual(checkFrontmatter(skill("demo", "'it''s fine: here'"), "demo"), []);
 });
 
+test("checks every line of a repeated key and reads the last one", () => {
+	// A Map keyed by name once dropped the first line's diagnostic.
+	const repeated = "---\nname: demo\ndescription: Invalid: mapping\ndescription: Correct text.\n---\n";
+	assert.deepEqual(checkFrontmatter(repeated, "demo").map((p) => p.line), [3]);
+	assert.match(checkFrontmatter("---\nname: demo\ndescription: Set.\ndescription:\n---\n", "demo")[0]?.message ?? "", /description/);
+});
+
 test("requires a frontmatter block whose name is the directory and whose description is set", () => {
 	assert.match(checkFrontmatter("# No frontmatter\n", "demo")[0]?.message ?? "", /must start/);
 	assert.match(checkFrontmatter("---\nname: demo\n", "demo")[0]?.message ?? "", /not closed/);
