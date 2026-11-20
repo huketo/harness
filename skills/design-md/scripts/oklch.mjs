@@ -13,9 +13,9 @@ A color is hex (#rgb, #rgba, #rrggbb, #rrggbbaa), rgb() or rgba(), hsl() or hsla
 a named color (the CSS list, transparent included). Commas or spaces both work, alpha after a slash or a fourth
 comma, as a number or a percent. Angles take deg, grad, rad or turn. Quote functions in the shell.
 Alpha is part of the color: it prints after the slash, and --delta prints both alphas and says "alpha differs"
-when they are more than 0.02 apart (the opacity tolerance), which makes the pair two colors whatever the
-distance. Hue prints as "none" when chroma is under 0.0001, as it is for grays. deltaE OK is the straight-line
-distance in OKLab times 100, the scale design-md's references/mapping-rules.md uses: under 0.5 counts as identical, the color
+when they are more than 0.02 apart, the default opacity tolerance; a project that documents its own tolerance
+classifies by that instead (mapping-rules.md, Tolerances). Hue prints as "none" when chroma is under 0.0001, as it is for grays. deltaE OK is the straight-line
+distance in OKLab times 100, the scale design-md's references/mapping-rules.md uses: under 0.5 counts as identical, the default color
 tolerance is 2, and a near pair is under 5. Not read: color(), lab(), lch(), color-mix(), var(), currentColor,
 relative colors and system colors.
 
