@@ -22,8 +22,10 @@ Only the SIL Open Font License 1.1 is kept, and only TrueType (glyf) variable fo
 its OFL.txt beside it, since the approval step records that file.
 --families skips the coarse pass and measures only those families (still OFL only).
 --offline reads only the cache and --local: nothing is downloaded, and a file missing from the cache is skipped.
-GITHUB_TOKEN, when set, is sent to api.github.com and raw.githubusercontent.com only, never printed. A 403 or 429
-from GitHub stops the search with the remaining limit, the reset time and what to do.
+GITHUB_TOKEN, when set, is sent over HTTPS to api.github.com and raw.githubusercontent.com only, never printed.
+Every hop of a redirect is checked again, through urllib and through the curl fallback alike: a hop to any other
+origin goes without it. A 403 or 429 from GitHub stops the search with the remaining limit, the reset time and
+what to do.
 Downloads go to --cache and are only read, never run. The ranking is a distance: each number's gap to the
 target, divided by what counts as a small gap, squared, weighted, summed, square-rooted. The score adds a
 penalty for missing axes: 0 with wdth and wght, 0.5 to 0.75 with wght alone. Lower is closer. Math, symbol and
@@ -55,7 +57,8 @@ CATALOG = "https://api.fontsource.org/v1/fonts"
 TREE = "https://api.github.com/repos/google/fonts/git/trees/main?recursive=1"
 RAW = "https://raw.githubusercontent.com/google/fonts/main/"
 COARSE = "https://cdn.jsdelivr.net/fontsource/fonts/{id}@latest/latin-{w}-normal.woff2"
-GITHUB_HOSTS = ("api.github.com", "raw.githubusercontent.com")
+# The origins (scheme, host, port) GITHUB_TOKEN may be sent to. Every hop of a redirect is checked against it.
+AUTH_ORIGINS = frozenset({("https", "api.github.com", 443), ("https", "raw.githubusercontent.com", 443)})
 OPEN = ("OFL-1.1", "OFL")
 USEFUL_AXES = ("wdth", "wght", "opsz", "GRAD")
 SKIP_WORDS = ("Math", "Symbols", "Icons", "Emoji", "Barcode")
@@ -73,11 +76,15 @@ def safe(name):
 
 
 # ------------------------------------------------------------------ downloads
+def origin(url):
+    u = urllib.parse.urlsplit(url)
+    return (u.scheme.lower(), (u.hostname or "").lower(), u.port or {"https": 443, "http": 80}.get(u.scheme.lower()))
+
+
 def auth_headers(url, env=os.environ):
-    """The GitHub token, for GitHub hosts only."""
+    """The GitHub token, for the GitHub API and raw hosts over HTTPS only."""
     token = env.get("GITHUB_TOKEN")
-    host = urllib.parse.urlsplit(url).hostname or ""
-    return {"Authorization": f"Bearer {token}"} if token and host in GITHUB_HOSTS else {}
+    return {"Authorization": f"Bearer {token}"} if token and origin(url) in AUTH_ORIGINS else {}
 
 
 def limit_advice(status, headers, env=os.environ):
@@ -99,34 +106,63 @@ def limit_advice(status, headers, env=os.environ):
     return "; ".join(parts) + f". To go on: {fix}, or run with --offline on a filled --cache."
 
 
+REDIRECTS = (301, 302, 303, 307, 308)
+MAX_HOPS = 10
+
+
 def curl_command(url, path, header_file, env=os.environ):
-    """curl arguments and the config it reads on stdin. Headers go through the config, so a token never shows in
-    the process list."""
-    argv = ["curl", "-sSL", "--config", "-", "-A", UA["User-Agent"], "-o", path, "-D", header_file,
-            "-w", "%{http_code}", url]
+    """curl arguments and the config it reads on stdin, for one hop: curl follows no redirect itself. Headers go
+    through the config, so a token never shows in the process list."""
+    argv = ["curl", "-sS", "--proto", "=http,https", "--config", "-", "-A", UA["User-Agent"], "-o", path,
+            "-D", header_file, "-w", "%{http_code} %{redirect_url}", url]
     config = "".join(f'header = "{k}: {v}"\n' for k, v in auth_headers(url, env).items())
     return argv, config
 
 
-def _curl(url, path):
+def curl_fetch(url, path):
+    """Download through curl, for a Python without CA certificates. Each redirect hop is a new curl run whose
+    headers come from auth_headers for that hop's URL, so the token goes only where urllib would send it."""
     with tempfile.TemporaryDirectory() as td:
         hdr = os.path.join(td, "headers")
-        argv, config = curl_command(url, path, hdr)
-        r = subprocess.run(argv, input=config, capture_output=True, text=True)
-        code = int(r.stdout.strip() or 0) if r.stdout.strip().isdigit() else 0
-        if code == 200:
-            return
-        headers = {}
-        if os.path.exists(hdr):
-            for line in open(hdr, encoding="latin-1"):
-                k, _, v = line.partition(":")
-                if v:
-                    headers[k.strip()] = v.strip()
-        if os.path.exists(path):
-            os.remove(path)
-        if code in (403, 429):
-            raise FetchError(f"{url}: refused, " + limit_advice(code, {k.title(): v for k, v in headers.items()}))
-        raise FetchError(f"{url}: HTTP {code or 'error'} {r.stderr.strip()[:200]}")
+        for _ in range(MAX_HOPS + 1):
+            argv, config = curl_command(url, path, hdr)
+            r = subprocess.run(argv, input=config, capture_output=True, text=True)
+            status, _, nxt = r.stdout.strip().partition(" ")
+            code = int(status) if status.isdigit() else 0
+            if code in REDIRECTS and nxt.strip():
+                url = urllib.parse.urljoin(url, nxt.strip())
+                continue
+            if code == 200:
+                return
+            headers = {}
+            if os.path.exists(hdr):
+                for line in open(hdr, encoding="latin-1"):
+                    k, _, v = line.partition(":")
+                    if v:
+                        headers[k.strip()] = v.strip()
+            if os.path.exists(path):
+                os.remove(path)
+            if code in (403, 429):
+                raise FetchError(f"{url}: refused, " + limit_advice(code, {k.title(): v for k, v in headers.items()}))
+            raise FetchError(f"{url}: HTTP {code or 'error'} {r.stderr.strip()[:200]}")
+    if os.path.exists(path):
+        os.remove(path)
+    raise FetchError(f"{url}: more than {MAX_HOPS} redirects")
+
+
+class AuthRedirect(urllib.request.HTTPRedirectHandler):
+    """Python's redirect handler copies the request's headers to the next hop, a token included. This one takes
+    the token off every hop and sets it again only where auth_headers allows it for that hop's URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None:
+            for held in (new.headers, new.unredirected_hdrs):
+                for k in [k for k in held if k.lower() == "authorization"]:
+                    del held[k]
+            for k, v in auth_headers(new.full_url).items():
+                new.add_unredirected_header(k, v)
+        return new
 
 
 def fetch(url, path, offline=False):
@@ -144,8 +180,11 @@ def fetch(url, path, offline=False):
             ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             pass
-        req = urllib.request.Request(url, headers={**UA, **auth_headers(url)})
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
+        req = urllib.request.Request(url, headers=UA)
+        for k, v in auth_headers(url).items():
+            req.add_unredirected_header(k, v)
+        opener = urllib.request.build_opener(AuthRedirect, urllib.request.HTTPSHandler(context=ctx))
+        with opener.open(req, timeout=60) as r:
             data = r.read()
         with open(part, "wb") as fh:
             fh.write(data)
@@ -156,7 +195,7 @@ def fetch(url, path, offline=False):
         raise FetchError(f"{url}: HTTP {e.code}")
     except urllib.error.URLError:
         # Some Python installs ship without CA certificates. curl uses the system's.
-        _curl(url, part)
+        curl_fetch(url, part)
     os.replace(part, path)
     return path
 

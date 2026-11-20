@@ -25,12 +25,92 @@ class GitHubAuth(unittest.TestCase):
         self.assertEqual(FF.auth_headers(FF.COARSE.format(id="x", w=400), env), {})
         self.assertEqual(FF.auth_headers(FF.TREE, {}), {})
 
+    def test_no_token_over_plain_http_even_to_a_github_host(self):
+        env = {"GITHUB_TOKEN": TOKEN}
+        self.assertEqual(FF.auth_headers("http://api.github.com/repos/google/fonts", env), {})
+        self.assertEqual(FF.auth_headers("http://raw.githubusercontent.com/google/fonts/main/x", env), {})
+        self.assertEqual(FF.auth_headers("https://api.github.com:8443/repos/google/fonts", env), {})
+
     def test_curl_gets_the_token_on_stdin_not_in_its_arguments(self):
         argv, config = FF.curl_command(FF.TREE, "/tmp/out.json", "/tmp/headers.txt", {"GITHUB_TOKEN": TOKEN})
         self.assertNotIn(TOKEN, " ".join(argv))
         self.assertIn(TOKEN, config)
         argv, config = FF.curl_command(FF.CATALOG, "/tmp/out.json", "/tmp/headers.txt", {"GITHUB_TOKEN": TOKEN})
         self.assertNotIn(TOKEN, config)
+
+
+class Server:
+    """A local HTTP server that records the headers of every request. With `to`, it redirects every request
+    there; else it answers 200 with a body."""
+
+    def __init__(self, test, to=None):
+        seen = self.seen = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                seen.append({k.lower(): v for k, v in self.headers.items()})
+                if to and self.path == "/start":
+                    self.send_response(302)
+                    self.send_header("Location", to() if callable(to) else to)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"synthetic font bytes")
+
+            def log_message(self, *a):
+                pass
+        self.srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        test.addCleanup(self.srv.server_close)
+        test.addCleanup(self.srv.shutdown)
+        self.port = self.srv.server_address[1]
+        self.origin = ("http", "127.0.0.1", self.port)
+
+    def url(self, path):
+        return f"http://127.0.0.1:{self.port}{path}"
+
+
+class Redirects(unittest.TestCase):
+    """The token goes only to an allowed origin, on every hop of a redirect. Server A stands in for a GitHub host
+    (its origin is allowed for the test); server B is another origin, same host, other port."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="mf-redirect-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.b = Server(self)
+        self.a = Server(self, to=self.b.url("/file"))
+        env = mock.patch.dict(os.environ, {"GITHUB_TOKEN": TOKEN}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+        origins = mock.patch.object(FF, "AUTH_ORIGINS", frozenset({self.a.origin}))
+        origins.start()
+        self.addCleanup(origins.stop)
+
+    def assert_token_stayed_home(self, path):
+        with open(path, "rb") as fh:
+            self.assertEqual(fh.read(), b"synthetic font bytes")
+        self.assertEqual([h.get("authorization") for h in self.a.seen], [f"Bearer {TOKEN}"])
+        self.assertEqual(len(self.b.seen), 1)
+        self.assertNotIn("authorization", self.b.seen[0], "the token followed the redirect to another origin")
+
+    def test_urllib_drops_the_token_when_a_redirect_leaves_the_origin(self):
+        path = os.path.join(self.dir, "font.ttf")
+        FF.fetch(self.a.url("/start"), path)
+        self.assert_token_stayed_home(path)
+
+    def test_curl_drops_the_token_when_a_redirect_leaves_the_origin(self):
+        if not shutil.which("curl"):
+            self.skipTest("curl is not on PATH, so the curl path cannot run here")
+        path = os.path.join(self.dir, "font.ttf")
+        FF.curl_fetch(self.a.url("/start"), path)
+        self.assert_token_stayed_home(path)
+
+    def test_urllib_keeps_the_token_on_a_redirect_within_the_origin(self):
+        home = Server(self, to=lambda: home.url("/file"))
+        with mock.patch.object(FF, "AUTH_ORIGINS", frozenset({home.origin})):
+            FF.fetch(home.url("/start"), os.path.join(self.dir, "font.ttf"))
+        self.assertEqual([h.get("authorization") for h in home.seen], [f"Bearer {TOKEN}"] * 2)
 
 
 class RateLimit(unittest.TestCase):
