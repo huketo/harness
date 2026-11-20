@@ -32,8 +32,30 @@ node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interfac
 
 스위트를 바꾸면 `version`을 올리고 새 iteration에서 실행합니다. 이어 가는 iteration은 처음 실행한 `suite.json`과 다르면 실행을 거부합니다.
 
+## 설명 기반 라우팅 검사
+
+[`route.ts`](route.ts)는 "스킬 설명만 보고 어느 스킬을 고르는가"를 검사합니다. 사례 파일의 후보 스킬마다 `skills/<name>/SKILL.md`의 frontmatter `description`을 읽고, 프롬프트마다 분류 호출을 한 번 보내 스킬 이름이나 `none` 하나를 받습니다. 스킬을 로드하거나 에이전트가 실제로 스킬을 발동하는지는 관찰하지 않으며, 보고서 첫머리에도 이 범위를 적습니다.
+
+- 사례 파일은 [`routing/`](routing/)에 둡니다. 첫 파일 [`routing/design.json`](routing/design.json)은 디자인 스킬 여덟 개(`awesome-interface`, `design-md`, `make-font`, `make-logo`, `imagegen`, `image-to-code`, `diagram-design`, `awesome-slides`) 사이의 충돌 사례를 한국어와 영어 프롬프트로 담습니다. 스킬마다 `should_fire`(그 스킬로 가야 할 프롬프트)와 `should_not_fire`(`goes_to`에 적은 다른 스킬이나 `none`으로 가야 할 프롬프트)를 둡니다. 같은 프롬프트를 여러 곳에 적으면 기대값이 모두 같아야 하며, 분류 호출은 한 번만 합니다.
+- 설명은 작업 트리가 아니라 커밋(`--ref`, 기본값 `HEAD`)에서 읽고, `scripts/check-repo.ts`의 `checkFrontmatter`가 거부하는 frontmatter는 같은 메시지로 거부합니다.
+- 분류 호출은 빈 임시 디렉터리에서 도구, 스킬, 슬래시 명령 없이 `claude -p`로 보내며, 시스템 프롬프트는 라우터 지시 한 문장으로 바꿉니다. 사용자 전역 `CLAUDE.md`처럼 Claude Code가 늘 넣는 맥락은 그대로 들어갑니다.
+- 답은 다섯 가지로 채점합니다: `correct`(기대한 답), `wrong`(다른 후보 스킬), `none`(스킬을 기대했는데 `none`), `malformed`(후보 이름이나 `none`이 아닌 답), `failed`(호출이 답 없이 끝남). 모두 `correct`일 때만 종료 코드가 0입니다.
+
+```bash
+# 보낼 요청만 출력하고 모델을 부르지 않습니다
+mise run skill-route -- --dry-run
+
+# 실제 실행: 프롬프트마다 유료 모델 호출이 한 번 일어납니다 (var/skill-eval/route/<suite>/run-<시각>/)
+mise run skill-route
+mise run skill-route -- --model claude-opus-5-5 --ref HEAD~1
+```
+
+결과 디렉터리에는 `report.md`(기대 답별 정답 수, 한국어와 그 밖의 프롬프트별 정답 수, 기대와 다르게 간 프롬프트 표), `results.json`, 호출별 `transcripts/`가 남습니다. 이 task는 `mise run check`와 CI에 들어 있지 않습니다. 설명을 고친 전후를 비교하려면 같은 모델로 `--ref`만 바꿔 두 번 실행하고 두 `report.md`를 나란히 봅니다.
+
 ## 테스트
 
 ```bash
 node --test 'scripts/skill-eval/**/*.test.ts'
 ```
+
+`route.test.ts`는 임시 저장소와 가짜 에이전트로 라우팅 실행기와 채점을 검사하며, 모델을 부르지 않습니다.

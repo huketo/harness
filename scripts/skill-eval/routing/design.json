@@ -1,0 +1,115 @@
+{
+	"suite": "design-description-routing",
+	"version": 1,
+	"skills": {
+		"awesome-interface": {
+			"should_fire": [
+				"The spacing and hierarchy on our settings page feel off. Fix them.",
+				"Review the checkout flow for accessibility problems before we ship.",
+				"대시보드 카드의 글자 대비가 낮아서 읽기 어려워요. 고쳐 주세요.",
+				"이 브랜치에서 바꾼 UI를 리뷰해 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Write a DESIGN.md that documents our color, type, and spacing rules.", "goes_to": "design-md" },
+				{ "prompt": "설정 페이지에 하드코딩된 색상 값이 우리 토큰 중 어디에 대응하는지 보고만 해 줘. 코드는 바꾸지 마.", "goes_to": "design-md" },
+				{ "prompt": "첨부한 스크린샷 그대로 이 랜딩 페이지를 우리 Next.js 앱에 구현해 줘.", "goes_to": "image-to-code" },
+				{ "prompt": "Make our own typeface based on the fonts in these screenshots.", "goes_to": "make-font" },
+				{ "prompt": "Generate three mockup images of the landing page hero. No code yet.", "goes_to": "imagegen" },
+				{ "prompt": "로그인 API가 500을 반환하는 원인을 찾아 줘.", "goes_to": "none" }
+			]
+		},
+		"design-md": {
+			"should_fire": [
+				"Write a DESIGN.md for this repository from the existing implementation.",
+				"Document our Select component: its states and usage rules.",
+				"설정 페이지에 하드코딩된 색상 값이 우리 토큰 중 어디에 대응하는지 보고만 해 줘. 코드는 바꾸지 마.",
+				"이번 세션에서 내가 지적한 디자인 수정 사항을 문서화된 규칙으로 정리해 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Our buttons use five different paddings. Make them consistent.", "goes_to": "awesome-interface" },
+				{ "prompt": "버튼의 hover 상태 색을 브랜드 색으로 바꿔 줘.", "goes_to": "awesome-interface" },
+				{ "prompt": "API 문서(OpenAPI)를 최신 엔드포인트에 맞게 갱신해 줘.", "goes_to": "none" }
+			]
+		},
+		"make-font": {
+			"should_fire": [
+				"Make me a font like these three. I love how they handle round letters.",
+				"Build a typeface for our brand from these screenshots of fonts we like.",
+				"이 폰트들처럼 한글도 되는 우리만의 서체를 만들어 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Pick a heading and body font pairing for our landing page.", "goes_to": "awesome-interface" },
+				{ "prompt": "랜딩 페이지 제목과 본문에 어울리는 폰트 조합을 골라서 적용해 줘.", "goes_to": "awesome-interface" },
+				{ "prompt": "Design a wordmark logo for our app.", "goes_to": "make-logo" },
+				{ "prompt": "우리 서비스 이름으로 워드마크 로고를 만들어 줘.", "goes_to": "make-logo" }
+			]
+		},
+		"make-logo": {
+			"should_fire": [
+				"Make me a logo for my product. Here are logos I like.",
+				"We need a mark and a wordmark for our note-taking app, like these but ours.",
+				"우리 카페 브랜드 로고를 만들어 줘. 마음에 드는 로고 몇 개를 첨부할게."
+			],
+			"should_not_fire": [
+				{ "prompt": "Generate a brand identity concept board image for our new tea shop.", "goes_to": "imagegen" },
+				{ "prompt": "로고 방향을 고를 수 있게 로고 콘셉트 이미지를 몇 장 생성해서 보여 줘.", "goes_to": "imagegen" },
+				{ "prompt": "Make our own typeface based on the fonts in these screenshots.", "goes_to": "make-font" }
+			]
+		},
+		"imagegen": {
+			"should_fire": [
+				"Generate three mockup images of the landing page hero. No code yet.",
+				"Generate a brand identity concept board image for our new tea shop.",
+				"iOS 앱 온보딩 화면 시안 이미지를 만들어 줘.",
+				"로고 방향을 고를 수 있게 로고 콘셉트 이미지를 몇 장 생성해서 보여 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Turn this generated mockup image into working React code.", "goes_to": "image-to-code" },
+				{ "prompt": "생성해 둔 대시보드 시안 이미지를 우리 웹앱 코드로 구현해 줘.", "goes_to": "image-to-code" },
+				{ "prompt": "Make me a logo for my product. Here are logos I like.", "goes_to": "make-logo" },
+				{ "prompt": "Generate a photo of a golden retriever on a beach for our blog post.", "goes_to": "none" },
+				{ "prompt": "회의에서 발표할 슬라이드 덱을 만들어 줘.", "goes_to": "awesome-slides" }
+			]
+		},
+		"image-to-code": {
+			"should_fire": [
+				"Implement this screenshot as a page in our Next.js app.",
+				"Turn this generated mockup image into working React code.",
+				"이 시안 이미지대로 웹사이트 첫 화면을 코딩해 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Generate a mockup image of a pricing page. No code yet.", "goes_to": "imagegen" },
+				{ "prompt": "이 시안 이미지대로 iOS 앱 화면을 SwiftUI로 구현해 줘.", "goes_to": "none" },
+				{ "prompt": "Our signup form's error states are confusing. Improve them.", "goes_to": "awesome-interface" },
+				{ "prompt": "회원가입 폼의 오류 메시지 문구와 배치를 개선해 줘.", "goes_to": "awesome-interface" }
+			]
+		},
+		"diagram-design": {
+			"should_fire": [
+				"Draw an architecture diagram of our services as an SVG.",
+				"Redraw this Mermaid flowchart as a clean branded diagram.",
+				"주문 처리 과정을 시퀀스 다이어그램으로 그려 줘.",
+				"3분기 일정을 간트 차트로 만들어 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Make a ten-slide deck for my conference talk about our architecture.", "goes_to": "awesome-slides" },
+				{ "prompt": "팀 회의에서 발표할 슬라이드 덱을 만들어 줘. 아키텍처 그림도 몇 장 들어가야 해.", "goes_to": "awesome-slides" },
+				{ "prompt": "Generate an illustration of a friendly robot for our homepage.", "goes_to": "none" }
+			]
+		},
+		"awesome-slides": {
+			"should_fire": [
+				"Make a slide deck for my technical talk on caching.",
+				"Turn this design doc into a decision deck for Friday's meeting.",
+				"신입 교육용 슬라이드를 만들어 줘. PDF도 필요해.",
+				"회의에서 발표할 슬라이드 덱을 만들어 줘."
+			],
+			"should_not_fire": [
+				{ "prompt": "Draw an org chart of our team as a PNG.", "goes_to": "diagram-design" },
+				{ "prompt": "우리 서비스 아키텍처를 다이어그램 한 장으로 그려 줘.", "goes_to": "diagram-design" },
+				{ "prompt": "Make an editable PowerPoint file I can tweak in Office.", "goes_to": "none" },
+				{ "prompt": "편집 가능한 PowerPoint(.pptx) 파일로 발표 자료를 만들어 줘.", "goes_to": "none" }
+			]
+		}
+	}
+}
