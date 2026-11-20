@@ -1,7 +1,8 @@
 # Building
 
 A direction is a recipe: a JSON file `build_logo.py` turns into the mark, the wordmark and two lockups. The recipe
-names shapes on a grid, OFL glyphs, and traces made by `trace_ref.py`. The full format is in `build_logo.py --help`.
+names shapes on a grid, OFL glyphs, and traces made by `trace_ref.py`. The full format is in
+`uv run scripts/build_logo.py --help`.
 
 ## A direction
 
@@ -19,12 +20,14 @@ names shapes on a grid, OFL glyphs, and traces made by `trace_ref.py`. The full 
 ```
 
 - **Shapes**: `rect` (with `r` for rounded corners), `circle`, `ring`, `arc` (a band from `start` to `end` degrees),
-  `polygon`, `glyph` (letters from an OFL font, outlined). `op` is add, cut, keep or xor, applied in order. Any shape
-  takes `rotate`, `mirror` and `repeat` (`count` with `rotate`, or `step` for a row).
+  `polygon`, `glyph` (letters from an OFL font, outlined), `trace` (see Tracing). `op` is add, cut, keep or xor,
+  applied in order. Any shape takes `rotate`, `mirror` and `repeat` (`count` with `rotate`, or `step` for a row).
 - **Coordinates on the grid, not free curves.** Agents place shapes well and draw curves badly. Keep every number a
   whole or half grid unit; the construction page draws those lines.
 - **Wordmark**: any OFL family on Google Fonts, fetched with its OFL.txt, shaped with HarfBuzz and outlined, with
-  `tracking` in thousandths of the em. If the name matches the font's Reserved Font Name the build warns.
+  `tracking` in thousandths of the em. The build copies each font's OFL.txt into its own `LICENSES/`. If the name
+  matches a Reserved Font Name the build warns; those names come only from the OFL's copyright lines
+  (`fonts.reserved_font_names`).
 - **Lockup**: `mark_scale` is the mark's height over the wordmark's cap height; `gap` is the space between, in cap
   heights. A stacked lockup is written too.
 - **Palette**: ink, paper, accent, neutral, tint. The book and the package use these five.
@@ -33,12 +36,12 @@ names shapes on a grid, OFL glyphs, and traces made by `trace_ref.py`. The full 
 
 Lead with abstract marks that make one move with two or three primitives: two squares overlapped and xor'd with one
 tilted ("a sketch snapping to the grid"), a disc cut once, one shape repeated and turned. These read as confident and
-hold at 16 px. Literal pictograms (a bell, a chat bubble, a moon) read as stock icons, and traces read as borrowed;
-use them last.
+hold at 16 px. Literal pictograms (a bell, a chat bubble, a moon) read as stock icons; use them last.
 
-Six directions, each a different answer to the idea, not six versions of one shape. Mix three kinds: traced marks,
-idea marks built from shapes, and typographic marks. At least half carry the idea as a picture (a hand, a ripple, a
-ring of voices), not as the first letter. A set of shape-built directions that works:
+Six directions, each a different answer to the idea, not six versions of one shape. Mix the kinds: idea marks built
+from shapes, typographic marks, and traced marks when the person gave you a drawing of their own. At least half carry
+the idea as a picture (a hand, a ripple, a ring of voices), not as the first letter. A set of shape-built directions
+that works:
 
 - a monogram: the first letter built from the product's own shapes;
 - a negative-space letter: the letter carved out of a solid disc, square or tile;
@@ -57,23 +60,31 @@ Give each its own wordmark face and palette, so the person compares directions, 
 
 ## Tracing
 
-The strongest marks in a moodboard have drawing in them that grid shapes can't reach. Trace one and change it:
+A drawing the person made, or their existing brand, has a hand in it that grid shapes can't reach. Trace it and
+change it. Only their own material: reference logos, Are.na images and stock photos set proportions and are never
+traced, and the scripts refuse them by hash and by likeness.
 
-1. Pick a reference whose picture fits the idea: a hand for "hush", rings for "settle", a ring of circles for
-   "many voices". The fit matters more than how famous the mark is.
-2. `python3 -I scripts/trace_ref.py <image> --crop x,y,w,h --out trace/<n>.svg` (crop in fractions, around the
-   mark only; `--invert` for a light mark on dark). potrace draws the curves and drops specks; check for captions
-   and stray type in the crop and cut them.
+1. Get the person's answer first (SKILL.md step 6). `brief.json` `trace_sources` holds the file, its sha256, the kind
+   of right (`own-drawing`, `own-brand`, `licensed`), the question you showed and their answer, both verbatim.
+2. `uv run scripts/trace_ref.py sketches/l.png --brief brief.json --refs <refs> --calibration calibration.json
+   --crop x,y,w,h --out trace/<n>.svg` (crop in fractions, around the mark only; `--threshold` and `--invert` for a
+   light mark on dark). It refuses a file not in `trace_sources`, a file whose sha256 is in any collection manifest,
+   and a crop whose mask, or whose traced path, scores at or over the limit against a collected image or a `--refs`
+   logo. The person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison.
+   potrace draws the curves and drops specks; check for stray type in the crop and cut it.
 3. Place it: `{"shape": "trace", "file": "trace/<n>.svg", "x": 2, "y": 2, "size": 44}`, with `rotate` and `mirror` as
-   usual. Then change one thing with the usual shapes so the mark says the idea: fill a centre, turn it level, add a
-   tail, cut a part away. Put `"traced_from": "<source>"` in the recipe,
-   as a neutral ID such as `arena 12345678` (the Are.na block number): the book prints it, so never a brand name, a
-   file name that holds one, or a URL.
-4. Look at it beside the original. A change nobody would notice isn't a change; one that breaks the drawing is too
+   usual. The path is found from the working folder first, then from the recipe's folder. Then change one thing with
+   the usual shapes so the mark says the idea: fill a centre, turn it level, add a tail, cut a part away.
+4. Build with `--brief brief.json --refs <refs> --calibration calibration.json`. The build reads
+   `trace/<n>.svg.provenance.json`, refuses an SVG that changed since it was traced or a source the brief no longer
+   vouches for, traces the source again behind the same gates, and writes the result and its record into the build.
+   Leave `traced_from` out of the recipe: the build refuses it and writes the trace's record into `build.json`
+   `traces` itself.
+5. Look at it beside the original. A change nobody would notice isn't a change; one that breaks the drawing is too
    much.
 
-A traced mark sits close to the original on purpose. The check reports the distance and passes it; the package's
-trademark sheet says it was traced and from what.
+The book shows where a traced mark came from, the kind of right, the person's answer and the score against the
+source; the trademark sheet says the same in words.
 
 ## Type
 
@@ -84,9 +95,9 @@ Pull the first letter out as the mark with a `glyph` shape and set the name in t
 ## Parts it may also use
 
 - Icons as a starting part: Lucide (ISC), Phosphor, Tabler, Heroicons, Iconoir (MIT), Material Symbols (Apache 2.0),
-  as `polygon` points or traced from the icon's own SVG (the icon is open; a reference logo never is). Change it until
-  the distance check passes against the icon too: an icon anyone can ship is a weak mark. Never Remix Icon, whose
-  licence bans logos even modified, and never a brand-icon set.
+  as `polygon` points; to trace one, record it in `trace_sources` as `licensed` with the person's answer, like any
+  source. Change it until the distance check passes against the icon too: an icon anyone can ship is a weak mark.
+  Never Remix Icon, whose licence bans logos even modified, and never a brand-icon set.
 - No image model draws final paths.
 
 ## Checks
@@ -99,17 +110,28 @@ Pull the first letter out as the mark with a `glyph` shape and set the name in t
 | Counters at 16 px | every hole at 512 px still open |
 | Ink on paper | 4.5:1 or more |
 | Accent against paper or ink | 3:1 or more |
-| Nearest reference | under the calibrated limit |
+| Nearest reference | under the calibrated limit, against every reference but a traced direction's own source |
 
 On the test brief (three directions for a site-inspection app), all three passed: strokes 2.7 to 4.4 px at 16 px,
 nearest reference 0.15, 0.36 and 0.73 against a limit of 0.81.
 
+A traced direction's score against its own source goes into `check.json` `source_scores` and the book, never into a
+pass or a fail: a source the person holds rights in may be used unchanged. Before checking, `check_logo.py` confirms
+every file `build.json` lists still has its sha256; `check.json` then records the sha256 of `build.json`, of the
+`--refs` images and of the calibration.
+
 ## Package
 
-`package_logo.py` writes, for the chosen direction:
+`package_logo.py` writes, for the chosen direction, into a new folder:
 
 - `svg/`: mark, wordmark, lockup and stacked lockup, each in ink, reversed, accent and black;
 - `png/`: the mark from 16 to 1024 px on a transparent square, and the lockup at 1600 wide; `favicon.ico`;
 - `LICENSES/`: each font's OFL.txt;
-- `trademark-search.md`: where to search the name and the mark's design codes, and that it is not a clearance;
-- `brand.json`: the palette and fonts.
+- `trademark-search.md`: where to search the name and the mark's design codes (KIPRIS for Korea), that it is not a
+  clearance, one sentence on what the distance check covered, and, for a traced mark, its source, the kind of right
+  and the person's question and answer verbatim; in the brief's language;
+- `brand.json`: the palette, the fonts and any trace's source and statement.
+
+It reads only the files `build.json` lists, so a part an earlier build left in the folder never ships, and it refuses
+a build whose `check.json` is missing, failed, or no longer matches `build.json`, its files, the `--refs` images or
+the calibration.

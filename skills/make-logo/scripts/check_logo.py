@@ -116,7 +116,7 @@ def check(build: str, refs: list[tuple[str, str, dict]], cal: dict, refs_sha256:
         {"check": n, "value": v, "pass_at": p, "ok": bool(ok)} for n, v, p, ok in rows],
         "nearest": [{"score": s, "ref": f} for s, f in near], "ink_share_by_size": sizes,
         "source_scores": source_scores,
-        # A detailed trace may close up at 16 px (SKILL.md step 7): those rows are reported, and the build still passes.
+        # A detailed trace may close up at 16 px (SKILL.md step 8): those rows are reported, and the build still passes.
         "ok": all(r[3] for r in rows if not (traces and r[0].endswith("at 16 px"))),
         "build_sha256": R.sha256_bytes(raw), "refs_sha256": refs_sha256, "calibration_sha256": calibration_sha256}
     R.write_bytes(os.path.join(build, "check.json"), json.dumps(report, indent=1, ensure_ascii=False).encode())

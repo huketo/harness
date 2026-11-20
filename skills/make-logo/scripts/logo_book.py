@@ -339,7 +339,7 @@ def main(argv: list[str] | None = None) -> None:
         os.makedirs(os.path.join(a.out, "photos"), exist_ok=True)
         for it in man["items"]:
             if not os.path.exists(os.path.join(a.photos, it["file"])):
-                continue  # deleted as not fitting the brand (SKILL.md step 8): drop it, credit and all
+                continue  # deleted as not fitting the brand (SKILL.md step 9): drop it, credit and all
             shutil.copy(os.path.join(a.photos, it["file"]), os.path.join(a.out, "photos", it["file"]))
             photos.append(it)
     photo = lambda k: f"photos/{photos[k % len(photos)]['file']}" if photos else None  # noqa: E731

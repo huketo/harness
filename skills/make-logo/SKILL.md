@@ -1,6 +1,6 @@
 ---
 name: make-logo
-description: Use when someone wants a logo, mark or wordmark for their product, such as "make me a logo", "/make-logo" or "a logo like these but ours". It learns proportions from logos they like and from Are.na, builds original marks from shapes and open fonts, traces the strongest ones and changes them to fit the idea, sets wordmarks in display fonts, and delivers a logo book of six directions.
+description: Use when someone wants a logo, mark or wordmark for their product, such as "make me a logo", "/make-logo" or "a logo like these but ours". It learns proportions from logos they like and from Are.na, builds original marks from shapes and open fonts, traces only drawings the person holds rights in, sets wordmarks in display fonts, and delivers a logo book of six directions.
 metadata:
   summary: Makes your own logo
 ---
@@ -13,92 +13,151 @@ use. Every variant is checked against every reference before anyone sees it.
 
 ## The line it holds
 
-Say this at the start, in plain words: "Some directions trace a logo from your moodboard and change it to carry your
-idea. Those sit close to the original on purpose, and I'll mark which ones they are." Then keep to it.
+Say this at the start, in plain words: "The logos you like and the ones I pull from Are.na set proportions only; I
+never trace them. If you have a drawing or a brand of your own, I can trace it, once you tell me it's yours." Then
+keep to it.
 
-- Outlines come from four places, each kept with its source (`references/building.md`): a trace of a moodboard
-  reference changed to carry the idea, shapes on a grid, OFL fonts set and outlined, and permissive icon sets.
-- Every traced direction names its source in its recipe (`traced_from`), and its package's trademark sheet says it
-  was traced. The distance check reports how close it sits; it doesn't block it.
-- Refuse "recreate X's logo" or any famous brand named as the target. Trace from the moodboard, not from a brand the
-  person names.
+- Outlines come from four places, each kept with its source (`references/building.md`): shapes on a grid, OFL fonts
+  set and outlined, permissive icon sets, and a trace of a file the person holds rights in (their own drawing, their
+  own brand, or material licensed to them).
+- Reference logos, Are.na pulls and stock photos are for measuring and mockups only (the owner's decision,
+  2026-11-20). The scripts refuse to trace them, however they are renamed, re-saved or cropped.
+- Refuse "recreate X's logo" or any famous brand named as the target.
 - Nothing here is a legal clearance. Say so, and give the trademark search sheet.
 
-Scripts are in `scripts/`. Python 3.10+ with `numpy`, `scipy`, `scikit-image`, `pillow`, `skia-pathops`, `fonttools`,
-`uharfbuzz` and `resvg-py`, run as `python3 -I`, and `potrace` for tracing; Node 18+ for the Are.na pull, and Playwright with a Chromium for the
-logo book (`render_book.mjs` finds it the way make-font's does). Downloaded references go in their own folder, are only read, and are never committed.
+## What the code holds, and what it can't
+
+Rights are the person's statement. The code binds that statement to the hash of the file it is about, refuses a
+result that sits close to any other reference, and prints the statement, word for word, in the book and the
+trademark sheet. It doesn't know whether the statement is true.
+
+- `trace_ref.py` traces only a file listed in `brief.json` `trace_sources` by sha256, never one whose sha256 is in a
+  collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
+  calibrated limit against a collected image or a `--refs` logo. The person's own sketch on the moodboard (same
+  sha256 as a `trace_sources` entry) is left out of that comparison. Each trace gets `<svg>.provenance.json`.
+- `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
+  today's collections and references, and refuses a recipe that says `traced_from`. `check_logo.py` leaves out only
+  a direction's own verified source; every other reference keeps the usual limit.
+- `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
+  file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw.
+- A shape the agent types in as `polygon` points has no source the chain can see: only the distance check stands
+  between it and a copy.
+
+## Decisions only the person makes
+
+Two answers come from the person, never from you: whether they hold the rights to a file you would trace, and which
+direction they choose. Ask each as a plain question, show the file or the book, and record the question and their
+answer verbatim (`trace_sources` in step 6, `choice` in step 9). In an unattended run, stop before each of these
+steps and report what you would ask; trace nothing and package nothing until a person has answered.
+
+## Setup
+
+Python scripts carry their dependencies (PEP 723): run each with `uv run scripts/<name>.py` (tested with Python
+3.12). Tracing needs potrace: the one on `PATH`, else, on linux-x86_64, `trace_ref.py` fetches the pinned 1.16 build
+from potrace's site into the cache after checking its sha256; elsewhere it prints the install command
+(`brew install potrace`, `apt install potrace`). Node 18+ runs the Are.na and photo pulls, and Playwright with a
+Chromium prints the book (`render_book.mjs` finds it through awesome-interface's `find-chromium.mjs` when that skill
+is installed beside this one).
+
+Collected images live outside the project, in `C=${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo`, one folder per
+collection, each with a `manifest.json` listing every file and its sha256. Nothing collected is ever committed or
+shipped. Below, `<refs>` stands for every reference folder, always the same list: `refs/mine/ "$C/arena/" "$C/world/"`.
 
 ## Steps
 
 1. **Ask once.** In one message: the name, what it does and for whom, one idea the mark could carry (a letter, an
-   object, a motion, a word), 3 to 6 logos they like (files, image URLs, sites, an Are.na channel), where it will live
-   (an app icon, a site, print), colour limits, and mark, wordmark or both. Defaults: both, one colour, the app icon.
+   object, a motion, a word), 3 to 6 logos they like (files, image URLs, sites, an Are.na channel), whether they have
+   a drawing, sketch or brand of their own to build from, where it will live (an app icon, a site, print), colour
+   limits, and mark, wordmark or both. Defaults: both, one colour, the app icon. Write the documents in the brief's
+   language; a brief in Korean gets Korean documents (`"language": "ko"`).
    Done when `brief.json` holds the answers and the defaults you took.
 
-2. **Gather.** Put the person's references in `refs/mine/` (a site: screenshot its header and crop the logo). Pull a
-   wider set: `node scripts/fetch_arena.mjs --default refs/arena 100`, or a channel they name
-   (`references/sources.md`). Then pull one set from the product's own world: search Are.na's channels
-   (`https://api.are.na/v2/search/channels?q=architecture%20identity`) for its field plus "logo" or "identity", and
-   fetch the two or three with the most blocks into `refs/world/`. The general set gives craft; this one gives
-   pictures that fit the idea. Run the distance check (step 7) against logo references only: photos of books, rooms
-   or products match any plain mark by silhouette and say nothing about copying. Without it, traces start from whatever is closest, and closest is often weak.
-   Done when `refs/` holds the person's references, up to 100 from Are.na, and a set from the product's world, each
-   with `manifest.json`.
+2. **Gather.** Put the person's references in `refs/mine/` (a site: screenshot its header and crop the logo), and
+   their own drawings, if any, in `sketches/`. Pull a wider set: `node scripts/fetch_arena.mjs --default arena 100`,
+   or a channel they name (`references/sources.md`). Then pull one set from the product's own world: search Are.na's
+   channels (`https://api.are.na/v2/search/channels?q=architecture%20identity`) for its field plus "logo" or
+   "identity", and fetch the two or three with the most blocks into one collection:
+   `node scripts/fetch_arena.mjs <slug> world 40`. The general set gives craft; this one gives pictures that fit the
+   idea. Run the distance check (step 8) against logo references only: photos of books, rooms or products match any
+   plain mark by silhouette and say nothing about copying.
+   Done when `refs/mine/` holds the person's references and `$C/arena/` and `$C/world/` each hold a `manifest.json`
+   with a sha256 for every file.
 
-3. **Measure.** `python3 -I scripts/measure_logo.py refs/*/ --out measurements.json --sheet measured.png`. Open the
-   sheet and look: every mask should be the mark and nothing else. Drop any that caught a photo, a caption or a sheet
-   of several marks (`references/measuring.md`).
+3. **Measure.** `uv run scripts/measure_logo.py <refs> --out measurements.json --sheet measured.png`. Open the sheet
+   and look: every mask should be the mark and nothing else. Drop any that caught a photo, a caption or a sheet of
+   several marks (`references/measuring.md`).
    Done when the measured set is clean and the person's own references are in it.
 
-4. **Calibrate.** With 30 or more measured references: `python3 -I scripts/calibrate.py measurements.json --out
-   calibration.json`. With fewer, use the shipped `scripts/calibration.json` (`references/distance.md`).
+4. **Calibrate.** With 30 or more measured references: `uv run scripts/calibrate.py measurements.json --out
+   calibration.json`. With fewer, use the shipped `scripts/calibration.json` (`references/distance.md`), and pass the
+   same file as `--calibration` to every later step.
    Done when the limit is set and the weakest edit it catches is reported.
 
 5. **Targets.** Take the person's references' numbers as the target, with the Are.na set's spread as the range.
    Where their references disagree, ask which way to lean.
    Done when `targets.json` holds the numbers and the leanings.
 
-6. **Directions.** Write six directions from the idea, each a different answer, not six takes on one shape. Mix
-   three kinds (`references/building.md`): traced marks (pick the moodboard logos whose picture fits the idea, trace
-   each with `python3 -I scripts/trace_ref.py <image> --crop x,y,w,h --out trace/<n>.svg`, then change one thing so it
-   carries the idea: a cut, a fill, a turn, a part removed); idea marks built from shapes; and typographic marks in a
-   display face with character. At least half carry the idea as a picture, not a letter. Each is a recipe (`references/building.md`): a title, the idea in one sentence, grid shapes, an
-   OFL wordmark, a palette. Build each: `python3 -I scripts/build_logo.py direction.json --out build/<n>`. Render all
-   six on one sheet and look: a mark that reads as a stock icon, the wrong letter, or a random pictogram gets
-   rewritten, not kept.
+6. **Rights, for each file to trace.** Only a file from the person themselves can be traced. Show it and ask, for
+   example, "Is this your own drawing (or your brand, or licensed to you), so I may trace it into your mark?" Record
+   their reply in `brief.json`:
+   `"trace_sources": [{"file": "sketches/l.png", "sha256": "<from sha256sum or shasum -a 256>", "rights": "own-drawing",
+   "question": "<the question, verbatim>", "answer": "<their answer, verbatim>"}]`, with `rights` one of
+   `own-drawing`, `own-brand`, `licensed`. A file changed after they answered needs a new answer.
+   Done when every file you will trace has an entry in their own words, or the directions use no trace.
+
+7. **Directions.** Write six directions from the idea, each a different answer, not six takes on one shape. Mix the
+   kinds (`references/building.md`): idea marks built from shapes, typographic marks in a display face with
+   character, and, when step 6 gave you a source, traced marks: `uv run scripts/trace_ref.py sketches/l.png --brief
+   brief.json --refs <refs> --calibration calibration.json --crop x,y,w,h --out trace/<n>.svg`, then change one thing
+   with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image:
+   drop that source, never work around it. At least half carry the idea as a picture, not a letter. Each is a recipe
+   (`references/building.md`): a title, the idea in one sentence, grid shapes, an OFL wordmark, a palette. Build
+   each: `uv run scripts/build_logo.py dirs/<n>.json --out build/<n> --brief brief.json --refs <refs> --calibration
+   calibration.json`. Render all six on one sheet and look: a mark that reads as a stock icon, the wrong letter, or a
+   random pictogram gets rewritten, not kept.
    Done when six directions build, each reads as its idea at 64 px, and no two are the same move.
 
-7. **Check.** `python3 -I scripts/check_logo.py build/* --refs refs/*/ --calibration calibration.json`: stroke at
-   16 px, counters at 16 px, palette contrast, nearest reference. A built direction that is too close: open the three
-   nearest beside it, look, change the recipe, build again. A traced direction reports its score and passes that row.
-   A detailed trace may fail the 16 px checks; keep it if it's strong, and say it needs a simpler favicon.
-   Done when every built direction passes, and every traced one fails nothing but the 16 px rows.
+8. **Check.** `uv run scripts/check_logo.py build/* --refs <refs> --calibration calibration.json`: stroke at 16 px,
+   counters at 16 px, palette contrast, nearest reference. A direction that is too close: open the three nearest
+   beside it, look, change the recipe, build again. A traced direction is held to the limit against every reference
+   but its own source; its score against that source is recorded and shown, never failed. A detailed trace may fail
+   the 16 px checks; keep it if it's strong, and say it needs a simpler favicon.
+   Done when every direction passes, a traced one failing nothing but the 16 px rows.
 
-8. **Logo book.** Fetch photos for the mockups: `node scripts/fetch_photos.mjs "<one or two mood words>" photos 6`
-   (free CC0 and CC BY stock from Openverse; look at them and delete any that don't fit). Then
-   `python3 -I scripts/logo_book.py build/* --out book --name "<name>" --line "<what it does>" --tagline "<...>"
-   --note "<a notification the app would send>" --photos photos`, then
-   `node scripts/render_book.mjs book` (`references/logo-book.md`). Open every page. Send `book/logobook.pdf` and let
-   the person choose.
-   Done when render_book.mjs exits 0 and the person has picked a direction.
+9. **Logo book.** Fetch photos for the mockups: `node scripts/fetch_photos.mjs "<one or two mood words>" photos 6`
+   (free CC0 and CC BY stock from Openverse, into `$C/photos/`; look at them and delete any that don't fit). Then
+   `uv run scripts/logo_book.py build/* --out book --refs <refs> --calibration calibration.json --brief brief.json
+   --name "<name>" --line "<what it does>" --tagline "<...>" --note "<a notification the app would send>" --photos
+   "$C/photos"`, then `node scripts/render_book.mjs book` (`references/logo-book.md`). A direction that failed the
+   check is left out; `--include-failed` shows it, marked. Open every page. Send `book/logobook.pdf` and ask the
+   person to choose; record the question and their answer verbatim in `brief.json` as `"choice"`.
+   Done when render_book.mjs exits 0 and the person's pick is recorded in their words.
 
-9. **Package.** `python3 -I scripts/package_logo.py build/<chosen> --out package --classes "<Nice classes>"`: SVGs
-   (mark, wordmark, lockups; ink, reversed, accent, black), PNGs from 16 to 1024 px, favicon.ico, LICENSES, and the
-   trademark search sheet. For a reveal video, hand the mark and its guides to make-motion.
+10. **Package.** `uv run scripts/package_logo.py build/<chosen> --out package --refs <refs> --calibration
+    calibration.json --brief brief.json --classes "<Nice classes>"`, into a new folder: SVGs (mark, wordmark,
+    lockups; ink, reversed, accent, black), PNGs from 16 to 1024 px, favicon.ico, LICENSES, and the trademark search
+    sheet, with KIPRIS for Korea and, for a traced mark, the person's statement word for word. For a reveal video,
+    hand the mark and its guides to make-motion.
 
 ## Never
 
-- Trace a famous brand the person names, or ship a trace unchanged.
-- Leave `traced_from` off a traced direction, or drop the traced note from its trademark sheet.
+- Trace a reference logo, an Are.na image, a stock photo, or a famous brand the person names, or any file without
+  the person's own answer in `trace_sources`.
+- Answer the rights question or pick the direction for the person, or reword their answer.
+- Edit a trace SVG, `build.json` or `check.json` by hand; change the recipe and run the steps again.
 - Name a reference's brand in any output file, sheet or message.
 - Call a variant cleared. Passing the distance check means it isn't a near copy of these references, nothing more.
 - Use Remix Icon (its licence bans logos) or any brand-icon set.
 
 ## Files
 
-- `scripts/fetch_arena.mjs`: step 2. `scripts/logolib.py`: loading, finding the ink, normalising.
+- `scripts/fetch_arena.mjs`, `scripts/fetch_photos.mjs`, `scripts/collection.mjs`: steps 2 and 9, into the cache.
+- `scripts/logolib.py`: loading, finding the ink, normalising. `scripts/rights.py`: hashes, the brief's
+  `trace_sources`, collection manifests, and the seal between steps.
 - `scripts/measure_logo.py`: step 3. `scripts/calibrate.py`: step 4. `scripts/distance.py`: the distance check.
-- `scripts/trace_ref.py`, `scripts/build_logo.py`, `scripts/fonts.py`: step 6. `scripts/check_logo.py`: step 7.
-- `scripts/logo_book.py`, `scripts/render_book.mjs`: step 8. `scripts/package_logo.py`: step 9.
+- `scripts/trace_ref.py` (with `scripts/potrace_bin.py`), `scripts/build_logo.py`, `scripts/fonts.py`: step 7.
+  `scripts/check_logo.py`: step 8.
+- `scripts/logo_book.py`, `scripts/render_book.mjs`: step 9. `scripts/package_logo.py`: step 10.
 - `scripts/calibration.json`: default weights and limit, fitted on 98 references.
+- `scripts/test_*.py`: the gate tests (`mise run test-logo-gates`), on synthetic images and fonts.
 - `references/`: sources, measuring, distance, building, logo-book.
