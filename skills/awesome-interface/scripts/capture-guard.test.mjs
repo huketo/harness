@@ -78,6 +78,8 @@ test("prove refuses a malformed row with its line number", () => {
 test("prove refuses a GraphQL POST row without its body", () => {
 	assert.throws(() => prove([`POST ${base}/graphql`]), /line 1: a GraphQL POST needs its body/);
 	assert.throws(() => prove([`POST ${base}/api/q`], { graphqlPaths: ["/api/q"] }), /line 1: a GraphQL POST needs its body/);
+	assert.throws(() => prove([`POST ${base}/graphql  `]), /line 1: a GraphQL POST needs its body/);
+	assert.throws(() => prove([`POST ${base}/graphql {not json`]), /line 1: a GraphQL POST body is not JSON/);
 });
 
 // A row can carry a request body, so a refusal names the line and the reason, never the row itself.

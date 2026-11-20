@@ -269,7 +269,7 @@ export function parseWrites(lines) {
 		const [, method, url, body] = m;
 		if (!/^[A-Za-z]+$/.test(method)) return bad.push({ line, why: "the method is not an HTTP method" });
 		try { new URL(url); } catch { return bad.push({ line, why: "the URL is not absolute" }); }
-		writes.push({ line, method: method.toUpperCase(), url, body });
+		writes.push({ line, method: method.toUpperCase(), url, body: body?.trim() || undefined });
 	});
 	return { writes, bad };
 }
@@ -280,7 +280,11 @@ export function parseWrites(lines) {
 export function prove(lines, opts = {}) {
 	const { writes, bad } = parseWrites(lines);
 	// A GraphQL POST is judged by its body, so a row without one would read as blocked and prove nothing.
-	for (const w of writes) if (w.method === "POST" && !w.body && isGraphqlPath(w.url, opts)) bad.push({ line: w.line, why: "a GraphQL POST needs its body" });
+	for (const w of writes) {
+		if (w.method !== "POST" || !isGraphqlPath(w.url, opts)) continue;
+		if (!w.body) bad.push({ line: w.line, why: "a GraphQL POST needs its body" });
+		else { try { JSON.parse(w.body); } catch { bad.push({ line: w.line, why: "a GraphQL POST body is not JSON" }); } }
+	}
 	bad.sort((a, b) => a.line - b.line);
 	// Reasons only: a row can carry a request body, which is not printed unless --bodies asks for it.
 	if (bad.length) throw new Error(bad.map((b) => `line ${b.line}: ${b.why}`).join("\n"));
