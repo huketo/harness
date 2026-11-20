@@ -1257,6 +1257,56 @@
         "Drop the statechart dependency: a counterexample is reported as steps in the code's words."
       ],
       "excluded_sources": []
+    },
+    "make-font": {
+      "adopted_on": "2026-11-20",
+      "source": "https://github.com/arla6ka/design.how",
+      "ownership": "harness-owned fork; no upstream contributions",
+      "license": "MIT",
+      "license_path": "skills/make-font/LICENSE.design-how",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/arla6ka/design.how",
+          "commit": "1ce5304466db2ba47a7a7524603e86df77c702bd",
+          "paths": [
+            "LICENSE",
+            "skills/make-font"
+          ],
+          "snapshot_sha256": "e0b91880d8d10744264287f7295f8aa5c5a8cc8cc9bf13941c1e65c6ed14d7d9",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land."
+      ]
+    },
+    "make-logo": {
+      "adopted_on": "2026-11-20",
+      "source": "https://github.com/arla6ka/design.how",
+      "ownership": "harness-owned fork; no upstream contributions",
+      "license": "MIT",
+      "license_path": "skills/make-logo/LICENSE.design-how",
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/arla6ka/design.how",
+          "commit": "1ce5304466db2ba47a7a7524603e86df77c702bd",
+          "paths": [
+            "LICENSE",
+            "skills/make-logo"
+          ],
+          "snapshot_sha256": "13093829fe8933c198cc8266151964f4a0fbf74ac7d916ab97dce0c87d17e45b",
+          "license": "MIT",
+          "license_path": "LICENSE"
+        }
+      ],
+      "local_changes": [
+        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land."
+      ]
     }
   },
   "removed_on": "2026-09-09",
