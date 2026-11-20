@@ -70,6 +70,40 @@ SAMPLE_LINES = [
     "H0H1H2H3H4H5H6H7H8H9H",
 ]
 
+# ------------------------------------------------------------------ Hangul classes
+# A syllable is an initial, a medial vowel and an optional final: U+AC00 + 588 initial + 28 medial + final. Its
+# class is set by those parts before anything is measured: where the vowel stands against the initial (beside it,
+# under it, or both) and whether a final sits under them. One mean per class is a target, never a single syllable.
+SYLLABLES = (0xAC00, 0xD7A3)
+VOWELS_BESIDE = {0, 1, 2, 3, 4, 5, 6, 7, 20}  # ㅏ ㅐ ㅑ ㅒ ㅓ ㅔ ㅕ ㅖ ㅣ
+VOWELS_UNDER = {8, 12, 13, 17, 18}  # ㅗ ㅛ ㅜ ㅠ ㅡ. The other seven (ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅢ) are both: mixed.
+# The syllables each class is measured on, fixed for every font. HANGUL_HELD_OUT are other syllables of the same
+# classes: measure_font.py reports how far their means land from the list's, which tests the classes on that font.
+HANGUL_CLASSES = {"H1": "가나머서저이니미", "H2": "고노도무수그느오", "H3": "과귀뇌뭐쉬의와위",
+                  "H4": "각난달맘선일진형", "H5": "공눈돌몸손울큰흥", "H6": "광권뒷원괜윙휠쾅"}
+HANGUL_HELD_OUT = {"H1": "펴캬벼해", "H2": "뷰표쿠효", "H3": "쇠퇴뒤희", "H4": "핥밖넋졌", "H5": "몫볶흙숯",
+                   "H6": "횝꿩뵘괌"}
+HANGUL_ANCHOR = "으"  # no blank column inside it and close to symmetric, so a screenshot is cut at it
+HANGUL_STEM = "이니미"  # the vertical stem: the last vertical run of ㅣ, at mid face height
+HANGUL_HSTROKE = HANGUL_ANCHOR + "그느"  # the horizontal stroke: ㅡ, the lowest run at the face's centre
+HANGUL_OVERSHOOT = ("오", "고")  # a round top against a flat one
+HANGUL_TEXT = HANGUL_ANCHOR + "".join(HANGUL_CLASSES.values()) + "".join(HANGUL_HELD_OUT.values())
+# One line per class, each syllable between two anchors, so a screenshot splits into syllables at the anchors.
+SAMPLE_LINES_KO = [HANGUL_ANCHOR + "".join(c + HANGUL_ANCHOR for c in chars) for chars in HANGUL_CLASSES.values()]
+# The units a Hangul number carries: lengths at cap height 700 (a Latin H measured with it), lengths per 1000 em
+# (a font file), and ratios, which need neither. make_targets.py merges values of one unit only.
+UNITS = ("cap700", "em1000", "ratio")
+
+
+def hangul_class(ch):
+    """H1 to H6, from the syllable's medial vowel and final alone, or None when ch is not a precomposed syllable."""
+    s = ord(ch) - SYLLABLES[0] if len(ch) == 1 else -1
+    if not 0 <= s <= SYLLABLES[1] - SYLLABLES[0]:
+        return None
+    medial, final = s % 588 // 28, s % 28
+    shape = 1 if medial in VOWELS_BESIDE else 2 if medial in VOWELS_UNDER else 3
+    return f"H{shape + (3 if final else 0)}"
+
 
 # The characters each script needs. check_font.py gates coverage on them, and fit_font.py subsets the base to them.
 COVERAGE = {
@@ -80,6 +114,8 @@ COVERAGE = {
     "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
     "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
     "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
+    # every modern syllable, then the compatibility jamo
+    "korean": "".join(map(chr, range(SYLLABLES[0], SYLLABLES[1] + 1))) + "".join(map(chr, range(0x3131, 0x318F))),
 }
 # Kept for every script: printable ASCII, Latin-1, and the typographic marks the font book and plain text use
 # (dashes, quotes, ellipsis, primes, fraction slash, minus).
@@ -684,13 +720,176 @@ def measure_face(face):
         m["rhythm"] = round(2 * m["sides"]["lc_straight"] / m["n_counter"], 3)
     m["space"] = r(F.adv(" ")) if F.has(" ") else None
     m["para"] = r(_safe(lambda: F.text_width(PARA)), 0)
-    f = F.font
-    os2, hh = f["OS/2"], f["hhea"]
-    m["vmetrics"] = {"upm": F.upm, "hhea": [hh.ascent, hh.descent, hh.lineGap],
-                     "typo": [os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap],
-                     "win": [os2.usWinAscent, os2.usWinDescent], "use_typo": bool(os2.fsSelection & 128)}
+    m["vmetrics"] = vmetrics(F.font)
     m["confidence"] = {key: "high" for key in m if key not in ("source", "confidence")}
     return m
+
+
+def vmetrics(f):
+    os2, hh = f["OS/2"], f["hhea"]
+    return {"upm": f["head"].unitsPerEm, "hhea": [hh.ascent, hh.descent, hh.lineGap],
+            "typo": [os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap],
+            "win": [os2.usWinAscent, os2.usWinDescent], "use_typo": bool(os2.fsSelection & 128)}
+
+
+# ------------------------------------------------------------------ measuring Hangul
+# `ink` is a Face, or anything else with has(ch), bounds(ch) -> (x0, y0, x1, y1) and hspans / vspans(ch, at) ->
+# [(start, end)] in order along the cut, y up: measure_image.py reads a screenshot through the same questions.
+def _boxes(ink, chars):
+    return [(c, b) for c in chars if ink.has(c) for b in [ink.bounds(c)] if b]
+
+
+def _run_median(ink, chars, cut):
+    """Median width of one run per syllable. cut(box) -> (axis, position, index): 1 cuts a row, 0 a column."""
+    widths = []
+    for c, b in _boxes(ink, chars):
+        axis, at, i = cut(b)
+        runs = ink.hspans(c, at) if axis == 1 else ink.vspans(c, at)
+        if runs:
+            widths.append(runs[i][1] - runs[i][0])
+    return st.median(widths) if widths else None
+
+
+def hangul_stem(ink):
+    """The vertical stem: the last run across ㅣ in HANGUL_STEM at mid face height, median of the three."""
+    return _run_median(ink, HANGUL_STEM, lambda b: (1, (b[1] + b[3]) / 2, -1))
+
+
+def hangul_stem_h1(ink):
+    """The vertical stem over the H1 class's mean face height, both read from the same ink."""
+    stem, h1 = hangul_stem(ink), _boxes(ink, HANGUL_CLASSES["H1"])
+    return stem / st.mean(b[3] - b[1] for _, b in h1) if stem and h1 else None
+
+
+def _contrast(ink):
+    """ㅇ in the anchor: its top and bottom thickness over its side thickness."""
+    got = _boxes(ink, HANGUL_ANCHOR)
+    if not got:
+        return None, None
+    b = got[0][1]
+    v = ink.vspans(HANGUL_ANCHOR, (b[0] + b[2]) / 2)  # ㅡ, then the bottom and the top of ㅇ, bottom up
+    if len(v) < 3:
+        return None, None
+    h = ink.hspans(HANGUL_ANCHOR, (v[-2][0] + v[-1][1]) / 2)  # the two sides of ㅇ at its middle
+    if len(h) < 2:
+        return None, None
+    ends = [(v[-1][1] - v[-1][0]), (v[-2][1] - v[-2][0])]
+    sides = [(h[0][1] - h[0][0]), (h[-1][1] - h[-1][0])]
+    return st.mean(ends) / st.mean(sides), min(ends + sides)
+
+
+def hangul_geometry(ink, font=True):
+    """Hangul numbers in the ink's own units: per class the mean face (the ink box) width and height; the stem; and
+    the report-only overshoot, ㅇ contrast and horizontal stroke. With font=True the boxes sit on the glyph origin
+    and the baseline, so each class also gets its face centre, sides and advance, the font whether its Hangul is
+    fixed-width, and held_out the held-out syllables' mean face over the list's."""
+    out = {"classes": {}}
+    for cls, chars in HANGUL_CLASSES.items():
+        bs = _boxes(ink, chars)
+        if not bs:
+            continue
+        g = {"syllables": "".join(c for c, _ in bs), "face_w": st.mean(b[2] - b[0] for _, b in bs),
+             "face_h": st.mean(b[3] - b[1] for _, b in bs)}
+        if font:
+            adv = [ink.adv(c) for c, _ in bs]
+            g["cx"] = st.mean((b[0] + b[2]) / 2 for _, b in bs)
+            g["cy"] = st.mean((b[1] + b[3]) / 2 for _, b in bs)
+            g["side"] = st.mean((b[0] + a - b[2]) / 2 for (_, b), a in zip(bs, adv))
+            g["side_asym"] = st.mean(a - b[2] - b[0] for (_, b), a in zip(bs, adv))
+            g["center_adv"] = st.mean((b[0] + b[2]) / 2 / a for (_, b), a in zip(bs, adv))
+            g["adv"] = st.mean(adv)
+            held = _boxes(ink, HANGUL_HELD_OUT[cls])
+            if held:
+                g["held_out"] = {"face_w": st.mean(b[2] - b[0] for _, b in held) / g["face_w"],
+                                 "face_h": st.mean(b[3] - b[1] for _, b in held) / g["face_h"]}
+        out["classes"][cls] = g
+    if font and out["classes"]:
+        advs = [ink.adv(c) for c in HANGUL_ANCHOR + "".join(HANGUL_CLASSES.values()) if ink.has(c)]
+        out["fixed_width"] = max(advs) - min(advs) <= 0.005 * st.mean(advs)
+        if out["fixed_width"]:
+            out["adv"] = st.mean(advs)
+            for g in out["classes"].values():
+                del g["adv"]
+    out["stem"] = hangul_stem(ink)
+    out["hstroke"] = _run_median(ink, HANGUL_HSTROKE, lambda b: (0, (b[0] + b[2]) / 2, 0))
+    out["contrast"], out["contrast_thinnest"] = _contrast(ink)
+    tops = [_boxes(ink, c) for c in HANGUL_OVERSHOOT]
+    out["overshoot"] = tops[0][0][1][3] - tops[1][0][1][3] if all(tops) else None
+    return out
+
+
+def hangul_measurement(geo, lengths, conf=None):
+    """The `hangul` object of a measurement file: hangul_geometry's numbers, each tagged with its unit. lengths maps
+    each length unit the source can give to the factor from its own units: cap700 when a Latin H was measured with
+    it, em1000 in a font file. A key holds lengths or one ratio, never both, and a ratio key's suffix names its
+    denominator: _cap the Latin cap height, _h1 the H1 class's face. conf(kind, raw) is the confidence of a value
+    read from a raw size ("size", "stroke" or "edge"); a font file's values are all high."""
+    def tag(v, unit, kind, raw):
+        return {"value": round(v, 4 if unit == "ratio" else 1), "unit": unit,
+                "confidence": conf(kind, raw) if conf else "high"}
+
+    def length(v, kind):
+        return [tag(v * k, u, kind, v) for u, k in lengths.items()]
+
+    def ratio(v, kind, raw):
+        return [tag(v, "ratio", kind, raw)]
+    cap = lengths.get("cap700")
+    h1 = geo["classes"].get("H1")
+    classes = {}
+    for cls, g in geo["classes"].items():
+        c = {"syllables": g["syllables"]}
+        for key in ("face_w", "face_h"):
+            c[key] = length(g[key], "size")
+            if cap:
+                c[key + "_cap"] = ratio(g[key] * cap / CAP, "size", g[key])
+            if h1:
+                c[key + "_h1"] = ratio(g[key] / h1[key], "size", min(g[key], h1[key]))
+        c["aspect"] = ratio(g["face_w"] / g["face_h"], "size", g["face_w"])
+        for key in ("cx", "cy", "side", "side_asym", "adv"):
+            if key in g:
+                c[key] = length(g[key], "size")
+        if "adv" in g and cap:
+            c["adv_cap"] = ratio(g["adv"] * cap / CAP, "size", g["adv"])
+        if "center_adv" in g:
+            c["center_adv"] = ratio(g["center_adv"], "size", g["face_w"])
+        classes[cls] = c
+    out = {"units": [*lengths, "ratio"], "classes": classes}
+    if geo["stem"]:
+        out["stem"] = length(geo["stem"], "stroke")
+        if h1:
+            out["stem_h1"] = ratio(geo["stem"] / h1["face_h"], "stroke", geo["stem"])
+    if "fixed_width" in geo:
+        out["fixed_width"] = geo["fixed_width"]
+        if geo["fixed_width"]:
+            out["adv"] = length(geo["adv"], "size")
+            if cap:
+                out["adv_cap"] = ratio(geo["adv"] * cap / CAP, "size", geo["adv"])
+    report = {}
+    for key, kind in (("overshoot", "edge"), ("hstroke", "stroke")):
+        if geo[key] is not None:
+            report[key] = length(geo[key], kind)
+            if h1:
+                report[key + "_h1"] = ratio(geo[key] / h1["face_h"], kind, abs(geo[key]))
+    if geo["contrast"]:
+        report["contrast"] = ratio(geo["contrast"], "stroke", geo["contrast_thinnest"])
+    if geo.get("pitch"):
+        report["pitch"] = {cls: length(v, "size") for cls, v in geo["pitch"].items()}
+        if h1:
+            report["pitch_h1"] = {cls: ratio(v / h1["face_h"], "size", v) for cls, v in geo["pitch"].items()}
+    out["report"] = report
+    out["held_out"] = {cls: {k: ratio(v, "size", g["face_h"]) for k, v in g["held_out"].items()}
+                       for cls, g in geo["classes"].items() if "held_out" in g}
+    return _pruned(out)
+
+
+def _pruned(tree):
+    """The tree without its empty lists (a length where the source has no length unit) and empty dicts."""
+    out = {}
+    for k, v in tree.items():
+        v = _pruned(v) if isinstance(v, dict) else v
+        if v != [] and v != {}:
+            out[k] = v
+    return out
 
 
 def stem_cap700(face, ch="n"):
@@ -749,6 +948,32 @@ def distance(target, cand, width_weight=1.0, skip=()):
             w = width_weight(cls, d) if callable(width_weight) else width_weight
             total += w * 0.5 * (d / WIDTH_SCALE) ** 2
     return round(total ** 0.5, 3), deltas
+
+
+def tagged_value(entries, unit):
+    """The value of one unit in a list of tagged values, or None."""
+    return next((e["value"] for e in entries or [] if e["unit"] == unit), None)
+
+
+def hangul_summary(h):
+    """Lines that show a hangul object's main numbers, lengths in the first unit it has them in."""
+    have = {e["unit"] for c in h["classes"].values() for e in c.get("face_h", [])}
+    unit = next((u for u in UNITS if u in have), "ratio")
+    out = [f"  hangul, lengths in {unit}" + (f"; fixed width {h['fixed_width']}" if "fixed_width" in h else "")]
+    keys = (("aspect", "ratio"), ("face_h_h1", "ratio"))
+    if unit != "ratio":
+        keys = (("face_w", unit), ("face_h", unit)) + keys
+    for cls, c in h["classes"].items():
+        row = ", ".join(f"{k} {tagged_value(c.get(k), u)}" for k, u in keys)
+        out.append(f"    {cls} {c.get('syllables', '')}: {row}")
+    out.append((f"    stem {tagged_value(h.get('stem'), unit)}, " if unit != "ratio" else "    ")
+               + f"stem / H1 face height {tagged_value(h.get('stem_h1'), 'ratio')}")
+    for k, v in h.get("report", {}).items():
+        if isinstance(v, list):
+            out.append(f"    report {k}: {v[0]['value']} {v[0]['unit']} ({v[0]['confidence']})")
+    for cls, v in h.get("held_out", {}).items():
+        out.append(f"    held-out {cls}: face width x{v['face_w'][0]['value']}, height x{v['face_h'][0]['value']}")
+    return out
 
 
 def load_json(p):

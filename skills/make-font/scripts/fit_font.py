@@ -37,6 +37,14 @@ For each style:
 5. Overlaps are removed (needs skia-pathops), the font is scaled so its cap height per em matches the target
    (or the base's), and the variation tables are dropped.
 
+Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Without a Latin n stem to aim at,
+the weight comes from the Hangul stem ratio: wght is solved so the base's vertical stem over its H1 face height,
+both read at the same wght, meets the ratio, and each later style steps from that wght by its weight-class
+difference. Before step 5, every Hangul target is stated in the y instance's own units beside what the base draws
+there: a length at cap 700 against the y instance's cap height, a length per 1000 em against the finished font's
+em, a ratio by the base's own H1 face. fit-log.json records them under each style's `hangul`. No Hangul glyph is
+moved yet: the base keeps its Hangul sizes, centres and spacing, and the Hangul follows the y instance.
+
 Output: <DIR>/<Family>-<Style>.fit.ttf and fit-log.json. The fonts still carry the base's names: package.py
 renames them. Run space_font.py next.
 """
@@ -91,7 +99,7 @@ class Base:
         self.vf = font
         self.axes = L.axes_of(self.vf)
         self.small = L.subset_font(self.vf, L.SOLVE_TEXT, layout=False)
-        self.cache, self.subsets = {}, {}
+        self.cache, self.subsets, self.hangul_small = {}, {}, None
 
     def clamp(self, loc):
         """Every axis pinned: the ones not given sit at their default, so no variation data survives."""
@@ -104,6 +112,12 @@ class Base:
         if text not in self.subsets:
             self.subsets[text] = L.subset_font(self.small, text, layout=False)
         return L.Face(self.subsets[text], self.clamp(loc))
+
+    def hangul(self, loc):
+        """A fast instance of the Hangul syllables fontlib measures, with H for the cap height."""
+        if self.hangul_small is None:
+            self.hangul_small = L.subset_font(self.vf, L.HANGUL_TEXT + "H", layout=False)
+        return L.Face(self.hangul_small, self.clamp(loc))
 
     def full(self, loc):
         key = tuple(sorted((k, round(v, 2)) for k, v in self.clamp(loc).items()))
@@ -126,6 +140,57 @@ def solve_wght(B, loc, ch, target_raw):
     lo, _, hi = B.axes["wght"]
     w, _ = L.solve_axis(lambda v: B.tiny({**loc, "wght": v}, "nHx"), lambda f: raw_stem(f, ch), target_raw, lo, hi, iters=10)
     return {**loc, "wght": round(w, 2)}
+
+
+def solve_hangul_wght(B, loc, ratio):
+    """The wght where the base's vertical stem over its H1 face height is `ratio`. The face height moves a little
+    with the weight, so each try reads both at the same wght."""
+    lo, _, hi = B.axes["wght"]
+    w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), L.hangul_stem_h1, ratio, lo, hi)
+    return round(w, 2)
+
+
+HANGUL_LENGTHS = ("face_w", "face_h", "cx", "cy", "side", "side_asym", "adv")
+
+
+def resolve_hangul(B, yloc, T, weight_from):
+    """The Hangul targets in the y instance's own units, beside what the base draws there. A length at cap 700
+    resolves against the y instance's cap height and a length per 1000 em against the finished font's em (the cap
+    height over cap_em, or the base's em); finish() scales the em uniformly, so both stay true. A ratio never
+    becomes a cap length: a size ratio multiplies the base's own H1 face, which keeps the base's Hangul scale."""
+    want = T["hangul"]
+    face = B.hangul(yloc)
+    geo = L.hangul_geometry(face)
+    h1 = geo["classes"]["H1"]
+    cap = face.bounds("H")[3]
+    em = 1000 * cap / T["cap_em"] if T.get("cap_em") else face.upm
+    per = {"cap700": cap / L.CAP, "em1000": em / 1000}
+
+    def length(entries, base):
+        unit = next((u for u in per if L.tagged_value(entries, u) is not None), None)
+        if unit and base is not None:
+            return {"target": round(L.tagged_value(entries, unit) * per[unit], 1), "base": round(base, 1), "from": unit}
+    out = {"weight_from": weight_from, "units": {u: round(k, 4) for u, k in per.items()}, "classes": {}}
+    for cls, w in want.get("classes", {}).items():
+        base = geo["classes"].get(cls)
+        if base is None:
+            continue
+        row = {k: r for k in HANGUL_LENGTHS if (r := length(w.get(k), base.get(k, geo.get(k))))}
+        if "face_h" not in row and (r := L.tagged_value(w.get("face_h_h1"), "ratio")):
+            row["face_h"] = {"target": round(r * h1["face_h"], 1), "base": round(base["face_h"], 1), "from": "ratio"}
+        if "face_w" not in row and "face_h" in row and (r := L.tagged_value(w.get("aspect"), "ratio")):
+            row["face_w"] = {"target": round(r * row["face_h"]["target"], 1), "base": round(base["face_w"], 1),
+                             "from": "ratio"}
+        out["classes"][cls] = row
+    for key in ("stem", "adv"):
+        if r := length(want.get(key), geo.get(key)):
+            out[key] = r
+    ratio = L.tagged_value(want.get("stem_h1"), "ratio")
+    if ratio and geo["stem"]:
+        out["stem_h1"] = {"target": ratio, "got": round(geo["stem"] / h1["face_h"], 4)}
+        out.setdefault("stem", {"target": round(ratio * h1["face_h"], 1), "base": round(geo["stem"], 1),
+                                "from": "ratio"})
+    return out
 
 
 def class_mean(face, chars):
@@ -294,19 +359,36 @@ def fit_style(B, T, style, args, log):
     tg = T["targets"]
     fixed = parse_loc(args.loc)
     first = T["styles"][0]
-    # Stem target: the style's own. Else find the base weight that draws the first style's stem, step it by the
-    # difference in weight class (500 - 400 = +100), and take the stem the base draws there.
-    stem_t = style.get("n_stem")
-    if stem_t is None and "wght" in B.axes:
-        cap = B.tiny(fixed, "nHx").bounds("H")[3]
-        w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
-        w2 = min(max(w1 + style["weight"] - first["weight"], B.axes["wght"][0]), B.axes["wght"][2])
+    step = style["weight"] - first["weight"]
+    hangul_ratio = L.tagged_value((T.get("hangul") or {}).get("stem_h1"), "ratio")
+    # Stem target: the style's own. Else find the base weight that draws the first style's stem (the Latin n stem,
+    # or without one the Hangul stem ratio), step it by the difference in weight class (500 - 400 = +100), and
+    # take the stem the base draws there.
+    stem_t, hangul_w, weight_from = style.get("n_stem"), None, "n_stem"
+    if stem_t is None and "wght" in B.axes and (first.get("n_stem") or hangul_ratio):
+        lo, _, hi = B.axes["wght"]
+        if first.get("n_stem"):
+            cap = B.tiny(fixed, "nHx").bounds("H")[3]
+            w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
+        else:
+            w1 = solve_hangul_wght(B, fixed, hangul_ratio)
+            weight_from = "stem_h1"
+        w2 = round(min(max(w1 + step, lo), hi), 2)
         stem_t = L.stem_cap700(B.tiny({**fixed, "wght": w2}, "nHx"))
-        log.append(f"{style['name']}: n stem target {stem_t:.1f}: the first style sits at wght {w1:.0f} on the base, "
-                   f"this one {style['weight'] - first['weight']:+d} from it at wght {w2:.0f}")
-    elif stem_t is None:
-        stem_t = first["n_stem"]
+        if weight_from == "stem_h1":
+            hangul_w = w2
+        if step:
+            weight_from += ", stepped from the first style"
+        source = f"the Hangul stem ratio {hangul_ratio}" if hangul_w else "the n stem"
+        log.append(f"{style['name']}: n stem target {stem_t:.1f}: the first style sits at wght {w1:.0f} on the base "
+                   f"(solved from {source}), this one {step:+d} from it at wght {w2:.0f}")
+    elif stem_t is None and "wght" not in B.axes:
+        stem_t = first.get("n_stem") or L.stem_cap700(B.tiny(fixed, "nHx"))
+        weight_from = "the base, which has no weight axis"
         log.append(f"{style['name']}: the base has no weight axis, so it keeps the first style's stem")
+    elif stem_t is None:
+        raise SystemExit(f"{style['name']}: targets.json has neither a Latin n stem nor a Hangul stem ratio (stem_h1) "
+                         "to solve the weight from. Measure a reference with n, or with 이, 니 and 미.")
     else:
         log.append(f"{style['name']}: n stem target {stem_t:.1f}")
     # 1. y instance
@@ -316,8 +398,11 @@ def fit_style(B, T, style, args, log):
         tries = [{**fixed, "opsz": round(lo + (hi - lo) * i / 8, 2)} for i in range(9)]
     best = None
     for loc in tries:
-        cap = B.tiny(loc, "nHx").bounds("H")[3]
-        loc = solve_wght(B, loc, "n", stem_t * cap / L.CAP)
+        if hangul_w is None:
+            cap = B.tiny(loc, "nHx").bounds("H")[3]
+            loc = solve_wght(B, loc, "n", stem_t * cap / L.CAP)
+        else:
+            loc = {**loc, "wght": hangul_w}
         m = L.measure_face(B.tiny(loc))
         err = sum(((m.get(k) or 0) - tg[k]) ** 2 / s ** 2 for k, s in (("contrast", 0.04), ("bar_stem", 0.06), ("xh_cap", 0.01))
                   if tg.get(k) is not None)
@@ -396,12 +481,16 @@ def fit_style(B, T, style, args, log):
         space_font.respace(f, tg, slog)
         alog.append(f"class sidebearings set inside the fit: moves {slog.get('side_moves')}")
     log.extend(alog)
+    hangul = resolve_hangul(B, yloc, T, weight_from) if T.get("hangul") else None
     notes = finish(f, T.get("cap_em"), T.get("vmetrics"))
     log.extend(notes)
     stuck = [c for c, e in hist[-1]["error_pct"].items() if abs(e) > args.tol]
-    return f, {"style": style, "n_stem_target": round(stem_t, 1), "y_location": yloc, "x_locations": xloc,
-               "factors": factor, "iterations": hist, "stretch_limit_hit": stuck,
-               "classes_measured": {c: L.CLASSES[c] for c in widths}}
+    info = {"style": style, "n_stem_target": round(stem_t, 1), "y_location": yloc, "x_locations": xloc,
+            "factors": factor, "iterations": hist, "stretch_limit_hit": stuck,
+            "classes_measured": {c: L.CLASSES[c] for c in widths}}
+    if hangul:
+        info["hangul"] = hangul
+    return f, info
 
 
 def main():
@@ -435,6 +524,9 @@ def main():
     sub, sub_rec = make_subset(files, base, T.get("scripts", ["latin"]), a.out_dir)
     print(f"subset of the approved base: {len(sub.getGlyphOrder())} glyphs, {sub_rec['file']}")
     B = Base(sub)
+    if T.get("hangul") and not all(sub.getBestCmap().get(ord(c)) for c in L.HANGUL_CLASSES["H1"] + L.HANGUL_STEM):
+        raise C.Refused(f"{a.targets} has Hangul targets, and the subset of the base lacks the H1 syllables "
+                        f"{L.HANGUL_CLASSES['H1']}: the targets' scripts need korean, and the base needs Hangul")
     out = {"base": os.path.basename(a.base), "base_axes": B.axes, "targets": os.path.basename(a.targets),
            "subset": sub_rec, "styles": []}
     written = []
@@ -452,6 +544,14 @@ def main():
         last = info["iterations"][-1]
         print(f"  width fit after {last['iteration']} pass(es), error % by class: {last['error_pct']}")
         print(f"  factors: {info['factors']}")
+        if "hangul" in info:
+            h = info["hangul"]
+            print(f"  hangul: weight from {h['weight_from']}"
+                  + (f"; stem / H1 face height {h['stem_h1']['got']} (target {h['stem_h1']['target']})"
+                     if "stem_h1" in h else ""))
+            for cls, row in h["classes"].items():
+                print(f"    {cls}: " + ", ".join(f"{k} {r['target']} from {r['from']} (base {r['base']})"
+                                              for k, r in row.items() if k in ("face_w", "face_h")))
         if info["stretch_limit_hit"]:
             print(f"  stretch limit reached for {info['stretch_limit_hit']}: the base cannot reach these widths "
                   f"within {a.max_stretch * 100:.0f} %. Say so, or pick a base with a width axis.")

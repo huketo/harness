@@ -18,8 +18,15 @@ reads advances (n-X-n and H-X-H contexts) and sidebearings (nn, no, HH, HO). Fro
 vertical proportions, stems and contrast only. Each number gets a confidence: high, medium or low. Pixel edges
 are read at sub-pixel precision from the anti-aliasing, so the error is about half a pixel per edge.
 
---selftest renders the sample lines from an open font, measures the pixels and the file, and prints the
-error per number. Run it once at the screenshot's cap height to see what a screenshot can be trusted for.
+A line with Hangul in it is cut into syllables by columns of ink instead, since a syllable is drawn in several
+parts: the six lines of fontlib.SAMPLE_LINES_KO set each measured syllable between two 으, and the ink between
+two anchors is one syllable. A line without the anchors is cut at its widest gaps, only when they stand clearly
+apart from the gaps inside a syllable; otherwise the script stops. Hangul numbers are ratios, plus lengths at
+cap height 700 when a Latin H in the same screenshot sets the scale. A screenshot of Hangul alone needs no H.
+
+--selftest renders the sample lines from an open font (the Latin ones, the Korean ones, or both, as the font
+has them), measures the pixels and the file, and prints the error per number. Run it once at the screenshot's
+size to see what a screenshot can be trusted for.
 """
 import argparse
 import os
@@ -33,6 +40,7 @@ import numpy as np  # noqa: E402
 import fontlib as L  # noqa: E402
 
 FLAT_BOTTOM = set("nhmxirklHNIEFLTBDKMPRXZ")
+GAP_APART = 1.5  # without anchors, the narrowest cut must be this many times the widest gap left inside a syllable
 
 
 # ------------------------------------------------------------------ pixels
@@ -146,7 +154,7 @@ def _runs(line):
     return out
 
 
-def split_lines(cov):
+def split_lines(cov, count=None):
     rows = (cov > 0.5).any(axis=1)
     d = np.diff(np.concatenate(([0], rows.astype(np.int8), [0])))
     bands = list(zip(np.where(d == 1)[0], np.where(d == -1)[0]))
@@ -160,6 +168,19 @@ def split_lines(cov):
             merged[-1] = (merged[-1][0], b)
         else:
             merged.append((a, b))
+    # A Hangul syllable is drawn in parts with blank rows between them (a final under the vowel), and when every
+    # syllable of a line has them there, the line reads as two bands. With more bands than `count` lines, join
+    # across the narrowest gaps, when they stand clearly apart from the gaps kept between the lines.
+    if count and len(merged) > count:
+        gaps = [merged[i + 1][0] - merged[i][1] for i in range(len(merged) - 1)]
+        order = sorted(range(len(gaps)), key=lambda i: gaps[i])
+        join, keep = set(order[:len(merged) - count]), order[len(merged) - count:]
+        wide = max(gaps[i] for i in join)
+        if not keep or min(gaps[i] for i in keep) >= max(GAP_APART * wide, wide + 2):
+            joined = merged[:1]
+            for i, band in enumerate(merged[1:]):
+                joined[-1:] = [(joined[-1][0], band[1])] if i in join else [joined[-1], band]
+            merged = joined
     return merged
 
 
@@ -203,21 +224,151 @@ def _spread(ls, chars):
     return sum(st.pstdev(v) for v in w.values() if len(v) > 1)
 
 
+# ------------------------------------------------------------------ Hangul lines
+def column_groups(comps):
+    """Ink joined by columns, left to right: components whose columns overlap or touch are one group, so a group
+    ends at a column without ink. Returns [(first column, last column, components)]."""
+    groups = []
+    for c in sorted(comps, key=lambda c: c[1].min()):
+        x0, x1 = c[1].min(), c[1].max()
+        if groups and x0 <= groups[-1][1] + 1:
+            g = groups[-1]
+            groups[-1] = (g[0], max(g[1], x1), g[2] + [c])
+        else:
+            groups.append((x0, x1, [c]))
+    return groups
+
+
+def _shape(group, cov):
+    """A group's width, height and top row, and its ink summed by column and by row."""
+    x0, x1, comps = group
+    ys = np.concatenate([c[0] for c in comps])
+    box = cov[ys.min():ys.max() + 1, x0:x1 + 1]
+    return x1 - x0 + 1, ys.max() - ys.min() + 1, ys.min(), box.sum(axis=0), box.sum(axis=1)
+
+
+def _correlation(p, q):
+    q = np.interp(np.linspace(0, 1, len(p)), np.linspace(0, 1, len(q)), q)
+    p, q = p - p.mean(), q - q.mean()
+    d = float(np.sqrt((p * p).sum() * (q * q).sum()))
+    return float((p * q).sum()) / d if d else 0.0
+
+
+def _same_glyph(s, a):
+    """Whether a group drawn like s is the glyph a: the same box on the same line, and the same ink profiles."""
+    def near(u, v):
+        return abs(u - v) <= max(2, 0.06 * v)
+    return (near(s[0], a[0]) and near(s[1], a[1]) and abs(int(s[2]) - int(a[2])) <= 2
+            and _correlation(a[3], s[3]) > 0.9 and _correlation(a[4], s[4]) > 0.9)
+
+
+def hangul_letters(cov, chars, text):
+    """One Letter per character of a line with Hangul in it, and how the line was cut: "anchors" or "gaps".
+
+    In the 으 X 으 form the first group of ink is an anchor, every group drawn like it is one, and the ink between
+    two anchors is one syllable, whatever its gaps. Otherwise, or when the anchors found do not fit the text, the
+    line is cut at its len(chars) - 1 widest gaps, and refused unless those stand clearly apart from the rest."""
+    comps = components(cov > 0.15)
+    if comps:
+        med = st.median(len(c[0]) for c in comps)
+        comps = [c for c in comps if len(c[0]) > med * 0.01]  # specks
+    groups = column_groups(comps)
+    a, n = L.HANGUL_ANCHOR, len(chars)
+
+    def letters(bounds):
+        return [Letter([c for g in groups[i:j] for c in g[2]], cov) for i, j in zip(bounds, bounds[1:])]
+    anchored = n >= 3 and n % 2 and set(chars[0::2]) == {a} and a not in chars[1::2]
+    if anchored and groups:
+        ref = _shape(groups[0], cov)
+        at = [i for i, g in enumerate(groups) if _same_glyph(_shape(g, cov), ref)]
+        if (len(at) == (n + 1) // 2 and at[-1] == len(groups) - 1
+                and all(j - i >= 2 for i, j in zip(at, at[1:]))):
+            return letters(sorted({0, len(groups)} | {i for k in at for i in (k, k + 1)})), "anchors"
+    if len(groups) < n:
+        raise SystemExit(f"line {text!r}: {len(groups)} groups of ink for {n} characters, so some touch. Set the "
+                         f"text larger or looser, or type the {a} X {a} lines (fontlib.SAMPLE_LINES_KO).")
+    gaps = [int(groups[i + 1][0] - groups[i][1] - 1) for i in range(len(groups) - 1)]
+    order = sorted(range(len(gaps)), key=lambda i: -gaps[i])
+    cut, inner = sorted(order[:n - 1]), [gaps[i] for i in order[n - 1:]]
+    if cut and inner:
+        narrow, wide = min(gaps[i] for i in cut), max(inner)
+        if narrow < max(GAP_APART * wide, wide + 2):
+            why = f"its {a} anchors were not found" if anchored else f"it has no {a} anchors"
+            raise SystemExit(f"line {text!r}: {why}, and its gaps do not fall in two groups: the "
+                             f"narrowest gap between syllables would be {narrow} px and the widest inside one "
+                             f"{wide} px, so the syllables cannot be told apart. Type the {a} X {a} lines "
+                             "(fontlib.SAMPLE_LINES_KO), or set the text looser.")
+    return letters([0, *(i + 1 for i in cut), len(groups)]), "gaps"
+
+
+class ImageInk:
+    """Syllables read from a screenshot, for fontlib.hangul_geometry: pixels, with rows negated so y points up."""
+
+    def __init__(self, letters):
+        self.letters = letters
+
+    def has(self, ch):
+        return ch in self.letters
+
+    def bounds(self, ch):
+        t = self.letters[ch]
+        return t.left(), -t.bottom(), t.right(), -t.top()
+
+    def hspans(self, ch, y):
+        return [(a, b) for a, b, _ in self.letters[ch].hruns(-y)]
+
+    def vspans(self, ch, x):
+        return [(-b, -a) for a, b, _ in reversed(self.letters[ch].vruns(x))]
+
+
+def measure_hangul(lines, k, cut_at):
+    """The hangul object from the Hangul lines. k turns pixels into cap700 units when a Latin H set the scale. The
+    distance from one anchor to the next is reported per class, never a target: it holds the pair's kerning."""
+    a = L.HANGUL_ANCHOR
+    seen, pitch = {}, {}
+    for ls, _ in lines:
+        for i, t in enumerate(ls):
+            seen.setdefault(t.ch, t)
+            cls = L.hangul_class(t.ch)
+            if cls and 0 < i < len(ls) - 1 and ls[i - 1].ch == a == ls[i + 1].ch:
+                pitch.setdefault(cls, []).append(ls[i + 1].left() - ls[i - 1].left())
+    geo = L.hangul_geometry(ImageInk(seen), font=False)
+    if not geo["classes"]:
+        return None
+    geo["pitch"] = {cls: st.mean(v) for cls, v in pitch.items()}
+    face_px = (geo["classes"].get("H1") or next(iter(geo["classes"].values())))["face_h"]
+
+    def conf(kind, px):
+        if kind == "stroke":
+            return conf_px(px)
+        if kind == "edge":
+            return "low" if face_px < 120 else "medium"
+        return "high" if px >= 60 else "medium" if px >= 30 else "low"
+    h = L.hangul_measurement(geo, {"cap700": k} if k else {}, conf)
+    h["cut_at"] = cut_at
+    return h
+
+
 # ------------------------------------------------------------------ measuring
 def conf_px(px):
     return "high" if px >= 6 else "medium" if px >= 3 else "low"
 
 
 def measure_lines(cov, texts):
-    bands = split_lines(cov)
+    bands = split_lines(cov, len(texts))
     if len(bands) != len(texts):
         raise SystemExit(f"found {len(bands)} lines of ink, --text has {len(texts)}. Crop or fix --text.")
-    lines, joined = [], []
+    lines, joined, hangul, cut_at = [], [], [], []
     for (a, b), text in zip(bands, texts):
         pad = 2
         sub = cov[max(a - pad, 0):b + pad]
-        ls = letters_of(sub)
         chars = [c for c in text if not c.isspace()]
+        if any(L.hangul_class(c) for c in chars):
+            ls, how = hangul_letters(sub, chars, text)
+            hangul.append(len(lines))
+            cut_at.append(how)
+        else:
+            ls = letters_of(sub)
         # A letter drawn in detached parts (some k, some fractions) reads as two. Join the closest neighbours,
         # the pair with the most overlap, until the count fits, and say so.
         while len(ls) > len(chars) > 0:
@@ -246,6 +397,10 @@ def measure_lines(cov, texts):
         return None, None
 
     H, bH = first("H")
+    hangul = [lines[i] for i in hangul]
+    if H is None and hangul and len(hangul) == len(lines):
+        return {"source": "image", "cap_em": None, "px_cap": None, "confidence": {},
+                "hangul": measure_hangul(hangul, None, cut_at), "letters_read": len(every)}
     if H is None:
         raise SystemExit("an H is needed to set the scale (cap height 700). Add one to the text.")
     cap_px = bH - H.top()
@@ -383,27 +538,58 @@ def measure_lines(cov, texts):
             C["side_" + key] = "medium"
     if m.get("n_counter") and sides.get("lc_straight") is not None:
         put("rhythm", 2 * sides["lc_straight"] / m["n_counter"], "medium")
+    if hangul:
+        m["hangul"] = measure_hangul(hangul, k, cut_at)
     m["letters_read"] = len(every)
     m["joined_parts"] = len(joined)
     return m
 
 
-def selftest(font, px, out_dir):
-    import fontlib
-    face = L.Face(font, subset_text=L.MEASURE_TEXT)
-    os.makedirs(out_dir, exist_ok=True)
-    rows = []
+def render_sheet(face, lines, px, path):
+    """The lines drawn from the face's outlines, one under another, as a greyscale PNG at px pixels per em."""
     gap = int(px * 0.6)
-    for line in L.SAMPLE_LINES:
-        cov, base, s = fontlib.rasterize(face, line, px, pad=gap // 2)
-        rows.append(cov)
+    rows = [L.rasterize(face, line, px, pad=gap // 2)[0] for line in lines]
     w = max(r.shape[1] for r in rows)
-    sheet = np.vstack([np.pad(r, ((0, 0), (0, w - r.shape[1]))) for r in rows])
-    path = os.path.join(out_dir, "selftest-sheet.png")
-    L.save_png(sheet, path)
-    got = measure_lines(load_coverage(path), L.SAMPLE_LINES)
-    want = L.measure_face(face)
+    L.save_png(np.vstack([np.pad(r, ((0, 0), (0, w - r.shape[1]))) for r in rows]), path)
+    return path
+
+
+def compare_hangul(want, got):
+    """The screenshot's Hangul numbers beside the file's, per class, in each unit both have."""
+    def rows(name, w, g):
+        for e in g or []:
+            f = next((v["value"] for v in w or [] if v["unit"] == e["unit"]), None)
+            if f:
+                print(f"  {name:16s} {e['unit']:6s} {f:8.3f} {e['value']:8.3f} {(e['value'] / f - 1) * 100:+7.2f}%  "
+                      f"{e['confidence']}")
+    print(f"  {'hangul':16s} {'unit':6s} {'file':>8s} {'image':>8s} {'error':>8s}  confidence")
+    for cls, c in want["classes"].items():
+        for key in ("face_w", "face_h", "aspect", "face_w_h1", "face_h_h1"):
+            rows(f"{cls} {key}", c.get(key), got["classes"].get(cls, {}).get(key))
+    for key in ("stem", "stem_h1"):
+        rows(key, want.get(key), got.get(key))
+    for key in ("hstroke", "hstroke_h1", "overshoot", "contrast"):
+        rows(f"report {key}", want["report"].get(key), got["report"].get(key))
+
+
+def selftest(font, px, out_dir):
+    face = L.Face(font, subset_text=L.MEASURE_TEXT + L.HANGUL_TEXT)
+    latin = all(face.has(c) for c in "".join(L.SAMPLE_LINES) if not c.isspace())
+    hangul = all(face.has(c) for c in "".join(L.SAMPLE_LINES_KO))
+    lines = (L.SAMPLE_LINES if latin else []) + (L.SAMPLE_LINES_KO if hangul else [])
+    if not lines:
+        raise SystemExit(f"{font} has neither every letter of fontlib.SAMPLE_LINES nor of SAMPLE_LINES_KO")
+    os.makedirs(out_dir, exist_ok=True)
+    path = render_sheet(face, lines, px, os.path.join(out_dir, "selftest-sheet.png"))
+    got = measure_lines(load_coverage(path), lines)
     print(f"selftest: {os.path.basename(font)} at {px}px per em, cap {got['px_cap']} px, sheet {path}")
+    if hangul:
+        lengths = {"cap700": L.CAP / face.bounds("H")[3]} if latin else {}
+        compare_hangul(L.hangul_measurement(L.hangul_geometry(face), {**lengths, "em1000": 1000 / face.upm}),
+                       got["hangul"])
+    if not latin:
+        return got
+    want = L.measure_face(face)
     print(f"  {'key':14s} {'file':>8s} {'image':>8s} {'error':>8s}  confidence")
     worst = 0.0
     for key in ("xh", "asc", "desc", "n_stem", "H_stem", "H_bar", "o_side", "o_thin", "contrast", "serif_ext",
@@ -453,6 +639,8 @@ def main():
             print("  widths", m["widths"])
         if "sides" in m:
             print("  sides ", m["sides"])
+        if m.get("hangul"):
+            print("\n".join(L.hangul_summary(m["hangul"])))
     if a.out:
         L.save_json(m, a.out)
 

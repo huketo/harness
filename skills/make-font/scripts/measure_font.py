@@ -11,6 +11,10 @@
           variable font with a reference at the same colour.
 Lengths are in cap-normalised units (cap height 700). The JSON also keeps cap_em, the real cap height per
 1000 em, and the font's vertical metrics. Every number is a font-wide value or a class mean.
+
+A font with Hangul syllables also gets a `hangul` object: per structural class (H1 to H6) the face size, centre,
+sides and advance, the vertical stem and the report-only numbers, each value tagged with its unit (cap700 when the
+font has a Latin H, em1000 always, ratio). A font without the Latin letters gets the Hangul numbers alone.
 """
 import argparse
 import json
@@ -23,6 +27,8 @@ from fontTools.ttLib import TTFont  # noqa: E402
 
 import fontlib as L  # noqa: E402
 
+LATIN_NEEDED = "Hxno"  # measure_face's scale and core cuts; a font without them is measured for Hangul only
+
 
 def parse_loc(s):
     if not s:
@@ -34,14 +40,24 @@ def measure_path(path, loc=None, stem=None):
     f = TTFont(path)
     axes = L.axes_of(f)
     loc = dict(loc or {})
-    small = L.subset_font(f, L.MEASURE_TEXT)
+    cmap = f.getBestCmap()
+    latin = all(ord(c) in cmap for c in LATIN_NEEDED)
+    if stem and not latin:
+        raise SystemExit(f"--stem solves the Latin n stem, and {path} has no {LATIN_NEEDED}")
     if stem and "wght" in axes:
         lo, hi = axes["wght"][0], axes["wght"][2]
         quick = L.subset_font(f, "nHx", layout=False)
         w, got = L.solve_axis(lambda v: L.Face(quick, {**loc, "wght": v}), L.stem_cap700, stem, lo, hi)
         loc["wght"] = round(w, 1)
-    face = L.Face(small, loc if axes else None)
-    m = L.measure_face(face)
+    if latin:
+        m = L.measure_face(L.Face(L.subset_font(f, L.MEASURE_TEXT), loc if axes else None))
+    else:
+        m = {"source": "file", "cap_em": None, "vmetrics": L.vmetrics(f), "confidence": {}}
+    if any(ord(c) in cmap for c in L.HANGUL_TEXT):
+        hface = L.Face(L.subset_font(f, L.HANGUL_TEXT + "H", layout=False), loc if axes else None)
+        lengths = {"cap700": L.CAP / hface.bounds("H")[3]} if latin else {}
+        lengths["em1000"] = 1000 / hface.upm
+        m["hangul"] = L.hangul_measurement(L.hangul_geometry(hface), lengths)
     m["file"] = os.path.basename(path)
     m["loc"] = loc
     m["axes"] = axes
@@ -63,10 +79,15 @@ def main():
     keys = ["cap_em", "xh", "xh_cap", "asc", "desc", "overshoot_lc", "n_stem", "H_stem", "H_bar", "o_side", "o_thin",
             "contrast", "bar_stem", "serif", "serif_ext", "serif_tip", "n_counter", "rhythm", "lc_avg", "uc_avg", "space", "para"]
     print(f"{m['file']}  loc {m['loc'] or 'default'}")
-    for k in keys:
-        print(f"  {k:13s} {m.get(k)}")
-    print("  widths       ", json.dumps(m["widths"]))
-    print("  sides        ", json.dumps(m["sides"]))
+    if "widths" in m:
+        for k in keys:
+            print(f"  {k:13s} {m.get(k)}")
+        print("  widths       ", json.dumps(m["widths"]))
+        print("  sides        ", json.dumps(m["sides"]))
+    else:
+        print("  no Latin H, x, n and o: Latin not measured")
+    if "hangul" in m:
+        print("\n".join(L.hangul_summary(m["hangul"])))
 
 
 if __name__ == "__main__":

@@ -79,3 +79,44 @@ follow x.
 The first style's stem comes from the measurement. Other styles take an explicit stem (`--style Medium:500:88`)
 or keep the base's own stem ratio between the two weights. Each style gets its own y instance and class instances.
 All styles share the vertical metrics, so they can mix in one line.
+
+## Hangul
+
+When `targets.json` has a `hangul` object (`references/measuring.md`, its last table), the targets' scripts
+must have `korean`, so the subset keeps the base's Hangul. This version fits the weight from Hangul and states
+every other Hangul target; it moves no Hangul glyph. The Hangul takes its outlines from the y instance, so it
+keeps the base's sizes, centres and spacing at the weight the fit chose.
+
+**Weight.** A style with an n stem, or after a first style with one, solves the weight from Latin as above. When
+the targets have no Latin n stem, the first style's wght is solved from `stem_h1`: the base's vertical stem
+(ㅣ in 이 니 미) over its H1 mean face height meets the reference's ratio. The face height moves a little with
+the weight, so each try reads both at the same wght. Each later style starts from that wght and moves by its
+weight-class difference (Bold 700 after Regular 400: +300), clamped to the axis. Targets with neither an n stem
+nor `stem_h1` are refused. Without a Latin target, the Latin takes the wght the Hangul chose, which keeps the
+base's own balance between the two.
+
+**Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
+there, and only then does `finish()` scale the em, once, at the end:
+
+- `cap700`: value × the y instance's cap height / 700.
+- `em1000`: value × the finished font's em / 1000. That em is the y instance's cap height over `cap_em` when a
+  file gave one, else the base's em.
+- `ratio`: never turned into a cap length. `face_h_h1` multiplies the base's own H1 face height at the y instance,
+  `aspect` that height, `stem_h1` the same H1 height. A screenshot of Hangul alone so keeps the base's Hangul
+  scale, centre heights and advances, and gives shapes and the weight only.
+
+A key with a length uses `cap700` first, then `em1000`; the ratios fill in where no length was measured.
+`finish()` scales x and y alike, so a ratio to the cap height survives it (checked by measuring the fitted font).
+The saved font rounds every point to a whole unit, so a stem lands up to a unit from the solve: about 1 % of an
+80-unit stem at 1000 units per em.
+
+`fit-log.json` records this under each style's `hangul`:
+
+| Field | Value |
+|-|-|
+| `weight_from` | `n_stem` or `stem_h1`, with ", stepped from the first style" after the first |
+| `units` | font units of the y instance per `cap700` and per `em1000` unit |
+| `classes.Hn.<key>` | `{"target", "base", "from"}` in font units of the y instance, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in |
+| `stem`, `adv` | the same, font-wide (`adv` for fixed-width Hangul) |
+| `stem_h1` | `{"target", "got"}`: the ratio aimed at, and the base's at the chosen wght |
+

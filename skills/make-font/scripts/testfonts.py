@@ -7,6 +7,7 @@
 No downloaded font is used. Every font here is made of rectangles, so its numbers are known: cap height 700,
 x-height 500, an n with two stems, an o and an O with a hole, a b that rises to 740 and a p that falls to -220
 (the font book reads its ascender and descender from them), and a weight axis that thickens the stems.
+hangul_vf adds every Hangul syllable fontlib measures, each class drawn as a consonant ring, a vowel and a final.
 """
 import os
 import re
@@ -17,6 +18,8 @@ from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
+
+import fontlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE_FAMILY = "Lumen Ledger"
@@ -225,6 +228,94 @@ def glyf_vf(path, family=BASE_FAMILY, copyright_line="Copyright 2026 The Lumen L
     fb.setupGvar(variations)
     fb.save(path)
     return path
+
+
+HANGUL_UPM = 1250  # not 1000, so a length per 1000 em (x 0.8) and at cap height 700 (x 1) differ
+
+
+def _hangul_rects(cls, s, t, top_extra=0):
+    """One syllable of a class at stem s and thin stroke t: a consonant ring, the vowel and, in H4 to H6, a final
+    ring. The vowel's vertical stem rises with the stem, so the face height changes a little with the weight."""
+    def ring(x0, y0, x1, y1):
+        return [(x0, y0, x1, y1, False), (x0 + s, y0 + t, x1 - s, y1 - t, True)]
+    top = 700 + round(s * 1.25)
+    return {
+        "H1": ring(80, 120, 520, 680) + [(640, -60, 640 + s, top, False)],
+        "H2": ring(200, 360, 700, 800 + top_extra) + [(100, 120, 800, 120 + t, False)],
+        "H3": ring(80, 380, 480, 800) + [(60, 160, 660, 160 + t, False), (680, -60, 680 + s, top, False)],
+        "H4": ring(80, 420, 480, 800) + [(600, 300, 600 + s, top, False)] + ring(140, -60, 700, 240),
+        "H5": ring(200, 540, 700, 800) + [(100, 400, 800, 400 + t, False)] + ring(160, -60, 740, 260),
+        "H6": ring(80, 520, 460, 800) + [(60, 420, 600, 420 + t, False), (640, 300, 640 + s, top, False)]
+              + ring(140, -60, 700, 240),
+    }[cls]
+
+
+def _hangul_glyphs(stem, chars, adv):
+    s, t = stem, round(stem * 0.8)
+    out = {}
+    for ch in chars:
+        cls = fontlib.hangul_class(ch)
+        rects = _hangul_rects(cls, s, t, top_extra=12 if ch == fontlib.HANGUL_OVERSHOOT[0] else 0)
+        pen = TTGlyphPen(None)
+        for r in rects:
+            _rect(pen, *r)
+        out[f"uni{ord(ch):04X}"] = (pen.glyph(), adv)
+    return out
+
+
+def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY):
+    """A TrueType variable font with a weight axis 100-900 (stems 40, 80 at 400, 160), the Latin glyphs of glyf_vf
+    when latin is true, and every syllable fontlib measures, drawn from rectangles by class. Its em is HANGUL_UPM,
+    its cap height 700, and every syllable `adv` units wide. At wght 400 the H1 face is 640 wide and 860 tall, the
+    stem 80."""
+    chars = sorted(set(fontlib.HANGUL_TEXT))
+
+    def master(stem):
+        glyphs, advs = _ttglyphs(stem) if latin else ({}, {})
+        if not latin:
+            for name, (a, rects) in _shapes(stem).items():
+                if name in (".notdef", "space"):
+                    pen = TTGlyphPen(None)
+                    for r in rects:
+                        _rect(pen, *r)
+                    glyphs[name], advs[name] = pen.glyph(), a
+        for name, (g, a) in _hangul_glyphs(stem, chars, adv).items():
+            glyphs[name], advs[name] = g, a
+        return glyphs, advs
+    glyphs, advs = master(80)
+    order = [n for n in ORDER if n in glyphs] + [f"uni{ord(c):04X}" for c in chars]
+    cmap = {cp: n for cp, n in CMAP.items() if n in glyphs}
+    cmap.update({ord(c): f"uni{ord(c):04X}" for c in chars})
+    fb = FontBuilder(HANGUL_UPM, isTTF=True)
+    fb.setupGlyphOrder(order)
+    fb.setupCharacterMap(cmap)
+    fb.setupGlyf(glyphs)
+    fb.setupHorizontalMetrics({n: (advs[n], glyphs[n].xMin if glyphs[n].numberOfContours else 0) for n in order})
+    _finish(fb, family, "Copyright 2026 The Lumen Ledger Project Authors", OFL_NOTICE, None)
+    fb.setupFvar(axes=[("wght", 100, 400, 900, "Weight")], instances=[])
+    heavy, _ = master(160)
+    light, _ = master(40)
+    variations = {}
+    for n in order:
+        if not glyphs[n].numberOfContours:
+            continue
+        base = list(glyphs[n].coordinates)
+        tv = []
+        for other, region in ((heavy[n], {"wght": (0, 1.0, 1.0)}), (light[n], {"wght": (-1.0, -1.0, 0)})):
+            d = [(q[0] - p[0], q[1] - p[1]) for p, q in zip(base, other.coordinates)] + [(0, 0)] * 4
+            tv.append(TupleVariation(region, d))
+        variations[n] = tv
+    fb.setupGvar(variations)
+    fb.save(path)
+    return path
+
+
+def instance(src, dst, wght):
+    """The static font of a variable font at one weight."""
+    from fontTools.ttLib import TTFont
+    from fontTools.varLib import instancer
+    instancer.instantiateVariableFont(TTFont(src), {"wght": wght}).save(dst)
+    return dst
 
 
 def glyf_static(path, family=BASE_FAMILY, notice=OFL_NOTICE):
