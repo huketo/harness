@@ -80,7 +80,7 @@ class Transform(StepsRan, Scratch):
         super().setUpClass()
         p = cls.p
         cls.base = T.hangul_vf(p("LumenLedger[wght].ttf"), latin=True, jamo="ㄱㅏ", composite="가니")
-        assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
+        cls.skill = T.approve_pinned(cls.dir, cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json"))
         T.instance(T.hangul_vf(p("ref.ttf"), latin=True, scale=1.2), p("ref-400.ttf"), 400)
         cls.runs["measure"] = T.run("measure_font.py", p("ref-400.ttf"), "--out", p("m-ref.json"))
         m = load(p("m-ref.json"))
@@ -91,7 +91,7 @@ class Transform(StepsRan, Scratch):
                                     "latin,korean", "--style", "Regular:400", "--style", "Bold:700", "--out",
                                     p("targets.json"))
         cls.runs["fit"] = T.run("fit_font.py", cls.base, p("targets.json"), "--base-json", p("base.json"), "--out-dir",
-                                p("build"))
+                                p("build"), skill=cls.skill)
         cls.log = load(p("build", "fit-log.json"))
         cls.subset = TTFont(p("build", "subset", "base.subset.ttf"))
 
@@ -172,7 +172,10 @@ class Transform(StepsRan, Scratch):
         self.assertAlmostEqual(stem["base"] * sx / stem["target"], 1, delta=0.01)
         self.assertAlmostEqual(stem["fitted"] / stem["target"], 1, delta=0.015)
         self.assertGreater(h["location"]["wght"], first["y_location"]["wght"] + 30)
-        self.assertEqual(second["hangul"]["weight_from"], "n_stem, stepped from the first style")
+        self.assertEqual(h["weight_from"], "stem cap700")  # the Hangul's own stem, not the Latin n the y came from
+        self.assertNotIn("stepped_from", h)
+        self.assertEqual(second["hangul"]["weight_from"], "stem cap700, stepped from the first style's Hangul location")
+        self.assertEqual(second["hangul"]["stepped_from"], {"style": "Regular", "location": h["location"]})
         self.assertAlmostEqual(second["hangul"]["location"]["wght"], h["location"]["wght"] + 300, delta=0.01)
         self.assertEqual(second["hangul"]["transform"], h["transform"])
 
@@ -197,16 +200,34 @@ class Transform(StepsRan, Scratch):
         moved = copy.deepcopy(font)
         g = moved["glyf"]["uniAC01"]
         g.coordinates[0] = (g.coordinates[0][0] - 30, g.coordinates[0][1])
+        inner = copy.deepcopy(font)  # 각: a point of its first ring's counter moved 30 units, the ink box kept
+        g = inner["glyf"]["uniAC01"]
+        box = boxes(inner)["uniAC01"]
+        i = next(i for i, (x, y) in enumerate(g.coordinates) if box[0] < x - 30 and x < box[2] and box[1] < y < box[3])
+        g.coordinates[i] = (g.coordinates[i][0] - 30, g.coordinates[i][1])
+        self.assertEqual(boxes(inner)["uniAC01"], box)
         recomposed = copy.deepcopy(font)  # 니 drawn again from its components, as the base draws it
         recomposed["glyf"]["uniB2C8"] = T._composite([("uniB2C8.a", 0), ("uniB2C8.b", T.COMPONENT_SHIFT)])
-        for case, f, glyph in (("a point moved", moved, "uniAC01"), ("a composite", recomposed, "uniB2C8")):
+        for case, f, glyph in (("a point moved", moved, "uniAC01"), ("an inner point moved, the box kept", inner,
+                                                                        "uniAC01"),
+                               ("a composite", recomposed, "uniB2C8")):
             with self.subTest(case=case):
                 state, detail = rows(f)["every Hangul glyph where the logged transform puts it"]
                 self.assertEqual(state, "FAIL")
                 self.assertIn(glyph, detail)
-        record = copy.deepcopy(s)
-        record["hangul"]["transform"]["classes"]["H2"]["sx"] = 1.2
-        self.assertEqual(rows(font, record)["Hangul transform within the limits"][0], "FAIL")
+        scale = s["hangul"]["transform"]["scale"]
+        for case, where, change in (("x 20 % over", "H2", {"sx": 1.2}),
+                                    ("y 3.09 % over x, x 3 % under y", "H2", {"sx": round(scale * 0.97, 5),
+                                                                               "sy": scale}),
+                                    ("a compatibility jamo moved across", "jamo", {"dx": 5.0}),
+                                    ("a compatibility jamo moved up", "jamo", {"dy": -4.0}),
+                                    ("a compatibility jamo widened", "jamo", {"adv_add": 3.0})):
+            record = copy.deepcopy(s)
+            xf = record["hangul"]["transform"]
+            (xf["jamo"] if where == "jamo" else xf["classes"][where]).update(change)
+            with self.subTest(case=case):
+                state, detail = rows(font, record)["Hangul transform within the limits"]
+                self.assertEqual(state, "FAIL", detail)
 
     def test_weight_harmony_runs_with_a_reference_that_measured_latin(self):
         t = load(self.p("targets.json"))
@@ -223,6 +244,51 @@ class Transform(StepsRan, Scratch):
         check_font.gate_harmony(G, L.Face(font), no_latin)
         self.assertEqual({name: state for _, name, state, _ in G.rows},
                          {"Hangul stem / Latin n stem": "NOT RUN", "Hangul face centre heights": "NOT RUN"})
+
+
+class TransformLimits(unittest.TestCase):
+    """The transform is logged and applied at five decimals, and the numbers logged lie within the limits: checked
+    by fontlib.hangul_transform_over, which fit_font.py and check_font.py both run, and here exactly, on the
+    fractions of the logged decimals."""
+
+    @staticmethod
+    def exact_over(xf):
+        from fractions import Fraction as F
+        s, out = F(str(xf["scale"])), []
+        if abs(s - 1) > F(str(L.HANGUL_SCALE_LIMIT)):
+            out.append("scale")
+        for cls, t in xf["classes"].items():
+            sx, sy = F(str(t["sx"])), F(str(t["sy"]))
+            for name, v in (("x", sx / s), ("y", sy / s), ("larger over smaller", max(sx, sy) / min(sx, sy))):
+                if abs(v - 1) > F(str(L.HANGUL_CLASS_LIMIT)):
+                    out.append(f"{cls} {name} {float(v - 1):+.6%}")
+        return out
+
+    def test_the_rounded_transform_stays_within_the_limits(self):
+        import random
+        import fit_font
+        rnd, bad = random.Random(1), []
+        for _ in range(500):
+            rows = {"classes": {cls: {k: {"target": round(1000 * rnd.uniform(0.85, 1.15), 1), "base": 1000.0,
+                                          "from": "cap700"} for k in ("face_w", "face_h")}
+                                for cls in L.HANGUL_CLASSES}}
+            xf = fit_font.hangul_transform(rows, {"classes": {}})
+            if self.exact_over(xf) or L.hangul_transform_over(xf):
+                bad.append((self.exact_over(xf), L.hangul_transform_over(xf), xf))
+        self.assertEqual(bad[:3], [], f"{len(bad)} of 500 transforms past the limits once rounded")
+
+    def test_the_limits_read_both_ways_and_hold_the_jamo_to_the_one_scale(self):
+        still = {"sx": 1.0, "sy": 1.0, "dx": 0.0, "dy": 0.0, "adv_add": 0.0}
+        xf = {"scale": 1.0, "classes": {cls: dict(still) for cls in L.HANGUL_CLASSES}, "jamo": dict(still)}
+        self.assertEqual(L.hangul_transform_over(xf), [])
+        for case, where, change in (("x 3 % under y", "H2", {"sx": 0.97}), ("y 3 % under x", "H5", {"sy": 0.97}),
+                                    ("jamo off the one scale", "jamo", {"sx": 1.01}),
+                                    ("jamo moved across", "jamo", {"dx": 2.0}), ("jamo moved up", "jamo", {"dy": 1.0}),
+                                    ("jamo widened", "jamo", {"adv_add": -1.0})):
+            moved = copy.deepcopy(xf)
+            (moved["jamo"] if where == "jamo" else moved["classes"][where]).update(change)
+            with self.subTest(case=case):
+                self.assertNotEqual(L.hangul_transform_over(moved), [])
 
 
 class Coverage(unittest.TestCase):
@@ -258,7 +324,7 @@ class Chain(StepsRan, Scratch):
         super().setUpClass()
         p = cls.p
         cls.base = T.hangul_vf(p("LumenLedger[wght].ttf"), latin=True, syllables=L.KS_X_1001, jamo="ㄱㅏ")
-        assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
+        cls.skill = skill = T.approve_pinned(cls.dir, cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json"))
         T.instance(T.hangul_vf(p("ref.ttf"), latin=False), p("ref-500.ttf"), 500)
         measure_image.render_sheet(L.Face(p("ref-500.ttf"), subset_text=L.HANGUL_TEXT), L.SAMPLE_LINES_KO, 200,
                                    p("shot.png"))
@@ -268,20 +334,21 @@ class Chain(StepsRan, Scratch):
         run["targets"] = T.run("make_targets.py", p("m.json"), "--family", T.NEW_FAMILY, "--scripts", "korean",
                                "--out", p("targets.json"))
         chain = ("--base-json", p("base.json"))
-        run["fit"] = T.run("fit_font.py", cls.base, p("targets.json"), *chain, "--out-dir", p("build"))
+        run["fit"] = T.run("fit_font.py", cls.base, p("targets.json"), *chain, "--out-dir", p("build"), skill=skill)
         fit_log = ("--fit-log", p("build", "fit-log.json"))
         run["space"] = T.run("space_font.py", p("build", "TesseraSans-Regular.fit.ttf"), p("targets.json"), "--out",
-                             p("build", "TesseraSans-Regular.ttf"), *chain, *fit_log, "--track", "5")
+                             p("build", "TesseraSans-Regular.ttf"), *chain, *fit_log, "--track", "5", skill=skill)
         space_log = ("--space-log", p("build", "TesseraSans-Regular.ttf.space-log.json"))
         run["package"] = T.run("package.py", p("build", "TesseraSans-Regular.ttf"), "--targets", p("targets.json"),
-                               *chain, *fit_log, *space_log, "--holder", "Synthetic Holder", "--out-dir", p("dist"))
+                               *chain, *fit_log, *space_log, "--holder", "Synthetic Holder", "--out-dir", p("dist"),
+                               skill=skill)
         run["check"] = T.run("check_font.py", p("dist", "ttf", "TesseraSans-Regular.ttf"), "--targets",
                              p("targets.json"), *chain, *fit_log, *space_log, "--package-log",
                              p("dist", "package-log.json"), "--package", p("dist"), "--reference-image", p("shot.png"),
-                             "--reference-text", "|".join(L.SAMPLE_LINES_KO), "--out-dir", p("checks"))
+                             "--reference-text", "|".join(L.SAMPLE_LINES_KO), "--out-dir", p("checks"), skill=skill)
         run["book"] = T.run("font_book.py", p("dist", "ttf", "TesseraSans-Regular.ttf"), "--webfonts",
                             p("dist", "webfonts"), "--targets", p("targets.json"), *fit_log, *space_log,
-                            "--check-report", p("checks", "check-report.json"), "--out-dir", p("book"))
+                            "--check-report", p("checks", "check-report.json"), "--out-dir", p("book"), skill=skill)
 
     def gates(self):
         return {g["gate"]: (g["state"], g["detail"]) for g in load(self.p("checks", "check-report.json"))["gates"]}
@@ -313,6 +380,24 @@ class Chain(StepsRan, Scratch):
         # our lines, set at the screenshot's H1 face height in the font the screenshot shows, are about as long
         self.assertAlmostEqual(sheet.width / shot.width, 1, delta=0.05)
         self.assertGreater(sheet.height, shot.height * 1.8)
+
+    def test_a_fit_log_without_the_hangul_record_fails_the_check(self):
+        p = self.p
+        log = load(p("build", "fit-log.json"))
+        for style in log["styles"]:
+            del style["hangul"]
+        os.makedirs(p("bare"))
+        T.write(p("bare", "fit-log.json"), json.dumps(log, ensure_ascii=False))
+        logs = ("--base-json", p("base.json"), "--fit-log", p("bare", "fit-log.json"), "--space-log",
+                p("build", "TesseraSans-Regular.ttf.space-log.json"))
+        ok(self, T.run("package.py", p("build", "TesseraSans-Regular.ttf"), "--targets", p("targets.json"), *logs,
+                       "--holder", "Synthetic Holder", "--out-dir", p("bare", "dist"), skill=self.skill))
+        r = T.run("check_font.py", p("bare", "dist", "ttf", "TesseraSans-Regular.ttf"), "--targets", p("targets.json"),
+                  *logs, "--package-log", p("bare", "dist", "package-log.json"), "--out-dir", p("bare", "checks"),
+                  skill=self.skill)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        gates = {g["gate"]: g["state"] for g in load(p("bare", "checks", "check-report.json"))["gates"]}
+        self.assertEqual(gates.get("Hangul transform recorded"), "FAIL", gates)
 
     def test_the_package_log_records_each_webfont(self):
         web = load(self.p("dist", "package-log.json"))["webfonts"]

@@ -191,6 +191,53 @@ def read_base(files, font_path, lic_path):
 
 
 SOURCES = ("google-fonts", "manifest", "local")
+MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bases.json")  # the pinned bases for Hangul
+
+
+def pinned_entry(files, source, font, licence):
+    """The bases.json entry a manifest source names, when the font and licence, as read, are the files it pins: the
+    font's sha256 is one of the entry's files', the licence's is the entry's licence's, and the source URL is that
+    file's URL. Anything else is refused, so a base said to come from the pinned manifest is one, byte for byte,
+    whatever a shortlist or a cache held. Returns the entry."""
+    key = source.get("manifest_entry")
+    families = (files.read(MANIFEST, "pinned manifest").json("pinned manifest") or {}).get("families") or {}
+    entry = families.get(key)
+    if entry is None:
+        raise Refused(f"the pinned manifest {MANIFEST} has no entry {key!r} (it has {', '.join(families) or 'none'}). "
+                      "A base from the manifest is a row of find_foundation.py's shortlist.")
+    pinned = next((f for f in entry.get("files") or [] if f.get("sha256") == font.sha256), None)
+    if pinned is None:
+        raise Refused(f"the font {font.path} has sha256 {font.sha256}, and the pinned manifest entry {key} pins "
+                      f"{', '.join(str(f.get('sha256')) for f in entry.get('files') or [])}. It is not the pinned "
+                      "file: download it again with find_foundation.py, whose cache keeps only pinned files.")
+    want = (entry.get("license") or {}).get("sha256")
+    if licence.sha256 != want:
+        raise Refused(f"the licence {licence.path} has sha256 {licence.sha256}, and the pinned manifest entry {key} "
+                      f"pins {want} for its licence. It is not the pinned OFL text.")
+    if source.get("url") != pinned.get("url"):
+        raise Refused(f"the source URL {source.get('url')!r} is not the one the pinned manifest entry {key} pins for "
+                      f"this file ({pinned.get('url')})")
+    return entry
+
+
+def needs_pinned_base(T):
+    """Whether these targets take only a base from the pinned manifest: korean in their scripts, or Hangul targets."""
+    return "korean" in (T.get("scripts") or []) or bool(T.get("hangul"))
+
+
+def require_pinned_base(files, approved, T, targets_path):
+    """A build with korean in its scripts builds only on a base of the pinned manifest: base.json records the source
+    as a manifest entry, and the base's font and licence, as this step read them, are the files that entry pins
+    (pinned_entry). Returns the entry's name, or None when the targets need no pinned base."""
+    if not needs_pinned_base(T):
+        return None
+    src = approved.rec.get("source") or {}
+    if src.get("kind") != "manifest":
+        raise Refused(f"{targets_path} has korean in its scripts, and {approved.path} records a base from "
+                      f"{src.get('kind')!r}. A Hangul build takes only a base from the pinned manifest (bases.json): "
+                      "rank it with find_foundation.py and approve its shortlist row with record_base.py.")
+    pinned_entry(files, src, approved.font, approved.licence)
+    return src["manifest_entry"]
 
 
 def approval_question(font_file, licence_file, source, base):
@@ -404,7 +451,8 @@ def rebuild_subset(approved, fit, fit_log):
 # ------------------------------------------------------------------ the whole chain
 def verify_build(files, base_json, targets, fit_log, space_logs):
     """The chain from base.json to the spaced fonts, checked one way for package.py and check_font.py. base.json
-    matches the base and its licence; the fit log was made from this base.json, read the base alone and this
+    matches the base and its licence, and with korean in the targets' scripts the base is a pinned manifest entry's
+    files (require_pinned_base); the fit log was made from this base.json, read the base alone and this
     targets.json, and its subset is what the base gives with the recorded arguments, byte for byte; every space
     log was made from this base.json and this targets.json, from fonts the fit log wrote. Refuses at the first
     broken link."""
@@ -415,6 +463,9 @@ def verify_build(files, base_json, targets, fit_log, space_logs):
         raise Refused("no --targets")
     tb = files.read(targets, "targets.json")
     T = tb.json("targets.json")
+    pinned = require_pinned_base(files, ap, T, targets)
+    if pinned:
+        rows.append(("the base is the pinned manifest entry the targets' korean needs", pinned))
     fit = load_log(files, fit_log, ap.sha, "--fit-log", "fit_font.py")
     if [e.get("sha256") for e in fit["chain"].get("inputs") or []] != [ap.font.sha256]:
         raise Refused(f"{fit_log}: fit_font.py's input is not exactly the approved base")

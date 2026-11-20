@@ -13,6 +13,7 @@ import threading
 import unittest
 from unittest import mock
 
+import chain as C
 import find_foundation as FF
 import fontlib as L
 import testfonts as T
@@ -266,8 +267,9 @@ class HangulManifest(unittest.TestCase):
 
     def test_the_approval_question_names_the_pinned_manifest_entry(self):
         L.save_json({"rows": self.rows}, self.p("shortlist.json"))
+        skill = T.pinned_skill(self.p("approval"), self.manifest)
         r = T.run("record_base.py", "--shortlist", self.p("shortlist.json"), "--family", "Lumen Near",
-                  "--question-only", "--out", self.p("base.json"))
+                  "--question-only", "--out", self.p("base.json"), skill=skill)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("from the pinned manifest entry near (https://fonts.example/near/Lumen%5Bwght%5D.ttf)", r.stdout)
 
@@ -288,7 +290,7 @@ class HangulManifest(unittest.TestCase):
                 self.assertIn("pinned manifest", r.stderr)
 
     def test_the_pinned_manifest_names_each_file_by_a_commit_and_its_sha256(self):
-        pinned = L.load_json(FF.MANIFEST)["families"]
+        pinned = L.load_json(C.MANIFEST)["families"]
         self.assertEqual(list(pinned), ["noto-sans-kr"])
         for key, e in pinned.items():
             for f in [*e["files"], e["license"]]:

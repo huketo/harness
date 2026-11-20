@@ -8,8 +8,10 @@ Every length a measurement returns is in cap-normalised units: the font is scale
 That puts a screenshot (no em size) and a font file on the same scale. `cap_em` keeps the file's real cap
 height per 1000 em, so a build can set the em size later.
 
-Nothing here copies an outline. A measurement is a font-wide number or a class mean.
+Nothing here copies a reference's outline. A measurement is a font-wide number or a class mean. The one outline
+operation, transform_hangul, moves the base's own Hangul, for fit_font.py and for check_font.py to check it.
 """
+import copy
 import io
 import json
 import re
@@ -94,6 +96,34 @@ SAMPLE_LINES_KO = [HANGUL_ANCHOR + "".join(c + HANGUL_ANCHOR for c in chars) for
 # each class's final x and y scale within HANGUL_CLASS_LIMIT of that scale and of each other (references/fitting.md).
 HANGUL_SCALE_LIMIT = 0.06
 HANGUL_CLASS_LIMIT = 0.03
+# The transform's numbers are five decimals (fit_font.TRANSFORM_STEP): past a limit by any of them is at least 1e-7.
+# The margin absorbs float division alone.
+_LIMIT_MARGIN = 1e-9
+
+
+def hangul_transform_over(xf):
+    """What in a Hangul transform (fit_font.hangul_transform) lies past the limits, [] when nothing does: the one
+    scale within HANGUL_SCALE_LIMIT; per class the x and y scale each within HANGUL_CLASS_LIMIT of it, and the larger
+    of the two over the smaller within it too, whichever axis is larger; the compatibility jamo at the one scale on
+    both axes, unmoved and with no advance added. fit_font.py runs it on the transform it logs and check_font.py on
+    the transform it reads."""
+    s, out = xf["scale"], []
+    if abs(s - 1) > HANGUL_SCALE_LIMIT + _LIMIT_MARGIN:
+        out.append(f"scale {s} ({s - 1:+.4%})")
+    for cls in HANGUL_CLASSES:
+        t = xf["classes"].get(cls)
+        if t is None:
+            out.append(f"{cls} has no transform")
+            continue
+        for name, v in (("x", t["sx"] / s), ("y", t["sy"] / s),
+                        ("larger axis over smaller", max(t["sx"], t["sy"]) / min(t["sx"], t["sy"]))):
+            if abs(v - 1) > HANGUL_CLASS_LIMIT + _LIMIT_MARGIN:
+                out.append(f"{cls} {name} {v - 1:+.4%}")
+    j = xf["jamo"]
+    if (j["sx"], j["sy"]) != (s, s):
+        out.append(f"jamo x {j['sx']}, y {j['sy']}, not the one scale {s}")
+    out += [f"jamo {k} {j.get(k)}" for k in ("dx", "dy", "adv_add") if j.get(k) != 0]
+    return out
 # The units a Hangul number carries: lengths at cap height 700 (a Latin H measured with it), lengths per 1000 em
 # (a font file), and ratios, which need neither. make_targets.py merges values of one unit only.
 UNITS = ("cap700", "em1000", "ratio")
@@ -125,6 +155,61 @@ def hangul_glyphs(font):
         elif cls := hangul_class(chr(cp)):
             out[name] = cls
     return out
+
+
+def decomposed(glyf, name):
+    """A copy of the glyph as a simple glyph: a composite's components drawn into its own points, so that moving it
+    never moves a glyph another one shares."""
+    from fontTools.ttLib.tables import ttProgram
+    from fontTools.ttLib.tables._g_l_y_f import Glyph, GlyphCoordinates
+    g = glyf[name]
+    if not g.isComposite():
+        return copy.deepcopy(g)
+    coords, ends, flags = g.getCoordinates(glyf)
+    out = Glyph()
+    out.numberOfContours = len(ends)
+    out.coordinates = GlyphCoordinates(coords)
+    out.endPtsOfContours = list(ends)
+    out.flags = bytearray(f & 1 for f in flags)  # on-curve bits only: the component flags do not apply to points
+    out.program = ttProgram.Program()
+    out.program.fromBytecode(b"")
+    return out
+
+
+def hangul_move(t, scale, coords, adv):
+    """One Hangul glyph's new points and advance under its class transform t (hangul_transform): the advance times
+    the Hangul's scale plus the class's addition, the ink scaled about its own box centre (of its points), then moved
+    by half the advance change, so the change splits evenly between the two sides, and by the class's shift."""
+    new_adv = round(adv * scale + t["adv_add"])
+    if not coords:
+        return [], new_adv
+    xs, ys = [p[0] for p in coords], [p[1] for p in coords]
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    ox, oy = cx + (new_adv - adv) / 2 + t["dx"], cy + t["dy"]
+    return [(round(t["sx"] * (x - cx) + ox), round(t["sy"] * (y - cy) + oy)) for x, y in coords], new_adv
+
+
+def transform_hangul(f, src, xf):
+    """Every Hangul glyph of f (each syllable by its class, the compatibility jamo) from src, the full instance at the
+    Hangul location, decomposed, then moved by hangul_move. fit_font.py moves the Hangul with it, and check_font.py
+    moves the base's again with it to know where every point belongs. Returns the glyphs moved (hangul_glyphs of
+    src) and how many were composites in src."""
+    from fontTools.ttLib.tables._g_l_y_f import GlyphCoordinates
+    glyf, hm, sglyf, shm = f["glyf"], f["hmtx"].metrics, src["glyf"], src["hmtx"].metrics
+    composites = 0
+    members = hangul_glyphs(src)
+    for name, cls in members.items():
+        composites += sglyf[name].isComposite()
+        g = decomposed(sglyf, name)
+        t = xf["jamo"] if cls == "jamo" else xf["classes"][cls]
+        coords, adv = hangul_move(t, xf["scale"], list(g.coordinates) if g.numberOfContours > 0 else [],
+                                  shm[name][0])
+        if coords:
+            g.coordinates = GlyphCoordinates(coords)
+            g.recalcBounds(glyf)
+        glyf[name] = g
+        hm[name] = (adv, g.xMin if g.numberOfContours > 0 else 0)
+    return members, composites
 
 
 # The characters each script needs. check_font.py gates coverage on them, and fit_font.py subsets the base to them.

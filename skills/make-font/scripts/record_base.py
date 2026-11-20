@@ -12,7 +12,9 @@
          --decision approved --font-sha256 <hash from the question> --license-sha256 <hash from the question>
 
 A shortlist row from the pinned Hangul manifest (find_foundation.py, bases.json) records the source as that
-manifest entry, with its URL.
+manifest entry, with its URL. A manifest source, from a shortlist row or --source manifest, is asked about and
+recorded only when the font and OFL text read are the files the entry pins (their sha256) and the URL is the one it
+pins for the font (chain.pinned_entry): a cached file that changed after the ranking is refused.
 
 Only a person can decide that a font may be the base. This script cannot check that decision; it binds it to the
 files. Run 1 checks the files and prints the question, which names the font's and the OFL text's sha256 and
@@ -78,6 +80,8 @@ def build(a, files):
     source = {"kind": kind, "url": url if kind != "local" else None,
               "manifest_entry": entry if kind == "manifest" else None}
     base = C.read_base(files, font_path, lic_path)
+    if kind == "manifest":
+        C.pinned_entry(files, source, base.font, base.licence)
     question = C.approval_question(font_path, lic_path, source, base)
     if a.question_only:
         return question

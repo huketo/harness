@@ -57,10 +57,10 @@ sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fontTools.ttLib import TTFont  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
 UA = {"User-Agent": "make-font-skill/1.0"}
-MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bases.json")  # the pinned bases for Hangul
 CATALOG = "https://api.fontsource.org/v1/fonts"
 TREE = "https://api.github.com/repos/google/fonts/git/trees/main?recursive=1"
 RAW = "https://raw.githubusercontent.com/google/fonts/main/"
@@ -538,8 +538,8 @@ def main():
         if a.local or a.families:
             raise SystemExit("with korean in the targets' scripts, the bases are the pinned manifest's (bases.json, "
                              "references/foundation.md): --local and --families do not apply")
-        print(f"korean: ranking the pinned bases of {os.path.basename(MANIFEST)} only", flush=True)
-        rows = manifest_rows(L.load_json(MANIFEST), a.cache, T, a.offline)
+        print(f"korean: ranking the pinned bases of {os.path.basename(C.MANIFEST)} only", flush=True)
+        rows = manifest_rows(L.load_json(C.MANIFEST), a.cache, T, a.offline)
     else:
         rows = search_rows(a, tg, styles, use, scripts, category)
     rows = [r for r in rows if "distance" in r]

@@ -235,7 +235,7 @@ class Fit(Scratch):
         p = cls.p
         cls.base = T.hangul_vf(p("LumenLedger[wght].ttf"), latin=True)
         cls.ofl = T.write(p("OFL.txt"), T.ofl_text())
-        assert T.approve(cls.base, cls.ofl, p("base.json")).returncode == 0
+        cls.skill = T.approve_pinned(cls.dir, cls.base, cls.ofl, p("base.json"))
         cls.runs = {}
         two_weights = ("--style", "Regular:400", "--style", "Bold:700")
         # A reference font with Hangul only, at wght 500: no Latin number, lengths per 1000 em and ratios.
@@ -267,7 +267,7 @@ class Fit(Scratch):
         cls.runs[f"targets {name}"] = T.run("make_targets.py", p(f"m-{name}.json"), "--family", T.NEW_FAMILY,
                                             *targets, "--out", p(f"targets-{name}.json"))
         cls.runs[f"fit {name}"] = T.run("fit_font.py", cls.base, p(f"targets-{name}.json"), "--base-json",
-                                        p("base.json"), "--out-dir", p(f"build-{name}"))
+                                        p("base.json"), "--out-dir", p(f"build-{name}"), skill=cls.skill)
 
     @staticmethod
     def shot(font, lines, path):
@@ -319,7 +319,9 @@ class Fit(Scratch):
             with self.subTest(reference=name):
                 first, second = self.style(f"build-{name}", 0), self.style(f"build-{name}", 1)
                 self.assertAlmostEqual(second["y_location"]["wght"], first["y_location"]["wght"] + 300, delta=0.01)
-                self.assertEqual(second["hangul"]["weight_from"], f"{weight_from}, stepped from the first style")
+                self.assertEqual(second["hangul"]["weight_from"],
+                                 f"{weight_from}, stepped from the first style's Hangul location")
+                self.assertEqual(second["hangul"]["stepped_from"]["location"], first["hangul"]["location"])
 
     def test_the_two_weights_have_different_outlines(self):
         a = outline_hash(self.p("build-ratio", "TesseraSans-Regular.fit.ttf"), L.HANGUL_CLASSES["H1"])
@@ -334,7 +336,7 @@ class Fit(Scratch):
 
     def test_lengths_at_cap_700_resolve_against_the_y_instance_cap(self):
         s = self.style("build-latin", 0)
-        self.assertEqual(s["hangul"]["weight_from"], "n_stem")
+        self.assertEqual(s["hangul"]["weight_from"], "stem cap700")  # the Latin n set the y, the Hangul stem its own
         face_h = s["hangul"]["classes"]["H1"]["face_h"]
         self.assertEqual(face_h["from"], "cap700")
         self.assertAlmostEqual(face_h["target"], 860, delta=1)
@@ -343,9 +345,9 @@ class Fit(Scratch):
     def test_hangul_targets_are_refused_on_a_base_without_hangul(self):
         p = self.p
         latin_only = T.glyf_vf(p("latin-only[wght].ttf"))
-        assert T.approve(latin_only, self.ofl, p("base-latin-only.json")).returncode == 0
+        skill = T.approve_pinned(p("latin-only"), latin_only, self.ofl, p("base-latin-only.json"), key="latin-only")
         r = T.run("fit_font.py", latin_only, p("targets-file.json"), "--base-json", p("base-latin-only.json"),
-                  "--out-dir", p("build-latin-only"))
+                  "--out-dir", p("build-latin-only"), skill=skill)
         self.assertNotEqual(r.returncode, 0, r.stdout)
         self.assertIn("refused", r.stderr)
         self.assertIn("H1 syllables", r.stderr)
@@ -394,7 +396,7 @@ class OpticalSize(Scratch):
         super().setUpClass()
         p = cls.p
         cls.base = T.hangul_vf(p("LumenLedger[opsz,wght].ttf"), latin=True, opsz=True)
-        assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
+        skill = T.approve_pinned(cls.dir, cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json"))
         two_weights = ("--style", "Regular:400", "--style", "Bold:700")
         T.instance(cls.base, p("ref-70.ttf"), 450, opsz=70)
         lines = ["HoH", *L.SAMPLE_LINES_KO]
@@ -411,7 +413,7 @@ class OpticalSize(Scratch):
                                                 "--scripts", "latin,korean", *two_weights, "--out",
                                                 p(f"targets-{name}.json"))
             cls.runs[f"fit {name}"] = T.run("fit_font.py", cls.base, p(f"targets-{name}.json"), "--base-json",
-                                            p("base.json"), "--out-dir", p(f"build-{name}"))
+                                            p("base.json"), "--out-dir", p(f"build-{name}"), skill=skill)
         cls.runs["measure shot fitted"] = T.run("measure_font.py", p("build-shot", "TesseraSans-Regular.fit.ttf"),
                                                 "--out", p("m-shot-fitted.json"))
 
@@ -441,7 +443,8 @@ class OpticalSize(Scratch):
         for name in ("shot", "reach"):
             with self.subTest(targets=name):
                 first, second = self.style(name, 0), self.style(name, 1)
-                self.assertEqual(second["hangul"]["weight_from"], "stem cap700, stepped from the first style")
+                self.assertEqual(second["hangul"]["weight_from"],
+                                 "stem cap700, stepped from the first style's Hangul location")
                 self.assertEqual(second["y_location"]["opsz"], first["y_location"]["opsz"])
                 self.assertAlmostEqual(second["y_location"]["wght"], first["y_location"]["wght"] + 300, delta=0.01)
 

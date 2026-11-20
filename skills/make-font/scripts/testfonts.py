@@ -9,8 +9,11 @@ x-height 500, an n with two stems, an o and an O with a hole, a b that rises to 
 (the font book reads its ascender and descender from them), and a weight axis that thickens the stems.
 hangul_vf adds every Hangul syllable fontlib measures, each class drawn as a consonant ring, a vowel and a final.
 """
+import hashlib
+import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -439,26 +442,70 @@ def flavoured(src, dst, flavor):
 
 
 # ------------------------------------------------------------------ running the scripts
-def run(script, *args, cwd=None):
-    """Run one skill script with this interpreter. Returns the CompletedProcess (never raises on exit code)."""
-    return subprocess.run([sys.executable, "-I", os.path.join(HERE, script), *map(str, args)],
+def run(script, *args, cwd=None, skill=HERE):
+    """Run one skill script with this interpreter, from `skill` (this folder, or a pinned_skill copy). Returns the
+    CompletedProcess (never raises on exit code)."""
+    return subprocess.run([sys.executable, "-I", os.path.join(skill, script), *map(str, args)],
                           capture_output=True, text=True, cwd=cwd)
 
 
-def approve(font, licence, out, *source, answer=SYNTHETIC_ANSWER):
+def approve(font, licence, out, *source, answer=SYNTHETIC_ANSWER, skill=HERE):
     """The approval step as an agent runs it, with a synthetic answer: print the question, then record it with the
     two sha256 values it names and the decision. Returns the CompletedProcess of the step that ended it (the first
     refusal, or the run that wrote base.json), with the question asked as .question."""
     src = source or ("--source", "local")
-    ask = run("record_base.py", "--font", font, "--licence", licence, *src, "--question-only", "--out", out)
+    ask = run("record_base.py", "--font", font, "--licence", licence, *src, "--question-only", "--out", out,
+              skill=skill)
     if ask.returncode:
         return ask
     question = ask.stdout.strip()
     font_sha, licence_sha = re.findall(r"\b[0-9a-f]{64}\b", question)[:2]
     r = run("record_base.py", "--font", font, "--licence", licence, *src, "--question", question, "--answer", answer,
-            "--decision", "approved", "--font-sha256", font_sha, "--license-sha256", licence_sha, "--out", out)
+            "--decision", "approved", "--font-sha256", font_sha, "--license-sha256", licence_sha, "--out", out,
+            skill=skill)
     r.question = question
     return r
+
+
+# ------------------------------------------------------------------ a pinned manifest of synthetic bases
+def sha256(path):
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def pinned_url(key, font):
+    return f"https://fonts.example/{key}/{os.path.basename(font)}"
+
+
+def manifest_entry(key, font, licence, family=BASE_FAMILY):
+    """A bases.json entry that pins this font and licence, at synthetic URLs."""
+    return {"family": family, "category": "sans", "version": "1.000", "rfn": [],
+            "license": {"url": f"https://fonts.example/{key}/OFL.txt", "sha256": sha256(licence)},
+            "files": [{"weight": "100 900", "url": pinned_url(key, font), "sha256": sha256(font)}]}
+
+
+def pinned_skill(folder, manifest):
+    """A copy of the skill's scripts in <folder>/skill with `manifest` as its bases.json. The skill's own bases.json
+    pins real fonts only, and a build with korean in its scripts takes only a base it pins, so a Hangul build on a
+    synthetic base runs from such a copy. Returns the copy's folder, for run() and approve()."""
+    dst = os.path.join(folder, "skill")
+    shutil.copytree(HERE, dst, ignore=shutil.ignore_patterns("__pycache__", "test_*.py", "bases.json"))
+    write(os.path.join(dst, "bases.json"), json.dumps(manifest))
+    return dst
+
+
+def pinned_source(key, font):
+    """record_base.py's arguments for a base from the pinned manifest entry `key`."""
+    return ("--source", "manifest", "--manifest-entry", key, "--url", pinned_url(key, font))
+
+
+def approve_pinned(folder, font, licence, out, key="lumen-ledger"):
+    """A skill copy whose bases.json pins this font and licence as the entry `key`, and the base approved from that
+    entry, as find_foundation.py's shortlist row would give it. Returns the copy's folder."""
+    skill = pinned_skill(folder, {"families": {key: manifest_entry(key, font, licence)}})
+    r = approve(font, licence, out, *pinned_source(key, font), skill=skill)
+    assert r.returncode == 0, r.stderr
+    return skill
 
 
 def write(path, text):

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = "==3.12.*"
-# dependencies = ["fonttools", "brotli", "uharfbuzz", "numpy", "pillow"]
+# dependencies = ["fonttools", "brotli", "uharfbuzz", "numpy", "pillow", "skia-pathops"]
 # ///
 """Gate a built font against targets.json, its open base, and the licence rules. Exit 1 on any failure.
 
@@ -30,8 +30,10 @@ Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
   counts of what fontlib.COVERAGE_REPORTED adds (the modern syllables, the compatibility jamo), not gated.
 - provenance: glyph order and character map equal the subset's; every glyph is within 3 % of the height and
   40 % of the width of the subset's glyph at the fit's y location (y comes from there, x from the width classes).
-  The Hangul a fit moved is checked against fit-log.json instead (gate_hangul): its transform within the limits, and
-  every Hangul glyph a simple glyph where that transform puts the subset's glyph at the fit's Hangul location.
+  The Hangul a fit moved is checked against fit-log.json instead (gate_hangul): with Hangul targets, every style must
+  have a Hangul record; its transform within the limits; every Hangul glyph a simple glyph whose points are, within
+  1 unit each, the ones the build makes from the subset's glyph at the fit's Hangul location (the logged transform,
+  overlap removal, the em scale and the track, step by step).
 - hangul: per weight, the Hangul stem over the n stem against the reference's ratio (±0.05) and every class's face
   centre height against its target (±15 at cap 700), each NOT RUN without a reference that measured it; the
   vertical strokes of the classes and the Hangul ink that leaves its advance, reported.
@@ -161,71 +163,100 @@ def gate_coverage(G, f, scripts):
             G.add("coverage", f"{s}, {what}", None, f"{sum(ord(c) in cm for c in chars)} of {len(chars)}")
 
 
-HANGUL_TOL = 2  # units at 1000 per em a Hangul ink edge or advance may land from the logged transform: two roundings
+HANGUL_POINT_TOL = 1  # units at 1000 per em a Hangul point or advance may land from where the build puts it
+OUTLINE_GATE = "every Hangul glyph where the logged transform puts it"
+
+
+def built_hangul(inst, fitted, track):
+    """Every Hangul glyph the way the build makes it from the base's instance at the fit's Hangul location, step by
+    step as fit_font.py and space_font.py do: the logged transform (fontlib.transform_hangul, the fit's own function),
+    overlaps removed when the fit removed them, the em scaled as finish() scales it (fontTools' scale_upem: every
+    coordinate and advance times the new em over the old, rounded once), and the track added to both sides of every
+    glyph with ink. name -> (points, contour ends, on-curve bits, advance)."""
+    import copy
+    from fontTools.misc.roundTools import otRound
+    exp = copy.deepcopy(inst)
+    members, _ = L.transform_hangul(exp, inst, fitted["hangul"]["transform"])
+    if fitted.get("overlaps_removed", True):
+        from fontTools.ttLib.removeOverlaps import removeOverlaps  # needs skia-pathops, as the fit did
+        removeOverlaps(exp, glyphNames=list(members))
+    k = 1000 / round(1000 / fitted["em_scale"])  # em_scale is 1000 over the em finish() scaled, at six decimals
+    glyf, hm = exp["glyf"], exp["hmtx"].metrics
+    out = {}
+    for name in members:
+        g, adv = glyf[name], otRound(hm[name][0] * k)
+        if g.numberOfContours > 0:
+            ink = track if adv else 0
+            out[name] = ([(otRound(x * k) + ink, otRound(y * k)) for x, y in g.coordinates], list(g.endPtsOfContours),
+                         [f & 1 for f in g.flags], adv + 2 * ink)
+        else:
+            out[name] = ([], [], [], adv)
+    return out
+
+
+def outline_far(g, want, adv):
+    """How a fitted Hangul glyph g (and its advance) differs from the glyph the build makes (built_hangul): a
+    composite, another point structure, or a point or the advance more than HANGUL_POINT_TOL units away. Returns
+    (what is wrong or None, the largest distance of a point or the advance)."""
+    pts, ends, on, want_adv = want
+    if g.isComposite():
+        return "is a composite", None
+    got = list(g.coordinates) if g.numberOfContours > 0 else []
+    got_ends = list(g.endPtsOfContours) if got else []
+    if (got_ends, [f & 1 for f in g.flags] if got else []) != (ends, on):
+        return (f"has {len(got_ends)} contours and {len(got)} points, the build makes {len(ends)} and {len(pts)}",
+                None)
+    dist = max([abs(adv - want_adv)] + [max(abs(a - c), abs(b - d)) for (a, b), (c, d) in zip(got, pts)])
+    if dist > HANGUL_POINT_TOL:
+        far = next(((i, p, q) for i, (p, q) in enumerate(zip(got, pts))
+                    if max(abs(p[0] - q[0]), abs(p[1] - q[1])) > HANGUL_POINT_TOL), None)
+        return (f"point {far[0]} at {tuple(far[1])}, the build puts it at {far[2]}" if far
+                else f"advance {adv}, the build gives {want_adv}"), dist
+    return None, dist
 
 
 def gate_hangul(G, f, base, fitted, track=0):
     """The Hangul against the fit log's transform. `base` is the subset fit_font.py fitted from, `fitted` the fit
     log's record of this style, `track` the units space_font.py added to each side of every glyph with ink. The
-    transform must lie within the limits (fontlib.HANGUL_SCALE_LIMIT, HANGUL_CLASS_LIMIT), and every Hangul glyph
-    must be a simple glyph whose ink box and advance are where that transform puts the base's glyph at the fit's
-    Hangul location, times the em scale: within HANGUL_TOL units. Anything else moved it."""
+    transform must lie within the limits (fontlib.hangul_transform_over, the check the fit ran), and every Hangul
+    glyph must be the glyph the build makes from the base at the fit's Hangul location (built_hangul): a simple glyph
+    with the same contours and points, each point and the advance within HANGUL_POINT_TOL units. Anything else moved
+    it, inside the ink box or not. Returns the base's instance at that location."""
     import copy
     from fontTools.pens.boundsPen import BoundsPen
     from fontTools.varLib import instancer
     h = fitted.get("hangul")
     if not h:
         return
-    xf, k = h["transform"], fitted["em_scale"]
-    s = xf["scale"]
-    over = [f"scale {s}"] if abs(s - 1) > L.HANGUL_SCALE_LIMIT + 1e-9 else []
-    for cls, t in [*xf["classes"].items(), ("jamo", xf["jamo"])]:
-        for name, v in (("x", t["sx"] / s), ("y", t["sy"] / s), ("x over y", t["sx"] / t["sy"])):
-            if abs(v - 1) > (0 if cls == "jamo" else L.HANGUL_CLASS_LIMIT) + 1e-6:
-                over.append(f"{cls} {name} {v - 1:+.2%}")
+    xf = h["transform"]
+    over = L.hangul_transform_over(xf)
     G.add("provenance", "Hangul transform within the limits", not over,
-          f"scale {s} (±{L.HANGUL_SCALE_LIMIT:.0%}); every class's x, y and x over y within "
-          f"±{L.HANGUL_CLASS_LIMIT:.0%} of it, the jamo at it" + (": " + ", ".join(over) if over else ""))
+          f"scale {xf['scale']} (±{L.HANGUL_SCALE_LIMIT:.0%}); every class's x and y within ±{L.HANGUL_CLASS_LIMIT:.0%} "
+          f"of it and its larger axis within {L.HANGUL_CLASS_LIMIT:.0%} of its smaller; the jamo at it, unmoved"
+          + (": " + ", ".join(over) if over else ""))
     inst = instancer.instantiateVariableFont(copy.deepcopy(base), h["location"], updateFontNames=False)
-    igs, iglyf, ihm = inst.getGlyphSet(), inst["glyf"], inst["hmtx"].metrics
-    ogs, oglyf, ohm = f.getGlyphSet(), f["glyf"], f["hmtx"].metrics
-    far, n, sides = [], 0, {"fitted": [], "base": []}
-    for name, cls in L.hangul_glyphs(inst).items():
-        n += 1
-        t = xf["jamo"] if cls == "jamo" else xf["classes"][cls]
-        adv = ihm[name][0]
-        new_adv = round(adv * s + t["adv_add"])
-        p = BoundsPen(igs)
+    try:
+        built = built_hangul(inst, fitted, track)
+    except (ImportError, KeyError) as e:  # skia-pathops missing here, or a transform without a class
+        G.add("provenance", OUTLINE_GATE, False, f"the Hangul cannot be made again as the fit made it: {e!r}")
+        return inst
+    igs, ihm, ogs, oglyf, ohm = inst.getGlyphSet(), inst["hmtx"].metrics, f.getGlyphSet(), f["glyf"], f["hmtx"].metrics
+    far, worst, sides, k = [], 0, {"fitted": [], "base": []}, fitted["em_scale"]
+    for name, want in built.items():
+        problem, dist = outline_far(oglyf[name], want, ohm[name][0])
+        worst = max(worst, dist or 0)
+        if problem:
+            far.append(f"{name} {problem}")
+        p, q = BoundsPen(igs), BoundsPen(ogs)
         igs[name].draw(p)
-        want_adv = round(new_adv * k)
-        if p.bounds:
-            coords = iglyf[name].getCoordinates(iglyf)[0]
-            cx = (min(x for x, _ in coords) + max(x for x, _ in coords)) / 2
-            cy = (min(y for _, y in coords) + max(y for _, y in coords)) / 2
-            x0, y0, x1, y1 = p.bounds
-            ox, oy = cx + (new_adv - adv) / 2 + t["dx"], cy + t["dy"]
-            want = [k * (t["sx"] * (x0 - cx) + ox) + track, k * (t["sy"] * (y0 - cy) + oy),
-                    k * (t["sx"] * (x1 - cx) + ox) + track, k * (t["sy"] * (y1 - cy) + oy)]
-            if want_adv:
-                want_adv += 2 * track
-        else:
-            want = None
-        q = BoundsPen(ogs)
         ogs[name].draw(q)
-        got = q.bounds
-        if got and p.bounds:
-            sides["fitted"].append(min(got[0], ohm[name][0] - got[2]))
-            sides["base"].append(min(p.bounds[0], adv - p.bounds[2]) * k)
-        if oglyf[name].isComposite():
-            far.append(f"{name} is a composite")
-        elif (want is None) != (got is None) or (want and max(abs(a - b) for a, b in zip(want, got)) > HANGUL_TOL):
-            far.append(f"{name} box {got and [round(v) for v in got]}, the transform puts it at "
-                       f"{want and [round(v) for v in want]}")
-        elif abs(ohm[name][0] - want_adv) > HANGUL_TOL:
-            far.append(f"{name} advance {ohm[name][0]}, the transform gives {want_adv}")
-    G.add("provenance", "every Hangul glyph where the logged transform puts it", not far,
-          f"{n - len(far)} of {n} simple and within {HANGUL_TOL} units of the base at {h['location']} moved by the "
-          "fit log's transform" + (": " + "; ".join(far[:4]) if far else ""))
+        if p.bounds and q.bounds:
+            sides["fitted"].append(min(q.bounds[0], ohm[name][0] - q.bounds[2]))
+            sides["base"].append(min(p.bounds[0], ihm[name][0] - p.bounds[2]) * k)
+    G.add("provenance", OUTLINE_GATE, not far,
+          f"{len(built) - len(far)} of {len(built)} simple, with the points the base at {h['location']} gets from the "
+          f"fit log's transform, overlap removal, the em scale and the track: every point and advance within "
+          f"{HANGUL_POINT_TOL} unit, the largest distance {worst:g}" + (": " + "; ".join(far[:4]) if far else ""))
     if sides["fitted"]:  # a face grown past its sides runs into the next syllable (references/fitting.md, Limits)
         G.add("hangul", "Hangul ink inside the advance", None, "; ".join(
             f"{what}: {sum(v < 0 for v in vals)} of {len(vals)} glyphs leave it, smallest side {min(vals):.0f}"
@@ -566,6 +597,9 @@ def main():
         gate_kerning(G, face, T["tolerances"]["min_gap"])
         gate_coverage(G, f, T.get("scripts", ["latin"]))
         fitted = next((s for s in fit["styles"] if s["style"]["name"] == tag), {})
+        if T.get("hangul") and not fitted.get("hangul"):
+            G.add("provenance", "Hangul transform recorded", False, f"targets.json has Hangul targets, and fit-log.json "
+                  f"records no Hangul transform for {tag}: the Hangul cannot be checked against what the fit did")
         hangul = L.hangul_glyphs(f) if fitted.get("hangul") else {}
         gate_provenance(G, f, subset_font, a.reference, fitted.get("y_location"), skip=hangul)
         if hangul:
