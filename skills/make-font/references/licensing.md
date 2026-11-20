@@ -23,8 +23,9 @@ and writes nothing. After the person answers, the second run writes `base.json` 
 `OFL.txt`'s sha256, name ID 13 exactly, the Reserved Font Names, where the font came from (a Google Fonts URL,
 a pinned manifest entry, or a local file), and the question, answer and decision verbatim. It writes only when
 both files still have the sha256 values the question named (`--font-sha256`, `--license-sha256`), the question
-passed in is, word for word, the one `chain.approval_question` makes again from the same files and source (a
-shortlist whose URL changed while the person read the question is refused), and `--decision` is `approved`. The
+passed in is, word for word, the one `chain.approval_question` makes again from the same files and source (the
+question names the source and its URL, a manifest entry's included, so a URL that changed while the person read
+the question is refused), and `--decision` is `approved`. The
 answer is never read for a yes. Every step that reads `base.json` makes the question again from the record and
 refuses one that differs.
 
@@ -34,12 +35,18 @@ One check of the files, `chain.read_base`, runs at both steps and again in every
   are refused;
 - the `OFL.txt` is the copyright statement, the OFL preamble, then the SIL Open Font License 1.1 word for word
   (white space aside; `fontlib.OFL_11_LICENCE`); a title alone or an edited condition is refused. Before the
-  preamble only `Copyright` lines and blank lines may stand, and a copyright line may not state a term (not, only,
-  may, must, licence, permission and the like): a line such as "You may not modify this Font Software" is an
-  added condition, and `fontlib.ofl_11_text_problem` names it;
-- name ID 13 grants the licence ("This Font Software is licensed under the SIL Open Font License, Version 1.1")
-  and names no other version or licence and no denial or exception (not, except, unless and the like); a label
-  alone ("OFL-1.1") is refused;
+  preamble only blank lines and copyright lines in the supported form may stand (`fontlib.COPYRIGHT_FORM`):
+  `Copyright`, an optional `(c)` or `©`, the years, the holder's name, an optional address in parentheses (URLs or
+  e-mail addresses joined by `|`), an optional `with Reserved Font Name(s) …` clause, an optional full stop. A
+  name is words with a capital letter or a digit, joined by spaces, commas and a few connectors (and, of, the,
+  by). Anything after the holder, the address or the Reserved Font Names, such as "Distribution is subject to
+  prior written approval", is refused as an unsupported copyright line, never read for its meaning; so are a
+  statement that runs over several lines and two statements on one line. `fontlib.ofl_11_text_problem` names
+  the part that is not in the form;
+- name ID 13 is the grant ("This Font Software is licensed under the SIL Open Font License, Version 1.1"),
+  followed only by the sentences published fonts add (`fontlib.NOTICE_FORM`): where the licence and its FAQ are
+  available, where a Modified Version's licence is available, and the "AS IS" disclaimer. A label alone
+  ("OFL-1.1"), another version, a denial, an exception or any other clause is refused;
 - when reading, the notice and Reserved Font Names `base.json` records equal what the files say now.
 
 `FONTLOG.txt` repeats the record under Provenance, file names without folders. `check-report.json` and the font
@@ -48,6 +55,10 @@ also lists the package outputs (each TTF and WOFF2, by sha256) the check verifie
 font whose sha256 is not among them, so the record is never printed beside another build's fonts.
 
 ## What the chain cannot prove
+
+The licence check reads forms. A clause written to look like a name (capitalised words after the holder's name,
+"Lumen Type, Distribution Requires Approval") is read as a name. The person who approves the base reads its
+`OFL.txt`; the code refuses everything outside the form, and cannot judge what a name says.
 
 Every log is a file the build wrote, and the chain checks that the files agree with each other and with the
 approved base. Each step reads a file once (`chain.Files`), so a file swapped after its hash was checked is
@@ -109,11 +120,15 @@ question without a reference's name, since the FONTLOG quotes it.
 `package.py` takes `--base-json`, `--fit-log` and one or more `--space-log` files, and runs `chain.verify_build`,
 the chain check `check_font.py` runs too: the fit and space logs must name this `targets.json`, the fit's subset
 must be what the base gives again, and every font must be a space log output. With no spaced font left (only
-`.fit.ttf` files given) it refuses. `--out-dir` may not be, or hold, any input. It builds the package in a
-temporary folder beside `--out-dir`, checks each TTF (a plain TrueType file) against the subset's glyph order and
+`.fit.ttf` files given) it refuses, and so it does when two fonts would package as one file (two spaced fonts of
+one style): every output name is decided before anything is written. `--out-dir` may not be, or hold, any input:
+an input whose path as given, whose folder resolved, or whose link target lies in `--out-dir` is refused, so
+`--replace` never removes a link to an input. It builds the package in a temporary folder beside `--out-dir`
+that stays private (0700) while the package is built, checked and logged, checks each TTF (a plain TrueType file) against the subset's glyph order and
 character map and against its spaced font's outlines and advances, and each WOFF2 against its TTF, all from the
 bytes it read and wrote (the spaced font whose sha256 it checked is the one it converts), writes
-`package-log.json` into the same folder, then moves the folder into place with one rename. The log lists the
+`package-log.json` into the same folder, then moves the folder into place with one rename and only then gives it
+the usual folder mode (0777 less the umask). The log lists the
 spaced fonts as inputs, the packaged TTF and WOFF2 as outputs, and `targets.json` and the logs, each by file name
 and sha256, with no builder paths. A non-empty `--out-dir` is refused unless `--replace` is given; then the old
 package is deleted only after the new one is in place. The README's CSS example falls back to `sans-serif`,

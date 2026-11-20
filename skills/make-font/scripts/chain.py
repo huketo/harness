@@ -82,9 +82,10 @@ class Files:
     written beside its path and renamed onto it, so it never writes through a link."""
 
     def __init__(self):
-        self._by_path, self._by_id = {}, {}
+        self._by_path, self._by_id, self._asked = {}, {}, []
 
     def read(self, path, what="file"):
+        self._asked.append(path)
         key = os.path.realpath(path)
         if key not in self._by_path:
             try:
@@ -98,7 +99,8 @@ class Files:
         return self._by_path[key]
 
     def paths(self):
-        return [b.path for b in self._by_path.values()]
+        """Every path this run was asked to read, as given, in order: a file read by two names has both."""
+        return list(dict.fromkeys(self._asked))
 
     def check_output(self, path):
         hit = self._by_path.get(os.path.realpath(path))
@@ -179,10 +181,11 @@ def read_base(files, font_path, lic_path):
                       "licence title alone, an edited licence, Apache-2.0 or any other licence is not a base.")
     names = L.english_names(f)
     n13 = names.get(13)
-    if not L.is_ofl_11_notice(n13):
-        raise Refused(f"{font_path}: name ID 13 is {n13!r}, not a notice that grants the {LICENCE_ID} alone. The "
-                      "font itself must say \"This Font Software is licensed under the SIL Open Font License, "
-                      "Version 1.1\", with no other version or licence and no exception.")
+    problem = L.ofl_11_notice_problem(n13)
+    if problem:
+        raise Refused(f"{font_path}: name ID 13 is {n13!r}, not a supported notice that grants the {LICENCE_ID} "
+                      f"alone: {problem}. The supported form is {L.NOTICE_FORM}; any other clause, another version "
+                      "or licence, a denial or an exception is refused.")
     return Record(font=font_b, licence=lic_b, name_id_13=n13, reserved_font_names=L.reserved_font_names(text),
                   family=names.get(16) or names.get(1))
 
@@ -194,8 +197,9 @@ def approval_question(font_file, licence_file, source, base):
     """The approval question for these files from this source, with the sha256 of both, so the answer belongs to
     these exact bytes. record_base.py prints it, and the record step and every later step make it again and
     accept only the same words."""
-    where = {"google-fonts": f"from Google Fonts ({source.get('url')})",
-             "manifest": f"from the pinned manifest entry {source.get('manifest_entry')}",
+    url = f" ({source['url']})" if source.get("url") else ""
+    where = {"google-fonts": f"from Google Fonts{url}",
+             "manifest": f"from the pinned manifest entry {source.get('manifest_entry')}{url}",
              "local": "a file you supplied"}[source["kind"]]
     rfn = base.reserved_font_names
     rfn = (f"Its Reserved Font Names, which the new name may not use: {', '.join(rfn)}." if rfn

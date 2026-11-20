@@ -203,21 +203,86 @@ _OFL_11_WORDS = " ".join(OFL_11_LICENCE.split())
 _OFL_PREAMBLE = re.compile(r"This Font Software is licensed under the SIL Open Font License, Version 1\.1\.\s+"
                            r"This license is copied below, and is also available with a FAQ at:\s+"
                            r"(?:https?://)?(?:scripts\.sil\.org/OFL|openfontlicense\.org)/?\s+-{10,}\s+")
-_OTHER_LICENCES = re.compile(r"Apache|GPL|MIT License|Creative Commons|Ubuntu Font Licen|Bitstream Vera", re.I)
 _QUOTES = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
 _COPYRIGHT_LINE = re.compile(r"\s*copyright\b", re.I)
-# A copyright line names holders, years, addresses and Reserved Font Names. One of these words on it states a
-# term, which the licence that follows does not have.
-_TERMS = re.compile(r"\b(?:not|no|nor|never|except|unless|only|without|prohibit\w*|forbid\w*|restrict\w*|"
-                    r"permi\w*|licen[cs]\w*|terms?|conditions?|may|must|shall|requir\w*)\b", re.I)
-_ADDRESSES = re.compile(r"\S+://\S+|\S+@\S+")
+
+
+# ------------------------------------------------------------------ the forms a copyright line and a notice take
+# Code cannot read a term, so it reads forms. A copyright line and a name ID 13 notice are accepted only in the
+# forms published OFL fonts use; any other clause on them is refused as an unsupported form, never interpreted.
+
+# A name is words joined by spaces. Each word has a capital letter or a digit (Lumen, tyPoland, 3D) or is one of
+# these connectors. A full stop may end a name's last word (Inc.) and an initial or short abbreviation (J., Co.).
+_CONNECTORS = {"and", "&", "of", "the", "by", "de", "da", "das", "dos", "del", "der", "di", "du", "la", "le",
+               "van", "von", "y", "et", "und"}
+_WORD = re.compile(r"[\w&'’-]+(?:\.[\w&'’-]+)*\.?")
+
+
+def _is_name(text, commas=True):
+    """True when text is a name, or with commas=True several names joined by commas (Lumen Type, Inc.)."""
+    for group in (re.split(r"\s*,\s+", text) if commas else [text]):
+        words = group.split()
+        if not words or all(w.lower() in _CONNECTORS for w in words):
+            return False
+        for i, w in enumerate(words):
+            if not _WORD.fullmatch(w):
+                return False
+            if w.endswith(".") and i < len(words) - 1 and not (len(w) <= 4 and w[0].isupper()):
+                return False
+            if w.lower() not in _CONNECTORS and not any(c.isupper() or c.isdigit() for c in w):
+                return False
+    return True
+
+
+_YEAR = r"(?:1[89]|20)\d\d"
+_CR_HEAD = re.compile(rf"\s*copyright(?:\s*(?:\(c\)|©))?\s+{_YEAR}(?:\s*[-–,]\s*{_YEAR})*,?\s+", re.I)
+_CR_RFN = re.compile(r"[,.]?\s+with\s+reserved\s+font\s+names?\s+", re.I)
+_CR_ADDRESS = re.compile(r"\s*\(([^()\s]+)\)$")
+_ADDRESS = re.compile(r"[a-z][a-z0-9+.-]*://[^\s()|]+|[^\s()|@]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+"
+                      r"|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:/[^\s()|]*)?", re.I)
+_QUOTED = "|".join(f"{re.escape(o)}[^{re.escape(c)}]+{re.escape(c)}" for o, c in _QUOTES.items())
+_QUOTED_NAMES = re.compile(rf"(?:{_QUOTED})(?:\s*,\s*(?:{_QUOTED}))*(?:\s*,?\s+and\s+(?:{_QUOTED}))?")
+COPYRIGHT_FORM = ("Copyright, an optional (c) or ©, the year or years, the holder's name, an optional address in "
+                  "parentheses, an optional \"with Reserved Font Name(s) ...\" clause and an optional full stop")
+
+
+def copyright_line_problem(line):
+    """Why a copyright line is not in the supported form, or None when it is. The form is COPYRIGHT_FORM: the
+    holder's name and the Reserved Font Names are names (_is_name), and the address is URLs or e-mail addresses
+    joined by |. A clause after any of them, a sentence or a term, is not part of the form."""
+    head = _CR_HEAD.match(line)
+    if not head:
+        return "it does not start with Copyright, an optional (c) or ©, and the year"
+    rest = line[head.end():].rstrip()
+    rfn = _CR_RFN.search(rest)
+    holder, names = (rest[:rfn.start()], rest[rfn.end():]) if rfn else (rest, None)
+    if names is None:
+        holder = holder[:-1] if holder.endswith(".") else holder
+    else:
+        names = names[:-1] if names.endswith(".") else names
+    address = _CR_ADDRESS.search(holder)
+    if address:
+        if not all(_ADDRESS.fullmatch(a) for a in address.group(1).split("|")):
+            return f"{address.group(0).strip()} is not an address (URLs or e-mail addresses joined by |)"
+        holder = holder[:address.start()]
+    holder = holder.strip()
+    if not _is_name(holder):
+        return (f"{holder!r} is not a holder's name followed by nothing else (a name is words with a capital "
+                "letter or a digit, joined by spaces, commas, and, of, the)")
+    if names is not None:
+        quoted = _QUOTED_NAMES.fullmatch(names)
+        if not (all(_is_name(n[1:-1], commas=False) for n in re.findall(_QUOTED, names)) if quoted
+                else _is_name(names)):
+            return (f"the Reserved Font Name clause {names!r} is not names alone (quoted names, or unquoted names "
+                    "joined by commas and \"and\")")
+    return None
 
 
 def ofl_11_text_problem(text):
     """Why a licence file is not the SIL Open Font License 1.1, or None when it is. An OFL.txt is the copyright
-    statement (Copyright lines and blank lines, nothing else), the two-line preamble whose FAQ address varies
-    between files, then the licence word for word, white space aside. Any other line before the preamble, or a
-    copyright line that states a term, adds a condition the OFL does not have."""
+    statement (copyright lines in the supported form, COPYRIGHT_FORM, and blank lines), the two-line preamble whose
+    FAQ address varies between files, then the licence word for word, white space aside. Any other line before the
+    preamble, or a copyright line in another form, may add a condition the OFL does not have, so it is refused."""
     m = _OFL_PREAMBLE.search(text)
     if not m:
         return "it has no OFL 1.1 preamble (\"This Font Software is licensed under the SIL Open Font License, " \
@@ -228,9 +293,10 @@ def ofl_11_text_problem(text):
     for ln in lines:
         if not _COPYRIGHT_LINE.match(ln):
             return f"the line {ln!r} stands before the licence and is not a copyright line"
-        term = _TERMS.search(_ADDRESSES.sub(" ", ln))
-        if term:
-            return f"the copyright line {ln!r} states a term ({term.group(0)!r})"
+        why = copyright_line_problem(ln)
+        if why:
+            return (f"the line {ln!r} is not a supported copyright line: {why}. The supported form is "
+                    f"{COPYRIGHT_FORM}")
     if not lines:
         return "it has no copyright line"
     return None
@@ -240,19 +306,53 @@ def is_ofl_11_text(text):
     return ofl_11_text_problem(text) is None
 
 
-# A notice that grants the OFL 1.1, and words that would take the grant back or narrow it.
-_GRANT = re.compile(r"\blicensed\s+under\s+the\s+SIL\s+Open\s+Font\s+License,?\s+(?:Version|v\.?)\s*1\.1\b", re.I)
-_DENIAL = re.compile(r"\b(?:not|no|nor|never|neither|except|excepting|excluding|unless|instead)\b|n['\u2019]t\b", re.I)
+# name ID 13: the sentence that grants the OFL 1.1, then only sentences published OFL fonts follow it with (where
+# the licence and its FAQ are, where a modifier's licence is, the "AS IS" disclaimer).
+_END = r"\.?(?=\s|$)"
+_URL = r"(?:https?://)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:/\S*?)?"
+_NAME_RUN = r"[^\s,;:!?()\"']+(?:\s+[^\s,;:!?()\"']+)*?"
+_NOTICE_GRANT = re.compile(r"This\s+Font\s+Software\s+is\s+licensed\s+under\s+the\s+SIL\s+Open\s+Font\s+License,?\s+"
+                           r"Version\s+1\.1" + _END, re.I)
+_NOTICE_SENTENCES = [
+    re.compile(r"This\s+license\s+is\s+(?:copied\s+below,\s+and\s+is\s+also\s+)?available\s+with\s+an?\s+FAQ\s+"
+               r"at:?\s+" + _URL + _END, re.I),
+    re.compile(rf"The\s+license\s+for\s+(?P<modifier>{_NAME_RUN})['’]s\s+Modified\s+Version(?:,\s+covering\s+"
+               rf"(?P<holder>{_NAME_RUN})['’]s\s+modifications\s+to\s+(?P<font>{_NAME_RUN}),)?\s+is\s+available\s+"
+               r"at:?\s+" + _URL + _END, re.I),
+    re.compile(r"This\s+Font\s+Software\s+is\s+distributed\s+on\s+an\s+\"AS\s+IS\"\s+BASIS,\s+"
+               r"WITHOUT\s+WARRANTIES\s+OR\s+CONDITIONS\s+OF\s+ANY\s+KIND,\s+either\s+express\s+or\s+implied" + _END,
+               re.I),
+]
+NOTICE_FORM = ("\"This Font Software is licensed under the SIL Open Font License, Version 1.1\", then only where "
+               "the licence and its FAQ are available, where a Modified Version's licence is available, or the "
+               "\"AS IS\" disclaimer")
+
+
+def ofl_11_notice_problem(notice):
+    """Why a name-table licence notice (name ID 13) does not grant the SIL Open Font License, Version 1.1 alone, or
+    None when it does. The notice is NOTICE_FORM: the grant first, then only the known sentences. A label alone
+    ("OFL-1.1"), another version, a denial, an exception or any other clause is not that form."""
+    text = (notice or "").strip()
+    m = _NOTICE_GRANT.match(text)
+    if not m:
+        return ("it does not begin with \"This Font Software is licensed under the SIL Open Font License, "
+                "Version 1.1\"")
+    pos = m.end()
+    while True:
+        pos = re.compile(r"\s*").match(text, pos).end()
+        if pos == len(text):
+            return None
+        for rx in _NOTICE_SENTENCES:
+            m = rx.match(text, pos)
+            if m and all(_is_name(v, commas=False) for v in m.groupdict().values() if v is not None):
+                pos = m.end()
+                break
+        else:
+            return f"{text[pos:]!r} follows the grant and is not one of the sentences supported after it"
 
 
 def is_ofl_11_notice(notice):
-    """True when a name-table licence notice (name ID 13) grants the SIL Open Font License, Version 1.1 ("This Font
-    Software is licensed under the SIL Open Font License, Version 1.1"), and names no other version or licence and
-    no denial or exception. A label alone ("OFL-1.1") grants nothing."""
-    if not notice or not _GRANT.search(notice) or _DENIAL.search(notice) or _OTHER_LICENCES.search(notice):
-        return False
-    versions = re.findall(r"(?:\bversion|\bv\.?|\bOFL[- ]?)\s*(\d+(?:\.\d+)*)", notice, re.I)
-    return all(v == "1.1" for v in versions)
+    return ofl_11_notice_problem(notice) is None
 
 
 def _rfn_clause(rest):

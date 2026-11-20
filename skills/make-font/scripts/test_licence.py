@@ -122,7 +122,7 @@ class RecordAndLoadCheckTheSameThings(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def refused_at_record(self, font, licence, *words):
-        out = self.p(os.path.basename(font) + ".json")
+        out = self.p(f"{os.path.basename(font)}-{os.path.basename(licence)}.json")
         r = T.approve(font, licence, out)
         self.assertNotEqual(r.returncode, 0, r.stdout)
         for w in ("refused",) + words:
@@ -191,6 +191,25 @@ class RecordAndLoadCheckTheSameThings(unittest.TestCase):
         font = T.glyf_vf(self.p("denied.ttf"), notice=NOT_AN_OFL_11_NOTICE[0])
         self.refused_at_load(font, "name ID 13", font__file=font, license__name_id_13=NOT_AN_OFL_11_NOTICE[0])
 
+    def test_a_copyright_line_with_a_trailing_clause_is_refused_as_an_unsupported_form(self):
+        for i, line in enumerate(TRAILING_CLAUSE_COPYRIGHT_LINES):
+            with self.subTest(line=line):
+                self.refused_at_record(self.base, T.write(self.p(f"tail-{i}.txt"), T.ofl_text(line)), "OFL-1.1",
+                                       "not a supported copyright line")
+
+    def test_a_copyright_line_with_a_trailing_clause_is_refused_at_load(self):
+        licence = T.write(self.p("tail.txt"), T.ofl_text(TRAILING_CLAUSE_COPYRIGHT_LINES[0]))
+        self.refused_at_load(self.base, "not a supported copyright line", license__file=licence)
+
+    def test_a_name_id_13_with_a_trailing_clause_is_refused_at_record(self):
+        for i, notice in enumerate(TRAILING_CLAUSE_NOTICES):
+            with self.subTest(notice=notice):
+                self.refused_at_record(T.glyf_vf(self.p(f"tail-{i}.ttf"), notice=notice), self.ofl, "name ID 13")
+
+    def test_a_name_id_13_with_a_trailing_clause_is_refused_at_load(self):
+        font = T.glyf_vf(self.p("tail.ttf"), notice=TRAILING_CLAUSE_NOTICES[0])
+        self.refused_at_load(font, "name ID 13", font__file=font, license__name_id_13=TRAILING_CLAUSE_NOTICES[0])
+
     def test_a_woff_or_woff2_base_is_refused_at_record(self):
         for flavor in ("woff", "woff2"):
             with self.subTest(flavor=flavor):
@@ -215,6 +234,28 @@ NOT_AN_OFL_11_NOTICE = [
     "This Font Software is licensed under the SIL Open Font License, Version 1.1 unless you sell it.",
     "OFL-1.1",
 ]
+# Notices that grant the OFL 1.1 and then add a clause of their own, in words no list of terms would catch.
+TRAILING_CLAUSE_NOTICES = [
+    "This Font Software is licensed under the SIL Open Font License, Version 1.1. Distribution is subject to "
+    "prior written approval.",
+    "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a "
+    "FAQ at: https://openfontlicense.org. Redistribution is subject to prior written approval by Lumen Type.",
+    "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a "
+    "FAQ at: https://openfontlicense.org Redistribution is subject to prior written approval.",
+]
+# Copyright lines that end in a clause of their own: after a full stop, after a comma, after the Reserved Font
+# Name, and in a script without capital letters.
+TRAILING_CLAUSE_COPYRIGHT_LINES = [
+    "Copyright 2026 The Lumen Ledger Project Authors (https://example.org/lumen-ledger). Distribution is subject "
+    "to prior written approval.",
+    "Copyright 2026 Lumen Type, distribution is subject to prior written approval.",
+    'Copyright 2021 The Tessera Project Authors, with Reserved Font Name "Tessera". Distribution is subject to '
+    "prior written approval.",
+    "Copyright 2017 Example Foundry, with Reserved Font Name Coda and Coda Mono, subject to prior written approval.",
+    "Copyright 2026 Lumen Type. \ubc30\ud3ec\ub294 \uc0ac\uc804 \uc11c\uba74 \uc2b9\uc778\uc744 "
+    "\ubc1b\uc544\uc57c \ud569\ub2c8\ub2e4.",
+    "Copyright 2026 Lumen Type (https://example.org/lumen) (approval needed).",
+]
 
 
 class WhatRealOflFilesSay(unittest.TestCase):
@@ -232,6 +273,24 @@ class WhatRealOflFilesSay(unittest.TestCase):
                        "either express or implied."):
             with self.subTest(notice=notice):
                 self.assertTrue(L.is_ofl_11_notice(notice))
+
+    def test_supported_copyright_line_forms_are_an_ofl_1_1_text(self):
+        """Copyright, an optional (c) or the sign, the years, the holder, an optional address in parentheses, an
+        optional Reserved Font Name clause (C3), an optional full stop."""
+        c3 = ['Copyright 2021 The Tessera Project Authors, with Reserved Font Name "Tessera".',
+              'Copyright (c) 2019 Lumen Type, with Reserved Font Names "Lumen" and "Lumen Ledger".',
+              "Copyright 2017 Example Foundry, with Reserved Font Name Coda and Coda Mono.",
+              'Copyright 2022 Arbor Type, with Reserved Font Names "Arbor", "Arbor Text" and "Arbor Display".']
+        for line in c3 + [
+                "Copyright 2026 The Lumen Ledger Project Authors (https://example.org/lumen-ledger)",
+                "Copyright 2026 The Lumen Ledger Project Authors.",
+                "copyright \u00a9 2015, 2019 Arbor Type, Inc. (https://example.org/arbor)",
+                'Copyright (c) 2010-2014 by Lumen Type Studio (team@example.org) with Reserved Font Name "Lumen"',
+                "Copyright (c) 2011, J. Fixture and the Arbor Type Authors (www.example.org|type@example.org), "
+                "with Reserved Font Name Arbor.",
+                "Copyright 2020 Lumen Type GmbH & Co. KG"]:
+            with self.subTest(line=line):
+                self.assertIsNone(L.ofl_11_text_problem(T.ofl_text(line)))
 
     def test_copyright_lines_with_reserved_names_and_windows_line_ends_are_an_ofl_1_1_text(self):
         head = ('Copyright © 2017 Lumen Type. with Reserved Font Name "Lumen"\r\n'

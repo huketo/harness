@@ -13,21 +13,22 @@
 
 Only a person can decide that a font may be the base. This script cannot check that decision; it binds it to the
 files. Run 1 checks the files and prints the question, which names the font's and the OFL text's sha256 and
-where the font came from, and writes nothing. Run 2 makes the question again from the same arguments and writes
-base.json only when both files still have the sha256 values the question named, the question passed in is that
-question word for word (so a shortlist whose source URL changed while the person read it is refused), and
---decision is "approved". The answer is kept word for word and never read for a yes; a person who declines gets
-no base.json.
+where the font came from (its URL too, when one is given), and writes nothing. Run 2 makes the question again
+from the same arguments and writes base.json only when both files still have the sha256 values the question
+named, the question passed in is that question word for word (so a source URL that changed while the person read
+it, in the shortlist or --url, is refused), and --decision is "approved". The answer is kept word for word and
+never read for a yes; a person who declines gets no base.json.
 
 Both runs refuse a base this skill cannot build on (chain.read_base, the same check every later step runs): a file
 that is not a plain TrueType variable font (WOFF, WOFF2, CFF, static and collections are refused), an OFL text that
-is not copyright lines and then the SIL Open Font License 1.1 word for word (any other line before the licence, or
-a copyright line that states a term, is refused), or a name ID 13 that does not grant the OFL 1.1 alone ("This Font
-Software is licensed under the SIL Open Font License, Version 1.1"; a denial, an exception or another version is
-refused). base.json holds the font's and the licence's sha256, name ID 13 exactly, the Reserved Font Names from the
-OFL's copyright lines, where the font came from, and the question, answer and decision. It is written once: a
-second run with the same record leaves it as it is, any other content is refused. fit_font.py, space_font.py,
-package.py and check_font.py all start from it.
+is not copyright lines in the supported form (fontlib.COPYRIGHT_FORM) and then the SIL Open Font License 1.1 word
+for word (any other line before the licence, or a clause after the holder, the address or the Reserved Font Names,
+is refused), or a name ID 13 that is not the grant ("This Font Software is licensed under the SIL Open Font
+License, Version 1.1") followed only by the sentences fontlib.NOTICE_FORM lists (any other clause is refused).
+base.json holds the font's and the licence's sha256, name ID 13 exactly, the Reserved Font Names from the OFL's
+copyright lines, where the font came from, and the question, answer and decision. It is written once: a second
+run with the same record leaves it as it is, any other content is refused. fit_font.py, space_font.py, package.py
+and check_font.py all start from it.
 """
 import argparse
 import datetime

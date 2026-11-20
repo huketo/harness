@@ -117,6 +117,23 @@ class ApprovalIsBoundToTheFilesAsked(unittest.TestCase):
                   "--out", self.out)
         self.refused(r, "question")
 
+    def test_a_manifest_url_is_in_the_question_and_a_changed_one_is_refused(self):
+        src = ["--font", self.base, "--licence", self.ofl, "--source", "manifest", "--manifest-entry",
+               "fixtures/lumen-ledger@1"]
+        ask = T.run("record_base.py", *src, "--url", "https://example.org/fonts/lumen-ledger.ttf", "--question-only",
+                    "--out", self.out)
+        self.assertEqual(ask.returncode, 0, ask.stderr)
+        question = ask.stdout.strip()
+        self.assertIn("fixtures/lumen-ledger@1", question)
+        self.assertIn("https://example.org/fonts/lumen-ledger.ttf", question)
+        record = ["--question", question, "--answer", T.SYNTHETIC_ANSWER, "--decision", "approved",
+                  "--font-sha256", sha(self.base), "--license-sha256", sha(self.ofl), "--out", self.out]
+        moved = T.run("record_base.py", *src, "--url", "https://example.org/elsewhere/lumen-ledger.ttf", *record)
+        self.refused(moved, "question")
+        self.refused(T.run("record_base.py", *src, *record), "question")
+        r = T.run("record_base.py", *src, "--url", "https://example.org/fonts/lumen-ledger.ttf", *record)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_only_an_approved_decision_records_a_base(self):
         question, font_sha, licence_sha = self.ask()
         for decision in (None, "declined", "yes", "Approved "):

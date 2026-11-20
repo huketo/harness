@@ -13,6 +13,7 @@ import io
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -462,6 +463,81 @@ class Pipeline(unittest.TestCase):
                   "--out-dir", base_json, "--replace")
         refused(self, r, "--out-dir")
         self.assertEqual(raw(base_json), raw(self.base_json))
+
+    def test_package_refuses_two_fonts_that_would_package_as_one_file(self):
+        q = self.scratch()
+        os.makedirs(q("again"))
+        again = q("again", STYLE + ".ttf")
+        ok(self, T.run("space_font.py", self.fit, self.targets, "--out", again, "--track", "8",
+                       "--base-json", self.base_json, "--fit-log", self.fit_log))
+        self.assertNotEqual(sha(again), sha(self.spaced))
+        r = T.run("package.py", self.spaced, again, "--targets", self.targets, "--base-json", self.base_json,
+                  "--fit-log", self.fit_log, "--space-log", self.space_log, again + ".space-log.json",
+                  "--holder", "Fixture Holder", "--out-dir", q("dist"))
+        refused(self, r, f"ttf/{STYLE}.ttf", self.spaced, again)
+        self.assertFalse(os.path.exists(q("dist")))
+        self.assertEqual([n for n in os.listdir(q()) if n.startswith(".package")], [])
+
+    def test_package_refuses_an_out_dir_that_holds_a_link_to_or_from_an_input(self):
+        """--replace removes the old package. An input given by a path inside it (a link to a file outside), or by a
+        link outside it to a file inside, is refused before anything is removed."""
+        for case in ("the input path is a link inside the package", "the input path links into the package"):
+            with self.subTest(case):
+                q = self.scratch()
+                shutil.copytree(self.p("dist"), q("dist"))
+                if case.endswith("inside the package"):
+                    given = q("dist", "base.json")
+                    os.symlink(self.base_json, given)
+                else:
+                    shutil.copy(self.base_json, q("dist", "base.json"))
+                    given = q("base.json")
+                    os.symlink(q("dist", "base.json"), given)
+                r = T.run("package.py", self.spaced, "--targets", self.targets, "--base-json", given,
+                          "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
+                          "--out-dir", q("dist"), "--replace")
+                refused(self, r, "--out-dir")
+                self.assertTrue(os.path.lexists(q("dist", "base.json")), "--replace removed an input")
+                self.assertEqual(raw(given), raw(self.base_json))
+
+    def test_package_stages_in_a_private_folder_and_publishes_with_the_umask(self):
+        """Under a shared umask (0002) the staging folder stays 0700 while the package is verified and its log is
+        written, up to the rename; the published folder then has the umask's usual folder mode."""
+        import package as P
+        q = self.scratch()
+        seen = []
+
+        def mode(path):
+            return stat.S_IMODE(os.stat(path).st_mode)
+
+        def staging():
+            return [mode(os.path.join(q(), n)) for n in os.listdir(q()) if n.startswith(".package-")]
+        real_verify, real_save, real_rename = P.verify, P.L.save_json, os.rename
+
+        def verify(*a, **k):
+            seen.extend(("verify", m) for m in staging())
+            return real_verify(*a, **k)
+
+        def save_json(obj, path):
+            real_save(obj, path)
+            seen.append(("log", mode(os.path.dirname(path))))
+
+        def rename(src, dst):
+            if os.path.basename(src).startswith(".package-"):
+                seen.append(("rename", mode(src)))
+            return real_rename(src, dst)
+        old = os.umask(0o002)
+        try:
+            with mock.patch.object(P, "verify", verify), mock.patch.object(P.L, "save_json", save_json), \
+                    mock.patch("os.rename", rename):
+                code, _, err = in_process("package.py", self.spaced, "--targets", self.targets,
+                                          "--base-json", self.base_json, "--fit-log", self.fit_log,
+                                          "--space-log", self.space_log, "--holder", "Fixture Holder",
+                                          "--out-dir", q("dist"))
+        finally:
+            os.umask(old)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(seen, [("verify", 0o700), ("log", 0o700), ("rename", 0o700)])
+        self.assertEqual(mode(q("dist")), 0o775)
 
     def test_package_refuses_when_no_spaced_font_is_left(self):
         q = self.scratch()

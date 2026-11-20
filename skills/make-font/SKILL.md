@@ -35,10 +35,11 @@ I don't trace or copy the outlines of the fonts you send." Then hold it.
   with its script, and never edit a log.
 
 The base is one TrueType (glyf) variable font in a plain `.ttf` file under the SIL Open Font License 1.1: its
-`OFL.txt` is copyright lines, then the licence word for word, and its name ID 13 grants the OFL 1.1 ("This Font
-Software is licensed under the SIL Open Font License, Version 1.1"). A licence file with any other line or an
-added term, a notice that denies or narrows the grant, and Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not
-bases; merging two fonts and splitting WOFF2 files are out of scope.
+`OFL.txt` is copyright lines in the supported form, then the licence word for word, and its name ID 13 is the
+grant ("This Font Software is licensed under the SIL Open Font License, Version 1.1") followed only by the
+sentences published fonts add to it. The check reads forms, not terms: a licence file with any other line, a
+copyright line or notice with a clause of its own, and Apache-2.0, static, CFF, WOFF and WOFF2 fonts are not
+bases (`references/licensing.md`); merging two fonts and splitting WOFF2 files are out of scope.
 
 Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP 723), so run it with
 `uv run scripts/<name>.py`: uv installs Python 3.12, `fonttools`, `brotli`, `uharfbuzz`, `numpy`, `pillow` and
@@ -82,8 +83,8 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    `--question "<the printed question, verbatim>" --answer "<their answer, verbatim>" --font-sha256 <font hash
    from the question> --license-sha256 <licence hash from the question>`, and `--decision approved` only if they
    approved. That run makes the question again from the same arguments and writes only if the one passed is
-   that question word for word. Any other decision, a file or a shortlist source URL that changed since the
-   question, or an edited question writes nothing; ask again. In an unattended run, stop after `--question-only`:
+   that question word for word. Any other decision, a file or a source URL (from the shortlist or `--url`) that
+   changed since the question, or an edited question writes nothing; ask again. In an unattended run, stop after `--question-only`:
    report the shortlist and the question, and leave `base.json` unwritten.
    Done when `base.json` exists. It is written once; a different base or answer needs a new build folder.
 
@@ -104,8 +105,9 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
 8. **Package and check.** `uv run scripts/package.py build/*.ttf --targets targets.json --base-json base.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --holder "<who owns the modifications>"
    --out-dir dist/` (`references/licensing.md`). It checks the chain, remaking the fit's subset from the base,
-   builds the package and its `package-log.json` in a temporary folder, checks every TTF and WOFF2 against the
-   chain, and only then moves the folder to `dist/`. `dist/` must lie outside `build/`. Then
+   builds the package and its `package-log.json` in a private (0700) temporary folder, checks every TTF and WOFF2
+   against the chain, and only then moves the folder to `dist/`. Give one spaced font per style. `dist/` must lie
+   outside `build/` and hold no input, nor a link to one. Then
    `uv run scripts/check_font.py dist/ttf/*.ttf --targets targets.json --base-json base.json
    --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log dist/package-log.json
    --reference <ref file> --package dist/ --out-dir checks/` (`references/checks.md`). It runs the same chain

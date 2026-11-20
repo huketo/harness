@@ -15,17 +15,21 @@ first: base.json against the base and its OFL text; the fit log made from that b
 and this targets.json, with a subset that the base gives again, byte for byte, with the recorded arguments; and
 every space log made from that base.json and this targets.json, from fonts the fit log wrote. Then every font
 given here must be an output of a space log. Unspaced fits (.fit.ttf) are skipped, and nothing left is a
-refusal. --space-log takes one or more files, and may repeat. Each input is read once (chain.Files): the bytes
-whose sha256 is checked are the bytes renamed, converted and compared, and the package log's sha256 values are of
-those bytes and of the TTF and WOFF2 bytes written.
+refusal, and so are two fonts that would package as one file (two spaced fonts of one style): every output name
+is decided before anything is written. --space-log takes one or more files, and may repeat. Each input is read
+once (chain.Files): the bytes whose sha256 is checked are the bytes renamed, converted and compared, and the
+package log's sha256 values are of those bytes and of the TTF and WOFF2 bytes written.
 
-DIR may not be, or hold, any input (base.json, targets.json, a log, a font, the base or its licence). The package
-is built in a temporary folder beside DIR. Each TTF and WOFF2 there is checked against the chain: a plain
-TrueType file with the subset's glyph order and character map, and the outlines and advances of the spaced font
-it came from. The package log, DIR/package-log.json, is written into the same folder: base.json's sha256, the
-spaced fonts as inputs, the TTF and WOFF2 as outputs, targets.json and the fit and space logs, each by file name
-and sha256. One rename then publishes the folder and its log together. An existing, non-empty DIR is refused
-unless --replace is given; then the old package is moved aside, and deleted only once the new one is in place.
+DIR may not be, or hold, any input (base.json, targets.json, a log, a font, the base or its licence), by the path
+given, by that path's folder resolved, or by the file it links to, so --replace never removes a link to an input.
+The package is built in a temporary folder beside DIR, private (0700) until it is published. Each TTF and WOFF2
+there is checked against the chain: a plain TrueType file with the subset's glyph order and character map, and
+the outlines and advances of the spaced font it came from. The package log, DIR/package-log.json, is written into
+the same folder: base.json's sha256, the spaced fonts as inputs, the TTF and WOFF2 as outputs, targets.json and
+the fit and space logs, each by file name and sha256. One rename then publishes the folder and its log together,
+and only then does the folder get the usual folder mode (0777 less the umask). An existing, non-empty DIR is
+refused unless --replace is given; then the old package is moved aside, and deleted only once the new one is in
+place.
 
 The new family name comes from targets.json. The script refuses a name that contains the base family's name or
 any Reserved Font Name of the base, because the OFL forbids a modified version to use them.
@@ -67,12 +71,6 @@ FALLBACK = {"sans": "sans-serif", "serif": "serif", "mono": "monospace"}
 LEGACY_ACCENTS = "`\u00a8\u00af\u00b4\u00b8\u02c6\u02c7\u02d8\u02d9\u02da\u02db\u02dc\u02dd"
 
 
-
-def _umask() -> int:
-    m = os.umask(0)
-    os.umask(m)
-    return m
-
 def fix_legacy_accents(f):
     """Spacing accents (U+00B4 and friends) are base glyphs, not marks. Some bases class them as marks in GDEF,
     which makes shapers zero their width. Returns the glyphs changed."""
@@ -91,6 +89,29 @@ def fix_legacy_accents(f):
 
 def ps_name(family, style):
     return re.sub(r"[^A-Za-z0-9]", "", family) + "-" + re.sub(r"[^A-Za-z0-9]", "", style)
+
+
+def plan_outputs(fonts, T):
+    """Each font's style and the TTF and WOFF2 names it packages as, decided before anything is written: a font
+    matches the style its filename ends in (-<Style>), never the order a glob gives. Refuses a font that matches no
+    style, and two fonts that would package as one file, which would leave only the second."""
+    plan, taken = [], {}
+    for p in fonts:
+        stem = os.path.splitext(os.path.basename(p))[0].lower()
+        style = next((s for s in T["styles"]
+                      if stem.endswith("-" + re.sub(r"[^A-Za-z0-9]", "", s["name"]).lower())), None)
+        if style is None:
+            raise C.Refused(f"{p}: its name does not end in -<Style> for any style in targets.json "
+                            f"({[s['name'] for s in T['styles']]})")
+        ps = ps_name(T["family"], style["name"])
+        names = (f"ttf/{ps}.ttf", f"webfonts/{ps}.woff2")
+        for n in names:
+            if n.lower() in taken:
+                raise C.Refused(f"{taken[n.lower()]} and {p} would both package as {n} (style {style['name']}). "
+                                "Give one spaced font per style.")
+            taken[n.lower()] = p
+        plan.append((p, style, ps) + names)
+    return plan
 
 
 def check_name(family, base_family, rfn):
@@ -254,26 +275,50 @@ def verify(built, subset_font):
                             f"({', '.join(f'U+{u:04X}' for u in bad[:6])})")
 
 
+def folder_mode():
+    """The mode os.mkdir gives a folder: 0777 less the umask."""
+    umask = os.umask(0)
+    os.umask(umask)
+    return 0o777 & ~umask
+
+
 def publish(tmp, out_dir, replace):
     """Move the finished package, its log inside it, into place with one rename. With replace, the package already
     there is moved aside first and deleted only once the new one is in place; if the new one cannot be moved in,
-    the old one goes back."""
-    if not (replace and os.path.isdir(out_dir) and os.listdir(out_dir)):
-        os.rename(tmp, out_dir)  # onto a missing or empty folder
-        return
-    old = tmp + ".old"
-    os.rename(out_dir, old)
+    the old one goes back.
+
+    The staging folder keeps mkdtemp's 0700 while it is built, verified and logged, so nothing else can change a
+    file between the check and the rename. The folder gets the usual folder mode only once it is in place, through
+    a descriptor opened before the rename, so the mode lands on this folder whatever its path now leads to."""
+    fd = os.open(tmp, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        os.rename(tmp, out_dir)
-    except OSError:
-        os.rename(old, out_dir)
-        raise
-    shutil.rmtree(old)
+        if not (replace and os.path.isdir(out_dir) and os.listdir(out_dir)):
+            os.rename(tmp, out_dir)  # onto a missing or empty folder
+            os.fchmod(fd, folder_mode())
+            return
+        old = tmp + ".old"
+        os.rename(out_dir, old)
+        try:
+            os.rename(tmp, out_dir)
+        except OSError:
+            os.rename(old, out_dir)
+            raise
+        os.fchmod(fd, folder_mode())
+        shutil.rmtree(old)
+    finally:
+        os.close(fd)
 
 
 def inside(path, folder):
-    path, folder = os.path.realpath(path), os.path.realpath(folder)
-    return path == folder or path.startswith(folder.rstrip(os.sep) + os.sep)
+    """True when path is folder or lies in it, read every way --replace could reach it: the path as given, its
+    folder's links resolved (where its own entry is), and every link resolved (the file it leads to). The folder is
+    read as given and resolved too. A link inside the package to an input outside is inside: replacing the package
+    would delete it."""
+    given = os.path.abspath(path)
+    paths = {given, os.path.join(os.path.realpath(os.path.dirname(given)), os.path.basename(given)),
+             os.path.realpath(path)}
+    folders = {os.path.abspath(folder), os.path.realpath(folder)}
+    return any(p == f or p.startswith(f.rstrip(os.sep) + os.sep) for p in paths for f in folders)
 
 
 def main():
@@ -323,26 +368,19 @@ def main():
     licence = b.approved.licence.data
     rfn = list(dict.fromkeys(rec["license"]["reserved_font_names"] + L.reserved_font_names(bn.get(0) or "")))
     check_name(T["family"], bfam, rfn)
+    plan = plan_outputs(fonts, T)
 
     parent = os.path.dirname(out_dir)
     os.makedirs(parent, exist_ok=True)
-    tmp = tempfile.mkdtemp(prefix=".package-", dir=parent)
-    # mkdtemp makes the folder 0700; the published package is an ordinary folder like the rest of the build.
-    os.chmod(tmp, 0o777 & ~_umask())
+    tmp = tempfile.mkdtemp(prefix=".package-", dir=parent)  # 0700 until publish() has moved it into place
     try:
         faces, listed, built = [], [], []
-        for p, src in zip(fonts, spaced):
-            # Match a font to its style by the -<Style> its filename ends in, never by the order a glob gives.
-            stem = os.path.splitext(os.path.basename(p))[0]
-            style = next((s for s in T["styles"] if stem.lower().endswith("-" + re.sub(r"[^A-Za-z0-9]", "", s["name"]).lower())), None)
-            if style is None:
-                raise SystemExit(f"{p}: its name does not end in -<Style> for any style in targets.json ({[s['name'] for s in T['styles']]})")
+        for (p, style, ps, ttf_name, woff_name), src in zip(plan, spaced):
             f = src.font()
-            ps = set_names(f, bn, T["family"], style["name"], style["weight"], a, a.version)
+            set_names(f, bn, T["family"], style["name"], style["weight"], a, a.version)
             fixed = fix_legacy_accents(f)
             if fixed:
                 print(f"{style['name']}: {len(fixed)} spacing accents reclassed from mark to base in GDEF")
-            ttf_name, woff_name = f"ttf/{ps}.ttf", f"webfonts/{ps}.woff2"
             ttf_data = C.font_bytes(f)
             w = TTFont(io.BytesIO(ttf_data))
             opts = subset.Options()
