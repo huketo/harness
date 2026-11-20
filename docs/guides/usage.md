@@ -102,8 +102,8 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 | --- | --- |
 | [`awesome-interface`](../../skills/awesome-interface/SKILL.md) | 일반 UI 제작·개선·검토. 새 화면의 시각 방향과 기존 제품을 보존하는 리디자인 절차를 포함하며, 접근성·배치·문구·타이포그래피·색상·시각적 완성도·웹 모션과 제스처·모바일 웹 대응의 공통 규칙을 소유합니다. 작은 수정은 관련 영역만 읽습니다. “declutter”, “reveal hero”처럼 증상이나 패턴 이름으로 요청하면 플레이북이 소유 규칙으로 안내합니다. |
 | [`image-to-code`](../../skills/image-to-code/SKILL.md) | 제공·선택·생성된 이미지에서 웹 UI를 구현합니다. 사용 가능한 참조는 재생성하지 않고, 필요한 이미지가 없을 때만 `imagegen`을 사용합니다. 네이티브 앱 구현은 범위 밖입니다. |
-| [`imagegen`](../../skills/imagegen/SKILL.md) | 웹 섹션·모바일 앱 화면·독립 로고·브랜드 콘셉트 보드의 실제 이미지 생성과 시각 확인. 내부 참조는 `frontend/common`, `frontend/web`, `frontend/mobile`, `logo`, `brandkit`이며 별도 등록 스킬이 아닙니다. |
-| [`design-md`](../../skills/design-md/SKILL.md) | 명시적으로 요청한 설계 문서의 추출·작성·갱신. 기존 문서 소유 경로를 우선하며 현재 구현·승인된 의도·제안·미확인을 구분합니다. Stitch는 선택적 어댑터입니다. 요청하면 세션의 디자인 교정을 규칙으로 제안하고, 승인받은 항목만 기록합니다. |
+| [`imagegen`](../../skills/imagegen/SKILL.md) | 웹 섹션·모바일 앱 화면·로고 콘셉트·브랜드 콘셉트 보드의 실제 이미지 생성과 시각 확인. 완성된 로고 파일(SVG·PNG 묶음)은 `make-logo`가 만듭니다. 내부 참조는 `frontend/common`, `frontend/web`, `frontend/mobile`, `logo`, `brandkit`이며 별도 등록 스킬이 아닙니다. |
+| [`design-md`](../../skills/design-md/SKILL.md) | 명시적으로 요청한 설계 문서의 추출·작성·갱신. 기존 문서 소유 경로를 우선하며 현재 구현·승인된 의도·제안·미확인을 구분합니다. Stitch는 선택적 어댑터입니다. 요청하면 세션의 디자인 교정을 규칙으로 제안하고, 승인받은 항목만 기록합니다. 컴포넌트 하나의 문서 항목과, 구현 값이 프로젝트의 기존 토큰에 어떻게 대응하는지 보여 주는 읽기 전용 보고도 만듭니다. |
 
 - “awesome-interface로 이 오류 문구만 고쳐 주세요.”
 - “이 화면을 전체 검토하되 수정하지 마세요.”

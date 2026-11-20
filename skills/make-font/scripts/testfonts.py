@@ -475,7 +475,7 @@ def flavoured(src, dst, flavor):
 def run(script, *args, cwd=None, skill=HERE):
     """Run one skill script with this interpreter, from `skill` (this folder, or a pinned_skill copy). Returns the
     CompletedProcess (never raises on exit code)."""
-    return subprocess.run([sys.executable, "-I", os.path.join(skill, script), *map(str, args)],
+    return subprocess.run([sys.executable, "-I", "-B", os.path.join(skill, script), *map(str, args)],
                           capture_output=True, text=True, cwd=cwd)
 
 

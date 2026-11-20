@@ -85,7 +85,7 @@ mise run test-logo-gates
 mise run test-skill-gates   # both
 ```
 
-The tasks run under `uv` with Python 3.12 (`uv run --no-project --python 3.12`), so the first run downloads Python and the packages and later runs reuse the cache. `test-logo-gates` needs `potrace` on `PATH` (or in the make-logo cache): without it the trace and seal cases are skipped, and a run with skips does not prove the trace gates. The tasks pass `-B`, but a test that starts a child interpreter can still write `__pycache__` into a script folder; git ignores it, and it is deleted after the run. They prove the gates' accept and refuse decisions against those fixtures; they do not call GitHub or Google Fonts, run fontbakery, or render a font or logo book in a browser, and those remain unverified until run separately.
+The tasks run under `uv` with Python 3.12 (`uv run --no-project --python 3.12`), so the first run downloads Python and the packages and later runs reuse the cache. `test-logo-gates` needs `potrace` on `PATH` (or in the make-logo cache): without it the trace and seal cases are skipped, and a run with skips does not prove the trace gates. The tasks and the child interpreters the tests start pass `-B`, so a run leaves no `__pycache__` in the script folders. They prove the gates' accept and refuse decisions against those fixtures; they do not call GitHub or Google Fonts, run fontbakery, or render a font or logo book in a browser, and those remain unverified until run separately.
 
 ## Shell
 
