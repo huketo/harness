@@ -10,8 +10,9 @@ person approved them, and the font given on the command line must be that file, 
 copy made elsewhere is refused. The base must be a TrueType variable font (glyf, fvar, gvar) in a plain `.ttf`
 file: `chain.read_base` checks it again here, as at the approval step.
 
-It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`) plus
-ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
+It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`, and
+`fontlib.SUBSET_ONLY` for `korean`, every modern syllable and the compatibility jamo, which `check_font.py` does
+not gate yet) plus ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
 `build/subset/base.subset.ttf`, and `fit-log.json` records it under `subset`: the base's sha256, the file, its
 sha256, the pyftsubset arguments in order and the fontTools version. `chain.build_subset` makes it, always with
 fontTools' own GSUB and GPOS serializer (HarfBuzz's repacker, used whenever uharfbuzz is installed, gives other
@@ -88,12 +89,18 @@ every other Hangul target; it moves no Hangul glyph. The Hangul takes its outlin
 keeps the base's sizes, centres and spacing at the weight the fit chose.
 
 **Weight.** A style with an n stem, or after a first style with one, solves the weight from Latin as above. When
-the targets have no Latin n stem, the first style's wght is solved from `stem_h1`: the base's vertical stem
-(ㅣ in 이 니 미) over its H1 mean face height meets the reference's ratio. The face height moves a little with
-the weight, so each try reads both at the same wght. Each later style starts from that wght and moves by its
-weight-class difference (Bold 700 after Regular 400: +300), clamped to the axis. Targets with neither an n stem
-nor `stem_h1` are refused. Without a Latin target, the Latin takes the wght the Hangul chose, which keeps the
-base's own balance between the two.
+the targets have no Latin n stem, the first style's wght is solved from the Hangul stem (ㅣ in 이 니 미), taken in
+this order:
+
+1. `stem` at `cap700` (a reference with a Latin H): the base's stem times 700 over its cap height meets it.
+2. `stem` at `em1000` (a font file without an H): the base's stem per 1000 of the finished em meets it, the em
+   being the cap height over `cap_em` when the targets have one, else the base's em.
+3. `stem_h1` (a screenshot of Hangul alone): the base's stem over its H1 mean face height meets the ratio.
+
+The cap height and the face height move a little with the weight, so each try reads them and the stem at the same
+wght. Each later style starts from that wght and moves by its weight-class difference (Bold 700 after Regular 400:
++300), clamped to the axis. Targets with neither an n stem nor a Hangul stem are refused. Without a Latin target,
+the Latin takes the wght the Hangul chose, which keeps the base's own balance between the two.
 
 **Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
 there, and only then does `finish()` scale the em, once, at the end:
@@ -114,7 +121,7 @@ The saved font rounds every point to a whole unit, so a stem lands up to a unit 
 
 | Field | Value |
 |-|-|
-| `weight_from` | `n_stem` or `stem_h1`, with ", stepped from the first style" after the first |
+| `weight_from` | `n_stem`, `stem cap700`, `stem em1000` or `stem_h1`, with ", stepped from the first style" after the first |
 | `units` | font units of the y instance per `cap700` and per `em1000` unit |
 | `classes.Hn.<key>` | `{"target", "base", "from"}` in font units of the y instance, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in |
 | `stem`, `adv` | the same, font-wide (`adv` for fixed-width Hangul) |

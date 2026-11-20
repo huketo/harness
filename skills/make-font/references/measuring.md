@@ -102,7 +102,9 @@ is measured: where the vowel stands against the initial, and whether a final sit
 | H5 | vowel under, final | 공눈돌몸손울큰흥 |
 | H6 | mixed vowel, final | 광권뒷원괜윙휠쾅 |
 
-The lists are fixed for every font, and one mean per class is a target; a single syllable never is.
+The lists are fixed for every font, and one mean per class is a target; a single syllable never is. A class
+read on fewer than two different syllables of its list gives no number, and neither does the stem without all
+three of 이 니 미. The measurement names what was read for them under `left_out` (`{"H1": "이", "stem": "이"}`).
 `HANGUL_HELD_OUT` holds four other syllables per class. A font file's measurement reports their mean face over
 the list's (`held_out`), which shows how well the list stands for its class in that font. In Noto Sans KR and
 Pretendard at wght 400 every class came within 4.5 %, except the H2 height: held-out ×1.08, because ㅜ and ㅠ
@@ -113,7 +115,8 @@ drop a leg below ㅡ and the held-out set has more of them. A class mean depends
 Each Hangul value is tagged: `{"value": 0.0887, "unit": "ratio", "confidence": "high"}`.
 
 - `cap700`: a length at Latin cap height 700, as every Latin number. Only when an H was measured with the
-  Hangul: a font file with Latin, or a screenshot with a Latin H in it at the same size.
+  Hangul: a font file with an H (with or without the rest of the Latin), or a screenshot with a Latin H in it at
+  the same size.
 - `em1000`: a length per 1000 em (`value × 1000 / upm`). Font files only.
 - `ratio`: a ratio of two lengths of the same source. Every source gives these, a screenshot of Hangul alone
   nothing else.
@@ -121,7 +124,9 @@ Each Hangul value is tagged: `{"value": 0.0887, "unit": "ratio", "confidence": "
 A key holds lengths (one entry per length unit the source has) or one ratio, never both. A ratio key's suffix
 names its denominator: `_cap` the Latin cap height, `_h1` the H1 class's mean face (height, or width for
 `face_w_h1`). `make_targets.py` merges values of one unit only; a value in another unit stays beside them as a
-target of its own, and a unit outside the three is refused.
+target of its own. It refuses a reference whose number is anything but a non-empty list of tagged values, each with
+a numeric `value` and one of the three units, at most one per unit: a tag outside a list, a tag without a value,
+a bare number.
 
 ### What is measured
 
@@ -137,7 +142,7 @@ The face is the ink box of a syllable. Cuts are straight lines through the outli
 | `side`, `side_asym` | mean of the two sidebearings, and mean right minus left | file |
 | `center_adv` | mean face centre over the advance | file |
 | `adv`, `adv_cap` | mean advance, per class when the Hangul is proportional, once when it is fixed-width | file |
-| `stem`, `stem_h1` | the last vertical run (ㅣ) across 이 니 미 at mid face height, median of the three; over the H1 mean face height | file, any screenshot (`stem` with H) |
+| `stem`, `stem_h1` | the last vertical run (ㅣ) across 이 니 미 at mid face height, median of the three (all three needed); over the H1 mean face height | file, any screenshot (`stem` with H) |
 | `report.overshoot` | top of 오 minus top of 고 | report only |
 | `report.hstroke` | the lowest run (ㅡ) at the face centre of 으 그 느, median | report only |
 | `report.contrast` | ㅇ of 으: top and bottom thickness over side thickness | report only |
@@ -161,7 +166,9 @@ Noto Sans KR, Pretendard and Noto Serif KR at wght 100, 400 and 900 (outlines, a
 per em), and its sides differ by at most 0.5 % of the advance. Without anchors, or when the anchors found do not
 fit the text, the line is cut at its N − 1 widest gaps (N characters), and only when the narrowest of those is at
 least 1.5 times, and 2 px more than, the widest gap left inside a syllable. Otherwise the script stops, because
-the gap between ㅇ and ㅣ in 이 can be as wide as the gap between two syllables. `cut_at` records which way each
+the gap between ㅇ and ㅣ in 이 can be as wide as the gap between two syllables. A line with exactly N groups of
+ink leaves no gap inside a syllable to compare, so it stops too: 이이 drawn tight is four groups. A screenshot of
+Hangul alone in which no class was read on two different syllables stops as well. `cut_at` records which way each
 line was cut. A line whose syllables all have blank rows at one height (a final under the vowel) reads as two
 bands of ink; bands are joined across the narrowest gaps when those stand as far apart from the line gaps.
 
@@ -181,7 +188,7 @@ only this table's fields. A *tagged list* is a list of tagged values, at most on
 
 | Path | Value | Units | Use |
 |-|-|-|-|
-| `classes` | object with keys `H1` to `H6`, each a class some reference measured | | |
+| `classes` | object with keys `H1` to `H6`, each a class some reference measured on two or more of its syllables | | |
 | `classes.Hn.syllables` | the measuring syllables the first reference had | | names only |
 | `classes.Hn.face_w`, `face_h` | tagged list | `cap700`, `em1000` | target |
 | `classes.Hn.face_w_cap`, `face_h_cap` | tagged list | `ratio` | target |
@@ -190,13 +197,13 @@ only this table's fields. A *tagged list* is a list of tagged values, at most on
 | `classes.Hn.cx`, `cy` | tagged list | `cap700`, `em1000` | target |
 | `classes.Hn.side`, `side_asym` | tagged list | `cap700`, `em1000` | target |
 | `classes.Hn.center_adv` | tagged list | `ratio` | target |
-| `classes.Hn.adv` | tagged list, proportional Hangul only | `cap700`, `em1000` | target |
-| `classes.Hn.adv_cap` | tagged list, proportional Hangul only | `ratio` | target |
-| `stem` | tagged list | `cap700`, `em1000` | target |
-| `stem_h1` | tagged list | `ratio` | target: the weight without a Latin stem |
-| `fixed_width` | true when every measured syllable has one advance (within 0.5 %), the commoner answer of the files | | |
-| `adv` | tagged list, fixed-width Hangul only | `cap700`, `em1000` | target |
-| `adv_cap` | tagged list, fixed-width Hangul only | `ratio` | target |
+| `classes.Hn.adv` | tagged list, only when `fixed_width` is false | `cap700`, `em1000` | target |
+| `classes.Hn.adv_cap` | tagged list, only when `fixed_width` is false | `ratio` | target |
+| `stem` | tagged list, from a reference that had all of 이 니 미 | `cap700`, `em1000` | target: the weight without a Latin stem, before `stem_h1` |
+| `stem_h1` | tagged list, the same | `ratio` | target: the weight without a Latin stem or a `stem` |
+| `fixed_width` | true when every measured syllable has one advance (within 0.5 %): the commoner answer of the files, the first file's on a tie | | |
+| `adv` | tagged list, only when `fixed_width` is true | `cap700`, `em1000` | target |
+| `adv_cap` | tagged list, only when `fixed_width` is true | `ratio` | target |
 | `report.overshoot`, `report.hstroke` | tagged list | `cap700`, `em1000` | report only |
 | `report.overshoot_h1`, `report.hstroke_h1`, `report.contrast` | tagged list | `ratio` | report only |
 | `report.pitch.Hn` | tagged list | `cap700` | report only |
@@ -205,7 +212,10 @@ only this table's fields. A *tagged list* is a list of tagged values, at most on
 
 A tagged value's `confidence` is the highest of the values merged into it. Every key is optional: a target exists
 only when a reference measured it, so a screenshot of Hangul alone gives the ratio keys, `stem_h1` and the ratio
-report. Neither `make_targets.py` nor `fit_font.py` needs a Latin field. A measurement file's `hangul` object has
-the same keys, plus three that describe how that reference was read and are not merged: `units` (the units it
-gives), `held_out.Hn.face_w` and `face_h` (font files, `ratio`) and `cut_at` (screenshots).
+report. Neither `make_targets.py` nor `fit_font.py` needs a Latin field. The advances come in one form only, the
+one `fixed_width` names; a reference of the other form is left out of them, and its answer is in
+`spread.fixed_width`. A measurement file's `hangul` object has the same keys, with each reference's advances in
+the form its own `fixed_width` names (else it is refused), plus four that describe how that reference was read and
+are not merged: `units` (the units it gives), `held_out.Hn.face_w` and `face_h` (font files, `ratio`), `cut_at`
+(screenshots) and `left_out` (`{"Hn" or "stem": the syllables read}`, for what had too few).
 

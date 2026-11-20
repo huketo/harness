@@ -233,15 +233,16 @@ def glyf_vf(path, family=BASE_FAMILY, copyright_line="Copyright 2026 The Lumen L
 HANGUL_UPM = 1250  # not 1000, so a length per 1000 em (x 0.8) and at cap height 700 (x 1) differ
 
 
-def _hangul_rects(cls, s, t, top_extra=0):
+def _hangul_rects(cls, s, t, top_extra=0, inset=0):
     """One syllable of a class at stem s and thin stroke t: a consonant ring, the vowel and, in H4 to H6, a final
-    ring. The vowel's vertical stem rises with the stem, so the face height changes a little with the weight."""
+    ring. The vowel's vertical stem rises with the stem, so the face height changes a little with the weight.
+    `inset` shortens the H2 vowel at both ends, which sets the anchor apart from the H2 syllables it stands between."""
     def ring(x0, y0, x1, y1):
         return [(x0, y0, x1, y1, False), (x0 + s, y0 + t, x1 - s, y1 - t, True)]
     top = 700 + round(s * 1.25)
     return {
         "H1": ring(80, 120, 520, 680) + [(640, -60, 640 + s, top, False)],
-        "H2": ring(200, 360, 700, 800 + top_extra) + [(100, 120, 800, 120 + t, False)],
+        "H2": ring(200, 360, 700, 800 + top_extra) + [(100 + inset, 120, 800 - inset, 120 + t, False)],
         "H3": ring(80, 380, 480, 800) + [(60, 160, 660, 160 + t, False), (680, -60, 680 + s, top, False)],
         "H4": ring(80, 420, 480, 800) + [(600, 300, 600 + s, top, False)] + ring(140, -60, 700, 240),
         "H5": ring(200, 540, 700, 800) + [(100, 400, 800, 400 + t, False)] + ring(160, -60, 740, 260),
@@ -250,36 +251,38 @@ def _hangul_rects(cls, s, t, top_extra=0):
     }[cls]
 
 
-def _hangul_glyphs(stem, chars, adv):
+def _hangul_glyphs(stem, chars, adv, scale=1.0):
     s, t = stem, round(stem * 0.8)
     out = {}
     for ch in chars:
         cls = fontlib.hangul_class(ch)
-        rects = _hangul_rects(cls, s, t, top_extra=12 if ch == fontlib.HANGUL_OVERSHOOT[0] else 0)
+        rects = _hangul_rects(cls, s, t, top_extra=12 if ch == fontlib.HANGUL_OVERSHOOT[0] else 0,
+                              inset=60 if ch == fontlib.HANGUL_ANCHOR else 0)
         pen = TTGlyphPen(None)
         for r in rects:
-            _rect(pen, *r)
-        out[f"uni{ord(ch):04X}"] = (pen.glyph(), adv)
+            _rect(pen, *(round(c * scale) for c in r[:4]), r[4])
+        out[f"uni{ord(ch):04X}"] = (pen.glyph(), round(adv * scale))
     return out
 
 
-def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY):
-    """A TrueType variable font with a weight axis 100-900 (stems 40, 80 at 400, 160), the Latin glyphs of glyf_vf
-    when latin is true, and every syllable fontlib measures, drawn from rectangles by class. Its em is HANGUL_UPM,
-    its cap height 700, and every syllable `adv` units wide. At wght 400 the H1 face is 640 wide and 860 tall, the
-    stem 80."""
+def hangul_vf(path, latin=True, adv=1000, family=BASE_FAMILY, scale=1.0):
+    """A TrueType variable font with a weight axis 100-900 (stems 40, 80 at 400, 160), Latin glyphs of glyf_vf
+    (all of them when latin is true, none when false, or the ones a string names, such as "H"), and every syllable
+    fontlib measures, drawn from rectangles by class (the anchor 으 with a shorter ㅡ). Its em is HANGUL_UPM, its cap
+    height 700, and every syllable `adv` units wide. At wght 400 the H1 face is 640 wide and 860 tall, the stem 80. `scale` draws the Hangul, its
+    advance included, that many times larger against the Latin."""
     chars = sorted(set(fontlib.HANGUL_TEXT))
+    keep = set(_shapes(80)) if latin is True else {".notdef", "space", *(latin or "")}
 
     def master(stem):
-        glyphs, advs = _ttglyphs(stem) if latin else ({}, {})
-        if not latin:
-            for name, (a, rects) in _shapes(stem).items():
-                if name in (".notdef", "space"):
-                    pen = TTGlyphPen(None)
-                    for r in rects:
-                        _rect(pen, *r)
-                    glyphs[name], advs[name] = pen.glyph(), a
-        for name, (g, a) in _hangul_glyphs(stem, chars, adv).items():
+        glyphs, advs = {}, {}
+        for name, (a, rects) in _shapes(stem).items():
+            if name in keep:
+                pen = TTGlyphPen(None)
+                for r in rects:
+                    _rect(pen, *r)
+                glyphs[name], advs[name] = pen.glyph(), a
+        for name, (g, a) in _hangul_glyphs(stem, chars, adv, scale).items():
             glyphs[name], advs[name] = g, a
         return glyphs, advs
     glyphs, advs = master(80)

@@ -267,7 +267,9 @@ def hangul_letters(cov, chars, text):
 
     In the 으 X 으 form the first group of ink is an anchor, every group drawn like it is one, and the ink between
     two anchors is one syllable, whatever its gaps. Otherwise, or when the anchors found do not fit the text, the
-    line is cut at its len(chars) - 1 widest gaps, and refused unless those stand clearly apart from the rest."""
+    line is cut at its len(chars) - 1 widest gaps, and refused unless those stand clearly apart from the gaps left
+    inside a syllable. A line with one group per character leaves no gap inside a syllable to compare, so it is
+    refused too: its groups may as well be the parts of fewer syllables."""
     comps = components(cov > 0.15)
     if comps:
         med = st.median(len(c[0]) for c in comps)
@@ -290,10 +292,14 @@ def hangul_letters(cov, chars, text):
     gaps = [int(groups[i + 1][0] - groups[i][1] - 1) for i in range(len(groups) - 1)]
     order = sorted(range(len(gaps)), key=lambda i: -gaps[i])
     cut, inner = sorted(order[:n - 1]), [gaps[i] for i in order[n - 1:]]
-    if cut and inner:
+    why = f"its {a} anchors were not found" if anchored else f"it has no {a} anchors"
+    if cut and not inner:
+        raise SystemExit(f"line {text!r}: {why}, and it has one group of ink per character ({n}), so no gap is left "
+                         "inside a syllable to show that the gaps between them stand apart: the groups may be the "
+                         f"parts of fewer syllables. Type the {a} X {a} lines (fontlib.SAMPLE_LINES_KO).")
+    if cut:
         narrow, wide = min(gaps[i] for i in cut), max(inner)
         if narrow < max(GAP_APART * wide, wide + 2):
-            why = f"its {a} anchors were not found" if anchored else f"it has no {a} anchors"
             raise SystemExit(f"line {text!r}: {why}, and its gaps do not fall in two groups: the "
                              f"narrowest gap between syllables would be {narrow} px and the widest inside one "
                              f"{wide} px, so the syllables cannot be told apart. Type the {a} X {a} lines "
@@ -335,7 +341,7 @@ def measure_hangul(lines, k, cut_at):
     geo = L.hangul_geometry(ImageInk(seen), font=False)
     if not geo["classes"]:
         return None
-    geo["pitch"] = {cls: st.mean(v) for cls, v in pitch.items()}
+    geo["pitch"] = {cls: st.mean(v) for cls, v in pitch.items() if cls in geo["classes"]}
     face_px = (geo["classes"].get("H1") or next(iter(geo["classes"].values())))["face_h"]
 
     def conf(kind, px):
@@ -399,8 +405,13 @@ def measure_lines(cov, texts):
     H, bH = first("H")
     hangul = [lines[i] for i in hangul]
     if H is None and hangul and len(hangul) == len(lines):
-        return {"source": "image", "cap_em": None, "px_cap": None, "confidence": {},
-                "hangul": measure_hangul(hangul, None, cut_at), "letters_read": len(every)}
+        h = measure_hangul(hangul, None, cut_at)
+        if h is None:
+            raise SystemExit(f"no Hangul class was read on two different syllables of its list "
+                             f"(fontlib.HANGUL_CLASSES), and one syllable is never a target. Type the "
+                             f"{L.HANGUL_ANCHOR} X {L.HANGUL_ANCHOR} lines (fontlib.SAMPLE_LINES_KO).")
+        return {"source": "image", "cap_em": None, "px_cap": None, "confidence": {}, "hangul": h,
+                "letters_read": len(every)}
     if H is None:
         raise SystemExit("an H is needed to set the scale (cap height 700). Add one to the text.")
     cap_px = bH - H.top()
@@ -539,7 +550,11 @@ def measure_lines(cov, texts):
     if m.get("n_counter") and sides.get("lc_straight") is not None:
         put("rhythm", 2 * sides["lc_straight"] / m["n_counter"], "medium")
     if hangul:
-        m["hangul"] = measure_hangul(hangul, k, cut_at)
+        h = measure_hangul(hangul, k, cut_at)
+        if h:
+            m["hangul"] = h
+        else:
+            print("Hangul left out: no class was read on two different syllables of its list", file=sys.stderr)
     m["letters_read"] = len(every)
     m["joined_parts"] = len(joined)
     return m
@@ -584,7 +599,7 @@ def selftest(font, px, out_dir):
     got = measure_lines(load_coverage(path), lines)
     print(f"selftest: {os.path.basename(font)} at {px}px per em, cap {got['px_cap']} px, sheet {path}")
     if hangul:
-        lengths = {"cap700": L.CAP / face.bounds("H")[3]} if latin else {}
+        lengths = {"cap700": L.CAP / face.bounds("H")[3]} if face.has("H") else {}
         compare_hangul(L.hangul_measurement(L.hangul_geometry(face), {**lengths, "em1000": 1000 / face.upm}),
                        got["hangul"])
     if not latin:

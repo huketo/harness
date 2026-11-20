@@ -58,11 +58,11 @@ class FontFile(Scratch):
     def setUpClass(cls):
         super().setUpClass()
         p = cls.p
-        for name, latin in (("both", True), ("hangul", False)):
+        for name, latin in (("both", True), ("hangul", False), ("cap", "H")):
             T.hangul_vf(p(f"{name}.ttf"), latin=latin)
             r = T.run("measure_font.py", p(f"{name}.ttf"), "--out", p(f"{name}.json"))
             assert r.returncode == 0, r.stderr
-        cls.both, cls.hangul = load(p("both.json")), load(p("hangul.json"))
+        cls.both, cls.hangul, cls.cap = load(p("both.json")), load(p("hangul.json")), load(p("cap.json"))
 
     def test_every_hangul_value_carries_one_of_the_three_units(self):
         for m in (self.both, self.hangul):
@@ -92,6 +92,17 @@ class FontFile(Scratch):
         self.assertEqual(m["hangul"]["units"], ["em1000", "ratio"])
         self.assertEqual({v["unit"] for _, v in tagged(m["hangul"])}, {"em1000", "ratio"})
         self.assertEqual(value(m["hangul"]["classes"]["H1"]["face_h"], "em1000"), 688)
+
+    def test_a_latin_H_alone_gives_lengths_at_cap_700(self):
+        m = self.cap
+        self.assertNotIn("widths", m)  # no x, n or o: the Latin is not measured, the H still sets the cap
+        h = m["hangul"]
+        self.assertEqual(h["units"], ["cap700", "em1000", "ratio"])
+        H1 = h["classes"]["H1"]
+        self.assertEqual(value(H1["face_h"], "cap700"), 860)
+        self.assertAlmostEqual(value(H1["face_h_cap"], "ratio"), 860 / 700, places=3)
+        self.assertEqual(value(h["stem"], "cap700"), 80)
+        self.assertAlmostEqual(value(h["adv_cap"], "ratio"), 1000 / 700, places=3)
 
     def test_ratios_and_the_report(self):
         h = self.both["hangul"]
@@ -168,9 +179,8 @@ class Screenshot(Scratch):
         self.assertAlmostEqual(value(h["classes"]["H1"]["face_h"], "cap700"), 860, delta=860 * 0.015)
 
 
-class Segmentation(Scratch):
-    """Syllables are cut at the 으 anchors; without them, at the widest gaps, and only when those stand clearly
-    apart from the gaps inside a syllable. The H1 glyph is a ring and a stem 120 units apart."""
+class Lines(Scratch):
+    """One line of Hangul rendered and read back. The H1 glyph is a ring and a stem 120 units apart."""
 
     @classmethod
     def setUpClass(cls):
@@ -179,10 +189,19 @@ class Segmentation(Scratch):
         T.hangul_vf(p("tight.ttf"), latin=False, adv=760)  # 40 + 80 units between syllables: the same 120
         T.hangul_vf(p("loose.ttf"), latin=False, adv=1000)  # 280 + 80 between syllables
 
-    def measure(self, font, text):
-        png = self.p(f"{os.path.basename(font)}-{len(text)}-{text[:2]}.png")
+    def measure(self, font, text, read_as=None):
+        """Render text in the font, then read the screenshot as read_as (by default the same text)."""
+        png = self.p(f"{os.path.basename(font)}-{text}-{read_as}.png")
         sheet(font, [text], png)
-        return T.run("measure_image.py", png, "--text", text, "--out", png + ".json")
+        return T.run("measure_image.py", png, "--text", read_as or text, "--out", png + ".json")
+
+    def read(self, font, text):
+        return load(self.p(f"{os.path.basename(font)}-{text}-None.png.json"))["hangul"]
+
+
+class Segmentation(Lines):
+    """Syllables are cut at the 으 anchors; without them, at the widest gaps, and only when those stand clearly
+    apart from the gaps inside a syllable."""
 
     def test_refuses_a_line_without_anchors_whose_gaps_do_not_fall_in_two_groups(self):
         r = self.measure(self.p("tight.ttf"), "이이이이")
@@ -190,17 +209,60 @@ class Segmentation(Scratch):
         self.assertIn("gaps", r.stderr)
         self.assertIn(L.HANGUL_ANCHOR, r.stderr)
 
+    def test_refuses_a_line_without_anchors_that_has_one_group_of_ink_per_character(self):
+        # 이이 in the tight font is four groups of ink with gaps of one width between them. Read as four syllables,
+        # no gap is left inside a syllable to show that the cuts stand apart, so the line is refused.
+        r = self.measure(self.p("tight.ttf"), "이이", read_as="가나이니")
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+        self.assertIn("gap", r.stderr)
+        self.assertIn(L.HANGUL_ANCHOR, r.stderr)
+
     def test_cuts_a_line_without_anchors_at_its_widest_gaps_when_they_stand_apart(self):
-        r = self.measure(self.p("loose.ttf"), "이이이이")
+        r = self.measure(self.p("loose.ttf"), "가나이니")
         self.assertEqual(r.returncode, 0, r.stderr)
-        h1 = load(self.p("loose.ttf-4-이이.png.json"))["hangul"]["classes"]["H1"]
+        h1 = self.read(self.p("loose.ttf"), "가나이니")["classes"]["H1"]
         self.assertAlmostEqual(value(h1["aspect"], "ratio"), 640 / 860, delta=0.015)
 
     def test_cuts_at_the_anchors_whatever_the_gaps(self):
-        r = self.measure(self.p("tight.ttf"), "으이으이으")
+        r = self.measure(self.p("tight.ttf"), "으가으이으")
         self.assertEqual(r.returncode, 0, r.stderr)
-        h1 = load(self.p("tight.ttf-5-으이.png.json"))["hangul"]["classes"]["H1"]
+        h1 = self.read(self.p("tight.ttf"), "으가으이으")["classes"]["H1"]
         self.assertAlmostEqual(value(h1["aspect"], "ratio"), 640 / 860, delta=0.015)
+
+
+class OneSyllable(Lines):
+    """A class is a mean over different syllables, and the stem a median over 이, 니 and 미: one syllable read again
+    and again is still one syllable."""
+
+    def test_refuses_a_screenshot_where_no_class_has_two_different_syllables(self):
+        for text in ("이이이이", "으이으이으이으이으"):
+            with self.subTest(text=text):
+                r = self.measure(self.p("loose.ttf"), text)
+                self.assertNotEqual(r.returncode, 0, r.stdout)
+                self.assertIn("two different syllables", r.stderr)
+
+    def test_a_class_with_one_syllable_is_left_out(self):
+        text = "으이으이으고으노으"  # H1 is 이 alone, H2 has 고 and 노
+        r = self.measure(self.p("loose.ttf"), text)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        h = self.read(self.p("loose.ttf"), text)
+        self.assertEqual(set(h["classes"]), {"H2"})
+        self.assertNotIn("stem_h1", h)
+        self.assertNotIn("face_w_h1", h["classes"]["H2"])
+        self.assertEqual(h["left_out"], {"H1": "이", "stem": "이"})
+
+    def test_the_stem_needs_all_three_of_its_syllables(self):
+        for text, stem in (("으이으니으가으", False), ("으이으니으미으", True)):
+            with self.subTest(text=text):
+                r = self.measure(self.p("loose.ttf"), text)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                h = self.read(self.p("loose.ttf"), text)
+                self.assertEqual(set(h["classes"]), {"H1"})
+                self.assertEqual("stem_h1" in h, stem)
+                if stem:
+                    self.assertAlmostEqual(value(h["stem_h1"], "ratio"), 80 / 860, delta=0.005)
+                else:
+                    self.assertEqual(h["left_out"], {"stem": "이니"})
 
 
 if __name__ == "__main__":

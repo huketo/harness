@@ -38,12 +38,14 @@ For each style:
    (or the base's), and the variation tables are dropped.
 
 Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Without a Latin n stem to aim at,
-the weight comes from the Hangul stem ratio: wght is solved so the base's vertical stem over its H1 face height,
-both read at the same wght, meets the ratio, and each later style steps from that wght by its weight-class
-difference. Before step 5, every Hangul target is stated in the y instance's own units beside what the base draws
-there: a length at cap 700 against the y instance's cap height, a length per 1000 em against the finished font's
-em, a ratio by the base's own H1 face. fit-log.json records them under each style's `hangul`. No Hangul glyph is
-moved yet: the base keeps its Hangul sizes, centres and spacing, and the Hangul follows the y instance.
+the weight comes from the Hangul stem: as a length when a reference gave one (`stem` at cap 700, else per 1000 em),
+else as the ratio `stem_h1`. wght is solved so the base's vertical stem, in that unit or over its H1 face height,
+meets it, the stem and the cap height or H1 face read at the same wght; each later style steps from that wght by
+its weight-class difference. Before step 5, every Hangul target is stated in the y instance's own units beside
+what the base draws there: a length at cap 700 against the y instance's cap height, a length per 1000 em against
+the finished font's em, a ratio by the base's own H1 face. fit-log.json records them under each style's `hangul`.
+No Hangul glyph is moved yet: the base keeps its Hangul sizes, centres and spacing, and the Hangul follows the y
+instance.
 
 Output: <DIR>/<Family>-<Style>.fit.ttf and fit-log.json. The fonts still carry the base's names: package.py
 renames them. Run space_font.py next.
@@ -142,11 +144,37 @@ def solve_wght(B, loc, ch, target_raw):
     return {**loc, "wght": round(w, 2)}
 
 
-def solve_hangul_wght(B, loc, ratio):
-    """The wght where the base's vertical stem over its H1 face height is `ratio`. The face height moves a little
-    with the weight, so each try reads both at the same wght."""
+HANGUL_STEM_LENGTHS = ("cap700", "em1000")  # the units a Hangul stem length is aimed at in, first found first
+
+
+def hangul_weight_aim(T):
+    """What the Hangul weight is solved from: (name, target, measure(face)). The stem as a length when a reference
+    gave one (at cap 700, else per 1000 em), else the stem over the H1 face height. measure reads the base's stem
+    in that unit, and the cap height or H1 face it needs, from the same face, so both come from the wght tried."""
+    h = T.get("hangul") or {}
+    for unit in HANGUL_STEM_LENGTHS:
+        target = L.tagged_value(h.get("stem"), unit)
+        if target is None:
+            continue
+        if unit == "cap700":
+            def measure(face):
+                return L.hangul_stem(face) * L.CAP / face.bounds("H")[3]
+        elif T.get("cap_em"):
+            def measure(face):  # the finished em is the cap height over cap_em
+                return L.hangul_stem(face) * T["cap_em"] / face.bounds("H")[3]
+        else:
+            def measure(face):  # the finished em is the base's
+                return L.hangul_stem(face) * 1000 / face.upm
+        return f"stem {unit}", target, measure
+    ratio = L.tagged_value(h.get("stem_h1"), "ratio")
+    return ("stem_h1", ratio, L.hangul_stem_h1) if ratio else None
+
+
+def solve_hangul_wght(B, loc, aim):
+    """The wght where the base's Hangul stem meets `aim` (hangul_weight_aim), each try read at its own wght."""
     lo, _, hi = B.axes["wght"]
-    w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), L.hangul_stem_h1, ratio, lo, hi)
+    _, target, measure = aim
+    w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), measure, target, lo, hi)
     return round(w, 2)
 
 
@@ -360,26 +388,27 @@ def fit_style(B, T, style, args, log):
     fixed = parse_loc(args.loc)
     first = T["styles"][0]
     step = style["weight"] - first["weight"]
-    hangul_ratio = L.tagged_value((T.get("hangul") or {}).get("stem_h1"), "ratio")
+    hangul_aim = hangul_weight_aim(T)
     # Stem target: the style's own. Else find the base weight that draws the first style's stem (the Latin n stem,
-    # or without one the Hangul stem ratio), step it by the difference in weight class (500 - 400 = +100), and
-    # take the stem the base draws there.
+    # or without one the Hangul stem: a length, else its ratio to the H1 face), step it by the difference in weight
+    # class (500 - 400 = +100), and take the stem the base draws there.
     stem_t, hangul_w, weight_from = style.get("n_stem"), None, "n_stem"
-    if stem_t is None and "wght" in B.axes and (first.get("n_stem") or hangul_ratio):
+    if stem_t is None and "wght" in B.axes and (first.get("n_stem") or hangul_aim):
         lo, _, hi = B.axes["wght"]
         if first.get("n_stem"):
             cap = B.tiny(fixed, "nHx").bounds("H")[3]
             w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
+            source = "the n stem"
         else:
-            w1 = solve_hangul_wght(B, fixed, hangul_ratio)
-            weight_from = "stem_h1"
+            w1 = solve_hangul_wght(B, fixed, hangul_aim)
+            weight_from = hangul_aim[0]
+            source = f"the Hangul {hangul_aim[0]} {hangul_aim[1]}"
         w2 = round(min(max(w1 + step, lo), hi), 2)
         stem_t = L.stem_cap700(B.tiny({**fixed, "wght": w2}, "nHx"))
-        if weight_from == "stem_h1":
+        if weight_from != "n_stem":
             hangul_w = w2
         if step:
             weight_from += ", stepped from the first style"
-        source = f"the Hangul stem ratio {hangul_ratio}" if hangul_w else "the n stem"
         log.append(f"{style['name']}: n stem target {stem_t:.1f}: the first style sits at wght {w1:.0f} on the base "
                    f"(solved from {source}), this one {step:+d} from it at wght {w2:.0f}")
     elif stem_t is None and "wght" not in B.axes:
@@ -387,7 +416,7 @@ def fit_style(B, T, style, args, log):
         weight_from = "the base, which has no weight axis"
         log.append(f"{style['name']}: the base has no weight axis, so it keeps the first style's stem")
     elif stem_t is None:
-        raise SystemExit(f"{style['name']}: targets.json has neither a Latin n stem nor a Hangul stem ratio (stem_h1) "
+        raise SystemExit(f"{style['name']}: targets.json has neither a Latin n stem nor a Hangul stem (stem or stem_h1) "
                          "to solve the weight from. Measure a reference with n, or with 이, 니 and 미.")
     else:
         log.append(f"{style['name']}: n stem target {stem_t:.1f}")

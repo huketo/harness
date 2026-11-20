@@ -114,6 +114,11 @@ COVERAGE = {
     "vietnamese": "ĂăÂâĐđÊêÔôƠơƯưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ",
     "cyrillic": "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяЄєІіЇїҐґЎў",
     "greek": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψωςάέήίόύώ",
+}
+# Scripts fit_font.py keeps in its subset that check_font.py has no coverage list for: which of their characters a
+# build must have is not settled here, so the subset keeps all of them and check_font.py reports the script as
+# unchecked.
+SUBSET_ONLY = {
     # every modern syllable, then the compatibility jamo
     "korean": "".join(map(chr, range(SYLLABLES[0], SYLLABLES[1] + 1))) + "".join(map(chr, range(0x3131, 0x318F))),
 }
@@ -125,12 +130,13 @@ COMMON_UNICODES = [(0x20, 0x7E), (0xA0, 0xFF), (0x2010, 0x2027), (0x2030, 0x203A
 
 def charset_unicodes(scripts):
     """The code points a build for these scripts keeps, as pyftsubset's --unicodes value. Raises on a script
-    with no list in COVERAGE, since a subset would silently drop it."""
+    with no list in COVERAGE or SUBSET_ONLY, since a subset would silently drop it."""
+    lists = {**COVERAGE, **SUBSET_ONLY}
     cps = {c for lo, hi in COMMON_UNICODES for c in range(lo, hi + 1)}
     for s in scripts:
-        if s not in COVERAGE:
-            raise ValueError(f"no character list for script {s!r} (known: {', '.join(COVERAGE)})")
-        cps |= {ord(c) for c in COVERAGE[s]}
+        if s not in lists:
+            raise ValueError(f"no character list for script {s!r} (known: {', '.join(lists)})")
+        cps |= {ord(c) for c in lists[s]}
     runs, start, prev = [], None, None
     for c in sorted(cps):
         if start is None:
@@ -739,20 +745,27 @@ def _boxes(ink, chars):
     return [(c, b) for c in chars if ink.has(c) for b in [ink.bounds(c)] if b]
 
 
-def _run_median(ink, chars, cut):
-    """Median width of one run per syllable. cut(box) -> (axis, position, index): 1 cuts a row, 0 a column."""
-    widths = []
+def _run_widths(ink, chars, cut):
+    """{syllable: width of one run} for the syllables the ink has. cut(box) -> (axis, position, index): 1 cuts a
+    row, 0 a column."""
+    widths = {}
     for c, b in _boxes(ink, chars):
         axis, at, i = cut(b)
         runs = ink.hspans(c, at) if axis == 1 else ink.vspans(c, at)
         if runs:
-            widths.append(runs[i][1] - runs[i][0])
-    return st.median(widths) if widths else None
+            widths[c] = runs[i][1] - runs[i][0]
+    return widths
+
+
+def _stem_widths(ink):
+    return _run_widths(ink, HANGUL_STEM, lambda b: (1, (b[1] + b[3]) / 2, -1))
 
 
 def hangul_stem(ink):
-    """The vertical stem: the last run across ㅣ in HANGUL_STEM at mid face height, median of the three."""
-    return _run_median(ink, HANGUL_STEM, lambda b: (1, (b[1] + b[3]) / 2, -1))
+    """The vertical stem: the last run across ㅣ in HANGUL_STEM at mid face height, median of the three, or None
+    unless all three were read."""
+    widths = _stem_widths(ink)
+    return st.median(widths.values()) if len(widths) == len(HANGUL_STEM) else None
 
 
 def hangul_stem_h1(ink):
@@ -778,15 +791,22 @@ def _contrast(ink):
     return st.mean(ends) / st.mean(sides), min(ends + sides)
 
 
+CLASS_MIN = 2  # different syllables a class mean needs: one syllable read again and again is still one
+
+
 def hangul_geometry(ink, font=True):
     """Hangul numbers in the ink's own units: per class the mean face (the ink box) width and height; the stem; and
     the report-only overshoot, ㅇ contrast and horizontal stroke. With font=True the boxes sit on the glyph origin
     and the baseline, so each class also gets its face centre, sides and advance, the font whether its Hangul is
-    fixed-width, and held_out the held-out syllables' mean face over the list's."""
-    out = {"classes": {}}
+    fixed-width, and held_out the held-out syllables' mean face over the list's. A class read on fewer than
+    CLASS_MIN of its syllables, and the stem without all of HANGUL_STEM, are left out: left_out names the
+    syllables they had."""
+    out = {"classes": {}, "left_out": {}}
     for cls, chars in HANGUL_CLASSES.items():
         bs = _boxes(ink, chars)
-        if not bs:
+        if len(bs) < CLASS_MIN:
+            if bs:
+                out["left_out"][cls] = "".join(c for c, _ in bs)
             continue
         g = {"syllables": "".join(c for c, _ in bs), "face_w": st.mean(b[2] - b[0] for _, b in bs),
              "face_h": st.mean(b[3] - b[1] for _, b in bs)}
@@ -811,7 +831,10 @@ def hangul_geometry(ink, font=True):
             for g in out["classes"].values():
                 del g["adv"]
     out["stem"] = hangul_stem(ink)
-    out["hstroke"] = _run_median(ink, HANGUL_HSTROKE, lambda b: (0, (b[0] + b[2]) / 2, 0))
+    if out["stem"] is None and (got := _stem_widths(ink)):
+        out["left_out"]["stem"] = "".join(got)
+    hstroke = _run_widths(ink, HANGUL_HSTROKE, lambda b: (0, (b[0] + b[2]) / 2, 0))
+    out["hstroke"] = st.median(hstroke.values()) if hstroke else None
     out["contrast"], out["contrast_thinnest"] = _contrast(ink)
     tops = [_boxes(ink, c) for c in HANGUL_OVERSHOOT]
     out["overshoot"] = tops[0][0][1][3] - tops[1][0][1][3] if all(tops) else None
@@ -879,6 +902,7 @@ def hangul_measurement(geo, lengths, conf=None):
     out["report"] = report
     out["held_out"] = {cls: {k: ratio(v, "size", g["face_h"]) for k, v in g["held_out"].items()}
                        for cls, g in geo["classes"].items() if "held_out" in g}
+    out["left_out"] = geo["left_out"]
     return _pruned(out)
 
 
@@ -973,6 +997,9 @@ def hangul_summary(h):
             out.append(f"    report {k}: {v[0]['value']} {v[0]['unit']} ({v[0]['confidence']})")
     for cls, v in h.get("held_out", {}).items():
         out.append(f"    held-out {cls}: face width x{v['face_w'][0]['value']}, height x{v['face_h'][0]['value']}")
+    for key, chars in h.get("left_out", {}).items():
+        need = f"all of {HANGUL_STEM}" if key == "stem" else f"{CLASS_MIN} different syllables of its list"
+        out.append(f"    left out: {key}, read on {chars} only; it needs {need}")
     return out
 
 

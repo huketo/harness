@@ -1,12 +1,18 @@
 # /// script
 # requires-python = "==3.12.*"
-# dependencies = ["fonttools"]
+# dependencies = ["fonttools", "brotli", "uharfbuzz", "numpy", "pillow"]
 # ///
 """Hangul structural classes: set from the initial, the medial vowel and the final alone, and right on syllables
-outside the measuring lists."""
+outside the measuring lists. The fit's subset keeps the Hangul, and check_font.py does not gate it yet."""
+import os
+import tempfile
 import unittest
 
+from fontTools.ttLib import TTFont
+
+import check_font
 import fontlib as L
+import testfonts as T
 
 # Labelled by hand from where the vowel stands (beside the initial, under it, or both) and whether a final sits
 # under them. None is in a measuring list; they include double initials, compound vowels and compound finals.
@@ -69,10 +75,18 @@ class Classes(unittest.TestCase):
             self.assertEqual(line[0::2], a * (len(chars) + 1))
             self.assertEqual(line[1::2], chars)
 
-    def test_the_korean_script_covers_every_modern_syllable(self):
-        need = set(L.COVERAGE["korean"])
-        self.assertEqual(sum(1 for cp in range(0xAC00, 0xD7A4) if chr(cp) in need), 11172)
+
+class Coverage(unittest.TestCase):
+    def test_the_fit_subset_keeps_every_modern_syllable(self):
         self.assertIn("U+AC00-D7A3", L.charset_unicodes(["korean"]))
+
+    def test_check_font_does_not_gate_korean_coverage(self):
+        # Which Hangul a build must cover is a later step's gate: until then check_font.py has no list for it.
+        with tempfile.TemporaryDirectory() as d:
+            font = TTFont(T.hangul_vf(os.path.join(d, "hangul.ttf")), lazy=False)
+        G = check_font.Gates()
+        check_font.gate_coverage(G, font, ["korean"])
+        self.assertEqual([row[:3] for row in G.rows], [("coverage", "korean", "INFO")])
 
 
 if __name__ == "__main__":

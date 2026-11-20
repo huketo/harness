@@ -14,7 +14,8 @@ Lengths are in cap-normalised units (cap height 700). The JSON also keeps cap_em
 
 A font with Hangul syllables also gets a `hangul` object: per structural class (H1 to H6) the face size, centre,
 sides and advance, the vertical stem and the report-only numbers, each value tagged with its unit (cap700 when the
-font has a Latin H, em1000 always, ratio). A font without the Latin letters gets the Hangul numbers alone.
+font has a Latin H, em1000 always, ratio). A font without the Latin letters gets the Hangul numbers alone; an H
+among them still sets the Hangul's cap700 lengths.
 """
 import argparse
 import json
@@ -55,9 +56,16 @@ def measure_path(path, loc=None, stem=None):
         m = {"source": "file", "cap_em": None, "vmetrics": L.vmetrics(f), "confidence": {}}
     if any(ord(c) in cmap for c in L.HANGUL_TEXT):
         hface = L.Face(L.subset_font(f, L.HANGUL_TEXT + "H", layout=False), loc if axes else None)
-        lengths = {"cap700": L.CAP / hface.bounds("H")[3]} if latin else {}
+        # The Hangul's cap is the H alone, whatever other Latin the font has.
+        cap = hface.bounds("H")[3] if hface.has("H") and hface.bounds("H") else None
+        lengths = {"cap700": L.CAP / cap} if cap else {}
         lengths["em1000"] = 1000 / hface.upm
-        m["hangul"] = L.hangul_measurement(L.hangul_geometry(hface), lengths)
+        geo = L.hangul_geometry(hface)
+        if geo["classes"]:
+            m["hangul"] = L.hangul_measurement(geo, lengths)
+        else:
+            print(f"Hangul left out: no class has {L.CLASS_MIN} syllables of its list (fontlib.HANGUL_CLASSES) "
+                  "in this font", file=sys.stderr)
     m["file"] = os.path.basename(path)
     m["loc"] = loc
     m["axes"] = axes

@@ -63,15 +63,17 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
    it prints how far pixel readings land from the file's numbers, for the Korean lines too. Report every number
    marked low confidence. Hangul is measured per structural class (H1 to H6), and every Hangul value carries its
    unit: `cap700` when a Latin H was measured with it, `em1000` from a file, `ratio` always. A screenshot of
-   Hangul alone needs no H and gives ratios. Method, definitions and error sizes: `references/measuring.md`.
+   Hangul alone needs no H and gives ratios. A class needs two different syllables of its list and the stem all of
+   이 니 미; the script names what it left out. Method, definitions and error sizes: `references/measuring.md`.
    Done when each reference has a measurement file and the person has seen the main numbers.
 
 3. **Targets.** `uv run scripts/make_targets.py m1.json m2.json --family "New Name" --use text --scripts latin
    --style Regular:400 --style Medium:500 --out targets.json`. It records the category (sans, serif or mono;
    `--category` to set it). With Hangul, add `korean` to `--scripts` (`latin,korean`): the Hangul targets go in
-   one `hangul` object, and only values of one unit are merged. No Latin number is needed; without one, the fit
-   solves the weight from the Hangul stem ratio. Where references disagree, the script lists the spread. Ask which
-   way to lean instead of averaging a serif with a sans.
+   one `hangul` object, and only values of one unit are merged. No Latin number is needed; without an n stem, the
+   fit solves the weight from the Hangul stem, as a length when a reference gave one, else as its ratio to the H1
+   face. Where references disagree, the script lists the spread. Ask which way to lean instead of averaging a serif
+   with a sans.
    Done when `targets.json` exists and every spread has an answer or a stated default.
 
 4. **Find the foundation.** `uv run scripts/find_foundation.py targets.json --cache <dir> --out shortlist.json`.
