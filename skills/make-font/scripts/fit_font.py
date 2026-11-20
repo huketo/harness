@@ -158,6 +158,9 @@ def hangul_weight_aim(T):
         target = L.tagged_value(h.get("stem"), unit)
         if target is None:
             continue
+        if not target > 0:
+            raise SystemExit(f"targets.json: the Hangul stem {unit} is {target}; a stem length must be above 0. "
+                             "Measure the references again.")
         if unit == "cap700":
             def measure(face):
                 return L.hangul_stem(face) * L.CAP / face.bounds("H")[3]
@@ -169,6 +172,8 @@ def hangul_weight_aim(T):
                 return L.hangul_stem(face) * 1000 / face.upm
         return f"stem {unit}", target, measure
     ratio = L.tagged_value(h.get("stem_h1"), "ratio")
+    if ratio is not None and not ratio > 0:
+        raise SystemExit(f"targets.json: the Hangul stem_h1 is {ratio}; it must be above 0. Measure the references again.")
     return ("stem_h1", ratio, L.hangul_stem_h1) if ratio else None
 
 
@@ -586,6 +591,7 @@ def main():
         L.charset_unicodes(T.get("scripts", ["latin"]))
     except ValueError as e:
         raise C.Refused(f"{a.targets}: {e}")
+    hangul_weight_aim(T)  # a stem target that cannot be solved is refused before anything is written
     fam = T["family"].replace(" ", "")
     styles = [s for s in T["styles"] if not a.style or s["name"] in a.style]
     style_paths = [os.path.join(a.out_dir, f"{fam}-{s['name']}.fit.ttf") for s in styles]

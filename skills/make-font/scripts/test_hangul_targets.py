@@ -357,6 +357,21 @@ class Fit(Scratch):
                                        delta=0.003)
 
 
+class StemTargets(unittest.TestCase):
+    def test_a_stem_target_that_is_not_above_zero_is_refused(self):
+        import fit_font
+        for stem, ratio in (({"cap700": 0.0}, None), ({"em1000": -3.0}, None), (None, 0.0)):
+            h = {}
+            if stem:
+                (unit, value), = stem.items()
+                h["stem"] = [{"value": value, "unit": unit, "confidence": "high"}]
+            if ratio is not None:
+                h["stem_h1"] = [{"value": ratio, "unit": "ratio", "confidence": "high"}]
+            with self.subTest(stem=stem, ratio=ratio), self.assertRaises(SystemExit) as cm:
+                fit_font.hangul_weight_aim({"hangul": h})
+            self.assertIn("above 0", str(cm.exception.code))
+
+
 class OpticalSize(Scratch):
     """A base with an optical-size axis 10-90 whose vertical strokes thicken as the size rises (testfonts.OPSZ_STEM:
     at wght w and size z the stem is s(w) + 32 (z - 10) / 80 at cap 700, s(100) = 40), so the contrast falls as the
