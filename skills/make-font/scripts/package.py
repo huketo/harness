@@ -2,22 +2,28 @@
 # requires-python = "==3.12.*"
 # dependencies = ["fonttools", "brotli"]
 # ///
-"""Name, license and package the spaced fonts: TTF, WOFF2, OFL.txt, FONTLOG.txt, a CSS file and a README.
+"""Name, license and package the spaced fonts: TTF, WOFF2, OFL.txt, FONTLOG.txt, a CSS file, a README and the
+package log.
 
   uv run package.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --targets targets.json
       --base-json base.json --fit-log build/fit-log.json --space-log build/*.space-log.json
-      --holder "Name for the copyright line" --out-dir DIR [--log package-log.json] [--replace]
+      --holder "Name for the copyright line" --out-dir DIR [--replace]
       [--vendor ABCD] [--version 1.000] [--designer "..."] [--url https://...] [--web-unicodes "U+0000-00FF,..."]
 
-Only fonts that came through the chain are packaged. base.json is checked against the base and its OFL text,
-both logs must have been made from that base.json, every space log's input must be an output of the fit log,
-and every font given here must be an output of a space log. --space-log takes one or more files, and may repeat.
+Only fonts that came through the chain are packaged. chain.verify_build, the check check_font.py runs too, goes
+first: base.json against the base and its OFL text; the fit log made from that base.json, from the base alone
+and this targets.json, with a subset that the base gives again, byte for byte, with the recorded arguments; and
+every space log made from that base.json and this targets.json, from fonts the fit log wrote. Then every font
+given here must be an output of a space log. Unspaced fits (.fit.ttf) are skipped, and nothing left is a
+refusal. --space-log takes one or more files, and may repeat.
 
-The package is built in a temporary folder beside DIR. Each TTF and WOFF2 there is then checked against the
-chain: same glyph order and character map as the subset fit_font.py recorded, and the same outlines and
-advances as the spaced font it came from. Only then does the folder become DIR. An existing, non-empty DIR is
-refused unless --replace is given. The log (--log, by default package-log.json beside DIR) lists the spaced
-fonts as inputs and the packaged TTF and WOFF2 as outputs; check_font.py reads it.
+DIR may not be, or hold, any input (base.json, targets.json, a log, a font, the base or its licence). The package
+is built in a temporary folder beside DIR. Each TTF and WOFF2 there is checked against the chain: a plain
+TrueType file with the subset's glyph order and character map, and the outlines and advances of the spaced font
+it came from. The package log, DIR/package-log.json, is written into the same folder: base.json's sha256, the
+spaced fonts as inputs, the TTF and WOFF2 as outputs, targets.json and the fit and space logs, each by file name
+and sha256. One rename then publishes the folder and its log together. An existing, non-empty DIR is refused
+unless --replace is given; then the old package is moved aside, and deleted only once the new one is in place.
 
 The new family name comes from targets.json. The script refuses a name that contains the base family's name or
 any Reserved Font Name of the base, because the OFL forbids a modified version to use them.
@@ -223,6 +229,10 @@ def verify(built, subset_font):
     for src_p, ttf_p, woff_p in built:
         src, ttf, woff = TTFont(src_p), TTFont(ttf_p), TTFont(woff_p)
         name = os.path.basename(ttf_p)
+        with open(ttf_p, "rb") as fh:
+            magic = fh.read(4)
+        if ttf.flavor is not None or magic not in C.TRUETYPE:
+            raise C.Refused(f"{name} is not a plain TrueType file (flavor {ttf.flavor!r})")
         if ttf.getGlyphOrder() != order or ttf.getBestCmap() != cmap:
             raise C.Refused(f"{name}: glyph order or character map differs from the subset fit_font.py recorded")
         ds, dt = drawings(src), drawings(ttf)
@@ -238,6 +248,28 @@ def verify(built, subset_font):
                             f"({', '.join(f'U+{u:04X}' for u in bad[:6])})")
 
 
+def publish(tmp, out_dir, replace):
+    """Move the finished package, its log inside it, into place with one rename. With replace, the package already
+    there is moved aside first and deleted only once the new one is in place; if the new one cannot be moved in,
+    the old one goes back."""
+    if not (replace and os.path.isdir(out_dir) and os.listdir(out_dir)):
+        os.rename(tmp, out_dir)  # onto a missing or empty folder
+        return
+    old = tmp + ".old"
+    os.rename(out_dir, old)
+    try:
+        os.rename(tmp, out_dir)
+    except OSError:
+        os.rename(old, out_dir)
+        raise
+    shutil.rmtree(old)
+
+
+def inside(path, folder):
+    path, folder = os.path.realpath(path), os.path.realpath(folder)
+    return path == folder or path.startswith(folder.rstrip(os.sep) + os.sep)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("fonts", nargs="+")
@@ -249,39 +281,35 @@ def main():
                          "(required)")
     ap.add_argument("--holder", required=True)
     ap.add_argument("--out-dir", required=True)
-    ap.add_argument("--log", help="where the package log goes; default package-log.json beside --out-dir")
     ap.add_argument("--replace", action="store_true",
-                    help="replace a non-empty --out-dir once the new package is verified")
+                    help="replace a non-empty --out-dir; the old package is deleted only once the new one is in place")
     ap.add_argument("--vendor", default="NONE")
     ap.add_argument("--version", type=float, default=1.0)
     ap.add_argument("--designer")
     ap.add_argument("--url")
     ap.add_argument("--web-unicodes", help="subset the WOFF2 files to these ranges; default keeps every glyph")
     a = ap.parse_args()
-    rec, base_sha = C.load_base(a.base_json)
-    fit = C.load_log(a.fit_log, base_sha, "--fit-log", "fit_font.py")
-    if not a.space_log:
-        raise C.Refused("no --space-log. Every font must come with the log space_font.py wrote for it.")
-    spaces = [C.load_log(p, base_sha, "--space-log", "space_font.py") for p in a.space_log]
-    fit_out = C.outputs(fit)
-    for p, sp in zip(a.space_log, spaces):
-        stray = [e["file"] for e in sp["chain"]["inputs"] if e["sha256"] not in fit_out]
-        if stray:
-            raise C.Refused(f"{p}: its input {stray[0]} is not an output of the fit log {a.fit_log}")
+    b = C.verify_build(a.base_json, a.targets, a.fit_log, a.space_log)
+    rec, base_sha = b.rec, b.base_sha
     fonts = [p for p in a.fonts if not p.endswith(".fit.ttf")]
     for p in [p for p in a.fonts if p.endswith(".fit.ttf")]:
-        print(f"skip {p}: an unspaced fit; package the spaced file step 6 wrote")
+        print(f"skip {p}: an unspaced fit; package the spaced file step 7 wrote")
+    if not fonts:
+        raise C.Refused("no spaced font to package: every file given is an unspaced fit (.fit.ttf). Give the "
+                        "fonts space_font.py wrote.")
     for p in fonts:
-        C.require_output(p, spaces, "--space-log", "space_font.py")
-    sub = fit.get("subset") or {}
-    if not sub.get("file") or not os.path.exists(sub["file"]) or C.sha256_file(sub["file"]) != sub.get("sha256"):
-        raise C.Refused(f"the subset {sub.get('file')!r} recorded in {a.fit_log} is missing or changed")
-    if sub.get("source_sha256") != rec["font"]["sha256"]:
-        raise C.Refused(f"the subset in {a.fit_log} was not made from the approved base")
+        C.require_output(p, b.spaces, "--space-log", "space_font.py")
     out_dir = os.path.abspath(a.out_dir)
+    inputs = [a.base_json, a.targets, a.fit_log, *a.space_log, *a.fonts, rec["font"]["file"], rec["license"]["file"]]
+    held = [p for p in inputs if inside(p, out_dir)]
+    if held:
+        raise C.Refused(f"--out-dir {a.out_dir} is or holds an input, {held[0]}; publishing there would replace it. "
+                        "Pick an --out-dir outside the build folder.")
+    if os.path.exists(out_dir) and not os.path.isdir(out_dir):
+        raise C.Refused(f"--out-dir {a.out_dir} is a file, not a folder")
     if os.path.isdir(out_dir) and os.listdir(out_dir) and not a.replace:
-        raise C.Refused(f"{a.out_dir} already holds files. Remove it, pick a new --out-dir, or pass --replace.")
-    log_path = a.log or os.path.join(os.path.dirname(out_dir), "package-log.json")
+        raise C.Refused(f"--out-dir {a.out_dir} already holds files. Remove it, pick a new --out-dir, or pass "
+                        "--replace.")
 
     T = L.load_json(a.targets)
     base = TTFont(rec["font"]["file"])
@@ -311,6 +339,7 @@ def main():
             if fixed:
                 print(f"{style['name']}: {len(fixed)} spacing accents reclassed from mark to base in GDEF")
             ttf = os.path.join(tmp, "ttf", ps + ".ttf")
+            f.flavor = None
             f.save(ttf)
             w = TTFont(ttf)
             opts = subset.Options()
@@ -334,13 +363,13 @@ def main():
             files += [f"ttf/{ps}.ttf", f"webfonts/{ps}.woff2"]
             print(f"{style['name']}: ttf/{ps}.ttf ({len(f.getGlyphOrder())} glyphs), webfonts/{ps}.woff2 "
                   f"({len(w.getGlyphOrder())} glyphs)")
-        verify(built, TTFont(sub["file"]))
+        verify(built, b.subset)
         year = datetime.date.today().year
         with open(os.path.join(tmp, "OFL.txt"), "wb") as fh:
             fh.write(f"Copyright {year} {a.holder} (modifications)\n".encode("utf-8") + licence)
-        files += ["OFL.txt", "FONTLOG.txt", "fonts.css", "README.md"]
+        files += ["OFL.txt", "FONTLOG.txt", "fonts.css", "README.md", "package-log.json"]
         with open(os.path.join(tmp, "FONTLOG.txt"), "w", encoding="utf-8") as fh:
-            fh.write(fontlog(T, bn, base, rec, fit, [L.load_json(p) for p in a.space_log], a.version, a, files))
+            fh.write(fontlog(T, bn, base, rec, b.fit, b.spaces, a.version, a, files))
         with open(os.path.join(tmp, "fonts.css"), "w", encoding="utf-8") as fh:
             fh.write(css(T["family"], faces))
         category = T.get("category") or ("serif" if T["targets"].get("serif") else "sans")
@@ -357,6 +386,8 @@ outline comes from that base. FONTLOG.txt lists what changed.
 - `ttf/`: desktop fonts. Install by opening the file.
 - `webfonts/`: WOFF2 files for the web, with `fonts.css` beside them.
 - `OFL.txt`: the licence. `FONTLOG.txt`: the base and every change.
+- `package-log.json`: the provenance chain, by sha256: the approval record, the build logs, the fonts packaged
+  and the files made from them.
 
 ## Use on the web
 
@@ -375,16 +406,18 @@ a larger work. A modified version keeps this licence and the copyright lines, an
 """
         with open(os.path.join(tmp, "README.md"), "w", encoding="utf-8") as fh:
             fh.write(readme)
-        if os.path.isdir(out_dir):
-            shutil.rmtree(out_dir)
-        os.rename(tmp, out_dir)
+        # The log goes in the package, by file name and sha256 (no builder paths), so one rename publishes both.
+        name = os.path.basename
+        chain = {"base_json_sha256": base_sha, "inputs": [C.entry(p, name(p)) for p in fonts],
+                 "outputs": [C.entry(x, os.path.relpath(x, tmp)) for _, ttf, woff in built for x in (ttf, woff)],
+                 "targets": C.entry(a.targets, name(a.targets))}
+        L.save_json({"chain": chain, "fit_log": C.entry(a.fit_log, name(a.fit_log)),
+                     "space_logs": [C.entry(p, name(p)) for p in a.space_log], "files": files},
+                    os.path.join(tmp, "package-log.json"))
+        publish(tmp, out_dir, a.replace)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    finals = [os.path.join(out_dir, os.path.relpath(x, tmp)) for _, ttf, woff in built for x in (ttf, woff)]
-    L.save_json({"chain": C.make_chain(base_sha, fonts, finals, a.targets), "fit_log": C.entry(a.fit_log),
-                 "space_logs": [C.entry(p) for p in a.space_log], "files": files}, log_path)
     print(f"verified against the chain, wrote {a.out_dir}: " + ", ".join(files))
-    print(f"package log: {log_path}")
 
 
 if __name__ == "__main__":

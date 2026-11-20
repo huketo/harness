@@ -62,23 +62,19 @@ def parse_loc(s):
 
 
 def make_subset(base_path, base_sha, scripts, out_dir):
-    """Subset the verified base to the scripts' characters, with its layout closure. Returns the subset, reread
-    from the file it was written to, and the record fit-log.json keeps of it."""
-    from fontTools import subset
-    args = [f"--unicodes={L.charset_unicodes(scripts)}", "--layout-features=*", "--glyph-names", "--notdef-outline",
-            "--name-IDs=*", "--name-languages=*", "--legacy-kern"]
-    opts = subset.Options()
-    rest = opts.parse_opts(args, ignore_unknown=["unicodes"])
-    unicodes = [u for r in rest for u in subset.parse_unicodes(r.split("=", 1)[1])]
-    f = TTFont(base_path, recalcTimestamp=False)
-    s = subset.Subsetter(opts)
-    s.populate(unicodes=unicodes)
-    s.subset(f)
+    """Subset the verified base to the scripts' characters, with its layout closure (chain.build_subset, which
+    package.py and check_font.py run again to check it). Returns the subset, reread from the file it was written
+    to, and the record fit-log.json keeps of it."""
+    import fontTools
+    args = C.subset_args(L.charset_unicodes(scripts))
+    data = C.build_subset(base_path, args)
     # A folder of its own, so a glob over the build folder (build/*.ttf) never picks the subset up as a style.
     os.makedirs(os.path.join(out_dir, "subset"), exist_ok=True)
     path = os.path.join(out_dir, "subset", "base.subset.ttf")
-    f.save(path)
-    rec = {"source_sha256": base_sha, "file": os.path.abspath(path), "sha256": C.sha256_file(path), "args": args}
+    with open(path, "wb") as fh:
+        fh.write(data)
+    rec = {"source_sha256": base_sha, "file": os.path.abspath(path), "sha256": C.sha256_bytes(data), "args": args,
+           "fonttools": fontTools.version}
     return TTFont(path), rec
 
 
@@ -437,6 +433,7 @@ def main():
         log = []
         f, info = fit_style(B, T, style, a, log)
         p = os.path.join(a.out_dir, f"{fam}-{style['name']}.fit.ttf")
+        f.flavor = None  # a plain TrueType file, whatever container the instances came through
         f.save(p)
         written.append(p)
         info["file"] = os.path.basename(p)

@@ -10,6 +10,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
@@ -81,7 +82,7 @@ class Pipeline(unittest.TestCase):
         cls.steps["package"] = T.run("package.py", cls.spaced, "--targets", cls.targets, "--base-json", cls.base_json,
                                      "--fit-log", cls.fit_log, "--space-log", cls.space_log,
                                      "--holder", "Fixture Holder", "--out-dir", p("dist"))
-        cls.package_log = p("package-log.json")
+        cls.package_log = p("dist", "package-log.json")
         cls.ttf = p("dist", "ttf", STYLE + ".ttf")
         cls.steps["check"] = T.run("check_font.py", cls.ttf, "--targets", cls.targets, "--base-json", cls.base_json,
                                    "--fit-log", cls.fit_log, "--space-log", cls.space_log,
@@ -248,7 +249,7 @@ class Pipeline(unittest.TestCase):
         self.assertNotEqual(sha(direct), sha(self.spaced))
         r = T.run("package.py", direct, "--targets", self.targets, "--base-json", self.base_json,
                   "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
-                  "--out-dir", q("dist"), "--log", q("package-log.json"))
+                  "--out-dir", q("dist"))
         refused(self, r, "space")
         self.assertFalse(os.path.exists(q("dist")))
         self.assertEqual([n for n in os.listdir(q()) if n.startswith(".package")], [])
@@ -261,7 +262,7 @@ class Pipeline(unittest.TestCase):
         f.save(changed)
         r = T.run("package.py", changed, "--targets", self.targets, "--base-json", self.base_json,
                   "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
-                  "--out-dir", q("dist"), "--log", q("package-log.json"))
+                  "--out-dir", q("dist"))
         refused(self, r, "sha256")
         self.assertFalse(os.path.exists(q("dist")))
 
@@ -270,13 +271,108 @@ class Pipeline(unittest.TestCase):
         shutil.copytree(self.p("dist"), q("dist"))
         args = ["package.py", self.spaced, "--targets", self.targets, "--base-json", self.base_json,
                 "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
-                "--out-dir", q("dist"), "--log", q("package-log.json")]
+                "--out-dir", q("dist")]
+        before = raw(q("dist", "package-log.json"))
         refused(self, T.run(*args), "--replace")
-        self.assertFalse(os.path.exists(q("package-log.json")))
+        self.assertEqual(raw(q("dist", "package-log.json")), before)
         ok(self, T.run(*args, "--replace"))
-        outputs = load(q("package-log.json"))["chain"]["outputs"]
-        self.assertEqual({e["sha256"] for e in outputs}, {sha(e["file"]) for e in outputs})
-        self.assertTrue(all(e["file"].startswith(q("dist")) for e in outputs))
+        outputs = load(q("dist", "package-log.json"))["chain"]["outputs"]
+        self.assertEqual({e["sha256"] for e in outputs}, {sha(q("dist", e["file"])) for e in outputs})
+        self.assertEqual(sorted(n for n in os.listdir(q()) if n.startswith(".package")), [])
+
+    # ---------------------------------------------------------------- the subset is made again from the base
+    def forged_fit_log(self, q):
+        """A subset made from another font with the fit log's arguments, and the fit log edited to name it: what a
+        caller could pass so that package.py and check_font.py compare against the wrong glyphs."""
+        other = T.glyf_vf(q("ArborText[wght].ttf"), family="Arbor Text", copyright_line="Copyright 2026 Arbor Type")
+        log = load(self.fit_log)
+        sub = log["subset"]
+        opts = subset.Options()
+        rest = opts.parse_opts(list(sub["args"]), ignore_unknown=["unicodes"])
+        s = subset.Subsetter(opts)
+        s.populate(unicodes=[u for r in rest for u in subset.parse_unicodes(r.split("=", 1)[1])])
+        f = TTFont(other, recalcTimestamp=False)
+        s.subset(f)
+        f.save(q("other.subset.ttf"))
+        self.assertEqual(TTFont(q("other.subset.ttf")).getGlyphOrder(), TTFont(sub["file"]).getGlyphOrder())
+        sub.update(file=q("other.subset.ttf"), sha256=sha(q("other.subset.ttf")))
+        return T.write(q("fit-log.json"), json.dumps(log))
+
+    def test_package_makes_the_subset_again_and_refuses_one_from_another_font(self):
+        q = self.scratch()
+        r = T.run("package.py", self.spaced, "--targets", self.targets, "--base-json", self.base_json,
+                  "--fit-log", self.forged_fit_log(q), "--space-log", self.space_log, "--holder", "Fixture Holder",
+                  "--out-dir", q("dist"))
+        refused(self, r, "subset")
+        self.assertFalse(os.path.exists(q("dist")))
+
+    def test_check_makes_the_subset_again_and_refuses_one_from_another_font(self):
+        q = self.scratch()
+        r = T.run("check_font.py", self.ttf, "--targets", self.targets, "--base-json", self.base_json,
+                  "--fit-log", self.forged_fit_log(q), "--space-log", self.space_log,
+                  "--package-log", self.package_log, "--out-dir", q("checks"))
+        refused(self, r, "subset")
+
+    # ---------------------------------------------------------------- package and check check one chain
+    def test_package_refuses_targets_other_than_the_ones_fit_and_space_read(self):
+        q = self.scratch()
+        targets = load(self.targets)
+        targets["use"] = "display"
+        T.write(q("targets.json"), json.dumps(targets))
+        r = T.run("package.py", self.spaced, "--targets", q("targets.json"), "--base-json", self.base_json,
+                  "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
+                  "--out-dir", q("dist"))
+        refused(self, r, "targets")
+        self.assertFalse(os.path.exists(q("dist")))
+
+    def test_check_refuses_logs_other_than_the_ones_package_recorded(self):
+        for flag in ("--fit-log", "--space-log"):
+            with self.subTest(flag=flag):
+                q = self.scratch()
+                logs = {"--fit-log": self.fit_log, "--space-log": self.space_log}
+                logs[flag] = T.write(q(os.path.basename(logs[flag])), json.dumps(load(logs[flag]), indent=2))
+                self.assertNotEqual(sha(logs[flag]), sha(self.fit_log if flag == "--fit-log" else self.space_log))
+                r = T.run("check_font.py", self.ttf, "--targets", self.targets, "--base-json", self.base_json,
+                          "--fit-log", logs["--fit-log"], "--space-log", logs["--space-log"],
+                          "--package-log", self.package_log, "--out-dir", q("checks"))
+                refused(self, r, "package")
+
+    # ---------------------------------------------------------------- publishing the package
+    def test_package_publishes_its_log_inside_the_package(self):
+        log = self.p("dist", "package-log.json")
+        self.assertTrue(os.path.exists(log))
+        self.assertFalse(os.path.exists(self.p("package-log.json")))
+        self.assertIn("package-log.json", text(self.p("dist", "README.md")))
+        self.assertNotIn(self.dir, text(log))  # hashes and file names, no builder paths
+
+    def test_package_refuses_an_out_dir_that_holds_its_inputs(self):
+        q = self.scratch()
+        os.makedirs(q("build"))
+        files = [shutil.copy(x, q("build")) for x in (self.spaced, self.fit_log, self.space_log)]
+        before = {f: raw(f) for f in files}
+        r = T.run("package.py", files[0], "--targets", self.targets, "--base-json", self.base_json,
+                  "--fit-log", files[1], "--space-log", files[2], "--holder", "Fixture Holder",
+                  "--out-dir", q("build"), "--replace")
+        self.assertTrue(all(os.path.exists(f) for f in files), "package.py removed its own inputs")
+        refused(self, r, "--out-dir")
+        self.assertEqual({f: raw(f) for f in files}, before)
+
+    def test_package_refuses_an_out_dir_that_is_an_input_file(self):
+        q = self.scratch()
+        base_json = shutil.copy(self.base_json, q("base.json"))
+        r = T.run("package.py", self.spaced, "--targets", self.targets, "--base-json", base_json,
+                  "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
+                  "--out-dir", base_json, "--replace")
+        refused(self, r, "--out-dir")
+        self.assertEqual(raw(base_json), raw(self.base_json))
+
+    def test_package_refuses_when_no_spaced_font_is_left(self):
+        q = self.scratch()
+        r = T.run("package.py", self.fit, "--targets", self.targets, "--base-json", self.base_json,
+                  "--fit-log", self.fit_log, "--space-log", self.space_log, "--holder", "Fixture Holder",
+                  "--out-dir", q("dist"))
+        refused(self, r, "no spaced font")
+        self.assertFalse(os.path.exists(q("dist")))
 
     def test_check_refuses_a_font_the_package_log_did_not_write(self):
         q = self.scratch()
@@ -284,6 +380,30 @@ class Pipeline(unittest.TestCase):
                   "--fit-log", self.fit_log, "--space-log", self.space_log, "--package-log", self.package_log,
                   "--out-dir", q("checks"))
         refused(self, r, "package")
+
+
+class Publish(unittest.TestCase):
+    def test_replace_keeps_the_old_package_until_the_new_one_is_in_place(self):
+        import package as P
+        d = tempfile.mkdtemp(prefix="mf-publish-")
+        self.addCleanup(shutil.rmtree, d, True)
+        out, new = os.path.join(d, "dist"), os.path.join(d, ".package-new")
+        os.makedirs(out)
+        os.makedirs(new)
+        T.write(os.path.join(out, "old.txt"), "the package already published")
+        T.write(os.path.join(new, "new.txt"), "the package being published")
+        real = os.rename
+
+        def rename(src, dst):
+            if os.path.abspath(src) == new:
+                raise OSError("synthetic failure while moving the new package into place")
+            return real(src, dst)
+        with mock.patch("os.rename", rename), mock.patch("os.replace", rename):
+            with self.assertRaises(OSError):
+                P.publish(new, out, True)
+        self.assertTrue(os.path.exists(os.path.join(out, "old.txt")), "the old package was deleted first")
+        self.assertEqual(text(os.path.join(out, "old.txt")), "the package already published")
+        self.assertEqual([n for n in os.listdir(d) if n not in ("dist", ".package-new")], [])
 
 
 if __name__ == "__main__":

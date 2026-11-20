@@ -253,6 +253,7 @@ def main():
     min_gap = a.min_gap if a.min_gap is not None else T.get("tolerances", {}).get("min_gap", 6)
     guard(f, min_gap, a.guard_f, log)
     f["OS/2"].recalcAvgCharWidth(f)
+    f.flavor = None
     f.save(a.out)
     after = L.measure_face(L.Face(TTFont(a.out)))
     log["sides_before"], log["sides_after"] = before, after["sides"]

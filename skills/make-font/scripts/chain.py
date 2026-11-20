@@ -44,8 +44,9 @@ def sha256_file(path):
         return sha256_bytes(fh.read())
 
 
-def entry(path):
-    return {"file": os.path.abspath(path), "sha256": sha256_file(path)}
+def entry(path, name=None):
+    """A file as a chain entry. `name` replaces the absolute path, for a log that ships with the package."""
+    return {"file": name if name is not None else os.path.abspath(path), "sha256": sha256_file(path)}
 
 
 # ------------------------------------------------------------------ the base's files
@@ -226,3 +227,115 @@ def require_output(path, logs, flag, step):
         raise Refused(f"{path} (sha256 {got}) is not an output listed in the {flag} log(s) {step} wrote. Only "
                       "fonts that came through the chain from the approved base are accepted.")
     return got
+
+
+# ------------------------------------------------------------------ the subset
+def subset_args(unicodes):
+    """The pyftsubset arguments fit_font.py subsets the base with, in order. fit-log.json records them."""
+    return [f"--unicodes={unicodes}", "--layout-features=*", "--glyph-names", "--notdef-outline", "--name-IDs=*",
+            "--name-languages=*", "--legacy-kern"]
+
+
+def build_subset(base_path, args):
+    """The subset of the base these arguments give, as the bytes of a plain TrueType file. The same base,
+    arguments and fontTools version give the same bytes, which is what lets package.py and check_font.py make it
+    again instead of trusting a file."""
+    from fontTools import subset
+    opts = subset.Options()
+    rest = opts.parse_opts(list(args), ignore_unknown=["unicodes"])
+    if not rest or any(not r.startswith("--unicodes=") for r in rest):
+        raise ValueError(f"expected pyftsubset options and one --unicodes=, got {list(args)!r}")
+    unicodes = [u for r in rest for u in subset.parse_unicodes(r.split("=", 1)[1])]
+    f = TTFont(base_path, recalcTimestamp=False)
+    s = subset.Subsetter(opts)
+    s.populate(unicodes=unicodes)
+    s.subset(f)
+    f.flavor = None
+    buf = io.BytesIO()
+    f.save(buf)
+    return buf.getvalue()
+
+
+def rebuild_subset(rec, fit, fit_log):
+    """Make the fit's subset again from the verified base with the arguments fit-log.json records, and refuse
+    unless it has the sha256 the log records. The subset file itself is never read. Returns the subset."""
+    import fontTools
+    sub = fit.get("subset") or {}
+    if sub.get("source_sha256") != rec["font"]["sha256"]:
+        raise Refused(f"{fit_log}: its subset was not made from the approved base")
+    try:
+        data = build_subset(rec["font"]["file"], sub.get("args") or [])
+    except Exception as e:  # arguments from a log are input: any failure to apply them is a broken link
+        raise Refused(f"{fit_log}: the subset arguments it records cannot be applied to the approved base: {e}")
+    got = sha256_bytes(data)
+    if got != sub.get("sha256"):
+        why = "the recorded subset was made from another font, or the log was edited"
+        if sub.get("fonttools") and sub["fonttools"] != fontTools.version:
+            why += f", or fontTools changed (the fit ran {sub['fonttools']}, this is {fontTools.version})"
+        raise Refused(f"{fit_log}: the subset made again from the approved base with the recorded arguments has "
+                      f"sha256 {got}, but the log records {sub.get('sha256')}: {why}. Run fit_font.py again.")
+    return TTFont(io.BytesIO(data))
+
+
+# ------------------------------------------------------------------ the whole chain
+class Build:
+    """What checking the chain up to the spaced fonts established, for package.py and check_font.py."""
+
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def verify_build(base_json, targets, fit_log, space_logs):
+    """The chain from base.json to the spaced fonts, checked one way for package.py and check_font.py. base.json
+    matches the base and its licence; the fit log was made from this base.json, read the base alone and this
+    targets.json, and its subset is what the base gives with the recorded arguments, byte for byte; every space
+    log was made from this base.json and this targets.json, from fonts the fit log wrote. Refuses at the first
+    broken link."""
+    rec, base_sha = load_base(base_json)
+    rows = [("base.json matches the base and its OFL text",
+             f"font sha256 {rec['font']['sha256']}, licence sha256 {rec['license']['sha256']}")]
+    if not targets or not os.path.isfile(targets):
+        raise Refused(f"no targets.json at {targets!r}")
+    targets_sha = sha256_file(targets)
+    fit = load_log(fit_log, base_sha, "--fit-log", "fit_font.py")
+    if [e.get("sha256") for e in fit["chain"].get("inputs") or []] != [rec["font"]["sha256"]]:
+        raise Refused(f"{fit_log}: fit_font.py's input is not exactly the approved base")
+    if (fit["chain"].get("targets") or {}).get("sha256") != targets_sha:
+        raise Refused(f"{fit_log}: fit_font.py read another targets.json than {targets} (sha256 {targets_sha}). "
+                      "Fit again with this targets.json, or package with the one the fit read.")
+    rows.append(("fit read only the approved base and targets.json", f"{len(fit['chain']['outputs'])} fonts written"))
+    subset = rebuild_subset(rec, fit, fit_log)
+    rows.append(("fit's subset made again from the approved base, byte for byte", f"sha256 {fit['subset']['sha256']}"))
+    if not space_logs:
+        raise Refused("no --space-log. The chain runs through the log space_font.py wrote for every style.")
+    spaces = [load_log(p, base_sha, "--space-log", "space_font.py") for p in space_logs]
+    fit_out = outputs(fit)
+    for p, sp in zip(space_logs, spaces):
+        ins = sp["chain"].get("inputs") or []
+        if not ins or any(e.get("sha256") not in fit_out for e in ins):
+            raise Refused(f"{p}: space_font.py's input is not a font the fit log {fit_log} lists as an output")
+        if (sp["chain"].get("targets") or {}).get("sha256") != targets_sha:
+            raise Refused(f"{p}: space_font.py read another targets.json than {targets}")
+    rows.append(("space read only fitted fonts and targets.json", f"{len(spaces)} space logs"))
+    return Build(rec=rec, base_sha=base_sha, targets_sha=targets_sha, fit=fit, spaces=spaces, subset=subset,
+                 rows=rows, fit_log=fit_log, space_logs=list(space_logs))
+
+
+def verify_package_log(b, package_log, fonts):
+    """The links after the spaced fonts, for check_font.py: the package log was made from this base.json and this
+    targets.json, from exactly these fit and space logs, took only spaced fonts, and lists every font checked as
+    an output. Returns the rows it adds."""
+    pkg = load_log(package_log, b.base_sha, "--package-log", "package.py")
+    if (pkg["chain"].get("targets") or {}).get("sha256") != b.targets_sha:
+        raise Refused(f"{package_log}: package.py read another targets.json")
+    if (pkg.get("fit_log") or {}).get("sha256") != sha256_file(b.fit_log):
+        raise Refused(f"{package_log}: package.py recorded another fit log than {b.fit_log}")
+    if sorted(e.get("sha256") for e in pkg.get("space_logs") or []) != sorted(sha256_file(p) for p in b.space_logs):
+        raise Refused(f"{package_log}: package.py recorded other space logs than {', '.join(b.space_logs)}")
+    ins = pkg["chain"].get("inputs") or []
+    if not ins or any(e.get("sha256") not in outputs(*b.spaces) for e in ins):
+        raise Refused(f"{package_log}: package.py took a font that is not an output of the space logs")
+    for p in fonts:
+        require_output(p, [pkg], "--package-log", "package.py")
+    return [("package read these logs and took only spaced fonts", f"{len(ins)} fonts"),
+            ("every font checked is a package output", f"{len(fonts)} fonts")]

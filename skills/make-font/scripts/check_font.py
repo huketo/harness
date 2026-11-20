@@ -5,15 +5,19 @@
 """Gate a built font against targets.json, its open base, and the licence rules. Exit 1 on any failure.
 
   uv run check_font.py dist/ttf/*.ttf --targets targets.json --base-json base.json
-      --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log package-log.json
+      --fit-log build/fit-log.json --space-log build/*.space-log.json --package-log dist/package-log.json
       [--package dist/] [--reference ref.ttf | --reference-image shot.png --reference-text "line|line"]
       [--out-dir DIR]
 
-First the chain, which refuses to go on (exit 1) when any link is broken: base.json matches the base and its
-OFL text; every log was made from that base.json; fit_font.py read only the base and this targets.json and fit
-from a subset it made of the base itself; space_font.py read only fitted fonts and this targets.json;
-package.py took only spaced fonts; and every font checked here is an output of package.py. That structure is
-the provenance guarantee: the build steps never opened a reference font.
+First the chain, which refuses to go on (exit 1) when any link is broken. chain.verify_build is the check
+package.py ran: base.json matches the base and its OFL text; every log was made from that base.json;
+fit_font.py read only the base and this targets.json, and its subset is what the base gives again with the
+recorded arguments, byte for byte (the glyph order and character map gates compare with that remade subset);
+space_font.py read only fitted fonts and this targets.json. Then the package log: it records this targets.json
+and exactly these fit and space logs, package.py took only spaced fonts, and every font checked here is one of
+its outputs. That structure is the provenance guarantee: the build steps never opened a reference font. What it
+cannot rule out: one agent that writes both the fonts and every log by hand, consistently. The chain shows the
+files agree with each other and with the approved base, not who made them.
 
 Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
 - metrics: x-height to cap, n stem, contrast, within the targets' tolerances (targets.json "tolerances").
@@ -357,39 +361,10 @@ def stacked(img_path, text, ours, out_dir, tag):
 
 
 def verify_chain(a):
-    """Every link from base.json to the fonts given. Returns (record, fit log, subset font, rows) or refuses."""
-    rec, base_sha = C.load_base(a.base_json)
-    fit = C.load_log(a.fit_log, base_sha, "--fit-log", "fit_font.py")
-    if not a.space_log:
-        raise C.Refused("no --space-log. The chain runs through the log space_font.py wrote for every style.")
-    spaces = [C.load_log(p, base_sha, "--space-log", "space_font.py") for p in a.space_log]
-    pkg = C.load_log(a.package_log, base_sha, "--package-log", "package.py")
-    targets_sha = C.sha256_file(a.targets)
-    rows = [("base.json matches the base and its OFL text", f"font {rec['font']['sha256'][:12]}, licence "
-             f"{rec['license']['sha256'][:12]}, approved {rec['approval']['recorded_at']}")]
-    fit_in = [e["sha256"] for e in fit["chain"]["inputs"]]
-    if fit_in != [rec["font"]["sha256"]] or (fit["chain"].get("targets") or {}).get("sha256") != targets_sha:
-        raise C.Refused(f"{a.fit_log}: fit_font.py's inputs are not exactly the approved base and {a.targets}")
-    rows.append(("fit read only the approved base and targets.json", f"{len(fit['chain']['outputs'])} fonts written"))
-    sub = fit.get("subset") or {}
-    if (sub.get("source_sha256") != rec["font"]["sha256"] or not sub.get("file") or not os.path.exists(sub["file"])
-            or C.sha256_file(sub["file"]) != sub.get("sha256")):
-        raise C.Refused(f"{a.fit_log}: the subset is missing, changed, or not made from the approved base")
-    rows.append(("fit made its subset from the approved base", f"subset {sub['sha256'][:12]}"))
-    fit_out = C.outputs(fit)
-    for p, sp in zip(a.space_log, spaces):
-        if (not sp["chain"]["inputs"] or any(e["sha256"] not in fit_out for e in sp["chain"]["inputs"])
-                or (sp["chain"].get("targets") or {}).get("sha256") != targets_sha):
-            raise C.Refused(f"{p}: space_font.py's inputs are not fitted fonts from {a.fit_log} and {a.targets}")
-    rows.append(("space read only fitted fonts and targets.json", f"{len(spaces)} space logs"))
-    space_out = C.outputs(*spaces)
-    if not pkg["chain"]["inputs"] or any(e["sha256"] not in space_out for e in pkg["chain"]["inputs"]):
-        raise C.Refused(f"{a.package_log}: package.py took a font that is not an output of the space logs")
-    rows.append(("package took only spaced fonts", f"{len(pkg['chain']['inputs'])} fonts"))
-    for p in a.fonts:
-        C.require_output(p, [pkg], "--package-log", "package.py")
-    rows.append(("every font checked is a package output", f"{len(a.fonts)} fonts"))
-    return rec, fit, TTFont(sub["file"]), rows
+    """Every link from base.json to the fonts given, by the same chain.verify_build package.py ran, then the package
+    log. Returns (the build, rows) or refuses."""
+    b = C.verify_build(a.base_json, a.targets, a.fit_log, a.space_log)
+    return b, b.rows + C.verify_package_log(b, a.package_log, a.fonts)
 
 
 def main():
@@ -407,7 +382,8 @@ def main():
     ap.add_argument("--package")
     ap.add_argument("--out-dir", default=".")
     a = ap.parse_args()
-    rec, fit, subset_font, chain_rows = verify_chain(a)
+    b, chain_rows = verify_chain(a)
+    rec, fit, subset_font = b.rec, b.fit, b.subset
     T = L.load_json(a.targets)
     base_vf = TTFont(rec["font"]["file"])
     os.makedirs(a.out_dir, exist_ok=True)
