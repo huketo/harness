@@ -59,7 +59,7 @@ TEXT = {
         "small": "작은 크기", "reversed": "반전", "on_colour": "색 바탕", "stroke": "16 px에서 획 굵기: {v}",
         "not_checked": "검사하지 않음", "checks": "검사", "not_run": "실행하지 않음",
         "failed": "검사에 실패했지만 요청에 따라 넣은 방향입니다",
-        "tracing": "마크의 출처", "traced": "{file}을 트레이싱했습니다", "source": "원본 파일", "sha": "SHA-256",
+        "tracing": "마크의 출처", "traced": "트레이싱 원본: {file}", "source": "원본 파일", "sha": "SHA-256",
         "kind": "권리 유형", "asked": "사용자에게 보인 질문", "answer": "사용자의 답(원문)",
         "score": "원본과의 점수", "score_line": "원본과의 점수 {s}(표시만 하며 검사하지 않습니다)",
         "unverified": "make-logo는 이 진술을 기록하고 파일의 해시에 묶었을 뿐이며, 진술이 사실인지는 확인하지 않았습니다.",

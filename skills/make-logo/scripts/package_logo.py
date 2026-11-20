@@ -140,7 +140,8 @@ def sheet(lang: str, name: str, classes: str, shapes: str, traces: list[dict], s
 {came}
 ## 한국 특허청(KIPRIS)
 
-- KIPRIS 상표 검색: https://www.kipris.or.kr/ 에서 "상표"를 고른 뒤 "{name}"을 한글, 영문, 비슷한 발음으로 검색합니다.
+- KIPRIS 상표 검색: https://www.kipris.or.kr/ 에서 "상표"를 고른 뒤, 다음 이름을 한글 표기와 영문 표기, 비슷한 발음으로
+  검색합니다: "{name}".
 - 도형이 들어간 상표는 KIPRIS의 도형 분류(비엔나 분류) 코드로도 검색합니다. 이 마크를 이루는 도형: {shapes}.
 - 지정상품 분류(니스 분류): {classes or "판매하는 상품과 서비스의 분류(소프트웨어는 보통 제9류와 제42류)"}
 
