@@ -358,9 +358,18 @@ class Fit(Scratch):
 
 
 class OpticalSize(Scratch):
-    """A base with an optical-size axis whose vertical strokes thicken as the size rises (testfonts.OPSZ_STEM), and
-    a screenshot of the same face at opsz 90 and wght 400 with H, o and the Korean lines, so the targets have a
-    Hangul stem at cap 700 and a contrast. The opsz scan picks 90 for the contrast; the weight must be solved there."""
+    """A base with an optical-size axis 10-90 whose vertical strokes thicken as the size rises (testfonts.OPSZ_STEM:
+    at wght w and size z the stem is s(w) + 32 (z - 10) / 80 at cap 700, s(100) = 40), so the contrast falls as the
+    size rises. Three sets of targets for Regular 400 and Bold 700, each with a Latin contrast and a Hangul stem at
+    cap 700:
+    - shot: a screenshot of the same face at opsz 70 and wght 450 with H, o and the Korean lines. A Bold scanned at
+      every size would land at opsz 90, 250 heavier than the Regular.
+    - reach: a contrast of 0.45, which opsz 90 at wght 100 comes closest to, and a stem of 55, which the wght axis
+      reaches only up to opsz 40 (at 50 its thinnest stem is 56).
+    - beyond: the same contrast and a stem of 30, thinner than the base draws at any size."""
+
+    TARGETS = {"reach": 55.0, "beyond": 30.0}  # the Hangul stem at cap 700 of the hand-written targets
+    CONTRAST = 0.45
 
     @classmethod
     def setUpClass(cls):
@@ -368,47 +377,68 @@ class OpticalSize(Scratch):
         p = cls.p
         cls.base = T.hangul_vf(p("LumenLedger[opsz,wght].ttf"), latin=True, opsz=True)
         assert T.approve(cls.base, T.write(p("OFL.txt"), T.ofl_text()), p("base.json")).returncode == 0
-        T.instance(cls.base, p("ref-90.ttf"), 400, opsz=90)
+        two_weights = ("--style", "Regular:400", "--style", "Bold:700")
+        T.instance(cls.base, p("ref-70.ttf"), 450, opsz=70)
         lines = ["HoH", *L.SAMPLE_LINES_KO]
-        measure_image.render_sheet(L.Face(p("ref-90.ttf"), subset_text=L.MEASURE_TEXT + L.HANGUL_TEXT), lines,
+        measure_image.render_sheet(L.Face(p("ref-70.ttf"), subset_text=L.MEASURE_TEXT + L.HANGUL_TEXT), lines,
                                    SHOT_PX, p("shot.png"))
-        cls.runs = {
-            "measure": T.run("measure_image.py", p("shot.png"), "--text", "|".join(lines), "--out", p("m.json")),
-            "targets": T.run("make_targets.py", p("m.json"), "--family", T.NEW_FAMILY, "--scripts", "latin,korean",
-                             "--style", "Regular:400", "--style", "Bold:700", "--out", p("targets.json")),
-            "fit": T.run("fit_font.py", cls.base, p("targets.json"), "--base-json", p("base.json"), "--out-dir",
-                         p("build")),
-        }
-        cls.runs["measure fitted"] = T.run("measure_font.py", p("build", "TesseraSans-Regular.fit.ttf"), "--out",
-                                           p("m-fitted.json"))
+        cls.runs = {"measure shot": T.run("measure_image.py", p("shot.png"), "--text", "|".join(lines), "--out",
+                                          p("m-shot.json"))}
+        for name, stem in cls.TARGETS.items():
+            m = {"source": "image", "cap_em": None, "confidence": {}, "contrast": cls.CONTRAST,
+                 "hangul": {"classes": {"H1": {"aspect": [v(0.75, "ratio")]}}, "stem": [v(stem, "cap700")]}}
+            T.write(p(f"m-{name}.json"), json.dumps(m))
+        for name in ("shot", *cls.TARGETS):
+            cls.runs[f"targets {name}"] = T.run("make_targets.py", p(f"m-{name}.json"), "--family", T.NEW_FAMILY,
+                                                "--scripts", "latin,korean", *two_weights, "--out",
+                                                p(f"targets-{name}.json"))
+            cls.runs[f"fit {name}"] = T.run("fit_font.py", cls.base, p(f"targets-{name}.json"), "--base-json",
+                                            p("base.json"), "--out-dir", p(f"build-{name}"))
+        cls.runs["measure shot fitted"] = T.run("measure_font.py", p("build-shot", "TesseraSans-Regular.fit.ttf"),
+                                                "--out", p("m-shot-fitted.json"))
 
     def test_every_step_ran(self):
         for step, r in self.runs.items():
             with self.subTest(step=step):
                 ok(self, r)
 
-    def style(self, i):
-        return load(self.p("build", "fit-log.json"))["styles"][i]
+    def style(self, name, i):
+        return load(self.p(f"build-{name}", "fit-log.json"))["styles"][i]
 
     def test_the_first_weight_is_solved_at_the_optical_size_the_scan_picks(self):
-        t = load(self.p("targets.json"))
+        t = load(self.p("targets-shot.json"))
         self.assertIsNotNone(t["targets"].get("contrast"))
         want = L.tagged_value(t["hangul"]["stem"], "cap700")
-        self.assertAlmostEqual(want, 80 + T.OPSZ_STEM, delta=2)
-        s = self.style(0)
-        self.assertEqual(s["y_location"]["opsz"], 90)
-        self.assertAlmostEqual(s["y_location"]["wght"], 400, delta=15)  # solved at opsz 10 it would be 600
+        self.assertAlmostEqual(want, 88 + T.OPSZ_STEM * 0.75, delta=2)
+        s = self.style("shot", 0)
+        self.assertEqual(s["y_location"]["opsz"], 70)
+        self.assertAlmostEqual(s["y_location"]["wght"], 450, delta=15)  # solved at opsz 10 it would be 600
         stem = s["hangul"]["stem"]
         self.assertEqual(stem["from"], "cap700")
         self.assertAlmostEqual(stem["base"] / stem["target"], 1, delta=0.01)
-        fitted = L.tagged_value(load(self.p("m-fitted.json"))["hangul"]["stem"], "cap700")
+        fitted = L.tagged_value(load(self.p("m-shot-fitted.json"))["hangul"]["stem"], "cap700")
         self.assertAlmostEqual(fitted / want, 1, delta=0.015)
 
-    def test_the_second_weight_steps_from_where_the_first_landed(self):
-        first, second = self.style(0), self.style(1)
-        self.assertEqual(second["hangul"]["weight_from"], "stem cap700, stepped from the first style")
-        self.assertEqual(second["y_location"]["opsz"], first["y_location"]["opsz"])
-        self.assertAlmostEqual(second["y_location"]["wght"], first["y_location"]["wght"] + 300, delta=0.01)
+    def test_the_second_weight_keeps_the_first_optical_size_and_steps_its_wght(self):
+        for name in ("shot", "reach"):
+            with self.subTest(targets=name):
+                first, second = self.style(name, 0), self.style(name, 1)
+                self.assertEqual(second["hangul"]["weight_from"], "stem cap700, stepped from the first style")
+                self.assertEqual(second["y_location"]["opsz"], first["y_location"]["opsz"])
+                self.assertAlmostEqual(second["y_location"]["wght"], first["y_location"]["wght"] + 300, delta=0.01)
+
+    def test_the_scan_keeps_an_optical_size_where_the_wght_reaches_the_hangul_stem(self):
+        s = self.style("reach", 0)
+        self.assertEqual(s["y_location"]["opsz"], 40)  # of the sizes that reach 55, the nearest to the contrast
+        stem = s["hangul"]["stem"]
+        self.assertAlmostEqual(stem["base"] / stem["target"], 1, delta=0.01)
+        self.assertNotIn("weight_missed_pct", s["hangul"])
+
+    def test_when_no_optical_size_reaches_the_hangul_stem_the_nearest_is_kept_and_logged(self):
+        s = self.style("beyond", 0)
+        self.assertEqual(s["y_location"], {"opsz": 10, "wght": 100})  # stem 40, the thinnest the base draws
+        self.assertAlmostEqual(s["hangul"]["weight_missed_pct"], (40 / 30 - 1) * 100, delta=0.2)
+        self.assertTrue(any("reaches the Hangul stem cap700 30 at no location" in line for line in s["log"]), s["log"])
 
 
 if __name__ == "__main__":

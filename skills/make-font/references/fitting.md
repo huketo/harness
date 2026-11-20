@@ -36,8 +36,8 @@ follow x.
 
 1. **y instance.** For each optical size tried (nine across the axis, unless `--loc` fixes it), solve the weight
    axis so the n stem meets the target (without a Latin n stem, the Hangul stem: see [Hangul](#hangul)), then
-   measure contrast, bar to stem and x-height to cap. Keep the size with the smallest error. With
-   `--no-contrast` the opsz scan is skipped.
+   measure contrast, bar to stem and x-height to cap. Keep the size with the smallest error (for the Hangul stem,
+   among the sizes where the wght axis reaches it). With `--no-contrast` the opsz scan is skipped.
 2. **x instance per class.** For each width class: on a width axis, bisect wdth so the class's mean advance meets
    its target. At every wdth tried, solve wght again so the class's stem (n for lowercase, H for capitals and
    figures) meets its target, because width changes stems. Without a width axis, or where it runs out, scale the
@@ -99,12 +99,17 @@ this order:
 3. `stem_h1` (a screenshot of Hangul alone): the base's stem over its H1 mean face height meets the ratio.
 
 The cap height and the face height move a little with the weight, so each try reads them and the stem at the same
-wght. The wght is solved at every optical size the y instance is chosen from (step 1), so the stem holds at the
-size the contrast scan keeps. Each later style starts from the wght where the first style's y instance landed and
-moves by its weight-class difference (Bold 700 after Regular 400: +300), clamped to the axis. The stem the base
-draws there is that style's own: at the first style's optical size the stepped wght draws it, at the other sizes
-tried the wght that draws the same stem. Targets with neither an n stem nor a Hangul stem are refused. Without a
-Latin target, the Latin takes the wght the Hangul chose, which keeps the base's own balance between the two.
+wght. The wght is solved at every optical size the y instance is chosen from (step 1). At some sizes the wght axis
+may not reach the stem: it is thicker than the boldest the axis draws there, or thinner than the lightest. The scan
+keeps a size where the axis reaches it, the one nearest the contrast, bar and x-height targets among those. When no
+size reaches it, the scan keeps the size whose axis end comes nearest, and `fit-log.json` records the miss
+(`weight_missed_pct`, and a line in the style's log).
+
+Each later style takes the first style's y location, its optical size included, with the wght moved by the
+weight-class difference (Bold 700 after Regular 400: +300) and clamped to the axis. It scans no optical size of its
+own, so the weight classes stay as far apart on the axis as their numbers. Targets with neither an n stem nor a
+Hangul stem are refused. Without a Latin target, the Latin takes the wght the Hangul chose, which keeps the base's
+own balance between the two.
 
 **Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
 there, and only then does `finish()` scale the em, once, at the end:
@@ -126,6 +131,7 @@ The saved font rounds every point to a whole unit, so a stem lands up to a unit 
 | Field | Value |
 |-|-|
 | `weight_from` | `n_stem`, `stem cap700`, `stem em1000` or `stem_h1`, with ", stepped from the first style" after the first |
+| `weight_missed_pct` | only when no optical size tried lets the wght axis reach the Hangul stem: the stem the base draws at the chosen location over the target, minus 1, in percent |
 | `units` | font units of the y instance per `cap700` and per `em1000` unit |
 | `classes.Hn.<key>` | `{"target", "base", "from"}` in font units of the y instance, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in |
 | `stem`, `adv` | the same, font-wide (`adv` for fixed-width Hangul) |

@@ -40,9 +40,10 @@ For each style:
 Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Without a Latin n stem to aim at,
 the weight comes from the Hangul stem: as a length when a reference gave one (`stem` at cap 700, else per 1000 em),
 else as the ratio `stem_h1`. wght is solved so the base's vertical stem, in that unit or over its H1 face height,
-meets it, the stem and the cap height or H1 face read at the same wght, at every location step 1 tries. Each later
-style steps by its weight-class difference from the wght where the first style's y instance landed, and the stem
-the base draws there is its own aim at the other locations tried. Before step 5, every Hangul target is stated in
+meets it, the stem and the cap height or H1 face read at the same wght, at every location step 1 tries. Step 1
+keeps a location where the wght axis reaches that stem; when none does, the nearest, and fit-log.json records by
+how much it misses. Each later style takes the first style's y location with the wght stepped by its weight-class
+difference, clamped to the axis, and scans no optical size of its own. Before step 5, every Hangul target is stated in
 the y instance's own units beside what the base draws there: a length at cap 700 against the y instance's cap
 height, a length per 1000 em against the finished font's em, a ratio by the base's own H1 face. fit-log.json
 records them under each style's `hangul`. No Hangul glyph is moved yet: the base keeps its Hangul sizes, centres
@@ -173,11 +174,17 @@ def hangul_weight_aim(T):
 
 def solve_hangul_wght(B, loc, aim):
     """loc with the wght where the base's Hangul stem meets `aim` (hangul_weight_aim), each try read at its own
-    wght."""
+    wght, and how far the stem drawn there misses the aim: 0 where the wght axis reaches it at loc, else the wght is
+    the nearer axis end and the miss is the stem drawn there over the aim, minus 1."""
     lo, _, hi = B.axes["wght"]
     _, target, measure = aim
+    thinnest, boldest = (measure(B.hangul({**loc, "wght": v})) for v in (lo, hi))
+    if target < thinnest:
+        return {**loc, "wght": lo}, thinnest / target - 1
+    if target > boldest:
+        return {**loc, "wght": hi}, boldest / target - 1
     w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), measure, target, lo, hi)
-    return {**loc, "wght": round(w, 2)}
+    return {**loc, "wght": round(w, 2)}, 0.0
 
 
 def y_tries(B, fixed, args, tg):
@@ -190,17 +197,19 @@ def y_tries(B, fixed, args, tg):
 
 
 def pick_y(B, tries, weigh, tg):
-    """The y instance: each location tried takes its wght from weigh(loc), and the one whose contrast, bar to stem
-    and x-height to cap come closest to the targets wins. Returns (location, its measurements)."""
+    """The y instance. Each location tried takes its wght from weigh(loc), which also returns how far the stem it
+    aims at stays from what the base draws there (0 where the wght axis reaches it). The locations that reach it come
+    first, and of them the one whose contrast, bar to stem and x-height to cap come closest to the targets wins; when
+    none reaches it, the nearest. Returns (location, its measurements, its miss)."""
     best = None
     for loc in tries:
-        loc = weigh(loc)
+        loc, miss = weigh(loc)
         m = L.measure_face(B.tiny(loc))
         err = sum(((m.get(k) or 0) - tg[k]) ** 2 / s ** 2 for k, s in (("contrast", 0.04), ("bar_stem", 0.06), ("xh_cap", 0.01))
                   if tg.get(k) is not None)
-        if best is None or err < best[0]:
-            best = (err, loc, m)
-    return best[1], best[2]
+        if best is None or (abs(miss), err) < best[0]:
+            best = ((abs(miss), err), loc, m, miss)
+    return best[1:]
 
 
 HANGUL_LENGTHS = ("face_w", "face_h", "cx", "cy", "side", "side_asym", "adv")
@@ -418,7 +427,8 @@ def fit_style(B, T, style, args, log):
     # Stem target: the style's own. Else find the base weight that draws the first style's stem, step it by the
     # difference in weight class (500 - 400 = +100), and take the stem the base draws there. The Latin n stem gives
     # an n stem to solve. Without one the Hangul stem does (a length, else its ratio to the H1 face): solved at every
-    # location the y instance is chosen from, and stepped from where the first style's y instance landed.
+    # location the y instance is chosen from for the first style, and a later style takes the first style's y
+    # location with the wght stepped.
     stem_t, weigh, weight_from = style.get("n_stem"), None, "n_stem"
     if stem_t is None and "wght" in B.axes and first.get("n_stem"):
         lo, _, hi = B.axes["wght"]
@@ -434,22 +444,20 @@ def fit_style(B, T, style, args, log):
         weight_from = aim[0]
         if step:
             lo, _, hi = B.axes["wght"]
-            first_y, _ = pick_y(B, tries, lambda loc: solve_hangul_wght(B, loc, aim), tg)
-            stepped = {**first_y, "wght": round(min(max(first_y["wght"] + step, lo), hi), 2)}
-            log.append(f"{style['name']}: the first style's y instance sits at {first_y} (solved from the Hangul "
-                       f"{aim[0]} {aim[1]}), this one {step:+d} from it at wght {stepped['wght']:.0f}")
-            # The stem the base draws there is this style's aim. At the first style's own location the stepped wght
-            # draws it, at another one the wght that draws the same stem.
-            aim = (aim[0], aim[2](B.hangul(stepped)), aim[2])
+            first_y, _, missed = pick_y(B, tries, lambda loc: solve_hangul_wght(B, loc, aim), tg)
+            tries = [{**first_y, "wght": round(min(max(first_y["wght"] + step, lo), hi), 2)}]
             weight_from += ", stepped from the first style"
+            log.append(f"{style['name']}: the first style's y instance sits at {first_y} (solved from the Hangul "
+                       f"{aim[0]} {aim[1]:.4g}" + (f", {missed * 100:+.1f} % off it" if missed else "")
+                       + f"), this one {step:+d} from it at {tries[0]}")
 
-            def weigh(loc):
-                return stepped if {**loc, "wght": stepped["wght"]} == stepped else solve_hangul_wght(B, loc, aim)
+            def weigh(loc):  # the first style's location, stepped: no optical size of its own
+                return loc, 0.0
         else:
             def weigh(loc):
                 return solve_hangul_wght(B, loc, aim)
-        log.append(f"{style['name']}: wght solved from the Hangul {aim[0]} {aim[1]:.4g} at each location the y "
-                   "instance is chosen from")
+            log.append(f"{style['name']}: wght solved from the Hangul {aim[0]} {aim[1]:.4g} at each location the y "
+                       "instance is chosen from")
     elif stem_t is None and "wght" not in B.axes:
         stem_t = first.get("n_stem") or L.stem_cap700(B.tiny(fixed, "nHx"))
         weight_from = "the base, which has no weight axis"
@@ -462,8 +470,11 @@ def fit_style(B, T, style, args, log):
     # 1. y instance
     if weigh is None:
         def weigh(loc):
-            return solve_wght(B, loc, "n", stem_t * B.tiny(loc, "nHx").bounds("H")[3] / L.CAP)
-    yloc, ym = pick_y(B, tries, weigh, tg)
+            return solve_wght(B, loc, "n", stem_t * B.tiny(loc, "nHx").bounds("H")[3] / L.CAP), 0.0
+    yloc, ym, missed = pick_y(B, tries, weigh, tg)
+    if missed:
+        log.append(f"{style['name']}: the wght axis reaches the Hangul {aim[0]} {aim[1]:.4g} at no location tried; "
+                   f"the nearest, {yloc}, draws {aim[1] * (1 + missed):.4g} ({missed * 100:+.1f} %)")
     if stem_t is None:  # the weight came from the Hangul: the Latin keeps the stem the base draws there
         stem_t = L.stem_cap700(B.tiny(yloc, "nHx"))
         log.append(f"{style['name']}: n stem target {stem_t:.1f}, the base's at the y instance")
@@ -547,6 +558,8 @@ def fit_style(B, T, style, args, log):
             "factors": factor, "iterations": hist, "stretch_limit_hit": stuck,
             "classes_measured": {c: L.CLASSES[c] for c in widths}}
     if hangul:
+        if missed:
+            hangul["weight_missed_pct"] = round(missed * 100, 1)
         info["hangul"] = hangul
     return f, info
 
@@ -605,6 +618,8 @@ def main():
         if "hangul" in info:
             h = info["hangul"]
             print(f"  hangul: weight from {h['weight_from']}"
+                  + (f", which no location tried reaches ({h['weight_missed_pct']:+.1f} %)"
+                     if "weight_missed_pct" in h else "")
                   + (f"; stem / H1 face height {h['stem_h1']['got']} (target {h['stem_h1']['target']})"
                      if "stem_h1" in h else ""))
             for cls, row in h["classes"].items():
