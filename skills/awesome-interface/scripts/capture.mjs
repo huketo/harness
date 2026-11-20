@@ -50,10 +50,10 @@ A capture needs one of these two, so no run starts before the guard's decision o
                        BODY" for GraphQL). capture runs capture-guard prove on them first, which checks the
                        guard's decision on each listed request and nothing more, and exits 2 before opening a
                        browser if any one would get through or a line is not METHOD URL
-  --no-backend         the app sends no writes (a static site, or every call answered by --guard-fixtures). The
-                       guard still aborts every write except a --read-procedures read, which continues, and a
-                       --guard-fixtures match, which is answered in the browser; each write it aborted is printed
-                       as a WARN line
+  --no-backend         the app sends no writes (a static site, or every call answered by --guard-fixtures). Skips
+                       the --writes dry run and nothing else: the guard decides each request as it always does
+                       (a GET or HEAD to a local host continues), and a WARN line names each aborted request
+                       whose method is not GET, HEAD or OPTIONS
   --read-procedures <a,b>  exact POST procedure names, or GraphQL operation names, that are reads and may continue
   --procedure-style <s>    rpc-post (default) or rest
   --graphql <path>...      a path that serves GraphQL, beyond any ending in /graphql or /gql
