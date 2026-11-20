@@ -35,10 +35,12 @@ trademark sheet. It doesn't know whether the statement is true.
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
   calibrated limit against a collected image or a `--refs` logo. It compares with every image, fit to measure or
   not: SVGs rasterised, a favicon too small to split enlarged, an image with transparency seen on white and on black
-  (its higher score counts). It refuses while one of them still can't be read as a mark (`not-comparable`), while a
-  `--refs` folder or file named is not there or an image is a broken link (`refs-missing`), while a collection holds
-  a file its manifest does not list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or
-  while a collected file is gone or no longer has the sha256 its manifest lists (`collection-changed`). The person's
+  (its higher score counts). It refuses while one of them still can't be read as one mark (`not-comparable`, also a
+  sheet whose mask leaves out a tenth of the ink seen on a ground), while a `--refs` folder or file named is not
+  there, a folder in them can't be listed, or an image is a broken link (`refs-missing`), while a collection is or
+  holds a symbolic link (`collection-linked`), while a collection holds a file its manifest does not list
+  (`collection-unlisted`: a pull that stopped, or a file put there by hand), or while a collected file is gone or no
+  longer has the sha256 its manifest lists (`collection-changed`). The person's
   own sketch on the moodboard (same sha256 as a `trace_sources` entry) is left out of that comparison; a collected
   file never is. Each trace gets `<svg>.provenance.json`.
 - `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
@@ -103,7 +105,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
 
 3. **Measure.** `uv run scripts/measure_logo.py <refs> --out measurements.json --sheet measured.png`. Open the sheet
    and look: every mask should be the mark and nothing else. Drop any that caught a photo, a caption or a sheet of
-   several marks (`references/measuring.md`).
+   several marks (`references/measuring.md`). Tracing and checking refuse one whose mask leaves part of the ink out,
+   but not two marks the mask keeps together, nor a small mark beside a larger one on the same ground: drop those.
    Done when the measured set is clean and the person's own references are in it.
 
 4. **Calibrate.** With 30 or more measured references: `uv run scripts/calibrate.py measurements.json --out
@@ -128,9 +131,9 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    character, and, when step 6 gave you a source, traced marks: `uv run scripts/trace_ref.py sketches/l.png --brief
    brief.json --refs <refs> --calibration calibration.json --crop x,y,w,h --out trace/<n>.svg`, then change one thing
    with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image:
-   drop that source, never work around it. `not-comparable` names a reference the gates can't read as a mark: take it
-   out of `refs/mine/` (or delete it from its collection and run `collection.mjs`), or replace it with a copy that
-   shows the mark on a plain ground, then trace again. At least half carry the idea as a picture, not a letter. Each
+   drop that source, never work around it. `not-comparable` names a reference the gates can't read as one mark: take
+   it out of `refs/mine/` (or delete it from its collection and run `collection.mjs`), or replace it with one mark
+   cropped out of it on a plain ground, then trace again. At least half carry the idea as a picture, not a letter. Each
    is a recipe (`references/building.md`): a title, the idea in one sentence, grid shapes, an OFL wordmark, a
    palette. Build each: `uv run scripts/build_logo.py dirs/<n>.json --out build/<n> --brief brief.json --refs <refs>
    --calibration calibration.json`. Render all six on one sheet and look: a mark that reads as a stock icon, the

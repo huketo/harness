@@ -73,10 +73,13 @@ traced, and the scripts refuse them by hash and by likeness.
    logo. Every image counts, even one `measure_logo.py` skips (a logo cut close out of a screenshot): an SVG is
    rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, and an image with transparency
    is seen on white and on black, its higher score counting (a sheet may hold a dark logo and a light one). While an
-   image still can't be read as a mark, the trace is refused (`not-comparable`, naming it): take it out of the
-   folder, or out of its collection, or replace it with a copy on a plain ground. A `--refs` folder or file that is
-   not there, or an image that is a broken link, is refused by name (`refs-missing`). A collection that holds a file
-   its manifest does not list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or a
+   image still can't be read as one mark, the trace is refused (`not-comparable`, naming it): take it out of the
+   folder, or out of its collection, or replace it with one mark cropped out of it on a plain ground. That includes a
+   sheet whose mask, on white or on black, keeps under 90% of the ink seen there: a second mark, or a favicon beside a
+   large logo that the split drops as a speck, would never be compared. A `--refs` folder or file that is not there,
+   a folder in them that can't be listed, or an image that is a broken link, is refused by name (`refs-missing`). A
+   collection that is or holds a symbolic link (`collection-linked`), one that holds a file its manifest does not
+   list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or a
    collected file that is gone or no longer has the sha256 its manifest lists (`collection-changed`), is refused too;
    `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. The
    person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison; a collected file
