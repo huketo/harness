@@ -39,7 +39,7 @@ Apply the relevant domain reference for a confirmed issue. Do not fabricate soci
 
 ## Change and verify in coherent slices
 
-Capture a before state for the affected view when available. Implement the smallest coherent slice that serves the redesign, preserving existing components and data contracts. Use existing fixtures or synthetic content rather than changing production records to preview states.
+Capture the affected views before changing them, and the same surfaces, states, widths and themes after each slice. For a locally served web build, use capture.mjs `--kind before` and `--kind after` and compare with pixdiff as [capture and compare](review.md#capture-and-compare) describes. Each changed region belongs to the slice; a region outside it is an unexplained difference and a finding, and often marks a preserved area the slice touched. Implement the smallest coherent slice that serves the redesign, preserving existing components and data contracts. Use existing fixtures or synthetic content rather than changing production records to preview states.
 
 For a visual overhaul, use [art direction](art-direction.md) only where the new visual language needs a decision. Do not generate multiple alternatives, a brand board, screenshots, or DESIGN.md by default. A requested comparison uses the main skill's alternatives workflow and retains the original until selection.
 
