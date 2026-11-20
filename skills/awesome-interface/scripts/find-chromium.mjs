@@ -1,5 +1,7 @@
-// find-chromium.mjs: find Playwright and a Chromium it can launch. Used by capture.mjs and pixdiff.mjs.
-// Node 18+, no dependencies of its own.
+// find-chromium.mjs: find Playwright and a Chromium it can launch. Used by capture.mjs and pixdiff.mjs here, and
+// by the make-font and make-logo render_book.mjs, which import it by path. Node 18+, no dependencies of its own.
+// Adapted from design.how skills/build-design-system/scripts (MIT, see ../LICENSE.design-how); the exported
+// functions behave as upstream at 1ce5304. Tests: find-chromium.test.mjs.
 //
 //   node find-chromium.mjs [--root <dir>] [--self-test]   prints where Playwright and the browser come from. Exit 0, or 2 on none
 //

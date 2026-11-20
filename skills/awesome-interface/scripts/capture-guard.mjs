@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// capture-guard.mjs: deny-by-default network guard for any script that drives a browser against a live app.
+// capture-guard.mjs: deny-by-default guard for the HTTP requests a Playwright page or context routes.
 // Node 18+, no dependencies. Works as a module (installGuard, decide, classifyName) and as a CLI.
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+// Adapted from design.how skills/build-design-system/scripts (MIT, see ../LICENSE.design-how).
+import { appendFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const HELP = `capture-guard.mjs: deny-by-default network guard for browser capture scripts
@@ -18,7 +17,6 @@ Usage
       app really sends, copied from its network log in the shape it has there, or "METHOD URL BODY" when the
       endpoint is GraphQL, with the request body as one line of JSON. Exits 1 if any one would continue.
       Pass the same options the capture uses. Then fire the same writes from the page and read guard.log.
-  node capture-guard.mjs --self-test
   node capture-guard.mjs --help
 
 Options (CLI and the opts object of decide and installGuard)
@@ -35,15 +33,23 @@ Options (CLI and the opts object of decide and installGuard)
                           getOrCreate can write, so prefer exact names for any run that reaches a real backend.
   --fixtures <json>       {"<procedure or last segment>": {"status":200,"body":{...}}}. Matched calls are
                           fulfilled in the browser and never reach the backend, whatever the method.
-  --log <file>            JSON lines, one per decision (installGuard writes it as guard.log). A request that is
-                          not GET, HEAD or OPTIONS carries its body, so capture.mjs can export request bodies.
-  hold                    installGuard only: procedure names to leave unanswered, to capture a pending state.
-                          releaseAll() aborts them before the page closes.
 
-capture.mjs installs this guard on every browser context before the first navigation. A script of your own
-does the same: await installGuard(context, opts).ready, then navigate. Create the context with
-serviceWorkers: "block", because a service worker's requests go around page and context routes. A WebSocket
-is never routed, so an app that writes over one is not guarded.
+installGuard only (opts object)
+  logFile                 JSON lines, one per decision (capture.mjs writes it as guard.log).
+  logBodies               true to keep the request body of every request that is not GET, HEAD or OPTIONS in the
+                          log. Off by default, because a body can carry personal data or a token. Turn it on only
+                          to compare request bodies between two captures.
+  hold                    procedure names to leave unanswered, to capture a pending state. releaseAll() aborts
+                          them before the page closes.
+
+Scope
+  The guard sees only the HTTP requests Playwright routes for the page or context it is installed on.
+  capture.mjs installs it on every browser context before the first navigation. A script of your own does
+  the same: await installGuard(context, opts).ready, then navigate. Create the context with
+  serviceWorkers: "block", because a service worker's requests go around page and context routes.
+  Outside the guard: WebSocket traffic (never routed, so an app that writes over one is not guarded), and any
+  request a script sends from Node rather than the page, such as capture.mjs's route status check (a GET).
+  Point captures at a local build with fixed data or state you can throw away.
 
 Rules
   1. A host that is not local is aborted, unless --allow-host names it.
@@ -258,7 +264,7 @@ export function installGuard(target, opts = {}) {
 	const holdNames = opts.hold || [];
 	const record = (entry, body) => {
 		const line = { t: new Date().toISOString(), ...entry };
-		if (!["GET", "HEAD", "OPTIONS"].includes(String(entry.method).toUpperCase())) line.body = body ?? "";
+		if (opts.logBodies && !["GET", "HEAD", "OPTIONS"].includes(String(entry.method).toUpperCase())) line.body = body ?? "";
 		log.push(line);
 		if (opts.logFile) appendFileSync(opts.logFile, JSON.stringify(line) + "\n");
 	};
@@ -320,138 +326,17 @@ function parse(argv) {
 		else if (a === "--method") o.method = next();
 		else if (a === "--url") o.url = next();
 		else if (a === "--body") o.body = next();
-		else if (a === "--log") o.logFile = next();
 		else if (a === "--writes") o.writes = next();
 		else if (a === "--help" || a === "-h") o.help = true;
-		else if (a === "--self-test") o.selfTest = true;
 		else if (a.startsWith("-")) { console.error(`capture-guard: unknown flag ${a}. See --help`); process.exit(2); }
 		else o._.push(a);
 	}
 	return o;
 }
 
-function fakePage() {
-	const calls = [];
-	let handler;
-	const page = {
-		calls,
-		async route(_p, h) { handler = h; },
-		async close() { calls.push("page.close"); },
-		async fire(method, url, postData) {
-			const route = {
-				request: () => ({ method: () => method, url: () => url, postData: () => postData }),
-				fulfill: async (r) => calls.push({ op: "fulfill", url, status: r.status }),
-				continue: async () => calls.push({ op: "continue", url, method }),
-				abort: async () => calls.push({ op: "abort", url, method }),
-			};
-			await handler(route);
-			return route;
-		},
-	};
-	return page;
-}
-
-async function selfTest() {
-	const dir = mkdtempSync(join(tmpdir(), "cg-"));
-	let failed = 0;
-	const t = (name, ok, detail = "") => { if (!ok) { failed++; console.error(`FAIL ${name} ${detail}`); } else console.log(`ok   ${name}`); };
-	try {
-		const base = "http://localhost:5173";
-		const rpc = (p) => `${base}/rpc/${p}`;
-		const prefix = { readVerbs: PREFIX_READ_VERBS };
-		t("default: a read-looking name is denied until listed", !classifyName("items/getItem").read && classifyName("items/getItem", { readProcedures: ["items/getItem"] }).read);
-		t("default: users/me aborted until listed", decide({ method: "POST", url: rpc("users/me") }, {}).action === "abort");
-		t("default: a listed last segment continues", decide({ method: "POST", url: rpc("users/me") }, { readProcedures: ["me"] }).action === "continue");
-		// A substring match once judged a name by a word inside it, so a read was blocked and a state never captured.
-		t("tokens split camelCase", JSON.stringify(tokens("itemUrl")) === '["item","url"]' && JSON.stringify(tokens("getItem")) === '["get","item"]');
-		t("prefix: getItem is a read", classifyName("items/getItem", prefix).read);
-		t("prefix: itemUrl has no read verb first", !classifyName("files/itemUrl", prefix).read);
-		const d1 = decide({ method: "POST", url: rpc("files/get") }, {});
-		t("files/get aborted with a way out named", d1.action === "abort" && /readProcedures/.test(d1.reason), JSON.stringify(d1));
-		const d2 = decide({ method: "POST", url: rpc("files/get") }, { readProcedures: ["files/get"] });
-		t("files/get continues once listed", d2.action === "continue", JSON.stringify(d2));
-		const d2b = decide({ method: "POST", url: rpc("files/get") }, { fixtures: { "files/get": { body: { url: "x" } } } });
-		t("files/get fulfilled from a fixture", d2b.action === "fulfill" && d2b.response.status === 200);
-		// A leaked update once changed real data.
-		const d3 = decide({ method: "POST", url: rpc("items/update"), postData: "{}" }, prefix);
-		t("prefix: items/update aborted", d3.action === "abort", JSON.stringify(d3));
-		t("prefix: getOrCreate is not a read", !classifyName("items/getOrCreate", prefix).read);
-		t("prefix: listUpdates is a read (plural is not a write token)", classifyName("feed/listUpdates", prefix).read);
-		t("prefix: items/list is a read", decide({ method: "POST", url: rpc("items/list") }, prefix).action === "continue");
-		t("prefix: users/me is a read", decide({ method: "POST", url: rpc("users/me") }, prefix).action === "continue");
-		t("rest style aborts POST reads", decide({ method: "POST", url: rpc("items/list") }, { procedureStyle: "rest" }).action === "abort");
-		t("PUT aborted", decide({ method: "PUT", url: `${base}/api/x` }, {}).action === "abort");
-		t("GET to app continues", decide({ method: "GET", url: `${base}/assets/app.js` }, {}).action === "continue");
-		t("non-localhost aborted", decide({ method: "GET", url: "https://api.example.com/v1/x" }, {}).action === "abort");
-		t("lookalike host aborted", decide({ method: "GET", url: "http://localhost.evil.com/x" }, {}).action === "abort");
-		t("a non-local host continues only when --allow-host names it", decide({ method: "GET", url: "https://api.example.com/v1/x" }, { allowHosts: ["api.example.com"] }).action === "continue");
-		t("OPTIONS to a local host continues as a preflight", decide({ method: "OPTIONS", url: `${base}/api/x` }, {}).action === "continue");
-		t("OPTIONS to a non-local host is aborted", decide({ method: "OPTIONS", url: "https://api.example.com/x" }, {}).action === "abort");
-		const writes = ["POST " + rpc("items/update"), "PUT " + base + "/api/x", "POST " + rpc("items/list")];
-		t("prove names a write the prefix verbs let through", prove(writes, prefix).length === 1);
-		t("prove is clean by default", prove(writes, { readProcedures: ["users/me"] }).length === 0);
-		t("bad procedureStyle throws", (() => { try { decide({ method: "GET", url: base }, { procedureStyle: "x" }); return false; } catch { return true; } })());
-
-		// GraphQL. Listing the endpoint once let every mutation through, because the body was never read.
-		const gq = `${base}/graphql`;
-		const body = (query, operationName) => JSON.stringify({ query, operationName, variables: {} });
-		const mutation = body("mutation UpdateItem($id: ID!) { updateItem(id: $id) { id } }", "UpdateItem");
-		const query = body("query ListItems { items { id } }", "ListItems");
-		t("graphql: listing the endpoint does not open a mutation", decide({ method: "POST", url: gq, postData: mutation }, { readProcedures: ["graphql"] }).action === "abort");
-		t("graphql: a listed mutation name is still aborted", decide({ method: "POST", url: gq, postData: mutation }, { readProcedures: ["UpdateItem"] }).action === "abort");
-		t("graphql: a listed query continues", decide({ method: "POST", url: gq, postData: query }, { readProcedures: ["ListItems"] }).action === "continue");
-		t("graphql: an unlisted query is aborted", decide({ method: "POST", url: gq, postData: query }, {}).action === "abort");
-		t("graphql: a query passes the read verbs by its name", decide({ method: "POST", url: gq, postData: query }, prefix).action === "continue");
-		t("graphql: a shorthand query has no name to list", decide({ method: "POST", url: gq, postData: body("{ items { id } }") }, { readProcedures: ["graphql"] }).action === "abort");
-		t("graphql: a batch with one mutation is aborted", decide({ method: "POST", url: gq, postData: `[${query},${mutation}]` }, { readProcedures: ["ListItems"] }).action === "abort");
-		t("graphql: braces in strings and variable defaults are not selection sets", JSON.stringify(graphqlOps('query Q($f: In = {a: "}"}) { a } # mutation X { b }\nfragment F on T { c }')) === '[{"type":"query","name":"Q"}]');
-		t("graphql: operationName picks the operation", decide({ method: "POST", url: gq, postData: body("query ListItems { a } mutation UpdateItem { b }", "UpdateItem") }, { readProcedures: ["ListItems", "UpdateItem"] }).action === "abort");
-		t("graphql: a persisted query continues only when listed by name", decide({ method: "POST", url: gq, postData: JSON.stringify({ operationName: "ListItems", extensions: {} }) }, { readProcedures: ["ListItems"] }).action === "continue" && decide({ method: "POST", url: gq, postData: JSON.stringify({ operationName: "UpdateItem" }) }, prefix).action === "abort");
-		t("graphql: a body that is not JSON is aborted", decide({ method: "POST", url: gq, postData: "x" }, { readProcedures: ["graphql"] }).action === "abort");
-		t("graphql: a fixture answers an operation by name", decide({ method: "POST", url: gq, postData: mutation }, { fixtures: { UpdateItem: { body: {} } } }).action === "fulfill");
-		t("graphql: a GET carrying a mutation is aborted", decide({ method: "GET", url: `${gq}?query=${encodeURIComponent("mutation { deleteItem(id: 1) }")}` }, {}).action === "abort");
-		t("graphql: --graphql marks another path", isGraphqlPath(`${base}/api/data`, { graphqlPaths: ["/api/data"] }) && decide({ method: "POST", url: `${base}/api/data`, postData: mutation }, { readProcedures: ["data"], graphqlPaths: ["/api/data"] }).action === "abort" && decide({ method: "POST", url: `${base}/api/data`, postData: mutation }, { readProcedures: ["data"] }).action === "continue");
-		t("graphql: prove reads a body on the line", prove([`POST ${gq} ${mutation}`], { readProcedures: ["graphql"] }).length === 0 && prove([`POST ${gq} ${query}`], { readProcedures: ["ListItems"] }).length === 1);
-
-		// installGuard against a fake page. A held write is aborted at close, not released.
-		const logFile = join(dir, "guard.log");
-		const page = fakePage();
-		const guard = installGuard(page, { logFile, hold: ["items/create", "items/list"], fixtures: { "users/me": { body: { id: "u1" } } } });
-		await guard.ready;
-		await page.fire("GET", `${base}/`);
-		await page.fire("POST", rpc("users/me"));
-		await page.fire("POST", rpc("items/create"), "{}");
-		await page.fire("POST", rpc("items/list"));
-		await page.fire("POST", rpc("items/update"), '{"id":1,"count":2}');
-		await page.fire("GET", "https://example.com/pixel.gif");
-		t("two routes held", guard.heldCount() === 2, String(guard.heldCount()));
-		t("nothing continued for the held write", !page.calls.some((c) => c.op === "continue" && /items\/create/.test(c.url)));
-		await guard.closePage(page);
-		const ops = page.calls.map((c) => (typeof c === "string" ? c : `${c.op}:${c.url.split("/").slice(-2).join("/")}`));
-		const closeAt = ops.indexOf("page.close");
-		t("held write aborted before page close", ops.indexOf("abort:items/create") > -1 && ops.indexOf("abort:items/create") < closeAt, ops.join(" | "));
-		t("held read aborted too, never released", ops.indexOf("abort:items/list") > -1 && !ops.includes("continue:items/list"));
-		t("items/update never continued", !ops.includes("continue:items/update") && ops.includes("abort:items/update"));
-		t("non-local aborted in the page", ops.some((o) => o.startsWith("abort:") && o.includes("pixel.gif")));
-		t("users/me fulfilled", ops.includes("fulfill:users/me"));
-		const lines = readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-		t("guard.log has one JSON line per decision", lines.length >= 8 && lines.every((l) => l.action && l.url && l.t), String(lines.length));
-		t("no continue of any write in the log", !lines.some((l) => l.action === "continue" && /items\/(update|create)/.test(l.url)));
-		// Request bodies were once dropped from the log, so no tool could compare them before and after.
-		t("guard.log keeps the body of a blocked write", lines.some((l) => /items\/update/.test(l.url) && l.action === "abort" && l.body === '{"id":1,"count":2}'), JSON.stringify(lines));
-		t("a GraphQL request is logged under its operation name", graphqlProc({ method: "POST", url: `${base}/graphql`, postData: '{"query":"mutation UpdateItem { a }"}' }) === "graphql/UpdateItem");
-		t("guard.log keeps no body on a GET", lines.filter((l) => l.method === "GET").every((l) => !("body" in l)));
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-	if (failed) { console.error(`${failed} self-test failure(s)`); process.exit(1); }
-	console.log("all as expected");
-}
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const o = parse(process.argv.slice(2));
 	if (o.help) console.log(HELP);
-	else if (o.selfTest) await selfTest();
 	else if (o._[0] === "names") {
 		for (const n of o._.slice(1)) {
 			const c = classifyName(n, o);
@@ -466,5 +351,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		for (const l of leaks) console.log(`LEAK\t${l.method} ${l.url}\t${l.reason}`);
 		console.log(leaks.length ? `${leaks.length} writes would reach the backend` : "every write is blocked");
 		process.exitCode = leaks.length ? 1 : 0;
-	} else { console.error("usage: capture-guard.mjs names|decide|prove|--self-test|--help"); process.exit(2); }
+	} else { console.error("usage: capture-guard.mjs names|decide|prove|--help"); process.exit(2); }
 }

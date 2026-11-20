@@ -1,28 +1,24 @@
 #!/usr/bin/env node
 // capture.mjs: screenshots of every route, width, theme and state, behind capture-guard. Node 18+, Playwright 1.49+.
-// Run `node capture.mjs --help` for usage.
-import { createServer } from "node:http";
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+// Run `node capture.mjs --help` for usage. Tests: capture.test.mjs.
+// Adapted from design.how skills/build-design-system/scripts (MIT, see ../LICENSE.design-how).
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { launchChromium, repoRoot } from "./find-chromium.mjs";
 import { installGuard, isLocalHost, prove } from "./capture-guard.mjs";
 
-const SELF = fileURLToPath(import.meta.url);
-
-const HELP = `capture.mjs: screenshots and accessibility trees for every route, width and theme, with every write blocked
+const HELP = `capture.mjs: screenshots and accessibility trees for every route, width and theme, with page writes blocked
 
 Usage
   node capture.mjs --base <url> --kind before|after --out <folder> (--routes <r>... | --surfaces <tsv>)
                    (--writes <file> | --no-backend) [options]
   node capture.mjs --base <url> --status (--routes <r>... | --surfaces <tsv>)
-  node capture.mjs --self-test | --help
+  node capture.mjs --help
 
-  Example, with the app served on port 3000:
-  node capture.mjs --base http://localhost:3000 --kind before --out .design-system/captures \\
-    --surfaces .design-system/surfaces.tsv --writes .design-system/writes.txt
+  Example, with the app served on port 3000 and the captures kept outside the checkout:
+  node capture.mjs --base http://localhost:3000 --kind before --out /tmp/ui-review/captures \\
+    --surfaces /tmp/ui-review/surfaces.tsv --writes /tmp/ui-review/writes.txt
 
 Routes
   --routes <r>...      each a path (/settings/profile) or surface=path (profile=/settings/profile), separated by
@@ -38,12 +34,14 @@ Files, in --out
   <surface>.<state>-<kind>-<width>.png      a listed state other than the load state
   ...same name with .aria.yml               the accessibility tree (roles, names, states). Diff before and after
   ...same name with .<audit>.json           what each --eval script returned
-  guard.log                                 one JSON line per network decision, with the body of every write
-  bodies.json                               with --run: the request bodies of every write, for bodies-check
+  guard.log                                 one JSON line per network decision. Request bodies only with --bodies
 
-The guard (capture-guard.mjs) is installed on the browser context before the first navigation. It aborts every
-non-local host, every PUT, PATCH and DELETE, and every POST not listed as a read. Service workers are blocked so
-no request goes around it. A WebSocket is not guarded: an app that writes over one is not safe to capture live.
+The guard (capture-guard.mjs) is installed on the browser context before the first navigation. For every HTTP
+request Playwright routes there, it aborts every non-local host, every PUT, PATCH and DELETE, and every POST not
+listed as a read. Service workers are blocked so their requests cannot go around the context route.
+Outside the guard: WebSocket traffic, so an app that writes over one is not safe to capture live, and the route
+status check below, a plain GET from Node before any browser opens. A GET that writes (a logout link) is
+continued like any GET. Capture a local build with fixed data or state you can throw away.
 A capture needs one of these two, so no run starts before its writes are proven blocked:
   --writes <file>      lines of "METHOD URL", every write the app sends, copied from its network log ("METHOD URL
                        BODY" for GraphQL). capture runs capture-guard prove on them first and exits 2 before
@@ -57,13 +55,15 @@ A capture needs one of these two, so no run starts before its writes are proven 
   --app-origin <url>...    origins that serve the app. Default: any local host
   --allow-host <host>...   a non-local host the page may reach. A non-local --base is refused unless named here
 
-Request bodies, for bodies-check.mjs in migrate-design-system
-  --run <RUN_ID>       write bodies.json in --out: {"run", "rows": [{url, proc, body, capturedAt}]}, one row per
-                       write the page sent, blocked or not. A GraphQL row's proc is graphql/<operation name>
-  --bodies <file>      write it here instead, such as <evidence>/bodies.before.json
+Request bodies are not recorded by default, because a body can carry personal data or a token.
+  --bodies <file>      record the body of every write the page sent, blocked or not, in guard.log, and write
+                       {"rows": [{method, url, proc, body, action}]} to <file>, in the order sent. A GraphQL
+                       row's proc is graphql/<operation name>. Use it only to compare request bodies: run the
+                       same states before and after, each with its own --bodies file, and diff the two
 
 Options
-  --root <dir>         the app's repo root, where Playwright is looked for first. Default: the git root of --out
+  --root <dir>         the app's repo root, where Playwright is looked for first. Default: the git root of --out,
+                       else of the current folder, else the current folder
   --widths 390,1280    viewport widths: the narrowest and widest the app supports
   --height 900         viewport height. 320 at --widths 390 shows overlays that run past a short screen
   --themes light,dark  the first is the default theme. Default: light
@@ -81,7 +81,8 @@ Options
                        Redirects are not followed: a 3xx is reported with its Location and fails unless
                        --expect-status or the status column names that code
 
-It requests every route first and exits 1 if any answers other than expected, after capturing the rest. The
+It requests every route first (the status check, outside the guard) and exits 1 if any answers other than
+expected, after capturing the rest. The
 clock is fixed, Math.random is seeded, reduced motion is on, lazy images load eagerly, and it waits for fonts
 and, on a React app, for handlers to attach.
 Exit 0 every planned capture written, 1 a route or capture failed or any capture is missing (each is listed),
@@ -92,8 +93,7 @@ const slug = (p) => p.replace(/[?#].*$/, "").replace(/^\/+|\/+$/g, "").replace(/
 
 async function main(argv) {
 	if (!argv.length || argv.includes("--help") || argv.includes("-h")) { console.log(HELP); process.exit(argv.length ? 0 : 2); }
-	if (argv.includes("--self-test")) process.exit(await selfTest());
-	const KNOWN = new Set(["--height", "--root", "--base", "--kind", "--out", "--routes", "--surfaces", "--widths", "--themes", "--theme-via", "--states", "--full", "--status", "--no-aria", "--expect-status", "--mobile", "--storage-state", "--eval", "--writes", "--read-procedures", "--procedure-style", "--guard-fixtures", "--app-origin", "--allow-host", "--no-backend", "--run", "--bodies", "--graphql"]);
+	const KNOWN = new Set(["--height", "--root", "--base", "--kind", "--out", "--routes", "--surfaces", "--widths", "--themes", "--theme-via", "--states", "--full", "--status", "--no-aria", "--expect-status", "--mobile", "--storage-state", "--eval", "--writes", "--read-procedures", "--procedure-style", "--guard-fixtures", "--app-origin", "--allow-host", "--no-backend", "--bodies", "--graphql"]);
 	const bad = argv.filter((a) => a.startsWith("--") && !KNOWN.has(a));
 	if (bad.length) die(`unknown ${bad.join(", ")}. See --help`);
 	const val = (f, d) => { const i = argv.indexOf(f); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : d; };
@@ -109,10 +109,9 @@ async function main(argv) {
 		if (!val("--writes") && !argv.includes("--no-backend")) die("give --writes <file> (every write the app sends, proven blocked before the browser opens) or --no-backend (the app sends none). See --help");
 		if (val("--writes") && argv.includes("--no-backend")) die("give --writes or --no-backend, not both");
 	}
-	const runId = val("--run");
-	if (runId && !/^[\w.-]+$/.test(runId)) die("--run takes an id of letters, digits, dot, dash or underscore");
-	if (val("--bodies") && !runId) die("--bodies needs --run <RUN_ID>, the id the run log records");
-	if (runId && statusOnly) die("--run writes request bodies from a capture, so it does not go with --status");
+	const bodiesFile = val("--bodies") && resolve(val("--bodies"));
+	if (argv.includes("--bodies") && !bodiesFile) die("--bodies takes a file, such as /tmp/ui-review/bodies.before.json");
+	if (bodiesFile && statusOnly) die("--bodies records request bodies from a capture, so it does not go with --status");
 	const widths = val("--widths", "390,1280").split(",").map(Number);
 	if (widths.some((w) => !w)) die("--widths takes numbers, such as 390,1280");
 	const height = Number(val("--height", "900"));
@@ -216,7 +215,7 @@ async function main(argv) {
 			const step = state ? steps[`${s.surface}.${state}`] || steps[state] : null;
 			if (state && typeof step !== "function") { missed.push(`${s.surface}.${state}: no function for it in --states`); continue; }
 			const ctx = await browser.newContext({ viewport: { width: w, height }, colorScheme: via === "media" ? (t === "dark" ? "dark" : "light") : "light", reducedMotion: "reduce", serviceWorkers: "block", ...(argv.includes("--mobile") ? { isMobile: true, hasTouch: true } : {}), ...(storageState ? { storageState } : {}) });
-			const guard = installGuard(ctx, { ...guardOpts, logFile });
+			const guard = installGuard(ctx, { ...guardOpts, logFile, logBodies: Boolean(bodiesFile) });
 			await guard.ready;
 			const page = await ctx.newPage();
 			try {
@@ -253,11 +252,10 @@ async function main(argv) {
 	const writes = log.filter((l) => !["GET", "HEAD", "OPTIONS"].includes(String(l.method).toUpperCase()) && l.action !== "error" && !/released|aborted at release/.test(l.reason || ""));
 	const unproven = writes.filter((w) => w.action === "abort" || w.action === "hold");
 	if (argv.includes("--no-backend") && unproven.length) console.log(`WARN\tthe app sent ${unproven.length} write request(s) though --no-backend was given, each blocked. List them in --writes: ${[...new Set(unproven.map((w) => `${w.method} ${w.proc}`))].join(", ")}`);
-	if (runId) {
-		const file = val("--bodies") ? resolve(val("--bodies")) : join(out, "bodies.json");
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, JSON.stringify({ run: runId, rows: writes.map((w) => ({ url: w.url, proc: w.proc, body: w.body ?? "", capturedAt: w.t, method: w.method, action: w.action })) }, null, 1) + "\n");
-		console.log(`bodies: ${writes.length} write request(s) from run ${runId} in ${file}${writes.length ? "" : ". None was sent, so the changed path was not exercised"}`);
+	if (bodiesFile) {
+		mkdirSync(dirname(bodiesFile), { recursive: true });
+		writeFileSync(bodiesFile, JSON.stringify({ rows: writes.map((w) => ({ method: w.method, url: w.url, proc: w.proc, body: w.body ?? "", action: w.action })) }, null, 1) + "\n");
+		console.log(`bodies: ${writes.length} write request(s) in ${bodiesFile}${writes.length ? "" : ". None was sent, so the changed path was not exercised"}`);
 	}
 	const planned = surfaces.reduce((n, s) => n + (1 + s.states.length) * widths.length * themes.length, 0);
 	for (const m of missed) console.log(`not captured\t${m}`);
@@ -265,91 +263,6 @@ async function main(argv) {
 	console.log(`Coverage: ${written.length} of ${planned} captures (${surfaces.length} surface(s), widths ${widths.join(",")}, themes ${themes.join(",")} via ${via}), ${aria ? `${trees} accessibility tree(s)` : "no accessibility trees (--no-aria)"}${audits.length ? `, ${evals} audit result(s)` : ""}, ${proved}. Not captured: hover, focus and pressed states, motion in flight, states the surfaces file does not list, routes not listed`);
 	// Any capture short of the plan fails the run, so a missing state is never read as a baseline.
 	process.exit(off.length || missed.length || written.length < planned ? 1 : 0);
-}
-
-// ---------------------------------------------------------------- self-test
-// A local app whose page fires a write on load. The capture must save the page and the write must never arrive.
-async function selfTest() {
-	let fails = 0;
-	const t = (name, ok, detail = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : `: ${detail}`}`); if (!ok) fails++; };
-	const hits = [];
-	const page = `<!doctype html><html><body><h1>Items</h1><button>Save</button><script>
-fetch("/rpc/items/update", { method: "POST", body: '{"id":1,"count":2}' }).catch(() => {});
-fetch("/rpc/items/list", { method: "POST", body: "{}" }).catch(() => {});
-fetch("/api/ping").catch(() => {});
-</script></body></html>`;
-	const server = createServer((req, res) => {
-		hits.push(`${req.method} ${req.url}`);
-		if (req.url === "/") { res.writeHead(200, { "content-type": "text/html" }); res.end(page); }
-		else if (req.url === "/gone") { res.writeHead(404); res.end(); }
-		else if (req.url === "/private") { res.writeHead(302, { location: "/login" }); res.end(); }
-		else if (req.url === "/login") { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><html><body><h1>Log in</h1></body></html>"); }
-		else if (req.url === "/blank") { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><html><body></body></html>"); }
-		else { res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); }
-	});
-	await new Promise((r) => server.listen(0, "127.0.0.1", r));
-	const base = `http://127.0.0.1:${server.address().port}`;
-	const dir = mkdtempSync(join(tmpdir(), "capture-"));
-	// The child is async and the server lives in this process, so run it without blocking the event loop.
-	const run = (...a) => new Promise((ok) => {
-		const p = spawn(process.execPath, [SELF, ...a], { cwd: dir });
-		let out = "";
-		p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (out += d));
-		p.on("close", (code) => ok({ code, out }));
-	});
-	try {
-		let r = await run("--base", base, "--status", "--routes", "/", "/gone");
-		t("--status exits 1 on a route that answers 404", r.code === 1 && /FAIL\t\/gone\t404/.test(r.out), r.out);
-		r = await run("--base", base, "--status", "--routes", "/", "gone=/gone", "--expect-status", "gone=404");
-		t("--expect-status accepts the expected code", r.code === 0, r.out);
-		// Redirects were once followed, so a route that bounced to /login read as 200.
-		r = await run("--base", base, "--status", "--routes", "/private");
-		t("--status reports a redirect as not OK, with its Location", r.code === 1 && /FAIL\t\/private\t302 -> \/login/.test(r.out), r.out);
-		r = await run("--base", base, "--status", "--routes", "private=/private", "--expect-status", "private=302");
-		t("--status accepts a redirect it was told to expect", r.code === 0, r.out);
-		// A non-local base once opened the guard to that host.
-		r = await run("--base", "http://app.example.com", "--status", "--routes", "/");
-		t("a non-local --base is refused without --allow-host", r.code === 2 && /not a local host/.test(r.out), r.out);
-		// A capture once started with no proof that the app's writes were blocked.
-		const before0 = hits.length;
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "noproof"), "--routes", "/");
-		t("a capture with neither --writes nor --no-backend is refused before any request", r.code === 2 && /--writes <file>.*--no-backend/.test(r.out) && hits.length === before0, r.out);
-		writeFileSync(join(dir, "writes.txt"), `POST ${base}/rpc/items/update\nPOST ${base}/rpc/items/list\n`);
-		const before = hits.length;
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "leak"), "--routes", "/", "--writes", join(dir, "writes.txt"), "--read-procedures", "items/update");
-		t("a write the guard would let through stops the run before any request", r.code === 2 && /LEAK\tPOST/.test(r.out) && hits.length === before, r.out);
-		const pw = spawnSync(process.execPath, [join(SELF, "..", "find-chromium.mjs"), "--root", dir], { encoding: "utf8" });
-		if (pw.status !== 0) {
-			console.log(`self-test: the browser checks did not run, because no Playwright and Chromium were found:\n${(pw.stderr || pw.stdout).trim()}`);
-			return 2;
-		}
-		hits.length = 0;
-		writeFileSync(join(dir, "writes.txt"), `POST ${base}/rpc/items/update\nPUT ${base}/api/items/1\n`);
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "shots"), "--routes", "/", "--widths", "390", "--writes", join(dir, "writes.txt"), "--read-procedures", "items/list", "--run", "RUN-T", "--bodies", join(dir, "evidence/bodies.before.json"));
-		t("a clean dry run is reported", /every one of 2 writes in --writes blocked/.test(r.out), r.out);
-		t("the capture exits 0", r.code === 0, r.out);
-		t("the screenshot and the accessibility tree are written", existsSync(join(dir, "shots/home-before-390.png")) && /button "Save"/.test(existsSync(join(dir, "shots/home-before-390.aria.yml")) ? readFileSync(join(dir, "shots/home-before-390.aria.yml"), "utf8") : ""), r.out);
-		t("the write never reached the server", !hits.some((h) => h.startsWith("POST /rpc/items/update")), hits.join(", "));
-		t("the listed read and the GET did reach it", hits.includes("POST /rpc/items/list") && hits.includes("GET /api/ping"), hits.join(", "));
-		const log = existsSync(join(dir, "shots/guard.log")) ? readFileSync(join(dir, "shots/guard.log"), "utf8").trim().split("\n").map((l) => JSON.parse(l)) : [];
-		t("guard.log records the write as aborted, with its body", log.some((l) => l.action === "abort" && /items\/update/.test(l.url) && l.body === '{"id":1,"count":2}'), JSON.stringify(log));
-		// Nothing once wrote request bodies, so request-body equality could not be shown with these tools.
-		const bodies = existsSync(join(dir, "evidence/bodies.before.json")) ? JSON.parse(readFileSync(join(dir, "evidence/bodies.before.json"), "utf8")) : {};
-		t("--run writes the blocked write's body in the shape bodies-check reads", bodies.run === "RUN-T" && bodies.rows?.some((x) => x.proc === "items/update" && x.body === '{"id":1,"count":2}' && x.url.startsWith(base) && !Number.isNaN(Date.parse(x.capturedAt))), JSON.stringify(bodies));
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "nb"), "--routes", "/", "--widths", "390", "--no-backend");
-		t("--no-backend still blocks the write and warns about it", r.code === 0 && /WARN\tthe app sent \d+ write/.test(r.out) && !hits.some((h) => h.startsWith("POST /rpc/items/update")), r.out);
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "blank"), "--routes", "/blank", "--widths", "16", "--height", "16", "--no-backend");
-		t("a blank render is not kept as a capture", r.code === 1 && /blank render/.test(r.out) && !existsSync(join(dir, "blank/blank-before-16.png")), r.out);
-		// A capture short of its plan once exited 0, so a missing state looked like a full baseline.
-		writeFileSync(join(dir, "surfaces.tsv"), "surface\troute\tstates\nhome\t/\topen\n");
-		r = await run("--base", base, "--kind", "before", "--out", join(dir, "short"), "--surfaces", join(dir, "surfaces.tsv"), "--widths", "390", "--no-backend");
-		t("a capture with a planned state missing exits 1 and names it", r.code === 1 && /1 of 2 planned/.test(r.out) && /not captured\thome\.open/.test(r.out), r.out);
-	} finally {
-		server.close();
-		rmSync(dir, { recursive: true, force: true });
-	}
-	console.log(fails ? `${fails} failed` : "all as expected");
-	return fails ? 1 : 0;
 }
 
 await main(process.argv.slice(2));
