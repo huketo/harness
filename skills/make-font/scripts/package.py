@@ -282,31 +282,34 @@ def folder_mode():
     return 0o777 & ~umask
 
 
-def publish(tmp, out_dir, replace):
+def publish(private_fd, out_dir, replace):
     """Move the finished package, its log inside it, into place with one rename. With replace, the package already
     there is moved aside first and deleted only once the new one is in place; if the new one cannot be moved in,
     the old one goes back.
 
-    The staging folder keeps mkdtemp's 0700 while it is built, verified and logged, so nothing else can change a
-    file between the check and the rename. The folder gets the usual folder mode only once it is in place, through
-    a descriptor opened before the rename, so the mode lands on this folder whatever its path now leads to."""
-    fd = os.open(tmp, os.O_RDONLY | os.O_DIRECTORY)
+    The package is staged as STAGED inside an owner-only (0700) folder that mkdtemp made next to out_dir, and every
+    rename here starts from that folder's descriptor, opened when it was made. Another user who can write to the
+    parent folder can rename or replace the private folder's entry, but cannot reach inside it, and the rename
+    still takes the verified STAGED child of the folder the descriptor holds. The package gets the usual folder mode
+    only once it is in place, through a descriptor to that same child."""
+    fd = os.open(STAGED, os.O_RDONLY | os.O_DIRECTORY, dir_fd=private_fd)
     try:
         if not (replace and os.path.isdir(out_dir) and os.listdir(out_dir)):
-            os.rename(tmp, out_dir)  # onto a missing or empty folder
+            os.rename(STAGED, out_dir, src_dir_fd=private_fd)  # onto a missing or empty folder
             os.fchmod(fd, folder_mode())
             return
-        old = tmp + ".old"
-        os.rename(out_dir, old)
+        os.rename(out_dir, "old", dst_dir_fd=private_fd)
         try:
-            os.rename(tmp, out_dir)
+            os.rename(STAGED, out_dir, src_dir_fd=private_fd)
         except OSError:
-            os.rename(old, out_dir)
+            os.rename("old", out_dir, src_dir_fd=private_fd)
             raise
         os.fchmod(fd, folder_mode())
-        shutil.rmtree(old)
     finally:
         os.close(fd)
+
+
+STAGED = "package"
 
 
 def inside(path, folder):
@@ -372,7 +375,10 @@ def main():
 
     parent = os.path.dirname(out_dir)
     os.makedirs(parent, exist_ok=True)
-    tmp = tempfile.mkdtemp(prefix=".package-", dir=parent)  # 0700 until publish() has moved it into place
+    private = tempfile.mkdtemp(prefix=".package-", dir=parent)  # owner-only; publish() renames out of it by descriptor
+    private_fd = os.open(private, os.O_RDONLY | os.O_DIRECTORY)
+    tmp = os.path.join(private, STAGED)
+    os.mkdir(tmp, 0o700)
     try:
         faces, listed, built = [], [], []
         for (p, style, ps, ttf_name, woff_name), src in zip(plan, spaced):
@@ -457,9 +463,10 @@ a larger work. A modified version keeps this licence and the copyright lines, an
         L.save_json({"chain": chain, "fit_log": b.fit.blob.entry(name(a.fit_log)),
                      "space_logs": [sp.blob.entry(name(p)) for p, sp in zip(a.space_log, b.spaces)],
                      "files": listed}, os.path.join(tmp, "package-log.json"))
-        publish(tmp, out_dir, a.replace)
+        publish(private_fd, out_dir, a.replace)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        os.close(private_fd)
+        shutil.rmtree(private, ignore_errors=True)
     print(f"verified against the chain, wrote {a.out_dir}: " + ", ".join(listed))
 
 

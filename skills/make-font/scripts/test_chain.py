@@ -510,7 +510,8 @@ class Pipeline(unittest.TestCase):
             return stat.S_IMODE(os.stat(path).st_mode)
 
         def staging():
-            return [mode(os.path.join(q(), n)) for n in os.listdir(q()) if n.startswith(".package-")]
+            return [m for n in os.listdir(q()) if n.startswith(".package-")
+                    for m in (mode(q(n)), mode(q(n, P.STAGED)))]
         real_verify, real_save, real_rename = P.verify, P.L.save_json, os.rename
 
         def verify(*a, **k):
@@ -521,10 +522,10 @@ class Pipeline(unittest.TestCase):
             real_save(obj, path)
             seen.append(("log", mode(os.path.dirname(path))))
 
-        def rename(src, dst):
-            if os.path.basename(src).startswith(".package-"):
-                seen.append(("rename", mode(src)))
-            return real_rename(src, dst)
+        def rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None):
+            if src == P.STAGED and src_dir_fd is not None:
+                seen.append(("rename", mode(f"/proc/self/fd/{src_dir_fd}"), mode(os.path.join(f"/proc/self/fd/{src_dir_fd}", src))))
+            return real_rename(src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
         old = os.umask(0o002)
         try:
             with mock.patch.object(P, "verify", verify), mock.patch.object(P.L, "save_json", save_json), \
@@ -536,8 +537,31 @@ class Pipeline(unittest.TestCase):
         finally:
             os.umask(old)
         self.assertEqual(code, 0, err)
-        self.assertEqual(seen, [("verify", 0o700), ("log", 0o700), ("rename", 0o700)])
+        self.assertEqual(seen, [("verify", 0o700), ("verify", 0o700), ("log", 0o700), ("rename", 0o700, 0o700)])
         self.assertEqual(mode(q("dist")), 0o775)
+        self.assertEqual([n for n in os.listdir(q()) if n.startswith(".package-")], [])
+
+    def test_package_publishes_the_verified_folder_when_its_parent_entry_is_swapped(self):
+        """Someone who can write to the destination's parent swaps the private staging folder's entry for their own
+        after the package is verified; the rename still takes the verified folder, by descriptor."""
+        import package as P
+        q = self.scratch()
+        real_save = P.L.save_json
+
+        def save_json(obj, path):
+            real_save(obj, path)
+            private = os.path.dirname(os.path.dirname(path))
+            os.rename(private, private + "-moved")
+            os.makedirs(os.path.join(private, P.STAGED))
+            T.write(os.path.join(private, P.STAGED, "unchecked.ttf"), "not verified")
+        with mock.patch.object(P.L, "save_json", save_json):
+            code, _, err = in_process("package.py", self.spaced, "--targets", self.targets,
+                                      "--base-json", self.base_json, "--fit-log", self.fit_log,
+                                      "--space-log", self.space_log, "--holder", "Fixture Holder",
+                                      "--out-dir", q("dist"))
+        self.assertEqual(code, 0, err)
+        self.assertFalse(os.path.exists(q("dist", "unchecked.ttf")), "the swapped-in folder was published")
+        self.assertTrue(os.path.exists(q("dist", "package-log.json")))
 
     def test_package_refuses_when_no_spaced_font_is_left(self):
         q = self.scratch()
@@ -723,23 +747,26 @@ class Publish(unittest.TestCase):
         import package as P
         d = tempfile.mkdtemp(prefix="mf-publish-")
         self.addCleanup(shutil.rmtree, d, True)
-        out, new = os.path.join(d, "dist"), os.path.join(d, ".package-new")
+        out, private = os.path.join(d, "dist"), os.path.join(d, ".package-new")
         os.makedirs(out)
-        os.makedirs(new)
+        os.makedirs(os.path.join(private, P.STAGED))
         T.write(os.path.join(out, "old.txt"), "the package already published")
-        T.write(os.path.join(new, "new.txt"), "the package being published")
+        T.write(os.path.join(private, P.STAGED, "new.txt"), "the package being published")
         real = os.rename
 
-        def rename(src, dst):
-            if os.path.abspath(src) == new:
+        def rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None):
+            if src == P.STAGED:
                 raise OSError("synthetic failure while moving the new package into place")
-            return real(src, dst)
-        with mock.patch("os.rename", rename), mock.patch("os.replace", rename):
-            with self.assertRaises(OSError):
-                P.publish(new, out, True)
-        self.assertTrue(os.path.exists(os.path.join(out, "old.txt")), "the old package was deleted first")
+            return real(src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
+        fd = os.open(private, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            with mock.patch("os.rename", rename):
+                with self.assertRaises(OSError):
+                    P.publish(fd, out, True)
+        finally:
+            os.close(fd)
         self.assertEqual(text(os.path.join(out, "old.txt")), "the package already published")
-        self.assertEqual([n for n in os.listdir(d) if n not in ("dist", ".package-new")], [])
+        self.assertEqual(sorted(os.listdir(private)), [P.STAGED])
 
 
 if __name__ == "__main__":
