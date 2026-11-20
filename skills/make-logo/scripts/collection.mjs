@@ -6,12 +6,18 @@
 //   node collection.mjs <collection name>
 //
 // lists what a collection holds now, after files were deleted or replaced by hand: every file still there with its
-// sha256, each keeping its earlier details (a photo's credits). Nothing is downloaded.
+// sha256. A file keeps its earlier details (a photo's credits) only while its bytes are the ones they were recorded
+// for. It also clears what a pull that stopped left behind (`*.part`). Nothing is downloaded.
 import {createHash} from 'node:crypto';
-import {readdir, readFile, stat, writeFile} from 'node:fs/promises';
+import {readdir, readFile, rename, rm, stat, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {isAbsolute, join, posix, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+
+/** The caches beside the collections (fonts.py, potrace_bin.py); rights.py never reads these as collections. */
+const TAKEN = new Set(['fonts', 'potrace']);
+/** A file being written is named this until it is whole; one left over marks a pull that stopped (rights.py refuses). */
+export const PART = '.part';
 
 export function cacheRoot(env = process.env) {
   const base = env.XDG_CACHE_HOME && isAbsolute(env.XDG_CACHE_HOME) ? env.XDG_CACHE_HOME : join(homedir(), '.cache');
@@ -24,6 +30,7 @@ export function collectionDir(name, env = process.env) {
     throw new Error(`collection name ${JSON.stringify(name)}: use one word (letters, digits, dot, dash, underscore); ` +
       `collections live in ${cacheRoot(env)}`);
   }
+  if (TAKEN.has(name)) throw new Error(`collection name ${JSON.stringify(name)} is taken by make-logo's ${name} cache; use another`);
   return join(cacheRoot(env), name);
 }
 
@@ -38,20 +45,62 @@ export async function exists(path) {
   }
 }
 
+/** Writes `data` to `path` whole or not at all: into <path>.part, then renamed over `path`. */
+export async function writeAtomic(path, data) {
+  await writeFile(path + PART, data);
+  await rename(path + PART, path);
+}
+
+/** file -> sha256, as the collection's manifest.json lists them now; empty when it has none. */
+export async function recorded(dir) {
+  try {
+    return new Map((JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).items ?? []).map((it) => [it.file, it.sha256]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Puts one pulled file in the collection and returns its sha256. A file already there is kept when it still has the
+ * sha256 the manifest recorded for it (`known`, from recorded()); otherwise `download()` fetches it again, and its
+ * bytes are written whole. `download()` resolves to the bytes, or to null to skip the file; this then returns null.
+ */
+export async function keepOrFetch(dir, file, known, download) {
+  const path = join(dir, file);
+  if (await exists(path)) {
+    const sha = sha256(await readFile(path));
+    if (known.get(file) === sha) return sha;
+  }
+  const data = await download();
+  if (!data) return null;
+  await writeAtomic(path, data);
+  return sha256(data);
+}
+
 async function filesUnder(dir, prefix = '') {
   const out = [];
   for (const e of (await readdir(join(dir, prefix), {withFileTypes: true})).sort((a, b) => a.name.localeCompare(b.name))) {
     const rel = prefix ? posix.join(prefix, e.name) : e.name;
     if (e.isDirectory()) out.push(...(await filesUnder(dir, rel)));
-    else if (e.isFile() && rel !== 'manifest.json' && !rel.endsWith('.part')) out.push(rel);
+    else if (e.isFile() && rel !== 'manifest.json' && !rel.endsWith(PART)) out.push(rel);
   }
   return out;
 }
 
+async function clearParts(dir, prefix = '') {
+  for (const e of await readdir(join(dir, prefix), {withFileTypes: true})) {
+    const rel = prefix ? posix.join(prefix, e.name) : e.name;
+    if (e.isDirectory()) await clearParts(dir, rel);
+    else if (e.name.endsWith(PART)) await rm(join(dir, rel), {force: true});
+  }
+}
+
 /**
- * Writes <dir>/manifest.json listing every file in the folder with its sha256: this pull's items first, in order,
- * then files from earlier pulls with their earlier details, then any other file found there. A listed file that is
- * gone is dropped.
+ * Writes <dir>/manifest.json, whole, listing every file in the folder with its sha256: this pull's items first, in
+ * order, then files from earlier pulls, then any other file found there. A file keeps the details of an item (this
+ * pull's, else an earlier pull's) only when that item's sha256 is the file's sha256 now: the details describe those
+ * bytes. A file changed since is listed with its sha256 alone, so the book credits none of it. A listed file that is
+ * gone is dropped, and what an unfinished write left (`*.part`) is removed first.
  */
 export async function writeManifest(dir, items, extra = {}) {
   let earlier = [];
@@ -60,22 +109,33 @@ export async function writeManifest(dir, items, extra = {}) {
   } catch {
     // no manifest yet
   }
-  const known = new Map();
-  for (const it of [...items, ...earlier]) if (!known.has(it.file)) known.set(it.file, it);
+  await clearParts(dir);
+  const recordedFor = new Map();
+  for (const it of [...items, ...earlier]) recordedFor.set(it.file, [...(recordedFor.get(it.file) ?? []), it]);
   const onDisk = new Set(await filesUnder(dir));
-  const order = [...known.keys(), ...[...onDisk].filter((f) => !known.has(f))];
+  const order = [...recordedFor.keys(), ...[...onDisk].filter((f) => !recordedFor.has(f))];
   const out = [];
   for (const file of order) {
     if (!onDisk.has(file)) continue;
-    out.push({...(known.get(file) ?? {}), file, sha256: sha256(await readFile(join(dir, file)))});
+    const sha = sha256(await readFile(join(dir, file)));
+    const details = (recordedFor.get(file) ?? []).find((it) => it.sha256 === sha) ?? {};
+    out.push({...details, file, sha256: sha});
   }
-  await writeFile(join(dir, 'manifest.json'), JSON.stringify({...extra, items: out}, null, 2));
+  await writeAtomic(join(dir, 'manifest.json'), JSON.stringify({...extra, items: out}, null, 2));
   return out;
 }
 
-/** Rewrites <dir>/manifest.json from the files in the folder now, keeping its other fields and each file's details. */
+/**
+ * Rewrites <dir>/manifest.json from the files in the folder now, keeping its other fields and the details of each file
+ * whose bytes are unchanged. A folder a first pull left with no manifest gets one.
+ */
 export async function refreshManifest(dir) {
-  const fields = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+  let fields = {};
+  try {
+    fields = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+  } catch {
+    // a first pull that stopped before it wrote one
+  }
   delete fields.items; // writeManifest reads them back with their details
   return writeManifest(dir, [], fields);
 }

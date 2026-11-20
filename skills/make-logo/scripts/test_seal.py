@@ -134,6 +134,19 @@ class Seal(Project):
         self.refused("refs-changed", self.package, b)
         self.refused("refs-changed", self.book, b)
 
+    def test_refuses_a_reference_that_is_not_there_by_name(self):
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        link = os.path.join(self.mine, "linked.png")
+        os.symlink(self.ws.path("nowhere.png"), link)
+        for step in (self.package, self.book):
+            with self.assertRaises(R.Refused) as cm:
+                step(b)
+            self.assertEqual(cm.exception.reason, "refs-missing", str(cm.exception))
+            self.assertIn(link, str(cm.exception))
+        self.check_refused("refs-missing", b)
+        self.assertFalse(os.path.exists(os.path.join(b, "check.json")), "a refused check left its old check.json")
+
     def test_refuses_a_file_changed_after_the_check(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
@@ -253,6 +266,19 @@ class Seal(Project):
         self.assertIn("Synthetic Creator", self.pages(book)["credits"])
         self.assertNotIn("b.png", R.read_bytes(os.path.join(book, "index.html")).decode())
 
+    def test_book_leaves_out_a_photo_changed_since_its_manifest_credited_it(self):
+        d = self.ws.collection("photos", {"a.png": G.mark_image(G.own), "b.png": G.mark_image(G.tee)})
+        man = R.read_json(os.path.join(d, "manifest.json"))
+        for it in man["items"]:
+            it.update(title="A field", creator="Synthetic Creator", license="CC0 1.0", source="https://example.org/" + it["file"])
+        R.write_bytes(os.path.join(d, "manifest.json"), json.dumps(man).encode())
+        G.mark_image(G.badge).save(os.path.join(d, "b.png"), "PNG")  # replaced by hand; its credits are for the old one
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        book = self.book(b, extra=("--photos", d))
+        self.assertEqual(os.listdir(os.path.join(book, "photos")), ["a.png"])
+        self.assertNotIn("b.png", R.read_bytes(os.path.join(book, "index.html")).decode())
+
     def test_sheet_counts_what_check_compared(self):
         self.ws.image("refs/mine/tee.png", G.mark_image(G.tee))
         b = self.build(self.recipe())
@@ -287,6 +313,19 @@ class CheckReferences(Project):
         self.assertEqual(self.check(b), 1)
         chk = R.read_json(os.path.join(b, "check.json"))
         self.assertTrue(chk["nearest"][0]["ref"].endswith("close.svg"), chk["nearest"])
+
+    def test_check_compares_both_grounds_of_a_transparent_reference(self):
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        svg = R.read_bytes(os.path.join(b, "mark.svg")).decode()
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=400, background="#ffffff"))
+        mark = G.padded(Image.open(io.BytesIO(png)).convert("RGB"))
+        sheet = self.ws.image("refs/mine/sheet.png", G.dark_and_light_on_clear(G.mark_image(G.tee), mark))
+        self.assertTrue(L.segment(L.load(sheet))["ok"], "the fixture must split on white, where only the dark mark shows")
+        self.assertEqual(self.check(b), 1)
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("sheet.png"), chk["nearest"])
+        self.assertEqual(chk["refs_compared"], 2, "a sheet compared on both grounds is still one reference image")
 
     def test_check_refuses_while_a_reference_cannot_be_compared(self):
         b = self.build(self.recipe())
@@ -378,6 +417,19 @@ class TracedDocuments(Project):
         self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
         self.refused("collections-changed", self.package, self.b)
         self.refused("collections-changed", self.book, self.b)
+
+    def test_package_and_book_refuse_a_pull_that_stopped_before_its_manifest(self):
+        # The first pull of a collection wrote the source's bytes, then stopped before it wrote manifest.json: the
+        # collections' digest is unchanged, and nothing lists the file.
+        first = os.path.join(R.cache_root(), "world", "cafe", "60000001.png")
+        os.makedirs(os.path.dirname(first))
+        R.write_bytes(first, R.read_bytes(self.sketch))
+        for step, wrote in ((self.package, "package"), (self.book, "book")):
+            with self.assertRaises(R.Refused) as cm:
+                step(self.b)
+            self.assertEqual(cm.exception.reason, "collection-unlisted", str(cm.exception))
+            self.assertIn("collection.mjs world", str(cm.exception))
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
 
     def test_package_and_book_write_nothing_once_the_source_changed(self):
         G.mark_image(G.own).rotate(90).save(self.sketch, "PNG")

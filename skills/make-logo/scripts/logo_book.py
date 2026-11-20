@@ -22,7 +22,8 @@ only the verified bytes of the files build.json lists: a build with no lockup sh
 lockup's place. A direction that failed check_logo.py is left out unless --include-failed, which shows it marked as
 failed. The book is written in the brief's language, Korean for a Korean brief, set in an OFL face from Google Fonts
 that has the script. A photo is used only when its manifest entry says who made it, under what licence and where it
-came from, so the credits page can name it.
+came from, so the credits page can name it, and only while its bytes still have the sha256 that entry lists: a photo
+replaced by hand is left out, not credited to the one it replaced.
 """
 from __future__ import annotations
 
@@ -351,7 +352,12 @@ def main(argv: list[str] | None = None) -> None:
             if not credited(it):
                 print(f"left out photo {it['file']}: its manifest entry names no creator, licence and source to credit")
                 continue
-            shutil.copy(os.path.join(a.photos, it["file"]), os.path.join(a.out, "photos", it["file"]))
+            data = R.read_bytes(os.path.join(a.photos, it["file"]))
+            if R.sha256_bytes(data) != it.get("sha256"):
+                print(f"left out photo {it['file']}: it changed after its manifest entry credited it, so the credit "
+                      "may be for another picture")
+                continue
+            R.write_bytes(os.path.join(a.out, "photos", it["file"]), data)
             photos.append(it)
     photo = lambda k: f"photos/{photos[k % len(photos)]['file']}" if photos else None  # noqa: E731
     pages, order = [], []

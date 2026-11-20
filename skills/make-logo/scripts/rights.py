@@ -9,8 +9,8 @@ collected material it must never be, and seals each step's output so the next st
 
 - brief.json `trace_sources`: the files the person said they hold rights in, each with its sha256, the kind of right
   (own-drawing, own-brand, licensed), the question shown to them and their answer, both verbatim.
-- collections: every `manifest.json` under `${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/`, each listing every file
-  with its sha256 (fetch_arena.mjs, fetch_photos.mjs).
+- collections: every folder under `${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/` but the font and potrace caches,
+  each with a `manifest.json` listing every file in it with its sha256 (fetch_arena.mjs, fetch_photos.mjs).
 - build.json `files` and check.json `build_sha256`, `refs_sha256`, `calibration_sha256`, and for a traced build
   `collected_sha256`: what package_logo.py and logo_book.py recompute before they go on.
 """
@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SHIPPED_CALIBRATION = os.path.join(HERE, "calibration.json")
 RIGHTS = ("own-drawing", "own-brand", "licensed")
 HEX64 = re.compile(r"[0-9a-f]{64}")
-# Why the distance gates could not read a mark in an image (trace_ref.gate_mask), for the refusal that names it.
+# Why the distance gates could not read a mark in an image (trace_ref.gate_masks), for the refusal that names it.
 UNCOMPARABLE = {"blank": "a blank image", "no-ink": "no ink found, enlarged or on either ground",
                 "unreadable": "not readable as an image or an SVG"}
 
@@ -82,32 +82,71 @@ def calibration_file(path: str | None) -> str:
     return os.path.abspath(path) if path else SHIPPED_CALIBRATION
 
 
-def refs_sha256(folders: list[str]) -> str:
-    """Over every image file in the --refs folders as they are now, never from a saved list."""
+def ref_images(folders: list[str]) -> list[str]:
+    """logolib.images() of the --refs folders and files, refusing ("refs-missing") while one named is not there or an
+    image found is a link to nothing: the gates and the seal would compare and hash nothing in its place."""
     sys.path.insert(0, HERE)
     import logolib as L
 
-    return digest(sha256_file(p) for p in L.images(folders))
+    found = L.images(folders)
+    missing = [p for p in folders if not os.path.exists(p)] + [p for p in found if not os.path.isfile(p)]
+    if missing:
+        raise Refused("refs-missing", f"these --refs paths are not there, or are links to nothing: "
+                                      f"{'; '.join(dict.fromkeys(missing))}. Pass folders and files that exist, and "
+                                      "remove or mend each broken link, then run this again.")
+    return found
+
+
+def refs_sha256(folders: list[str]) -> str:
+    """Over every image file in the --refs folders as they are now, never from a saved list."""
+    return digest(sha256_file(p) for p in ref_images(folders))
 
 
 # Collections ------------------------------------------------------------------------------------------------------
 
+NOT_COLLECTIONS = ("fonts", "potrace")  # the caches beside the collections; collection.mjs refuses these names
+MANIFEST = "manifest.json"
+
+
+def _files_under(d: str) -> set[str]:
+    """Every file under `d`, as a path relative to it with forward slashes, the way a manifest names it."""
+    out = set()
+    for root, dirs, names in os.walk(d):
+        dirs.sort()
+        out |= {os.path.relpath(os.path.join(root, n), d).replace(os.sep, "/") for n in names}
+    return out
+
+
 def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, str]]:
-    """(file, sha256 listed for it) for every item of every collection manifest under the cache. With `verify`, it
+    """(file, sha256 listed for it) for every item of every collection: each folder under the cache but the font and
+    potrace caches. Refuses ("collection-unlisted") while a collection holds a file its manifest.json does not list:
+    a pull that stopped before it rewrote the manifest (its files, a `.part` it was writing, or no manifest at all) or
+    a file added by hand would otherwise be compared with nothing and change no digest. With `verify`, it also
     refuses ("collection-changed") while a listed file is gone or its bytes no longer have that sha256."""
     root = root or cache_root()
-    out = []
-    for d, dirs, names in os.walk(root):
-        dirs.sort()
-        if "manifest.json" not in names:
+    out, unlisted = [], []
+    for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+        d = os.path.join(root, name)
+        if name in NOT_COLLECTIONS or not os.path.isdir(d):
             continue
-        man = os.path.join(d, "manifest.json")
-        for it in read_json(man).get("items", []):
+        man = os.path.join(d, MANIFEST)
+        listed = set()
+        for it in read_json(man).get("items", []) if os.path.isfile(man) else []:
             sha = it.get("sha256")
             if not (isinstance(sha, str) and HEX64.fullmatch(sha)):
                 raise Refused("manifest", f"{man} lists {it.get('file')!r} without a sha256. Fetch that collection "
                                           "again with this version of fetch_arena.mjs or fetch_photos.mjs.")
             out.append((os.path.join(d, it["file"]), sha))
+            listed.add(os.path.normpath(it["file"]).replace(os.sep, "/"))
+        extra = sorted(_files_under(d) - listed - {MANIFEST})
+        if extra:
+            unlisted.append(f"{', '.join(os.path.join(d, f) for f in extra)} (run `node scripts/collection.mjs {name}`)")
+    if unlisted:
+        raise Refused("collection-unlisted", f"these files are in a collection whose manifest does not list them: "
+                                             f"{'; '.join(unlisted)}. A pull that stopped before it finished, or a "
+                                             "file put there by hand, leaves them. collection.mjs clears what an "
+                                             "unfinished pull left and lists the rest with its sha256; run it for "
+                                             "each collection named, then run this again.")
     if verify:
         changed = [f for f, sha in out if not (os.path.isfile(f) and sha256_file(f) == sha)]
         if changed:

@@ -143,6 +143,49 @@ class TraceGates(unittest.TestCase):
         e = self.refused("mask-too-close", dark, [self.ws.entry(dark)])
         self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("light.png"), e.detail)
 
+    def test_compares_both_grounds_of_a_transparent_reference(self):
+        sheet = self.ws.image("refs/mine/sheet.png", G.dark_and_light_on_clear(G.mark_image(G.tee), G.mark_image(G.badge)))
+        self.assertTrue(L.segment(L.load(sheet))["ok"], "the fixture must split on white, where only the dark mark shows")
+        dark = self.ws.image("sketches/dark.jpg", reencoded(G.mark_image(G.badge)), "JPEG", quality=90)
+        e = self.refused("mask-too-close", dark, [self.ws.entry(dark)])
+        print(f"\n  light mark on a transparent sheet: mask {e.detail['mask_nearest']['score']:.4f}, limit {LIMIT:.4f}")
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("sheet.png"), e.detail)
+
+    def test_refuses_a_reference_that_is_not_there_by_name(self):
+        entry = self.ws.entry(self.sketch)
+        named = self.ws.path("refs", "named.png")  # on the command line, never written
+        typo = self.ws.path("refs", "mien")
+        link = os.path.join(self.mine, "linked.png")
+        os.symlink(self.ws.path("nowhere.png"), link)
+        e = self.refused("refs-missing", self.sketch, [entry], refs=[self.mine, self.arena, named, typo])
+        for f in (named, typo, link):
+            self.assertIn(f, str(e))
+        os.remove(link)
+        self.assertEqual(self.trace(self.sketch, [entry])["svg"], self.out)
+
+    def test_refuses_while_a_collection_holds_a_file_its_manifest_does_not_list(self):
+        entry = self.ws.entry(self.sketch)
+        # A pull that wrote an image and stopped before rewriting the manifest.
+        unlisted = os.path.join(self.arena, "logos", "50000002.png")
+        G.mark_image(G.badge).save(unlisted, "PNG")
+        e = self.refused("collection-unlisted", self.sketch, [entry])
+        self.assertIn(unlisted, str(e))
+        self.assertIn("collection.mjs arena", str(e))
+        os.remove(unlisted)
+        # Traces of a pull that never finished: a download and a manifest half written, a first pull with no manifest.
+        for rel in ("logos/50000003.png.part", "manifest.json.part"):
+            R.write_bytes(os.path.join(self.arena, rel), b"half")
+            e = self.refused("collection-unlisted", self.sketch, [entry])
+            self.assertIn(os.path.join(self.arena, rel), str(e))
+            os.remove(os.path.join(self.arena, rel))
+        first = os.path.join(R.cache_root(), "fresh", "channel", "1.png")
+        os.makedirs(os.path.dirname(first))
+        G.mark_image(G.badge).save(first, "PNG")
+        e = self.refused("collection-unlisted", self.sketch, [entry])
+        self.assertIn("collection.mjs fresh", str(e))
+        os.remove(first)
+        self.assertEqual(self.trace(self.sketch, [entry])["svg"], self.out)
+
     def test_refuses_while_a_reference_cannot_be_compared(self):
         blank = self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
         broken = self.ws.path("refs", "mine", "broken.png")
@@ -377,6 +420,16 @@ class BuildGates(unittest.TestCase):
         e = self.check_exit(out)
         self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
         self.assertEqual(e.reason, "collection-changed", str(e))
+        self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
+
+    def test_check_refuses_while_a_collection_holds_a_file_its_manifest_does_not_list(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})  # outside --refs
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 0)
+        G.mark_image(G.badge).save(os.path.join(world, "cafe", "60000002.png"), "PNG")
+        e = self.check_exit(out)
+        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
+        self.assertEqual(e.reason, "collection-unlisted", str(e))
         self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
 
     def test_check_refuses_a_trace_gated_before_a_collection_was_added(self):

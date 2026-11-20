@@ -12,14 +12,16 @@ if any direction fails. A failure goes back to the recipe.
 
 Every file build.json lists must still have its sha256, and the list must hold every part the build writes; the
 mark is read from those verified bytes. The references are the trace gates' own (trace_ref.reference_set): every
---refs image, SVGs rasterised, fit to measure or not, each read once. It refuses to check while one of them can't be
-read as a mark ("not-comparable"), and removes the builds' old check.json: take that file out or replace it. A traced
+--refs image, SVGs rasterised, fit to measure or not, one with transparency seen on white and on black, each read
+once. It refuses to check while one of them can't be read as a mark ("not-comparable") or a --refs path is not there
+("refs-missing"), and removes the builds' old check.json: take that file out, replace it, or mend the path. A traced
 direction (build.json `traces`, verified against its provenance) leaves out only its own source, by sha256, and never
 a collected file: every other reference keeps the usual limit. Its score against that source is recorded in
 `source_scores` for the book to show and fails nothing; a source the person holds rights in may be used unchanged.
 A trace whose gates saw other --refs images, another calibration or other collections than this check is refused,
-and the build's old check.json removed: build it again so the trace is gated against what the check sees. A
-collected file gone or changed since its manifest listed it is refused too ("collection-changed").
+and the build's old check.json removed: build it again so the trace is gated against what the check sees. For a
+traced build, a collected file gone or changed since its manifest listed it ("collection-changed") and a file in a
+collection that its manifest does not list ("collection-unlisted") are refused too.
 check.json also records the sha256 of build.json, of the --refs images, of the calibration and, for a traced build,
 of the collections, which package_logo.py and logo_book.py recompute before they go on.
 """
@@ -134,7 +136,7 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
     # Distance: the mark against every reference but its own verified source, scored with the calibrated model.
     cand = D.prepare(big, poses=True)
     marks = [m for m in refset["marks"] if m[1] not in own]
-    near = sorted(((D.fused(D.compare(cand, r), cal), f) for f, _, r in marks), reverse=True)[:3]
+    near = sorted(((T.score(cand, feats, cal), f) for f, _, feats in marks), reverse=True)[:3]
     top = near[0][0] if near else 0.0
     rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
     # Against the source it was traced from: shown in the book, never a failure.

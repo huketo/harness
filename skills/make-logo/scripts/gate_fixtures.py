@@ -105,6 +105,15 @@ def light_on_clear(im: Image.Image, grey: int = 226) -> Image.Image:
     return out
 
 
+def dark_and_light_on_clear(dark: Image.Image, light: Image.Image) -> Image.Image:
+    """Two marks side by side on one transparent ground, `dark` in black and `light` in light grey: a sheet with a
+    logo for each ground. Flattened onto white only the dark one shows; onto black only the light one."""
+    out = Image.new("RGBA", (dark.width + light.width, max(dark.height, light.height)), (0, 0, 0, 0))
+    out.alpha_composite(light_on_clear(dark, grey=0), (0, 0))
+    out.alpha_composite(light_on_clear(light), (dark.width, 0))
+    return out
+
+
 def font_bytes(family: str) -> bytes:
     """A TrueType font whose letters are plain boxes: enough for HarfBuzz to shape and for outlines to exist."""
     from fontTools.fontBuilder import FontBuilder

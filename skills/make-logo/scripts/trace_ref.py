@@ -20,11 +20,13 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
 4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3).
 In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
-fit to measure or not: an SVG rasterised, a raster too small to split enlarged, a light mark on a transparent ground
-set on black. It also refuses while any of them still can't be read as a mark ("not-comparable": take it out or
-replace it), and while a collected file is gone or no longer has the sha256 its manifest lists
-("collection-changed"). Each file, the source, every reference and the calibration, is read once, and the hashes
-recorded are of the bytes judged.
+fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
+white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
+any of them still can't be read as a mark ("not-comparable": take it out or replace it), while a --refs folder or
+file named is not there or an image is a broken link ("refs-missing"), while a collection holds a file its manifest
+does not list ("collection-unlisted": a pull that stopped, or a file put there by hand), and while a collected file
+is gone or no longer has the sha256 its manifest lists ("collection-changed"). Each file, the source, every
+reference and the calibration, is read once, and the hashes recorded are of the bytes judged.
 Beside the SVG it writes <svg>.provenance.json: the source and its sha256, the person's statement, the brief's
 sha256, every raster and potrace argument, the scores, the potrace binary, and the SVG's sha256.
 """
@@ -125,50 +127,62 @@ def run_potrace(mask_pbm: bytes, potrace: str) -> str:
 
 
 _SEGMENT_WHY = {"blank image": "blank", "no ink found": "no-ink"}
-_PREPARED: dict[str, tuple[dict | None, str]] = {}  # sha256 -> (features, "") or (None, why)
+_PREPARED: dict[str, tuple[list[dict], str]] = {}  # sha256 -> (features of each mask, "") or ([], why)
 
 
-def gate_mask(data: bytes) -> tuple[np.ndarray | None, str]:
-    """A reference's ink for the distance gates, or (None, why) with why a rights.UNCOMPARABLE code. Split as
-    logolib.load() gives it first, as measuring sees it; then, while no ink is found, enlarged to logolib.WORK when
-    it is smaller (a favicon), and set on black when it has transparency (a light mark for dark grounds)."""
+def gate_masks(data: bytes) -> tuple[list[np.ndarray], str]:
+    """A reference's ink for the distance gates, one mask for each ground it is seen on, or ([], why) with why a
+    rights.UNCOMPARABLE code. An opaque image is split as logolib.load() gives it, as measuring sees it. One with
+    transparency is split on white and on black, and both masks are kept: a sheet with a dark logo and a light one
+    shows one on each. On each ground, while no ink is found, the image is enlarged to logolib.WORK when it is smaller
+    (a favicon)."""
     try:
         im = L.open_image(data)
     except Exception:  # neither Pillow nor resvg can read it
-        return None, "unreadable"
-    why = ""
+        return [], "unreadable"
+    masks, why = [], ""
     for ground in [(255, 255, 255)] + ([(0, 0, 0)] if L.transparent(im) else []):
         for side in (None, L.WORK) if max(im.size) < L.WORK else (None,):
             seg = L.segment(L.flatten(im, ground, side))
             if seg["ok"]:
-                return seg["mask"], ""
+                masks.append(seg["mask"])
+                break
             why = why or seg["why"]
-    return None, _SEGMENT_WHY.get(why, why)
+    return masks, "" if masks else _SEGMENT_WHY.get(why, why)
 
 
-def _prepared(sha: str, data: bytes) -> tuple[dict | None, str]:
+def _prepared(sha: str, data: bytes) -> tuple[list[dict], str]:
     if sha not in _PREPARED:
-        mask, why = gate_mask(data)
-        _PREPARED[sha] = (D.prepare(mask, poses=False), "") if mask is not None else (None, why)
+        masks, why = gate_masks(data)
+        _PREPARED[sha] = ([D.prepare(m, poses=False) for m in masks], why)
     return _PREPARED[sha]
 
 
-def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
-    """What the distance checks compare with: every image in the --refs folders and every collected file, each read
-    once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, features)], once per sha256,
-    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+def _read(path: str) -> bytes | None:
+    try:
+        return R.read_bytes(path) if os.path.isfile(path) else None
+    except OSError:  # gone since it was listed
+        return None
 
-    Refuses ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest
-    lists, and ("not-comparable") while any image can't be read as a mark even by gate_mask()'s fallbacks: the gates
-    say nothing about a picture they could not compare."""
-    marks, uncomparable, changed, seen, ref_shas, read = [], [], [], set(), [], {}
-    for f, listed in [(f, None) for f in L.images(refs)] + list(collected):
+
+def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
+    """What the distance checks compare with: every image in the --refs folders and files and every collected file,
+    each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, [features of each
+    mask])], once per sha256, "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+
+    Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing,
+    ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest lists,
+    and ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say
+    nothing about a picture they could not compare."""
+    marks, uncomparable, changed, missing, seen, ref_shas, read = [], [], [], [], set(), [], {}
+    for f, listed in [(f, None) for f in R.ref_images(refs)] + list(collected):
         if f not in read:
-            data = R.read_bytes(f) if os.path.isfile(f) else None
+            data = _read(f)
             read[f] = (data, R.sha256_bytes(data) if data is not None else None)
         data, sha = read[f]
         if listed is None:
-            if data is None:  # gone since the folder was listed; the seal's refs_sha256 sees the difference
+            if data is None:  # gone between the listing and the read
+                missing.append(f)
                 continue
             ref_shas.append(sha)
         elif sha != listed:
@@ -177,11 +191,14 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
         if sha in seen:
             continue
         seen.add(sha)
-        feat, why = _prepared(sha, data)
-        if feat is None:
-            uncomparable.append(f"{f} ({R.UNCOMPARABLE.get(why, why)})")
+        feats, why = _prepared(sha, data)
+        if feats:
+            marks.append((f, sha, feats))
         else:
-            marks.append((f, sha, feat))
+            uncomparable.append(f"{f} ({R.UNCOMPARABLE.get(why, why)})")
+    if missing:
+        raise R.Refused("refs-missing", f"these --refs images could not be read: {'; '.join(missing)}. Put them back "
+                                        "or take them out of the --refs folders, then run this again.")
     if changed:
         raise R.Refused("collection-changed", "these collected files are gone or changed since their manifest listed "
                                               f"them: {'; '.join(changed)}. Fetch the collection again, or list what "
@@ -206,11 +223,16 @@ def calibration_snapshot(path: str | None) -> tuple[dict, str]:
         return D.load_calibration(copy), R.sha256_bytes(raw)
 
 
-def nearest(mask: np.ndarray, refs: list[tuple[str, str, dict]], cal: dict) -> dict:
+def score(cand: dict, feats: list[dict], cal: dict) -> float:
+    """A candidate's score against one reference image: the highest over the masks the image was seen as."""
+    return max(D.fused(D.compare(cand, f), cal) for f in feats)
+
+
+def nearest(mask: np.ndarray, refs: list[tuple[str, str, list[dict]]], cal: dict) -> dict:
     cand = D.prepare(mask, poses=True)
     best = {"score": 0.0, "ref": None}
-    for f, _, feat in refs:
-        s = D.fused(D.compare(cand, feat), cal)
+    for f, _, feats in refs:
+        s = score(cand, feats, cal)
         if s > best["score"]:
             best = {"score": s, "ref": f}
     return best
