@@ -34,11 +34,13 @@ trademark sheet. It doesn't know whether the statement is true.
 - `trace_ref.py` traces only a file listed in `brief.json` `trace_sources` by sha256, never one whose sha256 is in a
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
   calibrated limit against a collected image or a `--refs` logo. It compares with every image, fit to measure or
-  not: SVGs rasterised, a favicon too small to split enlarged, a light mark on a transparent ground set on black. It
-  refuses while one of them still can't be read as a mark (`not-comparable`), or while a collected file is gone or
-  no longer has the sha256 its manifest lists (`collection-changed`). The person's own sketch on the moodboard (same
-  sha256 as a `trace_sources` entry) is left out of that comparison; a collected file never is. Each trace gets
-  `<svg>.provenance.json`.
+  not: SVGs rasterised, a favicon too small to split enlarged, an image with transparency seen on white and on black
+  (its higher score counts). It refuses while one of them still can't be read as a mark (`not-comparable`), while a
+  `--refs` folder or file named is not there or an image is a broken link (`refs-missing`), while a collection holds
+  a file its manifest does not list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or
+  while a collected file is gone or no longer has the sha256 its manifest lists (`collection-changed`). The person's
+  own sketch on the moodboard (same sha256 as a `trace_sources` entry) is left out of that comparison; a collected
+  file never is. Each trace gets `<svg>.provenance.json`.
 - `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
   today's collections and references, goes on only while the record's raster arguments give back the mask it
   recorded, and refuses a recipe that says `traced_from`. `check_logo.py` compares with the same references, refuses
@@ -94,7 +96,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    `$C/photos/`; `references/logo-book.md`). Look at them and delete any that don't fit. Every collection is in
    place before anything is traced: a trace is gated against all of them, and a later pull or deletion stops a traced
    direction's book and package until it is built and checked again. After deleting or replacing a collected file by
-   hand, `node scripts/collection.mjs <name>` lists what the collection holds now.
+   hand, or after a pull that stopped (`collection-unlisted`), `node scripts/collection.mjs <name>` lists what the
+   collection holds now.
    Done when `refs/mine/` holds the person's references and `$C/arena/`, `$C/world/` and `$C/photos/` each hold a
    `manifest.json` listing every file there with its sha256.
 

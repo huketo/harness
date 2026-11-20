@@ -51,7 +51,8 @@ pull after a traced direction's check stops its book and package (`collections-c
 checked again. Broad mood words work ("laptop office", "doctor", "architect"); specific ones return museum scans and
 news photos. Look at every photo and delete any that doesn't fit, then `node scripts/collection.mjs photos` so the
 manifest lists what is left. The book uses a photo only when its manifest entry names its creator, licence and
-source; a file listed without them (one put in the folder by hand) is left out, and named.
+source, and only while the file still has the sha256 that entry lists; a file listed without them (one put in the
+folder by hand, or one replaced by hand) is left out, and named.
 Without `--photos` the cover and posters use each direction's colour field.
 
 ## Guides

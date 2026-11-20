@@ -17,12 +17,18 @@ Normalise the logos they like into `refs/mine/` as image files, raster or SVG (t
 ## Where collections live
 
 `fetch_arena.mjs` and `fetch_photos.mjs` take a collection name, not a path, and write to
-`${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<name>/`, outside any project. Each collection's `manifest.json` lists
-every file in its folder with its sha256 (`collection.mjs`): this pull's items, earlier pulls' items still on disk,
-and any other file found there. A file already in the folder is hashed, not downloaded again. `trace_ref.py` reads
-every manifest under that folder, and refuses while a listed file is gone or no longer has its sha256: after deleting
-or replacing a file by hand, `node scripts/collection.mjs <name>` rewrites the manifest from what the folder holds,
-keeping each file's details, with no download.
+`${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<name>/`, outside any project; `fonts` and `potrace` are taken by the
+caches beside them. Each collection's `manifest.json` lists every file in its folder with its sha256
+(`collection.mjs`): this pull's items, earlier pulls' items still on disk, and any other file found there. A file
+already in the folder is kept while it has the sha256 the manifest recorded for it, and downloaded again otherwise.
+Each file is written whole (as `<file>.part`, then renamed), and the manifest last. A file keeps its details (a
+photo's creator, licence and source) only while its bytes are the ones they were recorded for.
+
+`trace_ref.py` reads every collection under that folder. It refuses while a collection holds a file its manifest does
+not list (`collection-unlisted`: a pull that stopped before it rewrote the manifest left its files or a `.part`, or a
+file was put there by hand), and while a listed file is gone or no longer has its sha256 (`collection-changed`).
+`node scripts/collection.mjs <name>` clears what a stopped pull left and rewrites the manifest from what the folder
+holds, with no download; a file changed by hand is listed with its sha256 and no details.
 
 ## Are.na
 

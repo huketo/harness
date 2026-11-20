@@ -71,13 +71,16 @@ traced, and the scripts refuse them by hash and by likeness.
    light mark on dark). It refuses a file not in `trace_sources`, a file whose sha256 is in any collection manifest,
    and a crop whose mask, or whose traced path, scores at or over the limit against a collected image or a `--refs`
    logo. Every image counts, even one `measure_logo.py` skips (a logo cut close out of a screenshot): an SVG is
-   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, and a light mark on a
-   transparent ground is set on black. While an image still can't be read as a mark, the trace is refused
-   (`not-comparable`, naming it): take it out of the folder, or out of its collection, or replace it with a copy on a
-   plain ground. A collected file that is gone or no longer has the sha256 its manifest lists is refused too
-   (`collection-changed`); `node scripts/collection.mjs <name>` lists what a collection holds now. The person's own
-   sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison; a collected file never is,
-   whatever `trace_sources` lists.
+   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, and an image with transparency
+   is seen on white and on black, its higher score counting (a sheet may hold a dark logo and a light one). While an
+   image still can't be read as a mark, the trace is refused (`not-comparable`, naming it): take it out of the
+   folder, or out of its collection, or replace it with a copy on a plain ground. A `--refs` folder or file that is
+   not there, or an image that is a broken link, is refused by name (`refs-missing`). A collection that holds a file
+   its manifest does not list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or a
+   collected file that is gone or no longer has the sha256 its manifest lists (`collection-changed`), is refused too;
+   `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. The
+   person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison; a collected file
+   never is, whatever `trace_sources` lists.
    potrace draws the curves and drops specks; check for stray type in the crop and cut it.
 3. Place it: `{"shape": "trace", "file": "trace/<n>.svg", "x": 2, "y": 2, "size": 44}`, with `rotate` and `mirror` as
    usual. The path is found from the working folder first, then from the recipe's folder. Then change one thing with
