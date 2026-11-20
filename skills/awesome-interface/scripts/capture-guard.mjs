@@ -2,7 +2,7 @@
 // capture-guard.mjs: deny-by-default guard for the HTTP requests a Playwright page or context routes.
 // Node 18+, no dependencies. Works as a module (installGuard, decide, classifyName) and as a CLI.
 // Adapted from design.how skills/build-design-system/scripts (MIT, see ../LICENSE.design-how).
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const HELP = `capture-guard.mjs: deny-by-default network guard for browser capture scripts
@@ -13,9 +13,11 @@ Usage
   node capture-guard.mjs decide --method POST --url <url> [--body <text>] [--fixtures <json>] [options]
       Prints the decision as JSON: {action: fulfill|continue|abort, reason}.
   node capture-guard.mjs prove --writes <file> [options]
-      The dry run before any run that can reach a backend. Each line of the file is "METHOD URL" for a write the
-      app really sends, copied from its network log in the shape it has there, or "METHOD URL BODY" when the
-      endpoint is GraphQL, with the request body as one line of JSON. Exits 1 if any one would continue.
+      The dry run before any run that can reach a backend. It checks the guard's decision on each request the
+      file lists, and only on those. Each line is "METHOD URL" for a write the app really sends, copied from its
+      network log in the shape it has there, or "METHOD URL BODY" when the endpoint is GraphQL, with the request
+      body as one line of JSON. Blank lines and lines starting with # are skipped. Exits 1 if any one would
+      continue, 2 if a line has no method and absolute URL (each is named by its line number).
       Pass the same options the capture uses. Then fire the same writes from the page and read guard.log.
   node capture-guard.mjs --help
 
@@ -47,8 +49,11 @@ Scope
   capture.mjs installs it on every browser context before the first navigation. A script of your own does
   the same: await installGuard(context, opts).ready, then navigate. Create the context with
   serviceWorkers: "block", because a service worker's requests go around page and context routes.
-  Outside the guard: WebSocket traffic (never routed, so an app that writes over one is not guarded), and any
-  request a script sends from Node rather than the page, such as capture.mjs's route status check (a GET).
+  Outside the guard: WebSocket traffic (never routed, so an app that writes over one is not guarded), any
+  request a script sends from Node rather than the page, such as capture.mjs's route status check (a GET), and
+  every hop after a redirect. Playwright calls the route handler only for a request's first URL
+  (https://playwright.dev/docs/api/class-page#page-route), so a request the guard continues, such as a listed
+  POST read, that is answered 307 or 308 is sent again with its body to the Location, which the guard never judges.
   Point captures at a local build with fixed data or state you can throw away.
 
 Rules
@@ -251,11 +256,31 @@ export function decide(req, opts = {}) {
 
 // target: a Playwright Page or BrowserContext, or anything with route(pattern, handler).
 // The handler's route object needs request() with method(), url(), postData(), and fulfill, continue, abort.
-// Pure. Lines of "METHOD URL" in, the ones a guard with these options would let through out.
-// A third field is the request body, for an endpoint judged by its body (GraphQL).
+// Pure. The lines of a writes file in, {writes: [{line, method, url, body}], bad: [{line, text, why}]} out, with
+// 1-based line numbers. Blank lines and lines starting with # are skipped; any other line must be
+// "METHOD URL" or "METHOD URL BODY" with an absolute URL, or it is bad.
+export function parseWrites(lines) {
+	const writes = [], bad = [];
+	lines.forEach((text, i) => {
+		const line = i + 1;
+		if (!text.trim() || text.trimStart().startsWith("#")) return;
+		const m = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(text);
+		if (!m) return bad.push({ line, text, why: "needs METHOD URL" });
+		const [, method, url, body] = m;
+		if (!/^[A-Za-z]+$/.test(method)) return bad.push({ line, text, why: `${method} is not an HTTP method` });
+		try { new URL(url); } catch { return bad.push({ line, text, why: `${url} is not an absolute URL` }); }
+		writes.push({ line, method: method.toUpperCase(), url, body });
+	});
+	return { writes, bad };
+}
+
+// Pure. The lines of a writes file in, the ones a guard with these options would let through out.
+// A third field is the request body, for an endpoint judged by its body (GraphQL). Throws on a bad line, because
+// a line it cannot read is a write it never judged.
 export function prove(lines, opts = {}) {
-	return lines.map((l) => /^\s*(\S+)\s+(\S+)(?:\s+(.+))?$/.exec(l)).filter(Boolean)
-		.map(([, method, url, body]) => ({ method, url, ...decide({ method, url, postData: body }, opts) })).filter((d) => d.action === "continue");
+	const { writes, bad } = parseWrites(lines);
+	if (bad.length) throw new Error(bad.map((b) => `line ${b.line}: ${b.why}: ${JSON.stringify(b.text)}`).join("\n"));
+	return writes.map(({ method, url, body }) => ({ method, url, ...decide({ method, url, postData: body }, opts) })).filter((d) => d.action === "continue");
 }
 
 export function installGuard(target, opts = {}) {
@@ -334,7 +359,8 @@ function parse(argv) {
 	return o;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// The installer links the skill folder into place, so the path the script was started by can be a link.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
 	const o = parse(process.argv.slice(2));
 	if (o.help) console.log(HELP);
 	else if (o._[0] === "names") {
@@ -347,9 +373,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		console.log(JSON.stringify(decide({ method: o.method || "GET", url: o.url, postData: o.body }, o)));
 	} else if (o._[0] === "prove") {
 		if (!o.writes) { console.error("prove needs --writes <file>"); process.exit(2); }
-		const leaks = prove(readFileSync(o.writes, "utf8").split("\n"), o);
+		let leaks;
+		try { leaks = prove(readFileSync(o.writes, "utf8").split("\n"), o); }
+		catch (e) { console.error(`capture-guard: ${o.writes} has lines prove cannot read, so nothing was judged:\n${e.message}`); process.exit(2); }
 		for (const l of leaks) console.log(`LEAK\t${l.method} ${l.url}\t${l.reason}`);
-		console.log(leaks.length ? `${leaks.length} writes would reach the backend` : "every write is blocked");
+		console.log(leaks.length ? `${leaks.length} writes would reach the backend` : "every listed write is blocked");
 		process.exitCode = leaks.length ? 1 : 0;
 	} else { console.error("usage: capture-guard.mjs names|decide|prove|--help"); process.exit(2); }
 }

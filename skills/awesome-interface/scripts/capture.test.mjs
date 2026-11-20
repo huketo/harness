@@ -24,6 +24,7 @@ window.writesDone = Promise.allSettled([
   fetch("/api/items/1", { method: "PATCH", body: '{"count":4}' }),
   fetch("/api/items/1", { method: "DELETE" }),
   fetch("/rpc/items/list", { method: "POST", body: "{}" }),
+  fetch("/rpc/drafts/unreleased", { method: "POST", body: '{"draft":5}' }),
   fetch("/api/items"),
 ]);
 </script></body></html>`;
@@ -110,6 +111,26 @@ test("a write the guard would let through stops the run before any request", asy
 	assert.equal(hits.length, seen);
 });
 
+// slug() drops the query, so two such routes would write the same files and the second would overwrite the first.
+test("routes that would write the same capture files are refused before any request", async () => {
+	const seen = hits.length;
+	const r = await capture("--kind", "before", "--out", join(dir, "same"), "--routes", "/items?id=1", "/items?id=2", "--no-backend");
+	assert.equal(r.code, 2, r.out);
+	assert.match(r.out, /items-before-1280/);
+	assert.match(r.out, /surface=path/);
+	assert.equal(hits.length, seen);
+});
+
+test("a writes file with a row that is not METHOD URL stops the run before any request", async () => {
+	const seen = hits.length;
+	const file = join(dir, "malformed.txt");
+	writeFileSync(file, `# from the network log\nPOST ${base}/rpc/items/update\nPOST\n`);
+	const r = await capture("--kind", "before", "--out", join(dir, "malformed"), "--routes", "/", "--writes", file);
+	assert.equal(r.code, 2, r.out);
+	assert.match(r.out, /line 3/);
+	assert.equal(hits.length, seen);
+});
+
 test("no write reaches the server, GETs do, and guard.log keeps no request body by default", BROWSER_CASE, async (t) => {
 	if (noBrowser) return t.skip(noBrowser);
 	hits.length = 0;
@@ -117,6 +138,7 @@ test("no write reaches the server, GETs do, and guard.log keeps no request body 
 	const r = await capture("--kind", "before", "--out", out, "--surfaces", join(dir, "surfaces.tsv"), "--states", join(dir, "steps.mjs"), "--widths", "390", "--no-backend");
 	assert.equal(r.code, 0, r.out);
 	assert.match(r.out, /WARN\tthe app sent \d+ write/);
+	assert.match(r.out, /POST drafts\/unreleased/);
 	assert.ok(existsSync(join(out, "items.sent-before-390.png")), r.out);
 	assert.deepEqual(hits.filter((h) => WRITE.test(h)), []);
 	assert.ok(hits.includes("GET /api/items"), hits.join(", "));
@@ -132,7 +154,7 @@ test("--bodies records each write's body, and a listed POST read continues", BRO
 	const bodies = join(dir, "evidence", "bodies.before.json");
 	const r = await capture("--kind", "before", "--out", out, "--surfaces", join(dir, "surfaces.tsv"), "--states", join(dir, "steps.mjs"), "--widths", "390", "--writes", join(dir, "writes.txt"), "--read-procedures", "items/list", "--bodies", bodies);
 	assert.equal(r.code, 0, r.out);
-	assert.match(r.out, /every one of 4 writes in --writes blocked/);
+	assert.match(r.out, /the guard blocks each of the 4 requests in --writes/);
 	assert.deepEqual(hits.filter((h) => WRITE.test(h) && h !== "POST /rpc/items/list"), []);
 	assert.ok(hits.includes("POST /rpc/items/list") && hits.includes("GET /api/items"), hits.join(", "));
 	const log = readLog(join(out, "guard.log"));
@@ -141,6 +163,7 @@ test("--bodies records each write's body, and a listed POST read continues", BRO
 	const rows = JSON.parse(readFileSync(bodies, "utf8")).rows;
 	assert.ok(rows.some((x) => x.method === "POST" && x.proc === "items/update" && x.body === '{"id":1,"count":2}' && x.action === "abort"), JSON.stringify(rows));
 	assert.ok(rows.some((x) => x.method === "PATCH" && x.body === '{"count":4}'), JSON.stringify(rows));
+	assert.ok(rows.some((x) => x.proc === "drafts/unreleased" && x.body === '{"draft":5}' && x.action === "abort"), JSON.stringify(rows));
 });
 
 test("a blank render is not kept as a capture", BROWSER_CASE, async (t) => {

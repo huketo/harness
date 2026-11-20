@@ -1,10 +1,13 @@
 // Tests for capture-guard.mjs: the pure decision rules and installGuard against a fake page. No browser, no network.
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { PREFIX_READ_VERBS, classifyName, decide, graphqlOps, graphqlProc, installGuard, isGraphqlPath, prove, tokens } from "./capture-guard.mjs";
+import { PREFIX_READ_VERBS, classifyName, decide, graphqlOps, graphqlProc, installGuard, isGraphqlPath, parseWrites, prove, tokens } from "./capture-guard.mjs";
+
+const GUARD = join(import.meta.dirname, "capture-guard.mjs");
 
 const base = "http://localhost:5173";
 const rpc = (p) => `${base}/rpc/${p}`;
@@ -53,6 +56,20 @@ test("prove names every write a guard would let through", () => {
 	const writes = [`POST ${rpc("items/update")}`, `PUT ${base}/api/x`, `POST ${rpc("items/list")}`];
 	assert.equal(prove(writes, prefix).length, 1);
 	assert.equal(prove(writes, { readProcedures: ["users/me"] }).length, 0);
+});
+
+// A row prove cannot read is a write it never judged, so it fails the file instead of passing as blocked.
+test("prove refuses a malformed row with its line number", () => {
+	const { writes, bad } = parseWrites(["# copied from the network log", "", "POST", `PUT ${base}/api/x`, "DELETE /api/items/1"]);
+	assert.deepEqual(writes.map((w) => [w.line, w.method]), [[4, "PUT"]]);
+	assert.deepEqual(bad.map((b) => b.line), [3, 5]);
+	assert.throws(() => prove(["POST"]), /line 1/);
+	const file = join(dir, "malformed.txt");
+	writeFileSync(file, `POST ${rpc("items/update")}\nPOST\n`);
+	const r = spawnSync(process.execPath, [GUARD, "prove", "--writes", file], { encoding: "utf8" });
+	assert.equal(r.status, 2, r.stdout + r.stderr);
+	assert.match(r.stderr, /line 2/);
+	assert.doesNotMatch(r.stdout, /blocked/);
 });
 
 test("GraphQL is judged by its body, never by its path", () => {

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { launchChromium, repoRoot } from "./find-chromium.mjs";
-import { installGuard, isLocalHost, prove } from "./capture-guard.mjs";
+import { installGuard, isLocalHost, parseWrites, prove } from "./capture-guard.mjs";
 
 const HELP = `capture.mjs: screenshots and accessibility trees for every route, width and theme, with page writes blocked
 
@@ -22,7 +22,8 @@ Usage
 
 Routes
   --routes <r>...      each a path (/settings/profile) or surface=path (profile=/settings/profile), separated by
-                       spaces or commas. The surface name defaults to the path as a slug: / is home. Load state only
+                       spaces or commas. The surface name defaults to the path as a slug, without its query or
+                       hash: / is home. Routes that would share file names are refused. Load state only
   --surfaces <tsv>     a TSV with a header row holding surface and route (or path or url), and optionally states
                        (comma separated) and status (the HTTP code the route should answer, 200 when blank).
                        It is the only way to capture states
@@ -39,13 +40,16 @@ Files, in --out
 The guard (capture-guard.mjs) is installed on the browser context before the first navigation. For every HTTP
 request Playwright routes there, it aborts every non-local host, every PUT, PATCH and DELETE, and every POST not
 listed as a read. Service workers are blocked so their requests cannot go around the context route.
-Outside the guard: WebSocket traffic, so an app that writes over one is not safe to capture live, and the route
-status check below, a plain GET from Node before any browser opens. A GET that writes (a logout link) is
-continued like any GET. Capture a local build with fixed data or state you can throw away.
-A capture needs one of these two, so no run starts before its writes are proven blocked:
+Outside the guard: WebSocket traffic, so an app that writes over one is not safe to capture live; the route
+status check below, a plain GET from Node before any browser opens; and every hop after a redirect, because
+Playwright calls the route handler only for a request's first URL. A request the guard continues, such as a
+listed POST read, that is answered 307 or 308 is sent again with its body to the Location, unjudged. A GET that
+writes (a logout link) is continued like any GET. Capture a local build with fixed data or state you can throw away.
+A capture needs one of these two, so no run starts before the guard's decision on its writes is checked:
   --writes <file>      lines of "METHOD URL", every write the app sends, copied from its network log ("METHOD URL
-                       BODY" for GraphQL). capture runs capture-guard prove on them first and exits 2 before
-                       opening a browser if any one would get through
+                       BODY" for GraphQL). capture runs capture-guard prove on them first, which checks the
+                       guard's decision on each listed request and nothing more, and exits 2 before opening a
+                       browser if any one would get through or a line is not METHOD URL
   --no-backend         the app sends no writes (a static site, or every call answered by --guard-fixtures). The
                        guard still aborts every write, and a write seen anyway is printed as a WARN line
   --read-procedures <a,b>  exact POST procedure names, or GraphQL operation names, that are reads and may continue
@@ -116,7 +120,6 @@ async function main(argv) {
 	if (widths.some((w) => !w)) die("--widths takes numbers, such as 390,1280");
 	const height = Number(val("--height", "900"));
 	if (!height) die("--height takes a number, such as 320");
-	const themes = val("--themes", "light").split(",");
 	const via = val("--theme-via", "media");
 	if (!/^(media|class|storage:.+)$/.test(via)) die("--theme-via is media, class or storage:<key>");
 	const aria = !argv.includes("--no-aria");
@@ -150,6 +153,18 @@ async function main(argv) {
 	}
 	for (const s of surfaces) s.expect ??= 200;
 	if (surfaces.some((s) => s.surface.includes("."))) die("a surface name may not contain a dot; the dot separates surface and state");
+	const themes = val("--themes", "light").split(",");
+	const name = (s, state, w, t) => `${s.surface}${state ? `.${state}` : ""}-${kind}-${w}${t === themes[0] ? "" : `-${t}`}`;
+	// slug() drops the query and hash, so /items?id=1 and /items?id=2 would write the same files.
+	if (!statusOnly) {
+		const routesOf = new Map();
+		for (const s of surfaces) for (const state of ["", ...s.states]) for (const w of widths) for (const t of themes) {
+			const n = name(s, state, w, t);
+			routesOf.set(n, [...(routesOf.get(n) || []), s.route]);
+		}
+		const clash = [...routesOf].filter(([, r]) => r.length > 1);
+		if (clash.length) die(`${clash.length} planned capture name(s) would be written more than once, each capture overwriting the last: ${clash.map(([n, r]) => `${n} (${r.join(", ")})`).join("; ")}. Give each route its own surface name with surface=path, such as items-1=/items?id=1, or its own surface in --surfaces`);
+	}
 
 	// The guard's options, and the dry run that must come back clean before any browser opens.
 	const host = new URL(base).hostname;
@@ -168,11 +183,13 @@ async function main(argv) {
 	let proved = "--no-backend, so no dry run of the app's writes";
 	if (val("--writes")) {
 		const p = resolve(val("--writes")); if (!existsSync(p)) die(`no writes file at ${p}`);
-		const lines = readFileSync(p, "utf8").split("\n").filter((l) => l.trim() && !l.startsWith("#"));
-		const leaks = prove(lines, guardOpts);
+		const lines = readFileSync(p, "utf8").split("\n");
+		let leaks;
+		try { leaks = prove(lines, guardOpts); } catch (e) { die(`${p} has lines prove cannot read, so nothing was judged or captured:\n${e.message}`); }
+		const count = parseWrites(lines).writes.length;
 		for (const l of leaks) console.log(`LEAK\t${l.method} ${l.url}\t${l.reason}`);
-		if (leaks.length) die(`${leaks.length} of ${lines.length} writes in ${p} would reach the backend. Fix the guard options; nothing was captured`);
-		proved = `every one of ${lines.length} writes in --writes blocked`;
+		if (leaks.length) die(`${leaks.length} of ${count} writes in ${p} would reach the backend. Fix the guard options; nothing was captured`);
+		proved = `the guard blocks each of the ${count} requests in --writes (redirect hops are not judged)`;
 	}
 
 	// 1. Every route answers as expected. A type check passes a server/client break that only a request shows.
@@ -197,7 +214,6 @@ async function main(argv) {
 	const SETTLE = `(async () => { for (const i of document.querySelectorAll("img[loading=lazy]")) i.loading = "eager"; await Promise.all([...document.images].map((i) => i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; setTimeout(r, 3000); }))); await document.fonts.ready; document.getAnimations().forEach((a) => { try { a.finish(); } catch {} }); return true; })()`;
 	const themeClass = (t) => `document.documentElement.classList.toggle("dark", ${JSON.stringify(t)} === "dark"); document.documentElement.style.colorScheme = ${JSON.stringify(t)};`;
 	if (via !== "media" && themes.length > 1) console.error(`capture: --theme-via ${via} sets the theme by hand. It proves the tokens, not that a dark OS reaches them`);
-	const name = (s, state, w, t) => `${s.surface}${state ? `.${state}` : ""}-${kind}-${w}${t === themes[0] ? "" : `-${t}`}`;
 	const written = [], missed = [];
 	let evals = 0, trees = 0, blocked = 0;
 
@@ -249,7 +265,7 @@ async function main(argv) {
 	await browser.close();
 
 	const log = readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-	const writes = log.filter((l) => !["GET", "HEAD", "OPTIONS"].includes(String(l.method).toUpperCase()) && l.action !== "error" && !/released|aborted at release/.test(l.reason || ""));
+	const writes = log.filter((l) => !["GET", "HEAD", "OPTIONS"].includes(String(l.method).toUpperCase()) && l.action !== "error");
 	const unproven = writes.filter((w) => w.action === "abort" || w.action === "hold");
 	if (argv.includes("--no-backend") && unproven.length) console.log(`WARN\tthe app sent ${unproven.length} write request(s) though --no-backend was given, each blocked. List them in --writes: ${[...new Set(unproven.map((w) => `${w.method} ${w.proc}`))].join(", ")}`);
 	if (bodiesFile) {

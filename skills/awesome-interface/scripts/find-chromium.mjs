@@ -17,7 +17,7 @@
 //      ~/.cache/ms-playwright, %LOCALAPPDATA%\ms-playwright), newest first. playwright-core never ships a browser,
 //      and a version bump leaves the old download in place, so this is the common fix
 //   4. the system Chrome (Playwright's "chrome" channel, then the usual install paths)
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -124,7 +124,8 @@ export async function launchChromium(options = {}, { root } = {}) {
   return { error: [`found ${pw.from} but no Chromium would launch. Tried:`, ...tried.map((t) => `  ${t}`), "Run `npx playwright install chromium` in the repo root, or set PW_CHROMIUM to a Chrome or Chromium executable."].join("\n") };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// The installer links the skill folder into place, so the path the script was started by can be a link.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h") || argv.some((a) => a.startsWith("--") && a !== "--root" && a !== "--self-test")) {
     console.log("usage: node find-chromium.mjs [--root <dir>] [--self-test]\nPrints where Playwright and a launchable Chromium come from, after launching and closing it. Exit 0 when one launches, 2 when none does.\n--self-test is the same run: it passes only when a browser really launched.");

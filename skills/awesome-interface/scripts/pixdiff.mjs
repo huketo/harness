@@ -16,7 +16,8 @@
 // A pixel counts as changed when any channel differs by more than --tolerance
 // (0 to 255, default 0). A value-identical swap is proven at tolerance 0 only.
 // Exits 1 when any pair differs in size, is missing, or changes more pixels than
-// --max (percent, default 0).
+// --max (percent, default 0), and 2 on bad input, including a before folder with
+// nothing to compare, or when no browser launches.
 //
 // Needs Playwright (`playwright` or `playwright-core`) and a Chromium. find-chromium.mjs
 // finds both: PW_CHROMIUM, Playwright's own download, any other Playwright download in
@@ -56,11 +57,6 @@ for (const p of [A, B]) {
   if (!existsSync(p)) { console.error(`pixdiff: ${p} does not exist (relative paths resolve against ${process.cwd()})`); process.exit(2); }
 }
 
-const launched = await launchChromium({}, { root: repoRoot(rootArg, A) });
-if (launched.error) { console.error(`pixdiff: ${launched.error}`); process.exit(2); }
-const browser = launched.browser;
-console.error(`pixdiff: using ${launched.from}, ${launched.how}`);
-
 const walk = (d) => readdirSync(d).flatMap((e) => {
   const p = join(d, e);
   return statSync(p).isDirectory() ? walk(p) : p.endsWith(".png") && !p.includes(".diff.") ? [p] : [];
@@ -82,6 +78,14 @@ const pairs = dirMode
     return [rel, fa, join(B, kinded ? join(dirname(rel), basename(rel).replace("-before-", "-after-")) : rel)];
   })
   : [[relative(process.cwd(), B), A, B]];
+// Nothing compared is not a pass: an empty or mistyped baseline folder would otherwise exit 0.
+if (!pairs.length) { console.error(`pixdiff: no baseline: ${A} holds no PNG to compare. Capture it first with capture.mjs --kind before`); process.exit(2); }
+
+const launched = await launchChromium({}, { root: repoRoot(rootArg, A) });
+if (launched.error) { console.error(`pixdiff: ${launched.error}`); process.exit(2); }
+const browser = launched.browser;
+console.error(`pixdiff: using ${launched.from}, ${launched.how}`);
+
 
 const page = await browser.newPage();
 let failed = 0;

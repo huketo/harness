@@ -52,6 +52,15 @@ test("a bad --tolerance is refused before any browser starts", () => {
 	assert.match(r.out, /--tolerance takes a whole number/);
 });
 
+// An empty baseline folder pairs nothing, and nothing compared is not a pass.
+test("a before folder with nothing to pair fails before any browser starts", () => {
+	const empty = join(dir, "empty");
+	mkdirSync(empty);
+	const r = pixdiff(empty, join(dir, "shots"));
+	assert.equal(r.code, 2, r.out);
+	assert.match(r.out, /no baseline/);
+});
+
 test("identical images pass at tolerance 0", (t) => {
 	if (noBrowser) return t.skip(noBrowser);
 	const r = pixdiff(shot("home-before-390.png"), shot("home-after-390.png"));
