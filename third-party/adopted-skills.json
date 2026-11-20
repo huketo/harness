@@ -70,7 +70,7 @@
     },
     "awesome-interface": {
       "adopted_on": "2026-09-09",
-      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill + emilkowalski/skills + toss/apps-in-toss-harness",
+      "source": "jakubkrehel/skills + jakubkrehel/make-interfaces-feel-better + Leonxlnx/taste-skill + emilkowalski/skills + toss/apps-in-toss-harness + arla6ka/design.how",
       "ownership": "harness-owned; excluded from skills CLI updates",
       "license": "MIT AND BSD-3-Clause",
       "previous_registration": null,
@@ -78,7 +78,8 @@
         "skills/awesome-interface/LICENSE",
         "skills/awesome-interface/LICENSE.emilkowalski",
         "skills/awesome-interface/LICENSE.taste-skill",
-        "skills/awesome-interface/LICENSE.toss-apps-in-toss-harness"
+        "skills/awesome-interface/LICENSE.toss-apps-in-toss-harness",
+        "skills/awesome-interface/LICENSE.design-how"
       ],
       "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
       "upstreams": [
@@ -184,6 +185,31 @@
           "license": "MIT",
           "license_path": "LICENSE",
           "use": "Re-author choreograph's roles, pair relationships, one-entrance-per-container, non-uniform overlap, interruption and reduced-motion collapse into the conditional references/choreography.md, and its CSS stagger and sibling-menu direction into playbook recipes; add gestures' linked values, entry-axis dismissal, release-only overshoot and the inherited-custom-property cost to references/gestures.md; take break-ui's 'no limit found' wording. Exclude the initial response, mandatory 300ms caps and uniform-stagger bans as hard rules, useMeasure/useAnimate recipes, Vaul curves, Motion drag props and the ask-emil router."
+        },
+        {
+          "source": "https://github.com/arla6ka/design.how",
+          "commit": "1ce5304466db2ba47a7a7524603e86df77c702bd",
+          "paths": [
+            "LICENSE",
+            "skills/build-design-system/scripts/capture.mjs",
+            "skills/build-design-system/scripts/capture-guard.mjs",
+            "skills/build-design-system/scripts/pixdiff.mjs",
+            "skills/build-design-system/scripts/find-chromium.mjs",
+            "skills/ui-review/SKILL.md",
+            "skills/ui-review/references/criteria.md",
+            "skills/migrate-design-system/references/lessons.md",
+            "skills/migrate-design-system/references/parity.md",
+            "evals/incidents/capture-leaks-a-write.json",
+            "evals/incidents/write-surface-no-browser.json",
+            "evals/incidents/integer-field-swap.json",
+            "evals/incidents/file-accept-mime.json",
+            "evals/incidents/date-west-of-utc.json",
+            "evals/incidents/focus-ring-on-container.json"
+          ],
+          "snapshot_sha256": "1821a6d1a99eca63c65cdde9934624be84f858862213f13bbd9ee00560213654",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Adapt the guarded browser capture, pixel diff and Chromium discovery scripts into scripts/, and re-author ui-review and migrate-design-system review rules (input equivalence classes, Event Timing, real Tab focus checks, a ship line, corrections stated as failing checks, base and head capture comparison) into the review references. Exclude the build-design-system, migrate-design-system, design-system-boss and ui-review skills, parity.mjs, land.mjs, check-system.mjs and bodies-check.mjs."
         }
       ],
       "local_changes": [
@@ -199,7 +225,10 @@
         "2026-11-04: From the first awesome-interface comparison run, keep stress fixtures as reproducible evidence outside production paths and propose a fix per break; add worst-case data and conditional mobile-web references; make exiting surfaces unfocusable, keep over-dragged edge sheets attached, exclude shortcut and high-frequency surfaces from motion, address layout jumps on reveal, size answers to the question and avoid unverified version or maintenance claims.",
         "2026-11-18: Add references/choreography.md for several elements moving on one event, with upstream timing values restated as starting points beneath project tokens; ui.md's stagger paragraph now points to it.",
         "2026-11-18: Add references/playbook.md, a symptom-name index routing declutter, spacing, copy, alignment, font, font size, imagery and motion plays to their owning sections, plus navigation dropdown, arrow shift button and reveal hero recipes; the arrow shift recipe and the imagery section in ui.md are original to this repository.",
-        "2026-11-18: Add a declutter procedure to layout.md, sibling-trigger navigation panels to ui.md, linked values, entry-axis dismissal and release-only overshoot to gestures.md, and replace 'unbounded' with 'no limit found' in worst-case-data.md."
+        "2026-11-18: Add a declutter procedure to layout.md, sibling-trigger navigation panels to ui.md, linked values, entry-axis dismissal and release-only overshoot to gestures.md, and replace 'unbounded' with 'no limit found' in worst-case-data.md.",
+        "2026-11-20: Adapt design.how capture.mjs, capture-guard.mjs, pixdiff.mjs and find-chromium.mjs into scripts/ with node:test files whose browser cases skip without Playwright and a Chromium. Request bodies are logged only with capture.mjs --bodies; --run and the bodies-check shape are dropped; unreadable, empty or bodiless GraphQL --writes rows are refused; the help limits the guard to HTTP requests routed for the page and context, so WebSocket, the route status GET and redirect hops are outside it. find-chromium.mjs, which make-font and make-logo also import to print their books, resolves links before deciding it was run directly.",
+        "2026-11-20: Merge design.how ui-review and migrate-design-system rules into review.md, change-review.md, redesign.md, worst-case-data.md and assets/review-format.md in this skill's structure: base and head capture with pixdiff, real Tab presses for focus rings, Event Timing for responsiveness, a browser run before a write surface is cleared, corrections stated as checks that fail on the reviewed build, a ship line, and number, upload, Enter/Space and date equivalence classes; retain Arlan Marat's MIT notice in LICENSE.design-how.",
+        "2026-11-20: The description excludes token mapping reports alongside design-system documentation, leaving both to design-md."
       ],
       "excluded_sources": [
         {
@@ -342,7 +371,8 @@
         "Use the actual documented generator and inspected artifacts; preserve owned assets and separate primary images from optional details.",
         "Keep platform, responsive viewport and concept-versus-production boundaries explicit; remove mandatory section counts, style bans and fictional claims.",
         "Add wordmark, symbol, mascot, combination-mark and emblem decisions with type-specific inspection; distinguish standalone logo development from brand application boards.",
-        "Retain the upstream rounded mascot silhouette, dominant lower-corner primary, chromatic background, subtle depth and character-image prompt treatment; replace fixed batches, repeated approval, model allowlists and uninspected delivery with the shared workflow."
+        "Retain the upstream rounded mascot silhouette, dominant lower-corner primary, chromatic background, subtle depth and character-image prompt treatment; replace fixed batches, repeated approval, model allowlists and uninspected delivery with the shared workflow.",
+        "2026-11-20: The description limits the logo branch to concept images and excludes finished logo files, which make-logo delivers."
       ]
     },
     "design-md": {
@@ -377,17 +407,36 @@
           "license": "MIT",
           "license_path": "LICENSE",
           "use": "Re-author learn-taste as design-md's corrections mode (references/corrections.md): five correction signals, the filter tree, generalization levels, user or inferred why, propose-then-stop and write on approval. Route mechanism choice to writing-for-agents' corrections-become-constraints ladder, label learned rules Approved or Current, and treat transcripts as sensitive data. Exclude the standalone user-invoked skill and fixed Claude Code transcript paths."
+        },
+        {
+          "source": "https://github.com/arla6ka/design.how",
+          "commit": "1ce5304466db2ba47a7a7524603e86df77c702bd",
+          "paths": [
+            "LICENSE",
+            "skills/build-design-system/scripts/oklch.mjs",
+            "skills/component-docs/SKILL.md",
+            "skills/component-docs/references/doc-format.md",
+            "skills/token-mapping/SKILL.md",
+            "skills/token-mapping/references/mapping-rules.md"
+          ],
+          "snapshot_sha256": "5719db7373e64f09a7ffe9468f27a55e882e53b0ac99170d67f916bdf2b6a421",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author token-mapping as design-md's read-only token mapping report (references/mapping-rules.md) and component-docs as its component entry format (references/component.md), and adapt build-design-system's oklch.mjs as scripts/oklch.mjs with node:test coverage; exclude the standalone skills, the build-design-system edit path, default save paths and example-file writing."
         }
       ],
       "local_changes": [
         "Generalize Stitch design-system authoring into optional repository-owned documentation with one source of truth.",
         "Separate Current, Approved, Proposed and Unknown evidence; link runtime owners instead of creating replacement tokens.",
         "Keep Stitch as a conditional text adapter, not a prerequisite or implicit external action; remove preset aesthetic bans and unsourced values.",
-        "2026-11-18: Add the corrections mode for turning a session's design corrections into approved design-system rules or proposed checks; retain Emil Kowalski's MIT notice in LICENSE.emilkowalski."
+        "2026-11-18: Add the corrections mode for turning a session's design corrections into approved design-system rules or proposed checks; retain Emil Kowalski's MIT notice in LICENSE.emilkowalski.",
+        "2026-11-20: Add a read-only token mapping report mode that writes no file and maps only onto the runtime token owner (Approved or Proposed artifact tokens are not targets), a component entry format in the artifact's Current, Approved, Proposed and Unknown notation without a default save path or example-file writing, and scripts/oklch.mjs adapted from design.how with its self-test moved to oklch.test.mjs and the legacy parse and toOklch exports removed; retain Arlan Marat's MIT notice in LICENSE.design-how.",
+        "2026-11-20: The description names the one-component entry and the read-only token mapping report the body already handles, so routing reaches both."
       ],
       "license_paths": [
         "skills/design-md/LICENSE",
-        "skills/design-md/LICENSE.emilkowalski"
+        "skills/design-md/LICENSE.emilkowalski",
+        "skills/design-md/LICENSE.design-how"
       ]
     },
     "diagram-design": {
@@ -1280,7 +1329,12 @@
         }
       ],
       "local_changes": [
-        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land."
+        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land.",
+        "2026-11-20: The provenance, licence and approval gates landed, so the skill is installable. It builds only on an OFL-1.1 glyf variable font in a plain .ttf: OFL.txt may hold only copyright lines in the supported form before the licence text, name ID 13 must grant the OFL 1.1 with no clause of its own, and Apache-2.0, static, CFF and WOFF bases are refused. record_base.py prints an approval question naming the base and the sha256 of the font and its OFL.txt, and writes base.json only when the question comes back word for word with the person's verbatim answer and an explicit approved decision.",
+        "2026-11-20: fit, space, package and check carry a sha256 chain in their logs; every step reads each input once and refuses an output path that leads to an input through a name, symbolic link or hard link; package and check share one chain check and remake the fit's subset from the base. package.py builds in a 0700 temporary folder and moves it to dist/ only after checking every TTF and WOFF2, with package-log.json inside dist/ recording each output's sha256 and the spaced font it came from (from); check-report.json lists the verified outputs, and the font book refuses fonts not among them and prints the approval verbatim.",
+        "2026-11-20: find_foundation.py drops Apache candidates, sends GITHUB_TOKEN only to HTTPS GitHub origins on every redirect hop and explains rate limits; the output never keeps the base's name, a Reserved Font Name or its designer (name ID 9), parsed by one Reserved Font Name reader; reference outline comparison is a diagnostic only. Scripts carry PEP 723 metadata and run with uv on Python 3.12; synthetic FontBuilder gate tests run with mise run test-font-gates.",
+        "2026-11-20: Add Hangul. References are measured per structural class (H1 to H6) with unit-tagged values (cap700, em1000, ratio) from Korean sample lines between 으 anchors, and make_targets.py merges one unit per key into a hangul object. Without a Latin n stem the weight is solved from the Hangul stem; each later weight takes the first weight's Hangul location with the wght stepped by the weight-class difference, and keeps the first weight's transform and advance targets.",
+        "2026-11-20: Hangul builds take only a base whose files scripts/bases.json pins (Noto Sans KR in this version; Pretendard is a measurement reference only, because its OFL.txt header form is refused). The fit moves the Hangul by one scale within ±6 % and per-class x and y scales within ±3 %, quantised inside the limits; check gates KS X 1001, compares every Hangul point with the glyph the build makes from the base, and reads collision-guard and kerning pairs as HarfBuzz shapes them; the font book adds a fixed Hangul specimen and coverage counts."
       ]
     },
     "make-logo": {
@@ -1305,8 +1359,42 @@
         }
       ],
       "local_changes": [
-        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land."
+        "2026-11-20: Import the upstream tree unmodified as a local comparison baseline; not installable until the provenance, license, and trademark gates land.",
+        "2026-11-20: The provenance, rights and trademark gates landed, so the skill is installable. trace_ref.py traces only a file listed in brief.json trace_sources by sha256 with the person's verbatim question and answer, never a collected file, compares its mask and rendered path with every collected image and every --refs image except the person's own listed sources (a collected file is compared whatever brief.json lists), and refuses the trace when any of them reaches the calibrated distance limit; SVG references are rasterised, small favicons enlarged and transparent marks seen on white and black, and a reference the gates cannot read as one mark is refused (not-comparable). Each trace gets a provenance record.",
+        "2026-11-20: build, check, package and the logo book are sealed by sha256: build_logo.py re-traces through the same gates, build.json must list the mark and its grid, plus the wordmark and lockups when the build has a wordmark, check_logo.py refuses traces gated against other references, calibration or collections, and later steps read only verified bytes. Collections live in the XDG cache with manifests listing every file's sha256, refuse unlisted, linked or changed files, and are written atomically (collection.mjs refreshes one).",
+        "2026-11-20: potrace 1.16 is fetched for linux-x86_64 behind a pinned sha256 when it is not on PATH; Reserved Font Names come from OFL copyright lines; the logo book and trademark sheet can be written in Korean, with KIPRIS beside the other searches; the book finds Chromium through awesome-interface's find-chromium.mjs. Scripts carry PEP 723 metadata declaring Python 3.10 or later and run with uv; synthetic gate tests run on Python 3.12 with mise run test-logo-gates (potrace on PATH).",
+        "2026-11-20: distance.py also measures negative space, skeleton and thickness, reported but not in the shipped model, which stays unchanged; calibrate.py --features fits a chosen feature set and fused() scores with the features the calibration lists. A reference whose bytes are read but cannot be interpreted as one comparable mark stops check_logo.py with not-comparable and no check.json (a --refs path that is missing or unreadable is refs-missing); when every reference reads but none is left to compare (for example an empty --refs folder), the nearest-reference row says not checked and the gate outcome is unchanged."
       ]
+    },
+    "t3-orchestrate": {
+      "adopted_on": "2026-11-20",
+      "source": "Original harness skill; re-authors selected design.how operations guidance",
+      "ownership": "harness-owned original",
+      "license": "MIT",
+      "license_paths": [
+        "skills/t3-orchestrate/LICENSE.design-how"
+      ],
+      "previous_registration": null,
+      "snapshot_hash_recipe": "SHA-256 over selected source files sorted by relative POSIX path: UTF-8 path + NUL + file bytes + NUL. Directory paths expand recursively. Hashes describe upstream inputs, not the adapted output.",
+      "upstreams": [
+        {
+          "source": "https://github.com/arla6ka/design.how",
+          "commit": "1ce5304466db2ba47a7a7524603e86df77c702bd",
+          "paths": [
+            "LICENSE",
+            "skills/migrate-design-system/references/running-many-agents.md",
+            "skills/migrate-design-system/references/lessons.md"
+          ],
+          "snapshot_sha256": "118ce2117262172f86d82d77994eb7826c6739e5b65532b816231aa9737101a8",
+          "license": "MIT",
+          "license_path": "LICENSE",
+          "use": "Re-author the wait limits (including a verifier that deleted its only run result to escape a wait), refused-call handling and host-load valve as references/operations.md in T3 delegate_task terms; no upstream sentence is copied, and runner-specific parts (shell background jobs, pid files) are translated or dropped."
+        }
+      ],
+      "local_changes": [
+        "2026-11-20: Add references/operations.md: a time limit on every wait with a blocked (timed out) report line, no workaround for a refused call, and a host-load check before spawning children, inside the existing completion, authority and HITL rules; retain Arlan Marat's MIT notice in LICENSE.design-how."
+      ],
+      "excluded_sources": []
     }
   },
   "removed_on": "2026-09-09",

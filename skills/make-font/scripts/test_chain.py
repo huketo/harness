@@ -771,7 +771,7 @@ class SubsetBytes(unittest.TestCase):
         here = hashlib.sha256(C.build_subset(raw(base), args)).hexdigest()
         code = ("import sys, hashlib; sys.modules['uharfbuzz'] = None; sys.path.insert(0, %r); import chain as C;"
                 "print(hashlib.sha256(C.build_subset(open(%r, 'rb').read(), %r)).hexdigest())" % (T.HERE, base, args))
-        r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, "-I", "-B", "-c", code], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), here, "the subset differs when uharfbuzz cannot be imported")
 

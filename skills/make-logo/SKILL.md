@@ -165,8 +165,7 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
 10. **Package.** `uv run scripts/package_logo.py build/<chosen> --out package --refs <refs> --calibration
     calibration.json --brief brief.json --classes "<Nice classes>"`, into a new folder: SVGs (mark, wordmark,
     lockups; ink, reversed, accent, black), PNGs from 16 to 1024 px, favicon.ico, LICENSES, and the trademark search
-    sheet, with KIPRIS for Korea and, for a traced mark, the person's statement word for word. For a reveal video,
-    hand the mark and its guides to make-motion.
+    sheet, with KIPRIS for Korea and, for a traced mark, the person's statement word for word.
 
 ## Never
 
