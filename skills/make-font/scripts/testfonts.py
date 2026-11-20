@@ -5,7 +5,8 @@
 """Synthetic fixtures for the make-font gate tests: fonts drawn with FontBuilder and the OFL-1.1 text.
 
 No downloaded font is used. Every font here is made of rectangles, so its numbers are known: cap height 700,
-x-height 500, an n with two stems, an o and an O with a hole, and a weight axis that thickens the stems.
+x-height 500, an n with two stems, an o and an O with a hole, a b that rises to 740 and a p that falls to -220
+(the font book reads its ascender and descender from them), and a weight axis that thickens the stems.
 """
 import os
 import re
@@ -156,13 +157,18 @@ def _shapes(stem):
         "n": (520, [(60, 0, 60 + s, 500, False), (460 - s, 0, 460, 500, False), (60, 500 - t, 460, 500, False)]),
         "o": (520, [(50, -10, 470, 510, False), (50 + s, -10 + t, 470 - s, 510 - t, True)]),
         "x": (500, [(40, 0, 460, 500, False)]),
+        "b": (540, [(60, 0, 60 + s, 740, False), (60, 0, 480, t, False), (480 - s, 0, 480, 500, False),
+                    (60, 500 - t, 480, 500, False)]),
+        "p": (540, [(60, -220, 60 + s, 500, False), (60, 0, 480, t, False), (480 - s, 0, 480, 500, False),
+                    (60, 500 - t, 480, 500, False)]),
         "H": (720, [(70, 0, 70 + S, 700, False), (650 - S, 0, 650, 700, False), (70, 330, 650, 330 + t, False)]),
         "O": (740, [(50, -10, 690, 710, False), (50 + S, -10 + t, 690 - S, 710 - t, True)]),
     }
 
 
-CMAP = {0x20: "space", ord("n"): "n", ord("o"): "o", ord("x"): "x", ord("H"): "H", ord("O"): "O"}
-ORDER = [".notdef", "space", "n", "o", "x", "H", "O"]
+CMAP = {0x20: "space", ord("n"): "n", ord("o"): "o", ord("x"): "x", ord("H"): "H", ord("O"): "O", ord("b"): "b",
+        ord("p"): "p"}
+ORDER = [".notdef", "space", "n", "o", "x", "H", "O", "b", "p"]
 
 
 def _ttglyphs(stem):

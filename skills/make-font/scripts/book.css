@@ -169,6 +169,15 @@ p { font-size: 14px; }
 .lic-left > p { max-width: 700px; margin-bottom: 26px; }
 .lic-right p { margin-bottom: 14px; }
 .lic-right .sec { margin-top: 4px; }
+/* provenance */
+.prov-page { display: grid; grid-template-columns: 1fr 640px; gap: 72px; }
+.prov-left .h2 { margin-bottom: 22px; }
+.prov-left .lede { margin-bottom: 26px; }
+.prov-t th { width: 170px; vertical-align: top; padding-top: 7px; border-bottom: 1px solid var(--rule); }
+.prov-t td { vertical-align: top; }
+.hash { overflow-wrap: anywhere; word-break: break-all; }
+.prov-right .ofl p { overflow-wrap: anywhere; }
+.prov-right > p { margin-top: 8px; }
 .code { font-family: var(--mono); font-size: 12px; line-height: 1.5; background: var(--soft); padding: 16px 18px; margin-bottom: 26px; white-space: pre; }
 .mono { font-family: var(--mono); font-size: 12px; }
 

@@ -5,6 +5,7 @@
 """The provenance chain, end to end on a synthetic base: base.json, fit, space, package and check, and every way
 of stepping around it."""
 import hashlib
+import html
 import json
 import os
 import shutil
@@ -87,6 +88,9 @@ class Pipeline(unittest.TestCase):
         cls.steps["check"] = T.run("check_font.py", cls.ttf, "--targets", cls.targets, "--base-json", cls.base_json,
                                    "--fit-log", cls.fit_log, "--space-log", cls.space_log,
                                    "--package-log", cls.package_log, "--package", p("dist"), "--out-dir", p("checks"))
+        cls.steps["book"] = T.run("font_book.py", cls.ttf, "--webfonts", p("dist", "webfonts"), "--targets", cls.targets,
+                                  "--fit-log", cls.fit_log, "--space-log", cls.space_log,
+                                  "--check-report", p("checks", "check-report.json"), "--out-dir", p("book"))
 
     @classmethod
     def tearDownClass(cls):
@@ -140,13 +144,28 @@ class Pipeline(unittest.TestCase):
 
     def test_check_verifies_the_chain(self):
         r = self.steps["check"]
-        rows = load(self.p("checks", "check-report.json"))
+        rows = load(self.p("checks", "check-report.json"))["gates"]
         chain = [x for x in rows if x["group"] == "chain"]
         self.assertTrue(chain, r.stdout + r.stderr)
         self.assertEqual({x["state"] for x in chain}, {"PASS"}, chain)
         prov = {x["gate"]: x["state"] for x in rows if x["group"] == "provenance"}
         self.assertEqual(prov["glyph order equals the subset's"], "PASS")
         self.assertEqual(prov["character map equals the subset's"], "PASS")
+
+    def test_the_check_report_states_the_approved_base_and_the_approval(self):
+        rep = load(self.p("checks", "check-report.json"))
+        self.assertIsInstance(rep, dict, "check-report.json is a bare list of gates, with no provenance record")
+        rec = load(self.base_json)
+        self.assertEqual(rep["base"]["sha256"], sha(self.base))
+        self.assertEqual(rep["base"]["license"]["sha256"], sha(self.ofl))
+        self.assertEqual(rep["approval"], rec["approval"])
+
+    def test_the_font_book_prints_the_approved_base_and_the_approval(self):
+        ok(self, self.steps["book"])
+        page = text(self.p("book", "index.html"))
+        appr = load(self.base_json)["approval"]
+        for want in (sha(self.base), sha(self.ofl), appr["question"], appr["answer"]):
+            self.assertIn(html.escape(want), page)
 
     def test_package_names_and_readme(self):
         f = TTFont(self.ttf)
@@ -166,7 +185,7 @@ class Pipeline(unittest.TestCase):
         T.run("check_font.py", self.ttf, "--targets", self.targets, "--base-json", self.base_json,
               "--fit-log", self.fit_log, "--space-log", self.space_log, "--package-log", self.package_log,
               "--reference", ref, "--out-dir", q("checks"))
-        rows = load(q("checks", "check-report.json"))
+        rows = load(q("checks", "check-report.json"))["gates"]
         got = [(x["state"], x["detail"]) for x in rows if x["gate"].startswith("outline comparison")]
         self.assertEqual([g[0] for g in got], ["NOT RUN"], got)
         self.assertIn("CFF", got[0][1])

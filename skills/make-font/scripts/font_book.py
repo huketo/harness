@@ -6,14 +6,17 @@
 
   uv run font_book.py <Family-Regular.ttf> [<Family-Medium.ttf> ...] --out-dir DIR
       [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log a.space-log.json ...]
-      [--check-report check-report.json] [--licence OFL.txt] [--tagline "..."] [--version 1.000]
+      --check-report check-report.json [--licence OFL.txt] [--tagline "..."] [--version 1.000]
 
 Pages: cover, how it was made (with --targets), vertical metrics, weights, waterfall, text settings, character
 set (as many pages as it needs), figures, kerning and the collision guard, OpenType features (21 to a page),
-languages, and licence and install, where the check summary lists the gates that failed and those not run.
+languages, licence and install, where the check summary lists the gates that failed and those not run, and
+provenance: the approved base's file name and full sha256, its licence's sha256, and the approval question and
+answer verbatim, all from check-report.json.
 Every number on a page is read from the font files or the logs when the book is written.
-The book's own text names no reference and no base family: the licence page quotes the copyright lines from
-the font's name table, which is what the OFL requires.
+The book's own text names no reference and no base family. The licence page quotes the copyright lines from
+the font's name table, which is what the OFL requires, and the provenance page quotes the approval record,
+which names the base.
 
 Fonts are linked by relative path. The TTFs are used for the character set and languages so nothing is
 subset away; the WOFF2 files (from --webfonts, else the TTFs) set everything else.
@@ -213,7 +216,8 @@ def main():
     ap.add_argument("--targets")
     ap.add_argument("--fit-log")
     ap.add_argument("--space-log", action="extend", nargs="+", default=[])
-    ap.add_argument("--check-report")
+    ap.add_argument("--check-report", required=True,
+                    help="check-report.json from check_font.py: the gate summary and the approved base's provenance")
     ap.add_argument("--licence")
     ap.add_argument("--tagline")
     ap.add_argument("--version")
@@ -231,7 +235,7 @@ def main():
     T = L.load_json(a.targets) if a.targets else None
     fit = L.load_json(a.fit_log) if a.fit_log else None
     space = [L.load_json(p) for p in a.space_log]
-    check = L.load_json(a.check_report) if a.check_report else None
+    check = L.load_json(a.check_report)
     face = L.Face(reg)
     cm = face.cmap
     upm = face.upm
@@ -565,10 +569,11 @@ def main():
                          for p, (s, w), wp in zip(a.fonts, styles, web))
     checks = ""
     if check:
-        passed = sum(1 for r in check if r["state"] == "PASS")
-        failed = [r for r in check if r["state"] == "FAIL"]
+        gates = check["gates"]
+        passed = sum(1 for r in gates if r["state"] == "PASS")
+        failed = [r for r in gates if r["state"] == "FAIL"]
         failed_names = list(dict.fromkeys(r["gate"] for r in failed))  # gate names only: details may name a reference
-        not_run = list(dict.fromkeys(r["gate"] for r in check if r["state"] == "NOT RUN"))
+        not_run = list(dict.fromkeys(r["gate"] for r in gates if r["state"] == "NOT RUN"))
         checks = (f"<h3 class='sec' style='margin-top:26px'>Checks</h3><p>{passed} gates passed, {len(failed)} failed"
                   f"{': ' + esc(', '.join(failed_names[:6])) if failed else ''}."
                   f"{' Not run: ' + esc('; '.join(not_run)) + '.' if not_run else ''}</p>")
@@ -582,6 +587,30 @@ def main():
   </div>
   <div class="lic-right"><h3 class="sec">Install on the web</h3><p>Copy the WOFF2 files next to your stylesheet and add:</p><pre class="code">{esc(css_snip)}</pre>
     <h3 class="sec">Install on a computer</h3><p>Open each TTF and choose Install.</p></div>
+</div>""")
+
+    # provenance --------------------------------------------------------------
+    base, appr = check["base"], check["approval"]
+    src = base["source"]
+    where = {"google-fonts": f"Google Fonts, {src.get('url')}", "manifest": f"manifest entry {src.get('manifest_entry')}",
+             "local": "a file the requester supplied"}.get(src.get("kind"), str(src.get("kind")))
+    lic = base["license"]
+    B.page("provenance", "Provenance", f"""
+<div class="prov-page">
+  <div class="prov-left"><h2 class="f h2">Provenance</h2>
+    <p class="lede">Every outline in {esc(family)} comes from one open font, the base the requester approved. Each build step checked that font and its licence by sha256 before it ran, and took only files the step before it wrote.</p>
+    <table class="t small-t prov-t"><tbody>
+      <tr><th>Base font</th><td><span class="mono">{esc(base['file'])}</span><br><span class="mono hash">sha256 {esc(base['sha256'])}</span></td></tr>
+      <tr><th>Source</th><td>{esc(where)}</td></tr>
+      <tr><th>Licence</th><td>{esc(lic['id'])}, <span class="mono">{esc(lic['file'])}</span><br><span class="mono hash">sha256 {esc(lic['sha256'])}</span></td></tr>
+      <tr><th>Reserved Font Names</th><td>{esc(', '.join(lic['reserved_font_names']) or 'none')}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="prov-right"><h3 class="sec">The approval, verbatim</h3>
+    <div class="ofl"><p><b>Question.</b> {esc(appr['question'])}</p><p><b>Answer.</b> {esc(appr['answer'])}</p>
+      <p>Decision: {esc(appr.get('decision') or '')}, recorded {esc(appr['recorded_at'])}.</p></div>
+    <p>The approval is the requester's statement. The build cannot check it; it binds the statement to the two files above by their sha256 and prints it here as given.</p>
+  </div>
 </div>""")
 
     css = open(os.path.join(HERE, "book.css")).read().replace("ACCENT", ACCENT).replace('"BOOKFACE', f'"{family} Book')

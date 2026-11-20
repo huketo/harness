@@ -37,6 +37,9 @@ Then the gates, each PASS, FAIL, INFO or NOT RUN, with the number behind it:
 Renders: <out-dir>/overlay-<style>-<size>.png sets the reference and the font on the same lines at a text and
 a display size, reference in red, ours in blue, overlap black, with that legend drawn above. With a screenshot
 reference, the two are stacked at the same cap height instead.
+
+<out-dir>/check-report.json holds the approved base (file name, full sha256, source, licence and its sha256),
+the approval as base.json records it (question, answer and decision, verbatim), and every gate row.
 """
 import argparse
 import os
@@ -422,7 +425,17 @@ def main():
     not_run = sorted({r[1] for r in G.rows if r[2] == "NOT RUN"})
     print(f"\n{len(bad)} failed, {sum(1 for r in G.rows if r[2] == 'PASS')} passed"
           + (f", not run: {'; '.join(not_run)}" if not_run else ""))
-    L.save_json([{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows],
+    base, lic = rec["font"], rec["license"]
+    print(f"base {os.path.basename(base['file'])} sha256 {base['sha256']}, licence {lic['id']} sha256 {lic['sha256']}")
+    print(f"approved: Q {rec['approval']['question']!r} A {rec['approval']['answer']!r}")
+    # The record base.json keeps, as checked above, beside the gates: file names only, no builder paths.
+    L.save_json({"schema": "make-font/check-report@1",
+                 "base": {"file": os.path.basename(base["file"]), "sha256": base["sha256"], "source": rec["source"],
+                          "license": {"id": lic["id"], "file": os.path.basename(lic["file"]), "sha256": lic["sha256"],
+                                      "name_id_13": lic["name_id_13"],
+                                      "reserved_font_names": lic["reserved_font_names"]}},
+                 "approval": rec["approval"],
+                 "gates": [{"group": g, "gate": n, "state": s, "detail": d} for g, n, s, d in G.rows]},
                 os.path.join(a.out_dir, "check-report.json"))
     sys.exit(1 if bad else 0)
 
