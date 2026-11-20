@@ -17,9 +17,11 @@ colour, and its small sizes; then one page comparing them with their checks. No 
 --photos, credited at the end.
 
 Each build must still match its check.json (build.json, every file it lists, the --refs images, the calibration), and
-the book reads only the files build.json lists: a build with no lockup shows its mark in the lockup's place. A
-direction that failed check_logo.py is left out unless --include-failed, which shows it marked as failed. The book is
-written in the brief's language, Korean for a Korean brief, set in an OFL face from Google Fonts that has the script.
+the book reads only the verified bytes of the files build.json lists: a build with no lockup shows its mark in the
+lockup's place. A direction that failed check_logo.py is left out unless --include-failed, which shows it marked as
+failed. The book is written in the brief's language, Korean for a Korean brief, set in an OFL face from Google Fonts
+that has the script. A photo is used only when its manifest entry says who made it, under what licence and where it
+came from, so the credits page can name it.
 """
 from __future__ import annotations
 
@@ -76,14 +78,13 @@ def esc(s: str) -> str:
     return html.escape(s, quote=True)
 
 
-def read_svg(path: str) -> tuple[str, str]:
+def read_svg(svg: str) -> tuple[str, str]:
     """(viewBox, path d) of a single-path SVG written by build_logo.py."""
-    s = R.read_bytes(path).decode()
-    return re.search(r'viewBox="([^"]+)"', s).group(1), re.search(r' d="([^"]+)"', s).group(1)
+    return re.search(r'viewBox="([^"]+)"', svg).group(1), re.search(r' d="([^"]+)"', svg).group(1)
 
 
-def logo(path: str, fill: str, height: float | None = None, width: float | None = None, cls: str = "") -> str:
-    vb, d = read_svg(path)
+def logo(svg: str, fill: str, height: float | None = None, width: float | None = None, cls: str = "") -> str:
+    vb, d = read_svg(svg)
     _, _, w, h = (float(v) for v in vb.split())
     if height is not None:
         width = height * w / h
@@ -123,10 +124,10 @@ def thin(vals, lo, hi, g, gap_share=0.12, most=5):
     return sorted(keep)
 
 
-def construction(build: dict, bdir: str, p: dict, w: int, h: int) -> str:
+def construction(build: dict, files: dict[str, str], p: dict, w: int, h: int) -> str:
     """The mark on its grid with dashed guides run edge to edge, as the construction tile."""
     g = build["grid"]
-    _, d = read_svg(os.path.join(bdir, "mark-grid.svg"))
+    _, d = read_svg(files["mark-grid.svg"])
     s = h * 0.34 / g
     ox, oy = (w - g * s) / 2, (h - g * s) / 2
     lines = []
@@ -141,9 +142,9 @@ def construction(build: dict, bdir: str, p: dict, w: int, h: int) -> str:
             f'<path transform="translate({ox:.1f} {oy:.1f}) scale({s:.4f})" fill="{mix(p["paper"], p["neutral"], .25)}" d="{d}"/></svg>')
 
 
-def browser(name: str, bdir: str, p: dict) -> str:
+def browser(name: str, mark: str, p: dict) -> str:
     domain = re.sub(r"[^a-z0-9]", "", name.lower()) + ".com"
-    icon = f'<span class="fav" style="background:{p["accent"]}">{logo(os.path.join(bdir, "mark.svg"), p["ink"] if lum(p["accent"]) > .45 else "#ffffff", height=26)}</span>'
+    icon = f'<span class="fav" style="background:{p["accent"]}">{logo(mark, p["ink"] if lum(p["accent"]) > .45 else "#ffffff", height=26)}</span>'
     return f"""<div class="browser">
       <div class="tabs"><i></i><i></i><i></i><div class="tab">{icon}<b>{esc(name)}</b><span class="x">×</span></div></div>
       <div class="bar"><span class="nav">←</span><span class="nav">→</span><span class="nav">↻</span>
@@ -151,17 +152,17 @@ def browser(name: str, bdir: str, p: dict) -> str:
     </div>"""
 
 
-def phone(name: str, bdir: str, p: dict, note: str) -> str:
+def phone(name: str, mark: str, p: dict, note: str) -> str:
     on = p["ink"] if lum(p["accent"]) > .45 else "#ffffff"
     apps = []
     for i in range(16):
         if i == 5:
-            apps.append(f'<div class="app"><span class="ic" style="background:{p["accent"]}">{logo(os.path.join(bdir, "mark.svg"), on, height=40)}</span><em>{esc(name)}</em></div>')
+            apps.append(f'<div class="app"><span class="ic" style="background:{p["accent"]}">{logo(mark, on, height=40)}</span><em>{esc(name)}</em></div>')
         else:
             apps.append(f'<div class="app"><span class="ic" style="background:{mix(p["tint"], p["neutral"], (i % 5) / 8)}"></span><em></em></div>')
     return f"""<div class="phone" style="background:{mix(p['tint'], '#ffffff', .4)}">
       <div class="notch"></div><div class="time">9:41</div>
-      <div class="note"><span class="ic sm" style="background:{p['accent']}">{logo(os.path.join(bdir, 'mark.svg'), on, height=20)}</span>
+      <div class="note"><span class="ic sm" style="background:{p['accent']}">{logo(mark, on, height=20)}</span>
         <div><b>{esc(name)}</b><span>{esc(note)}</span></div></div>
       <div class="apps">{''.join(apps)}</div>
     </div>"""
@@ -249,24 +250,24 @@ section.page.cover { background: #161616; color: #fff; }
 """
 
 
-def lockup(bdir: str, files: dict, fill: str, height: float, stacked: bool = False) -> str:
+def lockup(files: dict[str, str], fill: str, height: float, stacked: bool = False) -> str:
     """The lockup this build wrote, or its mark, larger, when it wrote none (a mark-only build)."""
     name = "lockup-stacked.svg" if stacked else "lockup.svg"
     if name in files:
-        return logo(os.path.join(bdir, name), fill, height=height)
-    return logo(os.path.join(bdir, "mark.svg"), fill, height=height if stacked else height * 2.2)
+        return logo(files[name], fill, height=height)
+    return logo(files["mark.svg"], fill, height=height if stacked else height * 2.2)
 
 
-def poster(p: dict, bdir: str, files: dict, tagline: str, img: str | None) -> str:
+def poster(p: dict, files: dict[str, str], tagline: str, img: str | None) -> str:
     """The tall poster tile: a photo with the tagline and lockup in paper over a dark foot, or, with no photos, the
     direction's colour field with ink type."""
     box = "left:1014px;top:30px;width:556px;height:840px;"
     if img:
         return (f'<div class="tile" style="{box}background:#000 url({img}) center/cover">'
                 f'<div class="poster" style="background:linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.25) 45%, rgba(0,0,0,0) 70%);justify-content:flex-end;gap:36px">'
-                f'<h4 style="color:{p["paper"]}">{esc(tagline)}</h4><div class="lk">{lockup(bdir, files, p["paper"], 40)}</div></div></div>')
+                f'<h4 style="color:{p["paper"]}">{esc(tagline)}</h4><div class="lk">{lockup(files, p["paper"], 40)}</div></div></div>')
     return (f'<div class="tile" style="{box}{field(p)}"><div class="poster"><h4 style="color:{p["ink"]}">{esc(tagline)}</h4>'
-            f'<div class="lk">{lockup(bdir, files, p["ink"], 40)}</div></div></div>')
+            f'<div class="lk">{lockup(files, p["ink"], 40)}</div></div></div>')
 
 
 def trace_lines(t: dict, traces: list[dict], scores: dict[str, float]) -> str:
@@ -280,7 +281,7 @@ def trace_lines(t: dict, traces: list[dict], scores: dict[str, float]) -> str:
     return "".join(out)
 
 
-def trace_page(t: dict, bdir: str, p: dict, traces: list[dict], scores: dict[str, float]) -> str:
+def trace_page(t: dict, mark: str, p: dict, traces: list[dict], scores: dict[str, float], num: str) -> str:
     """A traced direction's page: its mark beside the person's statement about the source, verbatim."""
     rows = []
     for tr in traces:
@@ -291,12 +292,17 @@ def trace_page(t: dict, bdir: str, p: dict, traces: list[dict], scores: dict[str
     trs = "".join(f'<tr><td>{esc(k)}</td><td class="{c}">{esc(v)}</td></tr>' for k, v, c in rows)
     return (f'<div class="label"><h2>{esc(t["tracing"])}</h2></div>'
             f'<div class="tile" style="left:64px;top:190px;width:500px;height:646px;background:{p["paper"]}">'
-            f'{logo(os.path.join(bdir, "mark.svg"), p["ink"], height=230)}</div>'
-            f'<table class="provtable">{trs}</table><p class="unverified">{esc(t["unverified"])}</p><div class="num">{{N}}</div>')
+            f'{logo(mark, p["ink"], height=230)}</div>'
+            f'<table class="provtable">{trs}</table><p class="unverified">{esc(t["unverified"])}</p><div class="num">{num}</div>')
 
 
-def page(pid: str, body: str, cls: str = "", style: str = "") -> str:
-    return f'<section class="page {cls}" id="{pid}" style="{style}">{body}</section>'
+def page(num: str, body: str, cls: str = "", style: str = "") -> str:
+    return f'<section class="page {cls}" id="p{num}" style="{style}">{body}</section>'
+
+
+def credited(item: dict) -> bool:
+    """A photo the credits page can name: its manifest entry has a creator, a licence and a source."""
+    return all(isinstance(item.get(k), str) and item[k].strip() for k in ("creator", "license", "source"))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -319,12 +325,13 @@ def main(argv: list[str] | None = None) -> None:
     t = TEXT[lang]
     dirs = []
     for b in a.builds:
-        build, chk = R.sealed(b, a.refs, a.calibration, require_ok=False)
+        build, chk, verified = R.sealed(b, a.refs, a.calibration, require_ok=False)
         if not chk["ok"] and not a.include_failed:
             print(f"left out {b}: it failed check_logo.py (--include-failed shows it, marked)")
             continue
         scores = {sc["source_sha256"]: sc["score"] for sc in chk.get("source_scores", [])}
-        dirs.append((b, build, chk, R.traces(b, build), scores))
+        files = {rel: data.decode() for rel, data in verified.items() if rel.endswith(".svg")}
+        dirs.append((build, chk, R.traces(b, build, verified), scores, files))
     if not dirs:
         raise SystemExit("no direction passed check_logo.py; fix the recipes, or pass --include-failed to show them marked")
     os.makedirs(os.path.join(a.out, "fonts"), exist_ok=True)
@@ -340,89 +347,92 @@ def main(argv: list[str] | None = None) -> None:
         for it in man["items"]:
             if not os.path.exists(os.path.join(a.photos, it["file"])):
                 continue  # deleted as not fitting the brand (SKILL.md step 9): drop it, credit and all
+            if not credited(it):
+                print(f"left out photo {it['file']}: its manifest entry names no creator, licence and source to credit")
+                continue
             shutil.copy(os.path.join(a.photos, it["file"]), os.path.join(a.out, "photos", it["file"]))
             photos.append(it)
     photo = lambda k: f"photos/{photos[k % len(photos)]['file']}" if photos else None  # noqa: E731
     pages, order = [], []
 
-    def add(slug, html_):
+    def add(slug: str, make) -> None:
+        """One more page; `make` takes the page's number, two digits, for its id and its corner. The number goes
+        only where a template puts it, never into the person's words."""
         n = len(order) + 1
         order.append([n, slug])
-        pages.append(html_.replace("{N}", f"{n:02d}"))
+        pages.append(make(f"{n:02d}"))
 
-    first = dirs[0]
-    p0 = first[1]["palette"]
-    add("cover", page("p{N}", f"""
+    p0, files0 = dirs[0][0]["palette"], dirs[0][4]
+    add("cover", lambda N: page(N, f"""
       <div class="left"><div class="kicker">{esc(a.line)}</div></div>
       <h1>{esc(a.name)}</h1><div class="sub">{esc(t["logo_directions"])}</div>
       {f'<div class="right" style="background:#000 url({photo(0)}) center/cover"></div>' if photos else
-       f'<div class="right" style="{field(p0)}display:flex;align-items:center;justify-content:center">{logo(os.path.join(first[0], "mark.svg"), p0["ink"], height=300)}</div>'}
+       f'<div class="right" style="{field(p0)}display:flex;align-items:center;justify-content:center">{logo(files0["mark.svg"], p0["ink"], height=300)}</div>'}
     """, "cover"))
 
     count = t["direction"] if len(dirs) == 1 else t["directions"].format(n=len(dirs))
     cards = []
-    for b, build, chk, traces, scores in dirs:
+    for build, chk, traces, scores, files in dirs:
         p = build["palette"]
         fail = "" if chk["ok"] else f'<p class="fail">{esc(t["failed"])}</p>'
-        cards.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(os.path.join(b, 'mark.svg'), p['ink'], height=150)}</div>
+        cards.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(files['mark.svg'], p['ink'], height=150)}</div>
           <h3>{esc(build.get('title', ''))}</h3><p>{esc(build.get('idea', ''))}</p>{trace_lines(t, traces, scores)}{fail}</div>""")
     # Three to a page, like side by side: six cards on one page leave no room around the marks.
     for k in range(0, len(cards), 3):
-        add(f"directions-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>{esc(count)}</h2></div>
-      <div class="three">{''.join(cards[k:k + 3])}</div><div class="foot">{esc(a.line)}</div><div class="num">{{N}}</div>"""))
+        add(f"directions-{k // 3 + 1}", lambda N: page(N, f"""<div class="label"><h2>{esc(count)}</h2></div>
+      <div class="three">{''.join(cards[k:k + 3])}</div><div class="foot">{esc(a.line)}</div><div class="num">{N}</div>"""))
 
-    for i, (b, build, chk, traces, scores) in enumerate(dirs, 1):
+    for i, (build, chk, traces, scores, files) in enumerate(dirs, 1):
         p = build["palette"]
-        files = build["files"]
         dark = p["ink"]
+        m = files["mark.svg"]
         # Spread A: in use. A dark lockup, a browser tab, a poster.
-        add(f"d{i}-use", page("p{N}", f"""
-          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{dark}">{lockup(b, files, p['paper'], 64)}</div>
-          <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{p['tint']}">{browser(a.name, b, p)}</div>
-          {poster(p, b, files, tagline, photo(i))}"""))
+        add(f"d{i}-use", lambda N: page(N, f"""
+          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{dark}">{lockup(files, p['paper'], 64)}</div>
+          <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{p['tint']}">{browser(a.name, m, p)}</div>
+          {poster(p, files, tagline, photo(i))}"""))
         # Spread B: construction. A light lockup, the grid, a phone.
-        add(f"d{i}-build", page("p{N}", f"""
-          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{p['paper']}">{lockup(b, files, dark, 64)}</div>
-          <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{dark}">{construction(build, b, p, 954, 410)}</div>
-          <div class="tile" style="left:1014px;top:30px;width:556px;height:840px;background:{p['neutral']}">{phone(a.name, b, p, a.note or tagline)}</div>"""))
+        add(f"d{i}-build", lambda N: page(N, f"""
+          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{p['paper']}">{lockup(files, dark, 64)}</div>
+          <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{dark}">{construction(build, files, p, 954, 410)}</div>
+          <div class="tile" style="left:1014px;top:30px;width:556px;height:840px;background:{p['neutral']}">{phone(a.name, m, p, a.note or tagline)}</div>"""))
         if traces:
-            add(f"d{i}-trace", page("p{N}", trace_page(t, b, p, traces, scores)))
+            add(f"d{i}-trace", lambda N: page(N, trace_page(t, m, p, traces, scores, N)))
         # Colour.
         sw = [("paper", 36, 32, 336, 684), ("accent", 400, 32, 336, 296), ("tint", 764, 32, 286, 136), ("neutral", 764, 196, 286, 132), ("ink", 400, 356, 650, 360)]
         cells = "".join(
             f'<div class="sw" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;background:{p[k]};color:{"#161616" if lum(p[k]) > .3 else "#ffffff"}">{p[k].upper()}</div>'
             for k, x, y, w, h in sw)
-        add(f"d{i}-colour", page("p{N}", f"""<div class="label"><h2>{esc(t["colour"])}</h2></div>
-          <div class="swatches">{cells}</div><div class="num">{{N}}</div>"""))
+        add(f"d{i}-colour", lambda N: page(N, f"""<div class="label"><h2>{esc(t["colour"])}</h2></div>
+          <div class="swatches">{cells}</div><div class="num">{N}</div>"""))
         # Small sizes and versions.
-        m = os.path.join(b, "mark.svg")
         sizes = "".join(f'<div style="display:flex;flex-direction:column;align-items:center;gap:10px">{logo(m, dark, height=s)}<span style="font-size:12px;opacity:.55">{s}px</span></div>' for s in (16, 24, 32, 64))
         stroke = next((c["value"] for c in chk.get("checks", []) if c["check"] == "stroke at 16 px"), t["not_checked"])
-        add(f"d{i}-sizes", page("p{N}", f"""<div class="label"><h2>{esc(t["sizes"])}</h2></div>
+        add(f"d{i}-sizes", lambda N: page(N, f"""<div class="label"><h2>{esc(t["sizes"])}</h2></div>
           <div class="sizes">
             <div class="t" style="background:{p['paper']}"><small>{esc(t["small"])}</small>{sizes}<span class="cap">{esc(t["stroke"].format(v=stroke))}</span></div>
             <div class="t" style="background:{dark};align-items:center;padding:0">{logo(m, p['paper'], height=120)}<small style="color:{p['paper']}">{esc(t["reversed"])}</small></div>
             <div class="t" style="background:{p['accent']};align-items:center;padding:0">{logo(m, dark if lum(p['accent']) > .45 else '#ffffff', height=120)}<small>{esc(t["on_colour"])}</small></div>
           </div>
-          <div class="tile" style="left:64px;right:64px;top:550px;height:290px;background:{p['tint']}">{lockup(b, files, dark, 170, stacked=True)}</div>
-          <div class="num">{{N}}</div>"""))
+          <div class="tile" style="left:64px;right:64px;top:550px;height:290px;background:{p['tint']}">{lockup(files, dark, 170, stacked=True)}</div>
+          <div class="num">{N}</div>"""))
 
     rows = []
-    for b, build, chk, traces, scores in dirs:
+    for build, chk, traces, scores, files in dirs:
         p = build["palette"]
         checks = [(t["check_names"].get(c["check"], c["check"]), f"{c['value']} {'✓' if c['ok'] else '✗'}") for c in chk.get("checks", [])]
         checks += [(t["score"], f"{s:.3f}") for s in scores.values()]
         trs = "".join(f"<tr><td>{esc(k)}</td><td>{esc(v)}</td></tr>" for k, v in checks) or f"<tr><td>{esc(t['checks'])}</td><td>{esc(t['not_run'])}</td></tr>"
         fail = "" if chk["ok"] else f'<p class="fail">{esc(t["failed"])}</p>'
-        rows.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(os.path.join(b, 'mark.svg'), p['ink'], height=110)}{logo(os.path.join(b, 'mark.svg'), p['ink'], height=16)}</div>
+        rows.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(files['mark.svg'], p['ink'], height=110)}{logo(files['mark.svg'], p['ink'], height=16)}</div>
           <h3 style="font-weight:500;font-size:20px;margin-top:22px">{esc(build.get('title', ''))}</h3>{fail}<table>{trs}</table></div>""")
     # Three to a page: six on one page left the tiles cramped and the checks cut down.
     for k in range(0, len(rows), 3):
-        add(f"compare-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>{esc(t["side"])}</h2></div>
-      <div class="cmp">{''.join(rows[k:k + 3])}</div><div class="num">{{N}}</div>"""))
+        add(f"compare-{k // 3 + 1}", lambda N: page(N, f"""<div class="label"><h2>{esc(t["side"])}</h2></div>
+      <div class="cmp">{''.join(rows[k:k + 3])}</div><div class="num">{N}</div>"""))
     if photos:
-        lines = "".join(f'<tr><td>{esc(it["title"] or t["photo"])}</td><td>{esc(it["creator"])}</td><td>{esc(it["license"])}</td><td>{esc(it["source"])}</td></tr>' for it in photos)
-        add("credits", page("p{N}", f"""<div class="label"><h2>{esc(t["photos"])}</h2></div>
+        lines = "".join(f'<tr><td>{esc(it.get("title") or t["photo"])}</td><td>{esc(it["creator"])}</td><td>{esc(it["license"])}</td><td>{esc(it["source"])}</td></tr>' for it in photos)
+        add("credits", lambda N: page(N, f"""<div class="label"><h2>{esc(t["photos"])}</h2></div>
       <table class="credits">{lines}</table>"""))
 
     doc = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{esc(t["title"].format(name=a.name))}</title>'

@@ -9,7 +9,6 @@ from __future__ import annotations
 import io
 import os
 import pathlib
-import shutil
 import sys
 import tarfile
 import unittest
@@ -67,12 +66,9 @@ class Resolver(unittest.TestCase):
         R.write_bytes(P.cached(), FAKE)
         os.chmod(P.cached(), 0o755)
         with mock.patch.dict(os.environ, {"PATH": self.empty_path}):
-            self.assertIsNone(P.find())
-        if not G.POTRACE or R.sha256_file(G.POTRACE) != P.BINARY_SHA256:
-            self.skipTest("the pinned potrace 1.16 binary is not on this machine")
-        shutil.copyfile(G.POTRACE, P.cached())
-        with mock.patch.dict(os.environ, {"PATH": self.empty_path}):
-            self.assertEqual(P.find(), P.cached())
+            self.assertIsNone(P.find(), "a cached binary that is not the pinned one was taken")
+            with mock.patch.object(P, "BINARY_SHA256", R.sha256_bytes(FAKE)):  # the fixture stands in for the pin
+                self.assertEqual(P.find(), P.cached())
 
     def test_other_platforms_are_told_how_to_install(self):
         with mock.patch.dict(os.environ, {"PATH": self.empty_path}), mock.patch.object(P.sys, "platform", "darwin"):

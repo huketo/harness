@@ -33,13 +33,19 @@ trademark sheet. It doesn't know whether the statement is true.
 
 - `trace_ref.py` traces only a file listed in `brief.json` `trace_sources` by sha256, never one whose sha256 is in a
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
-  calibrated limit against a collected image or a `--refs` logo. The person's own sketch on the moodboard (same
-  sha256 as a `trace_sources` entry) is left out of that comparison. Each trace gets `<svg>.provenance.json`.
+  calibrated limit against a collected image or a `--refs` logo. It compares with every image whose ink it can tell
+  from the ground, fit to measure or not, and names each one it can't read as "not checked". The person's own sketch
+  on the moodboard (same sha256 as a `trace_sources` entry) is left out of that comparison. Each trace gets
+  `<svg>.provenance.json`.
 - `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
-  today's collections and references, and refuses a recipe that says `traced_from`. `check_logo.py` leaves out only
-  a direction's own verified source; every other reference keeps the usual limit.
+  today's collections and references, goes on only while the record's raster arguments give back the mask it
+  recorded, and refuses a recipe that says `traced_from`. `check_logo.py` leaves out only a direction's own verified
+  source; every other reference keeps the usual limit. It refuses a traced direction whose trace was gated against
+  other `--refs` images, another calibration or other collections than it is given, and removes that `check.json`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
-  file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw.
+  file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw. They read the
+  build's files only as those verified bytes. A `build.json` that leaves out a part the build writes (the mark, its
+  grid, the lockups of a build with a wordmark) is refused at every step.
 - A shape the agent types in as `polygon` points has no source the chain can see: only the distance check stands
   between it and a copy.
 
@@ -121,7 +127,9 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    counters at 16 px, palette contrast, nearest reference. A direction that is too close: open the three nearest
    beside it, look, change the recipe, build again. A traced direction is held to the limit against every reference
    but its own source; its score against that source is recorded and shown, never failed. A detailed trace may fail
-   the 16 px checks; keep it if it's strong, and say it needs a simpler favicon.
+   the 16 px checks; keep it if it's strong, and say it needs a simpler favicon. A `trace-gate-stale` refusal means
+   the references, the calibration or the collections changed after that direction was built (a new photo pull
+   counts): build it again, then check it.
    Done when every direction passes, a traced one failing nothing but the 16 px rows.
 
 9. **Logo book.** Fetch photos for the mockups: `node scripts/fetch_photos.mjs "<one or two mood words>" photos 6`

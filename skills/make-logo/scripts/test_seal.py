@@ -9,20 +9,31 @@ fonts, a temporary cache."""
 from __future__ import annotations
 
 import html
+import io
 import json
 import os
 import re
 import sys
 import unittest
+from contextlib import redirect_stdout
+from unittest import mock
+
+import resvg_py
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_logo as B  # noqa: E402
 import check_logo as C  # noqa: E402
+import distance as D  # noqa: E402
 import gate_fixtures as G  # noqa: E402
 import logo_book as LB  # noqa: E402
+import logolib as L  # noqa: E402
 import package_logo as PK  # noqa: E402
 import rights as R  # noqa: E402
 import trace_ref as T  # noqa: E402
+
+LIMIT = D.load_calibration(None)["limit"]
+FAKE_PATH = "M0 0L9 0L9 9Z"
 
 PALETTE = {"ink": "#151515", "paper": "#f7f5f1", "accent": "#c2410c", "neutral": "#9b9187", "tint": "#e7e2da"}
 
@@ -53,10 +64,19 @@ class Project(unittest.TestCase):
         B.main([recipe, "--out", out, "--fonts", self.ws.fonts, "--brief", self.brief, "--refs", *self.refs])
         return out
 
-    def check(self, *builds: str) -> int:
+    def check(self, *builds: str, extra: tuple = ()) -> int:
+        with self.assertRaises(SystemExit) as cm:
+            C.main([*builds, "--refs", *self.refs, *extra])
+        return cm.exception.code
+
+    def check_refused(self, reason: str, *builds: str) -> None:
         with self.assertRaises(SystemExit) as cm:
             C.main([*builds, "--refs", *self.refs])
-        return cm.exception.code
+        self.assertIsInstance(cm.exception, R.Refused, f"check_logo.py exited {cm.exception.code} instead of refusing")
+        self.assertEqual(cm.exception.reason, reason, str(cm.exception))
+
+    def sheet(self, build: str, out: str = "package", *extra: str) -> str:
+        return R.read_bytes(os.path.join(self.package(build, out, *extra), "trademark-search.md")).decode()
 
     def package(self, build: str, out: str = "package", *extra: str) -> str:
         out = os.path.join(self.ws.root, out)
@@ -90,7 +110,7 @@ class Seal(Project):
     def test_rebuilding_without_the_wordmark_in_the_same_folder(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
-        stale_lockup = LB.read_svg(os.path.join(b, "lockup.svg"))[1]
+        stale_lockup = LB.read_svg(R.read_bytes(os.path.join(b, "lockup.svg")).decode())[1]
         self.build(self.recipe(wordmark=False))
         self.assertTrue(os.path.exists(os.path.join(b, "lockup.svg")), "the fixture needs the old lockup left on disk")
         self.refused("stale-check", self.package, b)
@@ -104,7 +124,7 @@ class Seal(Project):
         book = self.book(b)
         doc = R.read_bytes(os.path.join(book, "index.html")).decode()
         self.assertNotIn(stale_lockup, doc)
-        mark = LB.read_svg(os.path.join(b, "mark.svg"))[1]
+        mark = LB.read_svg(R.read_bytes(os.path.join(b, "mark.svg")).decode())[1]
         self.assertIn(mark, self.pages(book)["d1-use"], "the in-use page draws the mark where the lockup would go")
 
     def test_refuses_once_a_reference_is_added_after_the_check(self):
@@ -156,8 +176,9 @@ class Seal(Project):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
         sheet = R.read_bytes(os.path.join(self.package(b), "trademark-search.md")).decode()
-        self.assertIn(PK.CHECKED["en"]["drawn"], sheet)
-        self.assertNotIn(PK.CHECKED["en"]["traced"], sheet)
+        self.assertIn("check_logo.py compared the mark with", sheet)
+        self.assertNotIn(PK.TRACED_NOTE["en"], sheet)
+        self.assertNotIn("Where the mark came from", sheet)
         self.assertIn("kipris.or.kr", sheet)
 
     def test_korean_brief_gives_a_korean_book_and_sheet(self):
@@ -171,9 +192,131 @@ class Seal(Project):
         self.assertEqual(R.sha256_file(os.path.join(book, "fonts", "book.ttf")),
                          R.sha256_file(os.path.join(self.ws.fonts, "notosanskr", "NotoSansKR-Regular.ttf")))
         sheet = R.read_bytes(os.path.join(self.package(b), "trademark-search.md")).decode()
-        self.assertIn(PK.CHECKED["ko"]["drawn"], sheet)
+        self.assertIn("check_logo.py는 이 마크를", sheet)
+        self.assertNotIn(PK.TRACED_NOTE["ko"], sheet)
         self.assertIn("KIPRIS", sheet)
         self.assertIn("https://www.kipris.or.kr", sheet)
+
+    def test_check_refuses_a_build_json_that_leaves_out_a_part_it_wrote(self):
+        for rel in ("mark.svg", "mark-grid.svg", "lockup.svg"):
+            with self.subTest(rel=rel):
+                b = self.build(self.recipe(), f"build/{rel[:-4]}")
+                bj = os.path.join(b, "build.json")
+                info = R.read_json(bj)
+                del info["files"][rel]
+                R.write_bytes(bj, json.dumps(info, indent=1).encode())
+                self.check_refused("build-changed", b)
+
+    def test_book_and_package_read_only_the_bytes_they_verified(self):
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        parts = ("mark.svg", "mark-grid.svg", "wordmark.svg", "lockup.svg", "lockup-stacked.svg")
+        kept = {rel: R.read_bytes(os.path.join(b, rel)) for rel in parts}
+        fake = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9" width="9" height="9"><path fill="#151515" d="{FAKE_PATH}"/></svg>\n'
+        real = R.sealed
+
+        def swapped_after_the_seal(*a, **kw):  # another program rewrites the parts once they have been verified
+            r = real(*a, **kw)
+            for rel in parts:
+                R.write_bytes(os.path.join(b, rel), fake.encode())
+            return r
+
+        with mock.patch.object(R, "sealed", swapped_after_the_seal):
+            doc = R.read_bytes(os.path.join(self.book(b), "index.html")).decode()
+        for rel, data in kept.items():
+            R.write_bytes(os.path.join(b, rel), data)
+        self.assertNotIn(FAKE_PATH, doc)
+        self.assertIn(re.search(r' d="([^"]+)"', kept["mark.svg"].decode()).group(1), doc)
+        with mock.patch.object(R, "sealed", swapped_after_the_seal):
+            pkg = self.package(b)
+        for name in os.listdir(os.path.join(pkg, "svg")):
+            self.assertNotIn(FAKE_PATH, R.read_bytes(os.path.join(pkg, "svg", name)).decode(), name)
+
+    def test_book_prints_braces_in_the_person_s_words_as_written(self):
+        b = self.build(self.recipe(idea="One {N} for every receipt."))
+        self.assertEqual(self.check(b), 0)
+        book = self.book(b, extra=("--line", "Counts {N} receipts", "--tagline", "{N} a day", "--note", "You have {N} new"))
+        doc = R.read_bytes(os.path.join(book, "index.html")).decode()
+        for words in ("One {N} for every receipt.", "Counts {N} receipts", "{N} a day", "You have {N} new"):
+            self.assertIn(html.escape(words), doc)
+        self.assertIn('<div class="num">02</div>', doc)
+
+    def test_book_uses_only_the_photos_it_can_credit(self):
+        d = self.ws.collection("photos", {"a.png": G.mark_image(G.own), "b.png": G.mark_image(G.tee)})
+        man = R.read_json(os.path.join(d, "manifest.json"))
+        man["items"][0].update(title="A field", creator="Synthetic Creator", license="CC0 1.0", source="https://example.org/a")
+        R.write_bytes(os.path.join(d, "manifest.json"), json.dumps(man).encode())
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        book = self.book(b, extra=("--photos", d))
+        self.assertEqual(os.listdir(os.path.join(book, "photos")), ["a.png"])
+        self.assertIn("Synthetic Creator", self.pages(book)["credits"])
+        self.assertNotIn("b.png", R.read_bytes(os.path.join(book, "index.html")).decode())
+
+    def test_sheet_counts_what_check_compared_and_names_what_it_could_not_read(self):
+        self.ws.image("refs/mine/blank.png", Image.new("RGB", (200, 200), "white"))
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        en, ko = self.sheet(b, "package-en", "--lang", "en"), self.sheet(b, "package-ko", "--lang", "ko")
+        self.assertNotIn("every reference", en)
+        self.assertIn("compared the mark with 1 reference image", en)
+        self.assertNotIn("참고 로고 전부", ko)
+        self.assertIn("참고 이미지 1개", ko)
+        for sheet in (en, ko):
+            self.assertIn("blank.png", sheet)
+            self.assertIn(f"{LIMIT:.3f}", sheet)
+
+
+class CheckReferences(Project):
+    """check_logo.py compares every reference it can split into ink and ground, and names the ones it can't."""
+
+    def test_check_compares_a_reference_whose_ink_fills_the_frame(self):
+        b = self.build(self.recipe())
+        self.assertEqual(self.check(b), 0)
+        svg = R.read_bytes(os.path.join(b, "mark.svg")).decode()
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=400, background="#ffffff"))
+        ref = self.ws.image("refs/mine/close-crop.png", Image.open(io.BytesIO(png)).convert("RGB"))
+        self.assertFalse(L.usable(L.segment(L.load(ref)))[0], "the fixture must be a reference unfit for measuring")
+        self.assertEqual(self.check(b), 1)
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("close-crop.png"), chk["nearest"])
+
+    def test_check_names_each_reference_it_could_not_read(self):
+        self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
+        R.write_bytes(self.ws.path("refs", "mine", "broken.png"), b"not an image")
+        b = self.build(self.recipe())
+        printed = io.StringIO()
+        with redirect_stdout(printed):
+            self.assertEqual(self.check(b), 0)
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertIn("refs_not_checked", chk)
+        self.assertEqual(sorted(os.path.basename(n["ref"]) for n in chk["refs_not_checked"]), ["blank.png", "broken.png"])
+        for n in chk["refs_not_checked"]:
+            self.assertIn(f"not checked: {n['ref']}", printed.getvalue())
+
+    def test_check_records_the_hashes_of_what_it_judged_with(self):
+        fresh = self.ws.image("refs/mine/fresh.png", G.mark_image(G.tee))
+        cal = self.ws.path("calibration.json")
+        R.write_bytes(cal, R.read_bytes(R.calibration_file(None)))
+        refs_before, cal_before = R.refs_sha256(self.refs), R.sha256_file(cal)
+        changed = R.read_json(cal)
+        changed["fused"]["limit"] = 0.99
+        b = self.build(self.recipe())
+        fired, real = [], L.segment
+
+        def change_while_judging(*a, **kw):  # the reference and the calibration change mid-run
+            if not fired:
+                fired.append(True)
+                G.mark_image(G.own).save(fresh, "PNG")
+                R.write_bytes(cal, json.dumps(changed).encode())
+            return real(*a, **kw)
+
+        # Start with no features cached by an earlier test, so every reference is read and judged now.
+        with mock.patch.dict(T._PREPARED, clear=True), mock.patch.object(L, "segment", change_while_judging):
+            self.assertEqual(self.check(b, extra=("--calibration", cal)), 0)
+        self.assertTrue(fired, "no reference was read while the hook was in place")
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertEqual((chk["refs_sha256"], chk["calibration_sha256"]), (refs_before, cal_before))
 
 
 @G.needs_potrace
@@ -204,10 +347,20 @@ class TracedDocuments(Project):
             self.assertIn(f"{self.score:.3f}", page, slug)
         self.assertIn(html.escape(self.entry["question"]), pages["d1-trace"])
 
+    def test_sheet_claims_only_the_shapes_the_recipe_has(self):
+        en, ko = self.sheet(self.b, "package-en", "--lang", "en"), self.sheet(self.b, "package-ko", "--lang", "ko")
+        self.assertNotIn("then changed with grid shapes", en)
+        self.assertNotIn("격자 도형으로 고친", ko)
+        self.assertIn("no other shape", en)
+        self.assertIn("다른 도형을 더하지 않았습니다", ko)
+        cut = self.build(self.recipe(mark=[{"shape": "trace", "file": "trace/own.svg", "x": 2, "y": 2, "size": 44},
+                                           {"op": "cut", "shape": "rect", "x": 20, "y": 20, "w": 4, "h": 4}]), "build/cut")
+        self.assertEqual(self.check(cut), 0)
+        self.assertIn("`cut rect`", self.sheet(cut, "package-cut"))
+
     def test_sheet_shows_the_statement_and_says_it_was_traced(self):
         sheet = R.read_bytes(os.path.join(self.package(self.b), "trademark-search.md")).decode()
-        self.assertIn(PK.CHECKED["en"]["traced"], sheet)
-        self.assertNotIn(PK.CHECKED["en"]["drawn"], sheet)
+        self.assertIn(PK.TRACED_NOTE["en"], sheet)
         self.assertIn(self.entry["answer"], sheet)
         self.assertIn(self.entry["sha256"], sheet)
         self.assertIn(f"{self.score:.3f}", sheet)

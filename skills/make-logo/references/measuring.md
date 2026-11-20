@@ -22,6 +22,9 @@ On 139 Are.na images it measured 98 and skipped 41. The tests still let some thr
 mark with its caption, a sheet of several marks. That's why step 3 makes you look at `--sheet`, the source and its
 mask side by side, and drop the bad ones.
 
+These tests choose what is measured, not what a mark is compared with: the distance checks in `trace_ref.py` and
+`check_logo.py` take every image whose ink they can find, skipped here or not (`building.md`).
+
 ## The numbers
 
 Lengths are per 1000 units of the mark's height.

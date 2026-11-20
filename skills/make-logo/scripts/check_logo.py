@@ -10,11 +10,16 @@ For each direction: the mark rendered at 16, 32, 64 and 512 px; its stroke at 16
 512 px; its palette's contrast; and its distance to every reference. Writes check.json into each build dir and exits 1
 if any direction fails. A failure goes back to the recipe.
 
-Every file build.json lists must still have its sha256. A traced direction (build.json `traces`, verified against
-its provenance) leaves out only its own source, by sha256: every other reference keeps the usual limit. Its score
-against that source is recorded in `source_scores` for the book to show and fails nothing; a source the person holds
-rights in may be used unchanged. check.json also records the sha256 of build.json, of the --refs images and of the
-calibration, which package_logo.py and logo_book.py recompute before they go on.
+Every file build.json lists must still have its sha256, and the list must hold every part the build writes; the
+mark is read from those verified bytes. The references are every --refs image whose ink can be told from its ground,
+fit to measure or not, each read once; one that can't be read as a mark is printed as "not checked" and listed in
+check.json `refs_not_checked`. A traced direction (build.json `traces`, verified against its provenance) leaves out
+only its own source, by sha256: every other reference keeps the usual limit. Its score against that source is
+recorded in `source_scores` for the book to show and fails nothing; a source the person holds rights in may be used
+unchanged. A trace whose gates saw other --refs images, another calibration or other collections than this check is
+refused, and the build's old check.json removed: build it again so the trace is gated against what the check sees.
+check.json also records the sha256 of build.json, of the --refs images and of the calibration, which package_logo.py
+and logo_book.py recompute before they go on.
 """
 from __future__ import annotations
 
@@ -39,13 +44,12 @@ import trace_ref as T  # noqa: E402
 SIZES = (16, 32, 64, 512)
 
 
-def render(svg_path: str, px: int, pad: float = 0.0) -> np.ndarray:
+def render(svg: str, px: int) -> np.ndarray:
     """The mark's ink at `px` on its long side, as floats 0-1 (1 is ink)."""
-    s = R.read_bytes(svg_path).decode()
-    png = bytes(resvg_py.svg_to_bytes(svg_string=s, width=px, background="#ffffff"))
+    png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=px, background="#ffffff"))
     im = np.asarray(Image.open(io.BytesIO(png)).convert("L"), dtype=float) / 255
     if im.shape[0] > px:  # a tall mark: refit on height
-        png = bytes(resvg_py.svg_to_bytes(svg_string=s, height=px, background="#ffffff"))
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, height=px, background="#ffffff"))
         im = np.asarray(Image.open(io.BytesIO(png)).convert("L"), dtype=float) / 255
     return 1 - im
 
@@ -63,13 +67,37 @@ def contrast(a: str, b: str) -> float:
     return (x + 0.05) / (y + 0.05)
 
 
-def check(build: str, refs: list[tuple[str, str, dict]], cal: dict, refs_sha256: str, calibration_sha256: str) -> dict:
+GATE_INPUTS = {"refs_sha256": "--refs images", "calibration_sha256": "calibration", "collected_sha256": "collections"}
+
+
+def check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict:
+    """Check one build against trace_ref.reference_set() and the calibration and write its check.json. A build this
+    refuses keeps no check.json, so nothing after it can go on from an earlier one."""
+    try:
+        return _check(build, refset, cal, calibration_sha256)
+    except R.Refused:
+        if os.path.exists(os.path.join(build, "check.json")):
+            os.remove(os.path.join(build, "check.json"))
+        raise
+
+
+def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict:
     raw = R.read_bytes(os.path.join(build, "build.json"))
     info = json.loads(raw)
-    R.check_files(build, info)
-    traces = R.traces(build, info)
+    files = R.verified_files(build, info)
+    traces = R.traces(build, info, files)
+    if traces:
+        now = {"refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256,
+               "collected_sha256": R.collected_sha256()}
+        for t in traces:
+            stale = [GATE_INPUTS[k] for k, v in now.items() if t["provenance"]["gate"].get(k) != v]
+            if stale:
+                raise R.Refused("trace-gate-stale", f"{build}/{t['svg']} was traced behind gates that saw other "
+                                                    f"{' and '.join(stale)} than this check. Build it again with the "
+                                                    "same --refs and --calibration, so its trace is gated against "
+                                                    "them, then check it.")
     own = {t["trace"]["source_sha256"] for t in traces}
-    mark = os.path.join(build, "mark.svg")
+    mark = files["mark.svg"].decode()
     big = render(mark, 512) > 0.5
     small = render(mark, 16)
     rows = []
@@ -97,14 +125,15 @@ def check(build: str, refs: list[tuple[str, str, dict]], cal: dict, refs_sha256:
 
     # Distance: the mark against every reference but its own verified source, scored with the calibrated model.
     cand = D.prepare(big, poses=True)
-    near = sorted(((D.fused(D.compare(cand, r), cal), f) for f, sha, r in refs if sha not in own), reverse=True)[:3]
+    marks = [m for m in refset["marks"] if m[1] not in own]
+    near = sorted(((D.fused(D.compare(cand, r), cal), f) for f, _, r in marks), reverse=True)[:3]
     top = near[0][0] if near else 0.0
     rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
     # Against the source it was traced from: shown in the book, never a failure.
     source_scores = []
     for t in traces:
         r = t["provenance"]["raster"]
-        src = T.ink_box(T.raster_mask(t["provenance"]["source"]["file"], r["crop"], r["threshold"], r["invert"], r["long_side"]))
+        src = T.ink_box(T.raster_mask(t["source"], r["crop"], r["threshold"], r["invert"], r["long_side"]))
         score = D.fused(D.compare(cand, D.prepare(src, poses=False)), cal) if src is not None else 0.0
         source_scores.append({"source_sha256": t["trace"]["source_sha256"], "score": score})
 
@@ -115,10 +144,11 @@ def check(build: str, refs: list[tuple[str, str, dict]], cal: dict, refs_sha256:
     report = {"direction": info.get("title", os.path.basename(build)), "checks": [
         {"check": n, "value": v, "pass_at": p, "ok": bool(ok)} for n, v, p, ok in rows],
         "nearest": [{"score": s, "ref": f} for s, f in near], "ink_share_by_size": sizes,
-        "source_scores": source_scores,
+        "source_scores": source_scores, "refs_compared": len(marks), "refs_not_checked": refset["not_checked"],
+        "limit": cal["limit"],
         # A detailed trace may close up at 16 px (SKILL.md step 8): those rows are reported, and the build still passes.
         "ok": all(r[3] for r in rows if not (traces and r[0].endswith("at 16 px"))),
-        "build_sha256": R.sha256_bytes(raw), "refs_sha256": refs_sha256, "calibration_sha256": calibration_sha256}
+        "build_sha256": R.sha256_bytes(raw), "refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256}
     R.write_bytes(os.path.join(build, "check.json"), json.dumps(report, indent=1, ensure_ascii=False).encode())
     return report
 
@@ -129,18 +159,14 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--refs", nargs="+", required=True)
     ap.add_argument("--calibration")
     a = ap.parse_args(argv)
-    cal_path = R.calibration_file(a.calibration)
-    cal = D.load_calibration(cal_path)
-    refs = []
-    for p in L.images(a.refs):
-        seg = L.segment(L.load(p))
-        if L.usable(seg)[0]:
-            refs.append((p, R.sha256_file(p), D.prepare(seg["mask"], poses=False)))
-    refs_sha, cal_sha = R.refs_sha256(a.refs), R.sha256_file(cal_path)
-    print(f"{len(refs)} references to check against, limit {cal['limit']:.3f}")
+    cal, cal_sha = T.calibration_snapshot(a.calibration)
+    refset = T.reference_set(a.refs)
+    print(f"{len(refset['marks'])} references to check against, limit {cal['limit']:.3f}")
+    for line in T.not_checked_lines(refset["not_checked"]):
+        print(line)
     ok = True
     for b in a.builds:
-        rep = check(b, refs, cal, refs_sha, cal_sha)
+        rep = check(b, refset, cal, cal_sha)
         ok &= rep["ok"]
         print(f"\n{rep['direction']}: {'pass' if rep['ok'] else 'FAIL'}")
         for c in rep["checks"]:

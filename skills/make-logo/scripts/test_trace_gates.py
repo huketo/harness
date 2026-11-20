@@ -11,9 +11,13 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import unittest
+from contextlib import redirect_stdout
+from unittest import mock
 
+import resvg_py
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +25,7 @@ import build_logo as B  # noqa: E402
 import check_logo as C  # noqa: E402
 import distance as D  # noqa: E402
 import gate_fixtures as G  # noqa: E402
+import logolib as L  # noqa: E402
 import rights as R  # noqa: E402
 import trace_ref as T  # noqa: E402
 
@@ -108,6 +113,64 @@ class TraceGates(unittest.TestCase):
         e = self.refused("mask-too-close", self.sketch, [self.ws.entry(self.sketch)])
         self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("own-sketch-copy.jpg"))
 
+    def test_refuses_a_re_encoded_copy_of_a_reference_whose_ink_fills_the_frame(self):
+        ref = self.ws.image("refs/mine/close-crop.png", G.tight(G.mark_image(G.badge)))
+        self.assertFalse(L.usable(L.segment(L.load(ref)))[0], "the fixture must be a reference unfit for measuring")
+        copy = self.ws.image("sketches/copy.jpg", G.padded(reencoded(G.tight(G.mark_image(G.badge)))), "JPEG", quality=90)
+        e = self.refused("mask-too-close", copy, [self.ws.entry(copy)])
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("close-crop.png"), e.detail)
+
+    def test_names_each_reference_it_could_not_read_as_not_checked(self):
+        self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
+        R.write_bytes(self.ws.path("refs", "mine", "broken.png"), b"not an image")
+        brief = self.ws.brief([self.ws.entry(self.sketch)])
+        printed = io.StringIO()
+        with redirect_stdout(printed):
+            T.main([self.sketch, "--brief", brief, "--refs", self.mine, self.arena, "--out", self.out])
+        gate = R.read_json(self.out + ".provenance.json")["gate"]
+        self.assertIn("not_checked", gate)
+        self.assertEqual(sorted(os.path.basename(n["ref"]) for n in gate["not_checked"]), ["blank.png", "broken.png"])
+        for n in gate["not_checked"]:
+            self.assertIn(f"not checked: {n['ref']}", printed.getvalue())
+
+    def test_traces_the_bytes_it_hashed(self):
+        entry = self.ws.entry(self.sketch)
+        first = self.trace(self.sketch, [entry])["provenance"]["mask_sha256"]
+        os.remove(self.out)
+        real = R.trace_source
+
+        def changed_after_hashing(*a, **kw):  # another program rewrites the file between the hash and the raster
+            G.mark_image(G.own).rotate(90).save(self.sketch, "PNG")
+            return real(*a, **kw)
+
+        with mock.patch.object(R, "trace_source", changed_after_hashing):
+            r = self.trace(self.sketch, [entry])
+        self.assertEqual(r["provenance"]["source"]["sha256"], entry["sha256"])
+        self.assertEqual(r["provenance"]["mask_sha256"], first)
+
+    def test_records_the_hashes_of_the_references_and_calibration_it_judged_with(self):
+        fresh = self.ws.image("refs/mine/fresh.png", G.mark_image(G.tee))
+        cal = self.ws.path("calibration.json")
+        shutil.copyfile(R.calibration_file(None), cal)
+        refs_before, cal_before = R.refs_sha256([self.mine, self.arena]), R.sha256_file(cal)
+        changed = R.read_json(cal)
+        changed["fused"]["limit"] = 0.99
+        fired, real = [], L.segment
+
+        def change_while_judging(*a, **kw):  # the reference and the calibration change mid-run
+            if not fired:
+                fired.append(True)
+                G.mark_image(G.own).rotate(45).save(fresh, "PNG")
+                R.write_bytes(cal, json.dumps(changed).encode())
+            return real(*a, **kw)
+
+        # Start with no features cached by an earlier test, so every reference is read and judged now.
+        with mock.patch.dict(T._PREPARED, clear=True), mock.patch.object(L, "segment", change_while_judging):
+            r = self.trace(self.sketch, [self.ws.entry(self.sketch)], calibration=cal)
+        self.assertTrue(fired, "no reference was read while the hook was in place")
+        gate = r["provenance"]["gate"]
+        self.assertEqual((gate["refs_sha256"], gate["calibration_sha256"], gate["limit"]), (refs_before, cal_before, LIMIT))
+
     def test_writes_provenance_beside_the_svg(self):
         entry = self.ws.entry(self.sketch)
         r = self.trace(self.sketch, [entry], crop=(0.1, 0.1, 0.8, 0.8), threshold=0.4)
@@ -126,7 +189,8 @@ class TraceGates(unittest.TestCase):
         self.assertEqual(rec["gate"]["collected_sha256"], R.collected_sha256())
         self.assertEqual(rec["gate"]["limit"], LIMIT)
         self.assertEqual(rec["potrace"]["sha256"], R.sha256_file(rec["potrace"]["path"]))
-        self.assertIn("1.16", rec["potrace"]["version"])
+        said = subprocess.run([rec["potrace"]["path"], "--version"], capture_output=True, text=True, check=True).stdout
+        self.assertEqual(rec["potrace"]["version"], said.strip().splitlines()[0])
         self.assertEqual(rec["svg_sha256"], R.sha256_file(self.out))
 
 
@@ -178,6 +242,13 @@ class BuildGates(unittest.TestCase):
         R.write_bytes(self.svg, R.read_bytes(self.svg) + "<!-- edited -->\n".encode())
         self.assert_build_refused("svg-changed", self.recipe())
 
+    def test_refuses_a_record_whose_raster_arguments_were_changed(self):
+        rec = self.svg + ".provenance.json"
+        prov = R.read_json(rec)
+        prov["raster"]["crop"] = [0, 0, 0.9, 1]
+        R.write_bytes(rec, json.dumps(prov, indent=1).encode())
+        self.assert_build_refused("record-changed", self.recipe())
+
     def test_refuses_traced_from_written_in_the_recipe(self):
         self.assert_build_refused("traced-from", self.recipe(traced_from="mine 2"))
 
@@ -216,12 +287,57 @@ class BuildGates(unittest.TestCase):
         self.assertEqual(s["source_sha256"], R.sha256_file(self.sketch))
         self.assertEqual(chk["build_sha256"], R.sha256_file(os.path.join(out, "build.json")))
         self.assertEqual(chk["refs_sha256"], R.refs_sha256(refs))
-        self.ws.image("refs/mine/own-sketch-copy.jpg", reencoded(G.mark_image(G.own)), "JPEG", quality=90)
+        # Another reference, there when the direction is built, close to what the recipe made of the trace but not to
+        # the trace: the trace passes its gates, and the check holds the mark to the usual limit against it.
+        out = self.assembled()
+        svg = R.read_bytes(os.path.join(out, "mark.svg")).decode()
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=400, background="#ffffff"))
+        self.ws.image("refs/mine/like-the-mark.png", G.padded(Image.open(io.BytesIO(png)).convert("RGB")))
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 1)
+        chk = R.read_json(os.path.join(out, "check.json"))
+        self.assertFalse(next(c for c in chk["checks"] if c["check"] == "nearest reference")["ok"])
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("like-the-mark.png"), chk["nearest"])
+
+    def assembled(self) -> str:
+        """A traced direction whose other shapes take it far from its source, so the distance check alone passes it."""
+        return self.build(self.recipe(mark=[{"shape": "trace", "file": "trace/own.svg", "x": 28, "y": 28, "size": 18},
+                                            {"shape": "ring", "cx": 16, "cy": 16, "r": 14, "width": 5},
+                                            {"shape": "rect", "x": 2, "y": 40, "w": 24, "h": 6}]))
+
+    def check_exit(self, out: str, *extra: str) -> SystemExit:
         with self.assertRaises(SystemExit) as cm:
-            C.main([out, "--refs", *refs])
-        self.assertEqual(cm.exception.code, 1)
-        row = next(c for c in R.read_json(os.path.join(out, "check.json"))["checks"] if c["check"] == "nearest reference")
-        self.assertFalse(row["ok"])
+            C.main([out, "--refs", self.mine, self.arena, *extra])
+        return cm.exception
+
+    def assert_check_refused(self, out: str, *extra: str) -> None:
+        e = self.check_exit(out, *extra)
+        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
+        self.assertEqual(e.reason, "trace-gate-stale", str(e))
+        self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
+
+    def test_check_refuses_a_trace_gated_before_a_reference_was_added(self):
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 0)
+        self.ws.image("refs/mine/sketch-copy.jpg", reencoded(G.mark_image(G.own)), "JPEG", quality=90)
+        with self.assertRaises(R.Refused) as cm:  # the trace gate, run now, refuses the source
+            T.trace(self.sketch, brief=self.brief, refs=[self.mine, self.arena], out=self.ws.path("trace", "again.svg"))
+        self.assertEqual(cm.exception.reason, "mask-too-close")
+        self.assert_check_refused(out)
+
+    def test_check_refuses_a_trace_gated_with_another_calibration(self):
+        out = self.assembled()
+        cal = R.read_json(R.calibration_file(None))
+        cal["fused"]["limit"] = 0.95
+        other = self.ws.path("calibration.json")
+        R.write_bytes(other, json.dumps(cal).encode())
+        self.assert_check_refused(out, "--calibration", other)
+
+    def test_check_refuses_a_trace_gated_before_a_collection_was_added(self):
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 0)
+        self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.badge)})
+        self.assert_check_refused(out)
 
 
 if __name__ == "__main__":

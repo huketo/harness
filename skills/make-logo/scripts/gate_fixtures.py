@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import potrace_bin as P  # noqa: E402
@@ -47,6 +47,30 @@ def own(d: ImageDraw.ImageDraw, x: float, y: float, s: float) -> None:
     d.rectangle([x + s * 0.1, y, x + s * 0.35, y + s], fill="black")
     d.rectangle([x + s * 0.1, y + s * 0.75, x + s * 0.9, y + s], fill="black")
     d.polygon([(x + s * 0.5, y + s * 0.1), (x + s * 0.9, y + s * 0.1), (x + s * 0.9, y + s * 0.5)], fill="black")
+
+
+def badge(d: ImageDraw.ImageDraw, x: float, y: float, s: float) -> None:
+    """Another studio's mark, unlike `external`: a triangle with a round hole."""
+    d.polygon([(x, y + s), (x + s / 2, y), (x + s, y + s)], fill="black")
+    d.ellipse([x + s * 0.38, y + s * 0.5, x + s * 0.62, y + s * 0.74], fill="white")
+
+
+def tee(d: ImageDraw.ImageDraw, x: float, y: float, s: float) -> None:
+    """A plain T, used by no other fixture."""
+    d.rectangle([x, y, x + s, y + s * 0.25], fill="black")
+    d.rectangle([x + s * 0.38, y, x + s * 0.62, y + s], fill="black")
+
+
+def tight(im: Image.Image) -> Image.Image:
+    """The picture cropped to its ink, so the mark touches every edge: a logo cut close out of a screenshot, which
+    logolib.usable() rejects for measuring ("ink fills the frame")."""
+    return im.crop(ImageOps.invert(im.convert("L")).getbbox())
+
+
+def padded(im: Image.Image, margin: int = 120) -> Image.Image:
+    out = Image.new("RGB", (im.width + 2 * margin, im.height + 2 * margin), "white")
+    out.paste(im, (margin, margin))
+    return out
 
 
 def halftone(d: ImageDraw.ImageDraw, x0: int, y0: int, x1: int, y1: int, dot: int = 7, pitch: int = 9) -> None:

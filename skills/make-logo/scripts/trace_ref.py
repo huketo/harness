@@ -19,6 +19,9 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
    calibrated limit against any collected image or --refs logo;
 4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3).
 In 3 and 4 a reference whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left out.
+Every other image whose ink can be told from its ground is compared, fit to measure or not; one that can't be read as
+a mark at all is printed as "not checked" and listed in the record. Each file, the source, every reference and the
+calibration, is read once, and the hashes recorded are of the bytes judged.
 Beside the SVG it writes <svg>.provenance.json: the source and its sha256, the person's statement, the brief's
 sha256, every raster and potrace argument, the scores, the potrace binary, and the SVG's sha256.
 """
@@ -52,13 +55,14 @@ LONG_SIDE = 1200  # potrace gets about this many pixels on the long side, so it 
 POTRACE_ARGS = ["-s", "--flat", "--turdsize", "60", "--opttolerance", "0.4", "-o", "out.svg", "in.pbm"]
 
 
-def raster_mask(source: str, crop=(0, 0, 1, 1), threshold: float = 0.5, invert: bool = False,
+def raster_mask(data: bytes, crop=(0, 0, 1, 1), threshold: float = 0.5, invert: bool = False,
                 long_side: int = LONG_SIDE) -> np.ndarray:
-    """The ink potrace is given: the crop, resized to `long_side`, thresholded (True is ink)."""
+    """The ink potrace is given, from the source file's bytes: the crop, resized to `long_side`, thresholded (True is
+    ink)."""
     x, y, w, h = (float(v) for v in crop)
     if not (0 <= x < 1 and 0 <= y < 1 and 0 < w <= 1 - x + 1e-9 and 0 < h <= 1 - y + 1e-9):
         raise SystemExit(f"--crop {x},{y},{w},{h} is not inside the image (fractions 0 to 1)")
-    with Image.open(source) as im:
+    with Image.open(io.BytesIO(data)) as im:
         im = im.convert("L")
     W, H = im.size
     im = im.crop((round(x * W), round(y * H), round((x + w) * W), round((y + h) * H)))
@@ -117,27 +121,61 @@ def run_potrace(mask_pbm: bytes, potrace: str) -> str:
     return pen.getCommands()
 
 
-_PREPARED: dict[str, dict | None] = {}  # sha256 -> the reference's prepared features, or None when it isn't a flat mark
+_SEGMENT_WHY = {"blank image": "blank", "no ink found": "no-ink"}
+_PREPARED: dict[str, tuple[dict | None, str]] = {}  # sha256 -> (features, "") or (None, why)
 
 
-def references(refs: list[str], collected: list[tuple[str, str]], skip: set[str]) -> list[tuple[str, str, dict]]:
-    """(file, sha256, features) of every flat mark among the --refs images and the collected files, once each by
-    sha256, leaving out the shas in `skip`."""
-    out, seen = [], set()
-    for f in L.images(refs) + [f for f, _ in collected if os.path.isfile(f)]:
-        sha = R.sha256_file(f)
-        if sha in seen or sha in skip:
+def _prepared(sha: str, data: bytes) -> tuple[dict | None, str]:
+    if sha not in _PREPARED:
+        try:
+            seg = L.segment(L.load(io.BytesIO(data)))
+        except Exception:  # Pillow can't open or decode it
+            _PREPARED[sha] = (None, "unreadable")
+        else:
+            _PREPARED[sha] = ((D.prepare(seg["mask"], poses=False), "") if seg["ok"]
+                              else (None, _SEGMENT_WHY.get(seg["why"], seg["why"])))
+    return _PREPARED[sha]
+
+
+def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
+    """What the distance checks compare with: every image in the --refs folders and every collected file, each read
+    once, so a sha256 recorded is of the bytes judged. A file whose ink can be told from its ground is compared
+    whether or not it is fit to measure (logolib.usable); one that can't be read as a mark at all goes in
+    `not_checked` with why, a rights.NOT_CHECKED code. Returns {"marks": [(file, sha256, features)], once per
+    sha256, "not_checked": [{"ref", "why"}], "refs_sha256": the --refs images' digest, as rights.refs_sha256()
+    computes it}."""
+    marks, not_checked, seen, ref_shas = [], [], set(), []
+    for f, is_ref in [(f, True) for f in L.images(refs)] + [(f, False) for f, _ in collected]:
+        if not os.path.isfile(f):
+            not_checked.append({"ref": f, "why": "gone"})
+            continue
+        data = R.read_bytes(f)
+        sha = R.sha256_bytes(data)
+        if is_ref:
+            ref_shas.append(sha)
+        if sha in seen:
             continue
         seen.add(sha)
-        if sha not in _PREPARED:
-            try:
-                seg = L.segment(L.load(f))
-                _PREPARED[sha] = D.prepare(seg["mask"], poses=False) if L.usable(seg)[0] else None
-            except Exception:  # an unreadable file is not a reference, as in measure_logo.py
-                _PREPARED[sha] = None
-        if _PREPARED[sha] is not None:
-            out.append((f, sha, _PREPARED[sha]))
-    return out
+        feat, why = _prepared(sha, data)
+        if feat is None:
+            not_checked.append({"ref": f, "why": why})
+        else:
+            marks.append((f, sha, feat))
+    return {"marks": marks, "not_checked": not_checked, "refs_sha256": R.digest(ref_shas)}
+
+
+def not_checked_lines(entries: list[dict]) -> list[str]:
+    return [f"  not checked: {n['ref']} ({R.NOT_CHECKED['en'].get(n['why'], n['why'])})" for n in entries]
+
+
+def calibration_snapshot(path: str | None) -> tuple[dict, str]:
+    """The calibration's model and the sha256 of the bytes it came from, read once. distance.load_calibration() takes
+    a path, so it reads a private copy of those bytes, not the file, which may change once it has been hashed."""
+    raw = R.read_bytes(R.calibration_file(path))
+    with tempfile.TemporaryDirectory() as t:
+        copy = os.path.join(t, "calibration.json")
+        R.write_bytes(copy, raw)
+        return D.load_calibration(copy), R.sha256_bytes(raw)
 
 
 def nearest(mask: np.ndarray, refs: list[tuple[str, str, dict]], cal: dict) -> dict:
@@ -151,28 +189,50 @@ def nearest(mask: np.ndarray, refs: list[tuple[str, str, dict]], cal: dict) -> d
 
 
 def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: str | None = None,
-          crop=(0, 0, 1, 1), threshold: float = 0.5, invert: bool = False, long_side: int = LONG_SIDE) -> dict:
+          crop=(0, 0, 1, 1), threshold: float = 0.5, invert: bool = False, long_side: int = LONG_SIDE,
+          reproduce: dict | None = None) -> dict:
     """Trace `source` into `out` behind every gate; returns {"provenance", "d", "svg", "record"}. Raises
-    rights.Refused, with the scores in `.detail`, instead of writing anything."""
+    rights.Refused, with the scores in `.detail`, instead of writing anything.
+
+    With `reproduce`, a provenance record (build_logo.py), it also refuses unless the source, the person's statement,
+    potrace's arguments and the mask are the ones that record holds, so the record's raster arguments must give back
+    the very mask it was traced from."""
     source = os.path.abspath(source)
     b = R.load_brief(brief)
-    src_sha = R.sha256_file(source)
+    if reproduce and not os.path.isfile(source):
+        raise R.Refused("source-changed", f"the source {source} recorded for this trace is gone. Trace again.")
+    data = R.read_bytes(source)
+    src_sha = R.sha256_bytes(data)
+    if reproduce and src_sha != reproduce["source"]["sha256"]:
+        raise R.Refused("source-changed", f"the source {source} changed after it was traced. Trace again.")
     entry = R.trace_source(b, source, src_sha)
+    if reproduce and entry != reproduce.get("trace_source"):
+        raise R.Refused("brief-changed", f"the person's statement for {source} in {brief} differs from the one in the "
+                                         "trace's record. Trace again so the record holds what they said.")
+    if reproduce and reproduce["raster"].get("potrace_args") != POTRACE_ARGS:
+        raise R.Refused("record-changed", f"the record says potrace ran with {reproduce['raster'].get('potrace_args')}, "
+                                          f"and trace_ref.py runs it with {POTRACE_ARGS}. Trace again with trace_ref.py.")
     collected = R.collected()
     hit = next((f for f, sha in collected if sha == src_sha), None)
     if hit:
         raise R.Refused("collected", f"{source} has the same sha256 as {hit}, collected for measuring. Collected and "
                                      "reference logos set proportions; they are never traced.")
-    cal_path = R.calibration_file(calibration)
-    cal = D.load_calibration(cal_path)
+    cal, cal_sha = calibration_snapshot(calibration)
     crop = [float(v) for v in crop]
-    mask = raster_mask(source, crop, threshold, invert, long_side)
+    mask = raster_mask(data, crop, threshold, invert, long_side)
     mask_pbm = pbm(mask)
+    mask_sha = R.sha256_bytes(mask_pbm)
+    if reproduce and mask_sha != reproduce.get("mask_sha256"):
+        raise R.Refused("record-changed", f"the record's raster arguments (crop {crop}, threshold {threshold}, invert "
+                                          f"{bool(invert)}, long side {long_side}) give another mask than the one it "
+                                          "records, so it was edited. Trace again with trace_ref.py.")
     tight = ink_box(mask)
     if tight is None:
         raise SystemExit(f"no ink in {source} at --crop {crop} and --threshold {threshold}{' with --invert' if invert else ''}")
-    refset = references(refs, collected, {e["sha256"] for e in b["trace_sources"]})
-    mask_near = nearest(tight, refset, cal)
+    refset = reference_set(refs, collected)
+    own = {e["sha256"] for e in b["trace_sources"]}
+    marks = [m for m in refset["marks"] if m[1] not in own]
+    mask_near = nearest(tight, marks, cal)
     if mask_near["score"] >= cal["limit"]:
         raise R.Refused("mask-too-close", f"the mask potrace would get scores {mask_near['score']:.3f} against "
                                           f"{mask_near['ref']} (limit {cal['limit']:.3f}). That is another logo, "
@@ -181,7 +241,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
     d = run_potrace(mask_pbm, potrace["path"])
     svg = svg_text(d)
     vector = ink_box(render_mask(svg))
-    vector_near = nearest(vector, refset, cal) if vector is not None else {"score": 0.0, "ref": None}
+    vector_near = nearest(vector, marks, cal) if vector is not None else {"score": 0.0, "ref": None}
     if vector_near["score"] >= cal["limit"]:
         raise R.Refused("vector-too-close", f"potrace's path scores {vector_near['score']:.3f} against "
                                             f"{vector_near['ref']} (limit {cal['limit']:.3f}; the mask scored "
@@ -189,8 +249,8 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                         mask_nearest=mask_near, vector_nearest=vector_near)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    data = svg.encode()
-    R.write_bytes(out, data)
+    svg_bytes = svg.encode()
+    R.write_bytes(out, svg_bytes)
     prov = {
         "schema": SCHEMA,
         "source": {"file": source, "sha256": src_sha},
@@ -198,12 +258,12 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
         "brief_sha256": b["sha256"],
         "raster": {"crop": crop, "threshold": threshold, "invert": bool(invert), "long_side": long_side,
                    "potrace_args": list(POTRACE_ARGS)},
-        "mask_sha256": R.sha256_bytes(mask_pbm),
-        "gate": {"calibration_sha256": R.sha256_file(cal_path), "limit": cal["limit"], "refs_sha256": R.refs_sha256(refs),
-                 "collected_sha256": R.digest(sha for _, sha in collected), "mask_nearest": mask_near,
-                 "vector_nearest": vector_near},
+        "mask_sha256": mask_sha,
+        "gate": {"calibration_sha256": cal_sha, "limit": cal["limit"], "refs_sha256": refset["refs_sha256"],
+                 "collected_sha256": R.digest(sha for _, sha in collected), "compared": len(marks),
+                 "not_checked": refset["not_checked"], "mask_nearest": mask_near, "vector_nearest": vector_near},
         "potrace": potrace,
-        "svg_sha256": R.sha256_bytes(data),
+        "svg_sha256": R.sha256_bytes(svg_bytes),
     }
     record = out + ".provenance.json"
     R.write_bytes(record, json.dumps(prov, indent=1, ensure_ascii=False).encode())
@@ -224,9 +284,11 @@ def main(argv: list[str] | None = None) -> None:
     r = trace(a.image, brief=a.brief, refs=a.refs, out=a.out, calibration=a.calibration,
               crop=a.crop.split(","), threshold=a.threshold, invert=a.invert)
     g = r["provenance"]["gate"]
-    print(f"traced {os.path.basename(a.image)} into {a.out} ({r['provenance']['trace_source']['rights']}): nearest "
-          f"reference {g['mask_nearest']['score']:.3f} as a mask, {g['vector_nearest']['score']:.3f} as a path, "
-          f"limit {g['limit']:.3f}; provenance in {r['record']}")
+    print(f"traced {os.path.basename(a.image)} into {a.out} ({r['provenance']['trace_source']['rights']}): nearest of "
+          f"{g['compared']} images compared {g['mask_nearest']['score']:.3f} as a mask, {g['vector_nearest']['score']:.3f} "
+          f"as a path, limit {g['limit']:.3f}; provenance in {r['record']}")
+    for line in not_checked_lines(g["not_checked"]):
+        print(line)
 
 
 if __name__ == "__main__":

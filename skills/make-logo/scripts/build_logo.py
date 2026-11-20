@@ -29,15 +29,16 @@ The recipe (units are grid squares, y down, on a `grid` x `grid` canvas):
 own centre or `about`), `mirror` ("x" or "y" across the grid's centre) and `repeat`.
 
 A `trace` file is an SVG trace_ref.py wrote, found from the working folder first, then from the recipe's folder. Its
-SVG is never used: the build checks its .provenance.json (the SVG's and the source's sha256, the person's statement
-still in --brief), then traces the source again with trace_ref.trace() and every gate, against --refs and the
-collections as they are now, and uses that path. A recipe that says `traced_from` is refused: whether and from what a
-mark was traced comes from the verified record only.
+SVG is never used: the build checks its .provenance.json against the SVG's sha256, then traces the source again with
+trace_ref.trace() and every gate, against --refs and the collections as they are now, and uses that path. That trace
+goes on only while the source, the person's statement in --brief, potrace's arguments and the mask the recorded
+raster arguments give are the ones the record holds. A recipe that says `traced_from` is refused: whether and from
+what a mark was traced comes from the verified record only.
 
 Writes mark.svg (tight), mark-grid.svg (on its grid, for the construction page), wordmark.svg, lockup.svg,
 lockup-stacked.svg, trace/<n>.svg with its provenance, LICENSES/ (each font's OFL.txt) and build.json: boxes, guides,
-the fonts, `traces` (the verified record of each trace) and `files` (every file this build wrote, with its sha256;
-package_logo.py and logo_book.py use only those).
+the fonts, `shapes` (each recipe shape and its op, in order), `traces` (the verified record of each trace) and `files`
+(every file this build wrote, with its sha256; package_logo.py and logo_book.py use only those).
 """
 from __future__ import annotations
 
@@ -291,18 +292,15 @@ def admit_traces(spec: dict, out: str, recipe_dir: str, brief: str | None, refs:
         if R.sha256_file(svg) != prov.get("svg_sha256"):
             raise R.Refused("svg-changed", f"{svg} changed after trace_ref.py wrote it. Trace again; change the mark "
                                            "with recipe shapes, not by editing the SVG.")
-        src = prov["source"]["file"]
-        if not os.path.isfile(src) or R.sha256_file(src) != prov["source"]["sha256"]:
-            raise R.Refused("source-changed", f"the source {src} recorded in {rec} is gone or changed. Trace again.")
-        if R.trace_source(R.load_brief(brief), src, prov["source"]["sha256"]) != prov.get("trace_source"):
-            raise R.Refused("brief-changed", f"the person's statement for {src} in {brief} differs from the one in {rec}. "
-                                             "Trace again so the record holds what they said.")
         raster = prov["raster"]
         rel = f"trace/{i}.svg"
-        r = T.trace(src, brief=brief, refs=refs, out=os.path.join(out, rel), calibration=calibration,
-                    crop=raster["crop"], threshold=raster["threshold"], invert=raster["invert"], long_side=raster["long_side"])
+        r = T.trace(prov["source"]["file"], brief=brief, refs=refs, out=os.path.join(out, rel), calibration=calibration,
+                    crop=raster["crop"], threshold=raster["threshold"], invert=raster["invert"],
+                    long_side=raster["long_side"], reproduce=prov)
         traced[i] = r["d"]
         p = r["provenance"]
+        for line in T.not_checked_lines(p["gate"]["not_checked"]):
+            print(f"{rel}:{line}")
         entries.append({"source_sha256": p["source"]["sha256"], "rights": p["trace_source"]["rights"],
                         "answer": p["trace_source"]["answer"], "provenance_sha256": R.sha256_file(r["record"]),
                         "svg_sha256": p["svg_sha256"]})
@@ -329,7 +327,8 @@ def build(spec: dict, out: str, fonts_dir: str, recipe_dir: str = ".", brief: st
     md = d_of(mark)
     put("mark.svg", svg(md, bounds(mark)))
     put("mark-grid.svg", svg(md, (0, 0, g, g)))
-    result = {"name": spec["name"], "grid": g, "mark_box": [round(v, 3) for v in bounds(mark)], "guides": guides(spec)}
+    result = {"name": spec["name"], "grid": g, "mark_box": [round(v, 3) for v in bounds(mark)], "guides": guides(spec),
+              "shapes": [{"shape": s["shape"], "op": s.get("op", "add")} for s in spec["mark"]]}
 
     fonts = {}
 

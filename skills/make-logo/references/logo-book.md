@@ -6,15 +6,16 @@ and no other studio's logo; its only photographs are free ones with a credits pa
 
 `logo_book.py` writes `book/index.html` and `pages.json`; `render_book.mjs` prints `pages/NN-slug.png` and
 `logobook.pdf` at 1600 x 900 (16:9), and exits 1 if the book's font didn't load or anything runs off a page or out of
-its tile.
+its tile. A full render (no `--pages`) removes the page images `pages.json` no longer names, so after a book printed
+with `--include-failed`, `pages/` holds the new book only.
 
 ## What goes in
 
 `logo_book.py` takes the same `--refs` and `--calibration` as `check_logo.py` and refuses a build whose `check.json`
-is missing or no longer matches `build.json`, the files it lists, the `--refs` images or the calibration. It finds a
-direction's pictures only through `build.json` `files`: a build with no wordmark has no lockup, and the book draws its
-mark, larger, wherever a lockup would go. A direction that failed the check is left out; `--include-failed` puts it in
-with "Failed a check" under its title, for a person who asked to see everything.
+is missing or no longer matches `build.json`, the files it lists, the `--refs` images or the calibration. It reads a
+direction's pictures only as the verified bytes of `build.json` `files`: a build with no wordmark has no lockup, and
+the book draws its mark, larger, wherever a lockup would go. A direction that failed the check is left out;
+`--include-failed` puts it in with "Failed a check" under its title, for a person who asked to see everything.
 
 ## Language
 
@@ -45,8 +46,9 @@ No page carries a numbered label or a dot separator, and the cover carries no li
 domain and CC BY only, StockSnap's CC0 stock first and Flickr after, and keeps each one's creator, licence and source
 for the credits page. They go to the `photos` collection in the cache, each with its sha256 (`sources.md`). Broad mood
 words work ("laptop office", "doctor", "architect"); specific ones return museum scans and news photos. Look at every
-photo and delete any that doesn't fit before printing. Without `--photos` the cover and posters use each direction's
-colour field.
+photo and delete any that doesn't fit before printing. The book uses a photo only when its manifest entry names its
+creator, licence and source; a file listed without them (one put in the folder by hand) is left out, and named.
+Without `--photos` the cover and posters use each direction's colour field.
 
 ## Guides
 

@@ -70,14 +70,18 @@ traced, and the scripts refuse them by hash and by likeness.
    --crop x,y,w,h --out trace/<n>.svg` (crop in fractions, around the mark only; `--threshold` and `--invert` for a
    light mark on dark). It refuses a file not in `trace_sources`, a file whose sha256 is in any collection manifest,
    and a crop whose mask, or whose traced path, scores at or over the limit against a collected image or a `--refs`
-   logo. The person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison.
+   logo. Every image whose ink can be told from its ground counts, even one `measure_logo.py` skips (a logo cut close
+   out of a screenshot); one it can't read as a mark is printed as "not checked" and listed in the record's
+   `gate.not_checked`. The person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that
+   comparison.
    potrace draws the curves and drops specks; check for stray type in the crop and cut it.
 3. Place it: `{"shape": "trace", "file": "trace/<n>.svg", "x": 2, "y": 2, "size": 44}`, with `rotate` and `mirror` as
    usual. The path is found from the working folder first, then from the recipe's folder. Then change one thing with
    the usual shapes so the mark says the idea: fill a centre, turn it level, add a tail, cut a part away.
 4. Build with `--brief brief.json --refs <refs> --calibration calibration.json`. The build reads
-   `trace/<n>.svg.provenance.json`, refuses an SVG that changed since it was traced or a source the brief no longer
-   vouches for, traces the source again behind the same gates, and writes the result and its record into the build.
+   `trace/<n>.svg.provenance.json`, refuses an SVG that changed since it was traced, a source the brief no longer
+   vouches for, or a record whose raster arguments no longer give the mask it recorded (an edited crop, say), traces
+   the source again behind the same gates, and writes the result and its record into the build.
    Leave `traced_from` out of the recipe: the build refuses it and writes the trace's record into `build.json`
    `traces` itself.
 5. Look at it beside the original. A change nobody would notice isn't a change; one that breaks the drawing is too
@@ -116,9 +120,14 @@ On the test brief (three directions for a site-inspection app), all three passed
 nearest reference 0.15, 0.36 and 0.73 against a limit of 0.81.
 
 A traced direction's score against its own source goes into `check.json` `source_scores` and the book, never into a
-pass or a fail: a source the person holds rights in may be used unchanged. Before checking, `check_logo.py` confirms
-every file `build.json` lists still has its sha256; `check.json` then records the sha256 of `build.json`, of the
-`--refs` images and of the calibration.
+pass or a fail: a source the person holds rights in may be used unchanged. The references are the trace gates' own:
+every `--refs` image whose ink can be told from its ground. The ones it can't read are printed as "not checked" and
+listed in `check.json` `refs_not_checked`, beside `refs_compared` and the `limit`. Before checking, `check_logo.py`
+confirms every file `build.json` lists still has its sha256 and that the list holds the mark, its grid and, with a
+wordmark, the wordmark and both lockups; it renders the mark from those verified bytes. It refuses a traced direction
+whose trace was gated against other `--refs` images, another calibration or other collections than the check's
+(`trace-gate-stale`), and removes its old `check.json`: build it again. `check.json` then records the sha256 of
+`build.json`, of the `--refs` images and of the calibration.
 
 ## Package
 
@@ -127,11 +136,13 @@ every file `build.json` lists still has its sha256; `check.json` then records th
 - `svg/`: mark, wordmark, lockup and stacked lockup, each in ink, reversed, accent and black;
 - `png/`: the mark from 16 to 1024 px on a transparent square, and the lockup at 1600 wide; `favicon.ico`;
 - `LICENSES/`: each font's OFL.txt;
-- `trademark-search.md`: where to search the name and the mark's design codes (KIPRIS for Korea), that it is not a
-  clearance, one sentence on what the distance check covered, and, for a traced mark, its source, the kind of right
-  and the person's question and answer verbatim; in the brief's language;
+- `trademark-search.md`: where to search the name and the design codes of the shapes the recipe uses (build.json
+  `shapes`; KIPRIS for Korea), that it is not a clearance, what the distance check compared (how many references,
+  the ones it could not read, the nearest score, the limit and which calibration set it), and, for a traced mark, its
+  source, the kind of right, the person's question and answer verbatim, and the other shapes the recipe combines the
+  trace with, or that it has none; in the brief's language;
 - `brand.json`: the palette, the fonts and any trace's source and statement.
 
-It reads only the files `build.json` lists, so a part an earlier build left in the folder never ships, and it refuses
-a build whose `check.json` is missing, failed, or no longer matches `build.json`, its files, the `--refs` images or
-the calibration.
+It reads only the verified bytes of the files `build.json` lists, so a part an earlier build left in the folder never
+ships, and it refuses a build whose `check.json` is missing, failed, or no longer matches `build.json`, its files, the
+`--refs` images or the calibration.

@@ -26,6 +26,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SHIPPED_CALIBRATION = os.path.join(HERE, "calibration.json")
 RIGHTS = ("own-drawing", "own-brand", "licensed")
 HEX64 = re.compile(r"[0-9a-f]{64}")
+# Why the distance checks could not compare a reference (trace_ref.reference_set), in each document language.
+NOT_CHECKED = {
+    "en": {"blank": "a blank image", "no-ink": "no ink found", "unreadable": "not readable as an image",
+           "gone": "listed in a collection manifest, but the file is gone"},
+    "ko": {"blank": "빈 이미지", "no-ink": "잉크를 찾지 못함", "unreadable": "이미지로 읽을 수 없음",
+           "gone": "수집 manifest에는 있지만 파일이 없음"},
+}
 
 
 class Refused(SystemExit):
@@ -178,25 +185,43 @@ def inside(build: str, rel: str) -> str:
     return os.path.join(build, rel)
 
 
-def check_files(build: str, info: dict) -> None:
-    """Every file build.json lists is there with the sha256 it was written with."""
-    if not isinstance(info.get("files"), dict):
+MARK = ("mark.svg", "mark-grid.svg")  # every build writes these
+LOCKUPS = ("wordmark.svg", "lockup.svg", "lockup-stacked.svg")  # and these when it has a wordmark
+
+
+def verified_files(build: str, info: dict) -> dict[str, bytes]:
+    """The bytes of every file build.json lists, each read once and matched to its sha256: the steps after the build
+    read the build's files from here only. Refuses a list that leaves out a file the build must have written: the
+    mark and its grid, the wordmark and lockups of a build with a wordmark, and each font licence it names."""
+    files = info.get("files")
+    if not isinstance(files, dict):
         raise Refused("build-changed", f"{build}/build.json has no file list. Build it again with build_logo.py.")
-    for rel, sha in info["files"].items():
+    need = [*MARK, *(LOCKUPS if "wordmark" in info else ()), *info.get("fonts", {}).values()]
+    missing = [rel for rel in need if rel not in files]
+    if missing:
+        raise Refused("build-changed", f"{build}/build.json does not list {', '.join(missing)}, which such a build "
+                                       "writes. Build again with build_logo.py.")
+    out = {}
+    for rel, sha in files.items():
         p = inside(build, rel)
-        if not os.path.isfile(p) or sha256_file(p) != sha:
+        data = read_bytes(p) if os.path.isfile(p) else None
+        if data is None or sha256_bytes(data) != sha:
             raise Refused("build-changed", f"{p} is missing or changed after build_logo.py wrote it. Build again.")
+        out[rel] = data
+    return out
 
 
-def traces(build: str, info: dict) -> list[dict]:
-    """Each verified trace of a build: its build.json entry, its provenance record, and where its files are."""
+def traces(build: str, info: dict, files: dict[str, bytes]) -> list[dict]:
+    """Each verified trace of a build: its build.json entry, its provenance record (from `files`, the verified
+    bytes), where its files are, and the traced source's bytes (`source`), read once and still of the sha256 it was
+    traced from."""
     out = []
-    by_sha = {sha: rel for rel, sha in info.get("files", {}).items()}
+    by_sha = {sha: rel for rel, sha in info["files"].items()}
     for t in info.get("traces", []):
         rec_rel = by_sha.get(t.get("provenance_sha256"))
         if not rec_rel or not rec_rel.endswith(".provenance.json"):
             raise Refused("build-changed", f"{build}/build.json names a trace whose provenance file it does not list")
-        prov = read_json(inside(build, rec_rel))
+        prov = json.loads(files[rec_rel])
         svg_rel = rec_rel[: -len(".provenance.json")]
         ts = prov.get("trace_source", {})
         agree = (prov["source"]["sha256"] == t["source_sha256"] == ts.get("sha256") and prov.get("svg_sha256") == t["svg_sha256"]
@@ -204,23 +229,27 @@ def traces(build: str, info: dict) -> list[dict]:
         if not agree:
             raise Refused("build-changed", f"{build}/build.json and {rec_rel} disagree about the trace. Build again.")
         src = prov["source"]["file"]
-        if not os.path.isfile(src) or sha256_file(src) != t["source_sha256"]:
+        data = read_bytes(src) if os.path.isfile(src) else None
+        if data is None or sha256_bytes(data) != t["source_sha256"]:
             raise Refused("source-changed", f"the traced source {src} is gone or changed since the build. Build again.")
-        out.append({"trace": t, "provenance": prov, "svg": svg_rel, "record": rec_rel})
+        out.append({"trace": t, "provenance": prov, "svg": svg_rel, "record": rec_rel, "source": data})
     return out
 
 
-def sealed(build: str, refs: list[str], calibration: str | None, require_ok: bool = True) -> tuple[dict, dict]:
-    """(build.json, check.json) of a build whose check still holds, or a refusal naming what changed."""
+def sealed(build: str, refs: list[str], calibration: str | None,
+           require_ok: bool = True) -> tuple[dict, dict, dict[str, bytes]]:
+    """(build.json, check.json, verified_files()) of a build whose check still holds, or a refusal naming what
+    changed."""
     bpath, cpath = os.path.join(build, "build.json"), os.path.join(build, "check.json")
     if not os.path.isfile(bpath):
         raise Refused("not-built", f"{build} has no build.json")
     if not os.path.isfile(cpath):
         raise Refused("not-checked", f"{build} has no check.json. Run check_logo.py on it first.")
-    info, chk = read_json(bpath), read_json(cpath)
-    if chk.get("build_sha256") != sha256_file(bpath):
+    raw = read_bytes(bpath)
+    info, chk = json.loads(raw), read_json(cpath)
+    if chk.get("build_sha256") != sha256_bytes(raw):
         raise Refused("stale-check", f"{build}/build.json changed since check_logo.py ran (a new build?). Check it again.")
-    check_files(build, info)
+    files = verified_files(build, info)
     if chk.get("refs_sha256") != refs_sha256(refs):
         raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
                                       "same folders, or check again against these.")
@@ -229,4 +258,4 @@ def sealed(build: str, refs: list[str], calibration: str | None, require_ok: boo
                                              "or check again.")
     if require_ok and not chk.get("ok"):
         raise Refused("check-failed", f"{build} failed check_logo.py. Change the recipe, build and check again.")
-    return info, chk
+    return info, chk, files
