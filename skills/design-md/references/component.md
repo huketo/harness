@@ -23,7 +23,7 @@ Never write a variant, prop, state, token name, example, or use without a listed
 4. Trace which source gave each example, variant, prop, state, and token. Every disagreement between sources is a line under Conflicts, with the quoted project rule that settles it, or "no rule, not chosen".
 5. Fill each section from sourced facts, copying token names and example code character for character.
 6. Write Usage rules last, in the rule shape below. Cut any rule you cannot break with a real snippet.
-7. Fill Guessed at, one line per judgment call, then reread the draft against Done.
+7. Fill Guessed at, one line per judgment call, then reread the draft against "Headings, in order" and "What goes in each".
 
 ## Headings, in order
 
