@@ -8,8 +8,10 @@
       [--webfonts DIR] [--targets targets.json] [--fit-log fit-log.json] [--space-log a.space-log.json ...]
       --check-report check-report.json [--licence OFL.txt] [--tagline "..."] [--version 1.000]
 
-Pages: cover, how it was made (with --targets), vertical metrics, weights, waterfall, text settings, character
-set (as many pages as it needs), figures, kerning and the collision guard, OpenType features (21 to a page),
+Pages: cover, how it was made (with --targets), vertical metrics, weights, waterfall, text settings, for a font with
+Hangul a fixed specimen (the six classes' measuring syllables drawn with their mean face, a class table, Korean text,
+Korean and Latin mixed) with the coverage as counts in pages.json, character set without the Hangul syllables and
+jamo (as many pages as it needs), figures, kerning and the collision guard, OpenType features (21 to a page),
 languages, licence and install, where the check summary lists the gates that failed and those not run, and
 provenance: the approved base's file name and full sha256, its licence's sha256, and the approval question and
 answer verbatim, all from check-report.json.
@@ -200,6 +202,20 @@ TEXT = {
           "slants the upright if asked for an italic the family does not have, which is worth avoiding.",
           "Fractions such as 3/4 and 7/16 come from the frac feature where the font has one."],
 }
+# Korean sample text, written for this book: it describes how the Hangul was fitted, in plain sentences.
+KO_TEXT = {
+    "a": ["한글 본문 글꼴은 글자 하나보다 문단으로 평가합니다. 읽는 사람이 글꼴을 의식하지 않고 내용을 따라갈 때, 글꼴은 "
+          "제 역할을 하고 있습니다.",
+          "이 글꼴의 한글은 기반 글꼴의 윤곽을 그대로 쓰고, 측정한 목표가 있을 때에만 크기와 굵기, 중심 높이를 조정합니다."],
+    "b": ["음절은 모음이 놓이는 자리와 받침의 유무에 따라 여섯 분류로 나뉩니다. 분류마다 자면의 너비와 높이를 목표에 "
+          "맞추고, 한 분류 안의 글자는 모두 같은 배율을 받습니다.",
+          "글자의 너비가 바뀌면 그 차이를 좌우 여백에 똑같이 나눕니다."],
+    "c": ["작은 크기에서는 획 사이의 공간이 먼저 막힙니다. 받침이 있는 글자의 속공간이 13픽셀에서도 열려 있는지 확인합니다.",
+          "네모꼴의 구조, 자소의 모양, 획의 맺음은 기반 글꼴이 그린 그대로입니다."],
+}
+KO_MIXED = ["HTML과 CSS로 짠 화면에서도 한글과 Latin 글자가 한 줄에 고르게 놓여야 합니다.",
+            "API 응답은 평균 120 ms였고, 3월 4일 오후 2시 30분에 v2.1을 배포했습니다.",
+            "Type, 글꼴, Font: 세 단어의 굵기와 높이가 서로 어울리는지 봅니다."]
 WATERFALL = [
     (120, "Handgloves at rest"), (96, "Measured, fitted, then spaced"), (72, "A face cut for paragraphs and labels"),
     (56, "Letters sit evenly on the line when the sides are fair"),
@@ -298,7 +314,7 @@ def main():
     B = Book(family)
     date = datetime.date.today().strftime("%B %Y")
     scripts = sorted({char_group(c).split()[0] for c in cm if char_group(c).split()[0] in ("Cyrillic", "Greek")})
-    script_line = ", ".join(["Latin"] + scripts)
+    script_line = ", ".join(["Latin"] + scripts + (["Hangul"] if any(L.hangul_class(chr(c)) for c in cm) else []))
 
     # 01 cover -------------------------------------------------------------
     words = family.split()
@@ -446,8 +462,81 @@ def main():
   <div class="tcol t13"><div class="tlabel">13 / 19 px</div><h3 class="f th13" style="font-weight:{w2}">Notes and captions</h3>{paras(TEXT['c'])}</div>
 </div>""")
 
-    # 07+ character set ------------------------------------------------------
-    shown = [c for c in sorted(cm) if not (0xE000 <= c <= 0xF8FF) and unicodedata.category(chr(c)) not in ("Zs", "Cc", "Cf")]
+    # Hangul: a fixed specimen, never the whole range -------------------------
+    coverage = {}
+    if any(L.hangul_class(chr(c)) for c in cm):
+        coverage["korean"] = {"KS X 1001": [sum(ord(c) in cm for c in L.KS_X_1001), len(L.KS_X_1001)],
+                              **{what: [sum(ord(c) in cm for c in chars), len(chars)]
+                                 for what, chars in L.COVERAGE_REPORTED["korean"].items()}}
+    if coverage:
+        geo = L.hangul_geometry(face)
+        hfit = ((fit or {}).get("styles") or [{}])[0]
+        hrec = hfit.get("hangul") or {}
+        xf, k_em = hrec.get("transform"), hfit.get("em_scale", 1)
+        cell, gap = 92, 14
+        S_ = cell / upm
+        bottom = min(g["cy"] - g["face_h"] / 2 for g in geo["classes"].values())
+        top = max(g["cy"] + g["face_h"] / 2 for g in geo["classes"].values())
+        row_h = (top - bottom) * S_ + 30
+        svg_w = len(max(L.HANGUL_CLASSES.values(), key=len)) * (cell + gap)
+        grid = f'<svg class="hg-grid" viewBox="0 0 {svg_w} {row_h * len(L.HANGUL_CLASSES):.0f}" width="{svg_w}" height="{row_h * len(L.HANGUL_CLASSES):.0f}">'
+        for r, (cls, chars) in enumerate(L.HANGUL_CLASSES.items()):
+            g = geo["classes"].get(cls)
+            base_y = r * row_h + (top * S_)
+            for i, ch in enumerate(chars):
+                if not face.has(ch):
+                    continue
+                x0, adv = i * (cell + gap), face.adv(ch)
+                grid += (f'<rect x="{x0}" y="{base_y - top * S_:.1f}" width="{adv * S_:.1f}" height="{(top - bottom) * S_:.1f}" '
+                         f'fill="none" stroke="#dcdcdc"/>')
+                if g:
+                    fx = x0 + (g["cx"] - g["face_w"] / 2) * S_
+                    fy = base_y - (g["cy"] + g["face_h"] / 2) * S_
+                    grid += (f'<rect x="{fx:.1f}" y="{fy:.1f}" width="{g["face_w"] * S_:.1f}" height="{g["face_h"] * S_:.1f}" '
+                             f'fill="none" stroke="{ACCENT}" stroke-dasharray="3 3"/>')
+                grid += f'<path transform="translate({x0} {base_y:.1f}) scale({S_:.4f} {-S_:.4f})" d="{face.svg_path(ch)}"/>'
+            grid += f'<text class="mv" x="0" y="{base_y - bottom * S_ + 20:.1f}">{cls}</text>'
+        grid += "</svg>"
+        heads = "<th>Class</th><th>Syllables, then held-out</th><th class='n'>Face w × h</th><th class='n'>Centre</th>"
+        heads += "<th class='n'>Advance</th>" + ("<th class='n'>Target w × h</th><th class='n'>Fit x / y</th>" if xf else "")
+        trs = ""
+        for cls, chars in L.HANGUL_CLASSES.items():
+            g = geo["classes"].get(cls)
+            if not g:
+                continue
+            adv = g.get("adv", geo.get("adv"))
+            trs += (f"<tr><td>{cls}</td><td class='f hg-syl'>{esc(chars)} <span class='muted'>{esc(L.HANGUL_HELD_OUT[cls])}</span></td>"
+                    f"<td class='n'>{num(g['face_w'], 0)} × {num(g['face_h'], 0)}</td><td class='n'>{num(g['cy'], 0)}</td>"
+                    f"<td class='n'>{num(adv, 0)}</td>")
+            if xf:
+                row, t = hrec["classes"].get(cls, {}), xf["classes"][cls]
+                tw, th = ((row[key]["target"] * k_em) if key in row else None for key in ("face_w", "face_h"))
+                trs += (f"<td class='n'>{num(tw, 0) or '—'} × {num(th, 0) or '—'}</td>"
+                        f"<td class='n'>{t['sx'] / xf['scale']:.3f} / {t['sy'] / xf['scale']:.3f}</td>")
+            trs += "</tr>"
+        fit_note = (f" The fit scaled the whole Hangul by {xf['scale']:.3f}; the last two columns are each class's target "
+                    "and its own x and y scale over that one." if xf else "")
+        counts = "; ".join(f"{what} {have} of {need}" for what, (have, need) in coverage["korean"].items())
+        B.page("hangul", "Hangul", f"""
+<div class="hg-page">
+  <div class="cs-head"><h2 class="f h2">Hangul</h2><p class="lede">The measuring syllables of the six classes, drawn from the {esc(styles[0][0])} outlines. Grey boxes are each advance; the dashed box is the class's mean face, from its mean centre, width and height. {esc(counts)}.</p></div>
+  <div class="hg-cols">{grid}
+    <div><table class="t small-t hg-t"><thead><tr>{heads}</tr></thead><tbody>{trs}</tbody></table>
+    <p class="note">Font units, {upm} to the em, read from the {esc(styles[0][0])} TTF.{esc(fit_note)} The base's square or open syllable shapes, its jamo shapes and its stroke endings are kept as drawn.</p></div>
+  </div>
+</div>""")
+        ko_cols = "".join(f'<div class="tcol {c}"><div class="tlabel">{lab}</div>{paras(KO_TEXT[key])}</div>'
+                          for key, c, lab in (("a", "t20", "20 / 32 px"), ("b", "t16", "16 / 26 px"), ("c", "t13", "13 / 21 px")))
+        mixed = "".join(f'<p class="f">{esc(t)}</p>' for t in KO_MIXED)
+        B.page("hangul-text", "Korean text", f"""
+<div class="ko-page">
+  <div class="text-page ko-text">{ko_cols}</div>
+  <div class="ko-mixed"><div class="tlabel">Korean and Latin in one line, 26 px</div>{mixed}</div>
+</div>""")
+
+    # 07+ character set: the Hangul syllables and compatibility jamo are counted above, not listed ----------
+    shown = [c for c in sorted(cm) if not (0xE000 <= c <= 0xF8FF) and unicodedata.category(chr(c)) not in ("Zs", "Cc", "Cf")
+             and not L.hangul_class(chr(c)) and not L.COMPAT_JAMO[0] <= c <= L.COMPAT_JAMO[1]]
     groups = {}
     for c in shown:
         groups.setdefault(char_group(c), []).append(c)
@@ -503,15 +592,14 @@ def main():
     if space and space[0].get("guard"):
         g0 = space[0]["guard"][0]
         l, r = g0["pair"][0], g0["pair"][1]
-        if face.has(l) and face.has(r):
+        if face.has(l) and face.has(r) and (gap := face.pair_gap(l + r)):
             total = face.kern(l + r) or 0
 
-            def pair_svg(extra, title):
-                gap = face.ink_gap(l, r)
-                gv = (gap[0] + extra) if gap else 0
+            def pair_svg(extra, title):  # the glyphs shaping sets, as the guard read them
+                gv = gap.gap + extra
                 s2 = 0.3
-                off = face.adv(l) + total + extra
-                sv = f'<svg viewBox="0 0 420 380" width="100%" height="auto"><g transform="translate(60 280) scale({s2} {-s2})"><path d="{face.svg_path(l)}"/><path transform="translate({off} 0)" d="{face.svg_path(r)}"/></g>'
+                off = gap.offset + extra
+                sv = f'<svg viewBox="0 0 420 380" width="100%" height="auto"><g transform="translate(60 280) scale({s2} {-s2})"><path d="{face.svg_path(gap.left)}"/><path transform="translate({off} 0)" d="{face.svg_path(gap.right)}"/></g>'
                 for v in (xh, 0, desc):
                     sv += f'<line x1="0" x2="420" y1="{280 - v * s2:.1f}" y2="{280 - v * s2:.1f}" stroke="{ACCENT}" opacity=".35"/>'
                 sv += "</svg>"
@@ -644,7 +732,7 @@ def main():
 </body></html>"""
     files.write(os.path.join(a.out_dir, "index.html"), doc.encode("utf-8"))
     files.write_json(os.path.join(a.out_dir, "pages.json"),
-                     {"family": family, "pages": [[n, s] for n, s, _ in B.pages]})
+                     {"family": family, "pages": [[n, s] for n, s, _ in B.pages], "coverage": coverage})
     print(f"{len(B.pages)} pages: {os.path.join(a.out_dir, 'index.html')}")
     print("next: node render_book.mjs " + a.out_dir)
 

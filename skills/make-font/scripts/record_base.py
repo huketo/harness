@@ -11,6 +11,11 @@
          --question "<the printed question, verbatim>" --answer "<their answer, verbatim>" \\
          --decision approved --font-sha256 <hash from the question> --license-sha256 <hash from the question>
 
+A shortlist row from the pinned Hangul manifest (find_foundation.py, bases.json) records the source as that
+manifest entry, with its URL. A manifest source, from a shortlist row or --source manifest, is asked about and
+recorded only when the font and OFL text read are the files the entry pins (their sha256) and the URL is the one it
+pins for the font (chain.pinned_entry): a cached file that changed after the ranking is refused.
+
 Only a person can decide that a font may be the base. This script cannot check that decision; it binds it to the
 files. Run 1 checks the files and prints the question, which names the font's and the OFL text's sha256 and
 where the font came from (its URL too, when one is given), and writes nothing. Run 2 makes the question again
@@ -49,30 +54,34 @@ def from_shortlist(files, path, family):
         raise C.Refused(f"{family!r} is not in {path}: {', '.join(r['family'] for r in rows)}")
     if not row.get("licence_path"):
         raise C.Refused(f"{family!r} in {path} has no OFL text beside it; pass --font and --licence")
+    if row.get("manifest_entry"):
+        return row["file"], row["licence_path"], "manifest", row.get("url"), row["manifest_entry"]
     kind = "google-fonts" if str(row.get("origin", "")).startswith("google/fonts/") else "local"
-    return row["file"], row["licence_path"], kind, row.get("url")
+    return row["file"], row["licence_path"], kind, row.get("url"), None
 
 
 def build(a, files):
     """The question (with --question-only) or the record to write."""
-    font_path, lic_path, kind, url = a.font, a.licence, a.source, a.url
+    font_path, lic_path, kind, url, entry = a.font, a.licence, a.source, a.url, a.manifest_entry
     if a.shortlist:
         if not a.family:
             raise C.Refused("--shortlist needs --family, the name of the row the person approved")
-        font_path, lic_path, kind, url = from_shortlist(files, a.shortlist, a.family)
+        font_path, lic_path, kind, url, entry = from_shortlist(files, a.shortlist, a.family)
     if not font_path or not lic_path or not kind:
         raise C.Refused("give --shortlist with --family, or --font, --licence and --source")
     if kind not in SOURCES:
         raise C.Refused(f"--source is one of {', '.join(SOURCES)}")
     if kind == "google-fonts" and not url:
         raise C.Refused("--source google-fonts needs --url, the address the font was fetched from")
-    if kind == "manifest" and not a.manifest_entry:
+    if kind == "manifest" and not entry:
         raise C.Refused("--source manifest needs --manifest-entry, the pinned entry the font came from")
-    if kind == "local" and (url or a.manifest_entry):
+    if kind == "local" and (url or entry):
         raise C.Refused("--source local takes neither --url nor --manifest-entry")
     source = {"kind": kind, "url": url if kind != "local" else None,
-              "manifest_entry": a.manifest_entry if kind == "manifest" else None}
+              "manifest_entry": entry if kind == "manifest" else None}
     base = C.read_base(files, font_path, lic_path)
+    if kind == "manifest":
+        C.pinned_entry(files, source, base.font, base.licence)
     question = C.approval_question(font_path, lic_path, source, base)
     if a.question_only:
         return question

@@ -185,6 +185,19 @@ class Pipeline(unittest.TestCase):
             with self.subTest(step=step):
                 ok(self, self.steps[step])
 
+    def test_the_font_assembled_after_the_width_iteration_has_the_widths_the_iteration_measured(self):
+        """The iteration assembles and measures the measuring subset only (fit_font.Base.measuring), and the whole
+        font is assembled once after it: its class means are the ones the last pass measured, within the rounding of
+        the em scale."""
+        import fontlib as L
+        last = load(self.fit_log)["styles"][0]["iterations"][-1]["error_pct"]
+        want = load(self.targets)["targets"]["widths"]
+        got = L.measure_face(L.Face(self.fit))["widths"]
+        self.assertTrue(last)
+        for cls, err in last.items():
+            with self.subTest(cls=cls):
+                self.assertAlmostEqual((got[cls] / want[cls] - 1) * 100, err, delta=0.2)
+
     def test_base_json_records_the_approval(self):
         rec = load(self.base_json)
         self.assertEqual(rec["schema"], "make-font/base@1")
@@ -434,6 +447,27 @@ class Pipeline(unittest.TestCase):
                           "--fit-log", logs["--fit-log"], "--space-log", logs["--space-log"],
                           "--package-log", self.package_log, "--out-dir", q("checks"))
                 refused(self, r, "package")
+
+    def test_check_runs_on_a_package_log_without_from_and_refuses_a_from_outside_the_inputs(self):
+        """Package logs written before each output named its spaced font have no "from"; a Latin package's gates
+        still run on them. A "from" that is not one of the package's inputs is refused."""
+        for case, edit in (("none", lambda e: e.pop("from")), ("outside", lambda e: e.update({"from": "0" * 64}))):
+            with self.subTest(case=case):
+                q = self.scratch()
+                dist = q("dist")
+                shutil.copytree(os.path.dirname(self.package_log), dist)
+                log = load(os.path.join(dist, "package-log.json"))
+                for e in log["chain"]["outputs"]:
+                    edit(e)
+                T.write(os.path.join(dist, "package-log.json"), json.dumps(log, indent=2))
+                r = T.run("check_font.py", os.path.join(dist, "ttf", STYLE + ".ttf"), "--targets", self.targets,
+                          "--base-json", self.base_json, "--fit-log", self.fit_log, "--space-log", self.space_log,
+                          "--package-log", os.path.join(dist, "package-log.json"), "--out-dir", q("checks"))
+                if case == "none":
+                    self.assertNotIn("refused", r.stderr)
+                    self.assertTrue(os.path.exists(q("checks", "check-report.json")), r.stderr)
+                else:
+                    refused(self, r, "not among the inputs")
 
     # ---------------------------------------------------------------- publishing the package
     def test_package_publishes_its_log_inside_the_package(self):

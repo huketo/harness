@@ -10,20 +10,25 @@
 This script opens the base font and targets.json. It never opens a reference font: the references reach it
 only as the numbers in targets.json.
 
-Before anything else it checks base.json (record_base.py wrote it when the person approved the base): the font
-and OFL text must still have the sha256 recorded there, and <base-vf.ttf> must be that font, byte for byte. A
-subset made elsewhere is refused. The script subsets the verified base itself, to the characters of the
-targets' scripts (fontlib.COVERAGE, plus ASCII, Latin-1 and common punctuation), writes
-<DIR>/subset/base.subset.ttf, and fits from that subset. fit-log.json records the subset (source sha256, file,
-sha256, pyftsubset arguments) and the chain: base.json's sha256, the base as input, every font written as output.
-Each input is read once (chain.Files), so the base it subsets is the base it checked, and each sha256 it logs is
-of the bytes it wrote. An output path that leads to an input (base.json, the base, its licence, targets.json),
-through a link or not, is refused before anything is written.
+Before anything else it checks base.json (record_base.py wrote it when the person approved the base): the font and
+OFL text must still have the sha256 recorded there, and <base-vf.ttf> must be that font, byte for byte. A subset
+made elsewhere is refused. With korean in the targets' scripts, the base must be a pinned manifest entry's files
+too (chain.require_pinned_base): base.json records that entry, and bases.json still pins both sha256 values. The
+script subsets the verified base itself, to the characters of the targets' scripts (fontlib.COVERAGE and
+COVERAGE_REPORTED, plus ASCII, Latin-1 and common punctuation), writes <DIR>/subset/base.subset.ttf, and fits from
+that subset. fit-log.json records the subset (source sha256, file, sha256, pyftsubset arguments) and the chain:
+base.json's sha256, the base as input, every font written as output. Each input is read once (chain.Files), so the
+base it subsets is the base it checked, and each sha256 it logs is of the bytes it wrote. An output path that leads
+to an input (base.json, the base, its licence, targets.json), through a link or not, is refused before anything is
+written.
 
 For each style:
 1. The y instance. The weight axis is solved so the n stem meets the target. If the base has an optical-size
    axis and --loc does not fix it, opsz is scanned too, for the o contrast and the H bar closest to the
-   targets. Every y coordinate comes from this instance, so x-height, bars and thin strokes come from it.
+   targets, among the sizes where the wght axis reaches the stem (else the nearest, with the miss in
+   fit-log.json). Every y coordinate comes from this instance, so x-height, bars and thin strokes come from it.
+   A later style without a stem of its own takes the first style's location with the wght moved by the
+   weight-class difference, and scans no optical size of its own.
 2. One x instance per width class. On a width axis, wdth is solved so the class's mean advance meets its
    target, and wght is solved again at that width so the class's stem stays on target. Where the axis runs
    out, the class is scaled horizontally by at most --max-stretch (3 % by default), with the weight solved for
@@ -31,23 +36,28 @@ For each style:
    Glyphs in no class take the y instance's own x.
 3. Assembly. Every location of one variable font has the same points, so each glyph takes x from its class
    instance and y from the y instance. Advances, components and mark anchors follow.
-4. Iteration. The class sidebearings are set (space_font.respace), because an advance is ink plus sides.
-   Then the assembled font is measured and each class's factor corrected, until every class mean is
-   within --tol percent of its target (or the stretch limit is reached, which the log reports).
+4. Iteration, on the measuring subset (the letters, figures and space, assembled the same way). The class
+   sidebearings are set (space_font.respace), because an advance is ink plus sides. Then the subset is measured
+   and each class's factor corrected, until every class mean is within --tol percent of its target (or the
+   stretch limit is reached, which the log reports). The whole font is assembled once, with the factors found.
 5. Overlaps are removed (needs skia-pathops), the font is scaled so its cap height per em matches the target
    (or the base's), and the variation tables are dropped.
 
-Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Without a Latin n stem to aim at,
-the weight comes from the Hangul stem: as a length when a reference gave one (`stem` at cap 700, else per 1000 em),
-else as the ratio `stem_h1`. wght is solved so the base's vertical stem, in that unit or over its H1 face height,
-meets it, the stem and the cap height or H1 face read at the same wght, at every location step 1 tries. Step 1
-keeps a location where the wght axis reaches that stem; when none does, the nearest, and fit-log.json records by
-how much it misses. Each later style takes the first style's y location with the wght stepped by its weight-class
-difference, clamped to the axis, and scans no optical size of its own. Before step 5, every Hangul target is stated in
-the y instance's own units beside what the base draws there: a length at cap 700 against the y instance's cap
-height, a length per 1000 em against the finished font's em, a ratio by the base's own H1 face. fit-log.json
-records them under each style's `hangul`. No Hangul glyph is moved yet: the base keeps its Hangul sizes, centres
-and spacing, and the Hangul follows the y instance.
+Hangul (targets.json's `hangul` object, when the targets' scripts have korean). Every Hangul target is stated in
+the units of the base's instance at the Hangul location beside what the base draws there: a length at cap 700
+against the y instance's cap height, a length per 1000 em against the finished font's em, a ratio by the base's own
+H1 face. From them, one transform (hangul_transform): one scale for the whole Hangul, within ±6 %
+(fontlib.HANGUL_SCALE_LIMIT), 1 without a length; per class a final x and y scale within ±3 % of it and of each
+other (HANGUL_CLASS_LIMIT), a vertical shift to the class's centre height, and an advance that splits its change
+evenly between the two sides and moves only the class's mean centre; the compatibility jamo at the one scale alone.
+Composites are decomposed first. The weight is one for the whole Hangul, solved from the Hangul stem (a length at
+cap 700, else per 1000 em, else the ratio stem_h1) over the transform's H1 scale, the two solved in turn on the
+measuring syllables. Without a Latin n stem it sets the y instance, at every location step 1 tries, and the Latin
+follows it; with one, the Hangul takes a wght of its own at the y location's other axes. Without a Hangul stem the
+Hangul follows the y instance. A later style steps the first style's Hangul location like its y location and keeps
+the first style's transform. The whole Hangul moves once, after the Latin is assembled and before step 5, from the
+full instance at the Hangul location. fit-log.json records the targets, what the base and the fitted font draw, the
+transform and the location under each style's `hangul`, and the style's em_scale.
 
 Output: <DIR>/<Family>-<Style>.fit.ttf and fit-log.json. The fonts still carry the base's names: package.py
 renames them. Run space_font.py next.
@@ -55,9 +65,11 @@ renames them. Run space_font.py next.
 import argparse
 import copy
 import io
+import math
 import os
 import statistics as st
 import sys
+import time
 import unicodedata
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
@@ -129,6 +141,14 @@ class Base:
             self.cache[key] = instancer.instantiateVariableFont(copy.deepcopy(self.vf), dict(key), updateFontNames=False)
         return self.cache[key]
 
+    def measuring(self, loc):
+        """The instance at loc of the solving subset (the letters, figures and space a class mean and the sides need),
+        cached: the width iteration assembles and measures it, and the whole font is assembled once, after."""
+        key = ("measuring",) + tuple(sorted((k, round(v, 2)) for k, v in self.clamp(loc).items()))
+        if key not in self.cache:
+            self.cache[key] = self.tiny(dict(key[1:])).font
+        return self.cache[key]
+
 
 def raw_stem(face, ch):
     xh = face.bounds("x")[3]
@@ -146,13 +166,36 @@ def solve_wght(B, loc, ch, target_raw):
     return {**loc, "wght": round(w, 2)}
 
 
+def reach_wght(B, loc, face, measure, target, iters=12):
+    """loc with the wght where measure(face(loc at that wght)) meets target, and how far what the base draws there
+    misses it: 0 where the wght axis reaches the target at loc, else the wght is the nearer axis end and the miss is
+    what is drawn there over the target, minus 1."""
+    lo, _, hi = B.axes["wght"]
+    thinnest, boldest = (measure(face({**loc, "wght": v})) for v in (lo, hi))
+    if target < thinnest:
+        return {**loc, "wght": lo}, thinnest / target - 1
+    if target > boldest:
+        return {**loc, "wght": hi}, boldest / target - 1
+    w, _ = L.solve_axis(lambda v: face({**loc, "wght": v}), measure, target, lo, hi, iters=iters)
+    return {**loc, "wght": round(w, 2)}, 0.0
+
+
+def latin_weigh(B, stem_t):
+    """weigh(loc) for pick_y: the wght where the n stem meets stem_t at cap 700, each wght's stem read against the cap
+    height that wght draws (the cap may grow with the weight), and the miss where the wght axis does not reach it."""
+    def weigh(loc):
+        return reach_wght(B, loc, lambda at: B.tiny(at, "nHx"), L.stem_cap700, stem_t, iters=10)
+    return weigh
+
+
 HANGUL_STEM_LENGTHS = ("cap700", "em1000")  # the units a Hangul stem length is aimed at in, first found first
 
 
-def hangul_weight_aim(T):
+def hangul_weight_aim(T, cap=None):
     """What the Hangul weight is solved from: (name, target, measure(face)). The stem as a length when a reference
-    gave one (at cap 700, else per 1000 em), else the stem over the H1 face height. measure reads the base's stem
-    in that unit, and the cap height or H1 face it needs, from the same face, so both come from the wght tried."""
+    gave one (at cap 700, else per 1000 em), else the stem over the H1 face height. measure reads the base's stem in
+    that unit, and the H1 face it needs, from the same face, so both come from the wght tried. The cap height a length
+    is over is the face's own, or `cap` when given: the y instance's, when the Latin has a wght of its own."""
     h = T.get("hangul") or {}
     for unit in HANGUL_STEM_LENGTHS:
         target = L.tagged_value(h.get("stem"), unit)
@@ -163,10 +206,10 @@ def hangul_weight_aim(T):
                              "Measure the references again.")
         if unit == "cap700":
             def measure(face):
-                return L.hangul_stem(face) * L.CAP / face.bounds("H")[3]
+                return L.hangul_stem(face) * L.CAP / (cap or face.bounds("H")[3])
         elif T.get("cap_em"):
             def measure(face):  # the finished em is the cap height over cap_em
-                return L.hangul_stem(face) * T["cap_em"] / face.bounds("H")[3]
+                return L.hangul_stem(face) * T["cap_em"] / (cap or face.bounds("H")[3])
         else:
             def measure(face):  # the finished em is the base's
                 return L.hangul_stem(face) * 1000 / face.upm
@@ -175,21 +218,6 @@ def hangul_weight_aim(T):
     if ratio is not None and not ratio > 0:
         raise SystemExit(f"targets.json: the Hangul stem_h1 is {ratio}; it must be above 0. Measure the references again.")
     return ("stem_h1", ratio, L.hangul_stem_h1) if ratio else None
-
-
-def solve_hangul_wght(B, loc, aim):
-    """loc with the wght where the base's Hangul stem meets `aim` (hangul_weight_aim), each try read at its own
-    wght, and how far the stem drawn there misses the aim: 0 where the wght axis reaches it at loc, else the wght is
-    the nearer axis end and the miss is the stem drawn there over the aim, minus 1."""
-    lo, _, hi = B.axes["wght"]
-    _, target, measure = aim
-    thinnest, boldest = (measure(B.hangul({**loc, "wght": v})) for v in (lo, hi))
-    if target < thinnest:
-        return {**loc, "wght": lo}, thinnest / target - 1
-    if target > boldest:
-        return {**loc, "wght": hi}, boldest / target - 1
-    w, _ = L.solve_axis(lambda v: B.hangul({**loc, "wght": v}), measure, target, lo, hi)
-    return {**loc, "wght": round(w, 2)}, 0.0
 
 
 def y_tries(B, fixed, args, tg):
@@ -220,16 +248,17 @@ def pick_y(B, tries, weigh, tg):
 HANGUL_LENGTHS = ("face_w", "face_h", "cx", "cy", "side", "side_asym", "adv")
 
 
-def resolve_hangul(B, yloc, T, weight_from):
-    """The Hangul targets in the y instance's own units, beside what the base draws there. A length at cap 700
-    resolves against the y instance's cap height and a length per 1000 em against the finished font's em (the cap
-    height over cap_em, or the base's em); finish() scales the em uniformly, so both stay true. A ratio never
-    becomes a cap length: a size ratio multiplies the base's own H1 face, which keeps the base's Hangul scale."""
+def resolve_hangul(B, hloc, T, cap=None):
+    """The Hangul targets in the units of the base's instance at hloc, beside what the base draws there, and that
+    geometry. A length at cap 700 resolves against `cap`, the y instance's cap height (the face's own when not given),
+    and a length per 1000 em against the finished font's em (that cap height over cap_em, or the base's em); finish()
+    scales the em uniformly, so both stay true. A ratio never becomes a cap length: a size ratio multiplies the base's
+    own H1 face, which keeps the base's Hangul scale."""
     want = T["hangul"]
-    face = B.hangul(yloc)
+    face = B.hangul(hloc)
     geo = L.hangul_geometry(face)
     h1 = geo["classes"]["H1"]
-    cap = face.bounds("H")[3]
+    cap = cap or face.bounds("H")[3]
     em = 1000 * cap / T["cap_em"] if T.get("cap_em") else face.upm
     per = {"cap700": cap / L.CAP, "em1000": em / 1000}
 
@@ -237,7 +266,7 @@ def resolve_hangul(B, yloc, T, weight_from):
         unit = next((u for u in per if L.tagged_value(entries, u) is not None), None)
         if unit and base is not None:
             return {"target": round(L.tagged_value(entries, unit) * per[unit], 1), "base": round(base, 1), "from": unit}
-    out = {"weight_from": weight_from, "units": {u: round(k, 4) for u, k in per.items()}, "classes": {}}
+    out = {"units": {u: round(k, 4) for u, k in per.items()}, "classes": {}}
     for cls, w in want.get("classes", {}).items():
         base = geo["classes"].get(cls)
         if base is None:
@@ -257,7 +286,99 @@ def resolve_hangul(B, yloc, T, weight_from):
         out["stem_h1"] = {"target": ratio, "got": round(geo["stem"] / h1["face_h"], 4)}
         out.setdefault("stem", {"target": round(ratio * h1["face_h"], 1), "base": round(geo["stem"], 1),
                                 "from": "ratio"})
+    return out, geo
+
+
+def class_scales(kx, ky, limit=L.HANGUL_CLASS_LIMIT):
+    """A class's x and y scale over the Hangul's one scale, each within 1 ± limit, and x over y within 1 + limit
+    either way: a ratio past it moves both toward their geometric mean."""
+    kx, ky = (min(max(k, 1 - limit), 1 + limit) for k in (kx, ky))
+    if not 1 / (1 + limit) <= kx / ky <= 1 + limit:
+        mid, r = (kx * ky) ** 0.5, (1 + limit) ** (0.5 if kx > ky else -0.5)
+        kx, ky = (min(max(k, 1 - limit), 1 + limit) for k in (mid * r, mid / r))
+    return kx, ky
+
+
+TRANSFORM_STEP = 10 ** 5  # the transform's scales are logged, and applied, at five decimals
+
+
+def step_within(v, lo, hi):
+    """v at five decimals, the nearest such value within [lo, hi]: rounding never carries it past a limit."""
+    lo_q, hi_q = math.ceil(lo * TRANSFORM_STEP) / TRANSFORM_STEP, math.floor(hi * TRANSFORM_STEP) / TRANSFORM_STEP
+    return min(max(round(v, 5), lo_q), hi_q)
+
+
+def class_axes(s, kx, ky, limit=L.HANGUL_CLASS_LIMIT):
+    """A class's final x and y scale at five decimals, from its scales over the one scale s (class_scales): each
+    within 1 ± limit of s, and the larger within 1 + limit of the smaller."""
+    sx = step_within(s * kx, s * (1 - limit), s * (1 + limit))
+    sy = step_within(s * ky, max(s * (1 - limit), sx / (1 + limit)), min(s * (1 + limit), sx * (1 + limit)))
+    return sx, sy
+
+
+def hangul_transform(rows, geo):
+    """The Hangul's final transform, from the targets resolve_hangul states. One scale for the whole Hangul: the
+    geometric mean of target over base of every class's face width and height given as a length, within
+    L.HANGUL_SCALE_LIMIT, and 1 when no length was measured. Then per class the final x and y scale (that scale times
+    class_scales, at five decimals within the limits: class_axes), the vertical shift that puts the class's mean face
+    centre at its target height (cy), what is added to every advance after the scale (adv, per class or font-wide),
+    and the horizontal shift that puts the class's mean face centre at its target (cx). A class without a target
+    takes the one scale and the font-wide advance. The compatibility jamo take the one scale alone. Every number is
+    rounded as logged, the fit applies the logged numbers, and a transform fontlib.hangul_transform_over finds past a
+    limit is never logged."""
+    sizes = [r[k]["target"] / r[k]["base"] for r in rows["classes"].values() for k in ("face_w", "face_h")
+             if k in r and r[k]["from"] != "ratio"]
+    wanted = math.exp(st.mean(math.log(v) for v in sizes)) if sizes else 1.0
+    s = step_within(wanted, 1 - L.HANGUL_SCALE_LIMIT, 1 + L.HANGUL_SCALE_LIMIT)
+    wide = rows["adv"]["target"] - s * rows["adv"]["base"] if "adv" in rows else 0.0
+    out = {"scale": s, "scale_wanted": round(wanted, 5), "classes": {},
+           "jamo": {"sx": s, "sy": s, "dx": 0.0, "dy": 0.0, "adv_add": 0.0}}
+    for cls in L.HANGUL_CLASSES:
+        r, g = rows["classes"].get(cls, {}), geo["classes"].get(cls)
+        want = [r[k]["target"] / r[k]["base"] / s if k in r else 1.0 for k in ("face_w", "face_h")]
+        kx, ky = class_scales(*want)
+        sx, sy = class_axes(s, kx, ky)
+        add = r["adv"]["target"] - s * r["adv"]["base"] if "adv" in r else wide
+        t = {"sx": sx, "sy": sy, "dy": round(r["cy"]["target"] - g["cy"], 2) if "cy" in r else 0.0,
+             "adv_add": round(add, 2)}
+        if "cx" in r:
+            t["dx"] = round(r["cx"]["target"] - g["cx"] - ((s - 1) * g.get("adv", geo.get("adv")) + add) / 2, 2)
+        else:
+            t["dx"] = 0.0
+        if (kx, ky) != tuple(want):
+            t["wanted"] = {"sx": round(s * want[0], 5), "sy": round(s * want[1], 5)}
+        out["classes"][cls] = t
+    if over := L.hangul_transform_over(out):
+        raise SystemExit(f"the Hangul transform lies past its limits ({'; '.join(over)}), which fit_font.py never "
+                         "writes: this is a bug in hangul_transform")
     return out
+
+
+def h1_stem_factor(aim, xf):
+    """How much the transform multiplies what the aim measures: the H1 x scale for a stem length (ㅣ of 이 니 미 is
+    an H1 stroke), the H1 x scale over its y scale for the stem over the H1 face height."""
+    h1 = xf["classes"]["H1"]
+    return h1["sx"] if aim[0].startswith("stem ") else h1["sx"] / h1["sy"]
+
+
+def solve_hangul(B, loc, T, aim, cap=None):
+    """The Hangul at loc: the targets beside the base there and the transform, and with an aim, the wght solved so
+    the stem the transform makes meets it. The transform depends on the face sizes the wght draws and the wght on the
+    transform's H1 scales, so the two are solved in turn on the measuring syllables until the wght settles.
+    Returns (loc, miss, rows, geo, transform)."""
+    rows, geo = resolve_hangul(B, loc, T, cap)
+    xf = hangul_transform(rows, geo)
+    if aim is None or "wght" not in B.axes:
+        return loc, 0.0, rows, geo, xf
+    got, miss, last = loc, 0.0, None
+    for _ in range(6):
+        got, miss = reach_wght(B, loc, B.hangul, aim[2], aim[1] / h1_stem_factor(aim, xf))
+        rows, geo = resolve_hangul(B, got, T, cap)
+        xf = hangul_transform(rows, geo)
+        if last is not None and abs(got["wght"] - last) < 0.5:
+            break
+        last = got["wght"]
+    return got, miss, rows, geo, xf
 
 
 def class_mean(face, chars):
@@ -384,17 +505,20 @@ def fix_lsb(f):
 
 
 def finish(f, cap_em, vm_target):
-    """Remove overlaps, scale to the target cap height per em, set vertical metrics, drop variation tables."""
-    notes = []
+    """Remove overlaps, scale to the target cap height per em, set vertical metrics, drop variation tables. Returns
+    the notes, the factor the em scale multiplied every length by, and whether the overlaps were removed."""
+    notes, removed = [], False
     try:
         from fontTools.ttLib.removeOverlaps import removeOverlaps
         removeOverlaps(f)
         notes.append("overlaps removed")
+        removed = True
     except ImportError:
         notes.append("skia-pathops missing: overlaps kept (the OVERLAP_SIMPLE flag still makes them render)")
     cap = glyph_bounds(f, f.getBestCmap()[ord("H")])[3]
     if cap_em:
         f["head"].unitsPerEm = round(1000 * cap / cap_em)
+    em_scale = 1000 / f["head"].unitsPerEm
     scale_upem(f, 1000)
     notes.append(f"scaled to 1000 upm, cap height {round(glyph_bounds(f, f.getBestCmap()[ord('H')])[3], 1)}")
     for t in ("STAT", "MVAR", "HVAR", "VVAR", "avar", "fvar", "gvar", "cvar", "DSIG"):
@@ -419,70 +543,135 @@ def finish(f, cap_em, vm_target):
     cm = f.getBestCmap()
     os2.sxHeight = round(glyph_bounds(f, cm[ord("x")])[3])
     os2.sCapHeight = round(glyph_bounds(f, cm[ord("H")])[3])
-    return notes
+    return notes, em_scale, removed
 
 
-def fit_style(B, T, style, args, log):
-    tg = T["targets"]
-    fixed = parse_loc(args.loc)
-    first = T["styles"][0]
-    step = style["weight"] - first["weight"]
-    tries = y_tries(B, fixed, args, tg)
+def locate_first(B, T, args):
+    """Where the first style sits; every later style steps from it. The first style's n stem, when it has one, sets
+    the wght at each location the y instance is chosen from; else the Hangul stem does, after the Hangul transform,
+    and the Latin takes that wght. With both, the Hangul solves a wght of its own at the y location's other axes.
+    Without a Hangul stem the Hangul follows the y location. Returns the y location, its measurements and miss, what
+    the weight came from, and with Hangul targets the Hangul location, its miss and the transform."""
+    tg, first = T["targets"], T["styles"][0]
+    tries = y_tries(B, parse_loc(args.loc), args, tg)
     aim = hangul_weight_aim(T)
-    # Stem target: the style's own. Else find the base weight that draws the first style's stem, step it by the
-    # difference in weight class (500 - 400 = +100), and take the stem the base draws there. The Latin n stem gives
-    # an n stem to solve. Without one the Hangul stem does (a length, else its ratio to the H1 face): solved at every
-    # location the y instance is chosen from for the first style, and a later style takes the first style's y
-    # location with the wght stepped.
-    stem_t, weigh, weight_from = style.get("n_stem"), None, "n_stem"
-    if stem_t is None and "wght" in B.axes and first.get("n_stem"):
-        lo, _, hi = B.axes["wght"]
-        cap = B.tiny(fixed, "nHx").bounds("H")[3]
-        w1 = solve_wght(B, fixed, "n", first["n_stem"] * cap / L.CAP)["wght"]
-        w2 = round(min(max(w1 + step, lo), hi), 2)
-        stem_t = L.stem_cap700(B.tiny({**fixed, "wght": w2}, "nHx"))
-        if step:
-            weight_from += ", stepped from the first style"
-        log.append(f"{style['name']}: n stem target {stem_t:.1f}: the first style sits at wght {w1:.0f} on the base "
-                   f"(solved from the n stem), this one {step:+d} from it at wght {w2:.0f}")
-    elif stem_t is None and "wght" in B.axes and aim:
-        weight_from = aim[0]
-        if step:
-            lo, _, hi = B.axes["wght"]
-            first_y, _, missed = pick_y(B, tries, lambda loc: solve_hangul_wght(B, loc, aim), tg)
-            tries = [{**first_y, "wght": round(min(max(first_y["wght"] + step, lo), hi), 2)}]
-            weight_from += ", stepped from the first style"
-            log.append(f"{style['name']}: the first style's y instance sits at {first_y} (solved from the Hangul "
-                       f"{aim[0]} {aim[1]:.4g}" + (f", {missed * 100:+.1f} % off it" if missed else "")
-                       + f"), this one {step:+d} from it at {tries[0]}")
-
-            def weigh(loc):  # the first style's location, stepped: no optical size of its own
-                return loc, 0.0
-        else:
-            def weigh(loc):
-                return solve_hangul_wght(B, loc, aim)
-            log.append(f"{style['name']}: wght solved from the Hangul {aim[0]} {aim[1]:.4g} at each location the y "
-                       "instance is chosen from")
-    elif stem_t is None and "wght" not in B.axes:
-        stem_t = first.get("n_stem") or L.stem_cap700(B.tiny(fixed, "nHx"))
-        weight_from = "the base, which has no weight axis"
-        log.append(f"{style['name']}: the base has no weight axis, so it keeps the first style's stem")
-    elif stem_t is None:
-        raise SystemExit(f"{style['name']}: targets.json has neither a Latin n stem nor a Hangul stem (stem or stem_h1) "
-                         "to solve the weight from. Measure a reference with n, or with 이, 니 and 미.")
+    if "wght" not in B.axes:
+        at = dict(zip(("y", "ym", "miss"), pick_y(B, tries, lambda loc: (loc, 0.0), tg)),
+                  weight_from="the base, which has no weight axis")
+    elif first.get("n_stem"):
+        at = dict(zip(("y", "ym", "miss"), pick_y(B, tries, latin_weigh(B, first["n_stem"]), tg)), weight_from="n_stem")
+    elif aim:
+        at = dict(zip(("y", "ym", "miss"), pick_y(B, tries, lambda loc: solve_hangul(B, loc, T, aim)[:2], tg)),
+                  weight_from=aim[0])
     else:
-        log.append(f"{style['name']}: n stem target {stem_t:.1f}")
-    # 1. y instance
-    if weigh is None:
-        def weigh(loc):
-            return solve_wght(B, loc, "n", stem_t * B.tiny(loc, "nHx").bounds("H")[3] / L.CAP), 0.0
-    yloc, ym, missed = pick_y(B, tries, weigh, tg)
-    if missed:
-        log.append(f"{style['name']}: the wght axis reaches the Hangul {aim[0]} {aim[1]:.4g} at no location tried; "
-                   f"the nearest, {yloc}, draws {aim[1] * (1 + missed):.4g} ({missed * 100:+.1f} %)")
-    if stem_t is None:  # the weight came from the Hangul: the Latin keeps the stem the base draws there
+        raise SystemExit(f"{first['name']}: targets.json has neither a Latin n stem nor a Hangul stem (stem or "
+                         "stem_h1) to solve the weight from. Measure a reference with n, or with 이, 니 and 미.")
+    at["aim"] = aim
+    if T.get("hangul"):
+        cap = B.tiny(at["y"], "nHx").bounds("H")[3]
+        if aim and at["weight_from"] == "n_stem":
+            rest = {k: v for k, v in at["y"].items() if k != "wght"}
+            at["hangul"], at["hangul_miss"], _, _, at["transform"] = solve_hangul(B, rest, T, hangul_weight_aim(T, cap),
+                                                                                  cap)
+            at["hangul_weight_from"] = aim[0]
+        else:
+            at["hangul"], at["hangul_miss"] = at["y"], at["miss"] if aim and at["weight_from"] == aim[0] else 0.0
+            at["transform"] = hangul_transform(*resolve_hangul(B, at["y"], T, cap))
+            at["hangul_weight_from"] = at["weight_from"]
+    return at
+
+
+def stepped(B, loc, step):
+    """loc with its wght moved by step and clamped to the axis."""
+    if "wght" not in B.axes:
+        return dict(loc)
+    lo, _, hi = B.axes["wght"]
+    return {**loc, "wght": round(min(max(loc["wght"] + step, lo), hi), 2)}
+
+
+def locate(B, T, args, style, first_at, log):
+    """This style's y location, its measurements, its miss, the n stem the Latin is fitted to there, what the weight
+    came from, and with Hangul targets where the Hangul sits: {"location", "weight_from"}, and "stepped_from" for a
+    later style. The first style takes locate_first's. A later style with an n stem of its own (--style
+    Medium:500:88) is solved like the first; any other takes the first style's y location, its optical size
+    included, with the wght moved by the weight-class difference (Bold 700 after Regular 400: +300), and scans no
+    optical size of its own, so the weights stay as far apart on the axis as their classes. The Hangul location
+    steps from the first style's Hangul location the same way, unless the Hangul follows the y instance (no Hangul
+    stem target), and then its weight comes from wherever the y's did."""
+    tg, first, name = T["targets"], T["styles"][0], style["name"]
+    step = style["weight"] - first["weight"]
+    aim = first_at["aim"]
+    what = "n stem" if first_at["weight_from"] == "n_stem" else f"Hangul {aim[0]} {aim[1]:.4g}" if aim else "base"
+    stem_t, weight_from = style.get("n_stem"), first_at["weight_from"]
+    if style is first:
+        yloc, ym, miss = first_at["y"], first_at["ym"], first_at["miss"]
+        stem_t = first.get("n_stem")
+        if aim and weight_from == aim[0]:
+            log.append(f"{name}: wght solved from the {what}, after the Hangul transform, at each location the y "
+                       "instance is chosen from")
+        if miss:
+            drawn = (stem_t or aim[1]) * (1 + miss)
+            log.append(f"{name}: the wght axis reaches the {what if stem_t is None else f'n stem {stem_t:.1f}'} at no "
+                       f"location tried; the nearest, {yloc}, draws {drawn:.4g} ({miss * 100:+.1f} %)")
+    elif stem_t is not None and "wght" in B.axes:
+        yloc, ym, miss = pick_y(B, y_tries(B, parse_loc(args.loc), args, tg), latin_weigh(B, stem_t), tg)
+        weight_from = "n_stem"
+        if miss:
+            log.append(f"{name}: the wght axis reaches the n stem {stem_t:.1f} at no location tried; the nearest, "
+                       f"{yloc}, draws {stem_t * (1 + miss):.4g} ({miss * 100:+.1f} %)")
+    else:
+        yloc, miss = stepped(B, first_at["y"], step), 0.0
+        ym = L.measure_face(B.tiny(yloc))
+        weight_from += ", stepped from the first style"
+        log.append(f"{name}: the first style's y instance sits at {first_at['y']} (solved from the {what}), this one "
+                   f"{step:+d} from it at {yloc}")
+    if stem_t is None:  # the Latin keeps the n stem the base draws at the y location
         stem_t = L.stem_cap700(B.tiny(yloc, "nHx"))
-        log.append(f"{style['name']}: n stem target {stem_t:.1f}, the base's at the y instance")
+        log.append(f"{name}: n stem target {stem_t:.1f}, the base's at the y instance")
+    else:
+        log.append(f"{name}: n stem target {stem_t:.1f}")
+    hangul_at = None
+    if "hangul" in first_at:
+        if not aim:
+            hangul_at = {"location": yloc, "weight_from": weight_from}
+        elif style is first:
+            hangul_at = {"location": first_at["hangul"], "weight_from": first_at["hangul_weight_from"]}
+        else:
+            hangul_at = {"location": stepped(B, first_at["hangul"], step),
+                         "weight_from": first_at["hangul_weight_from"] + ", stepped from the first style's Hangul location",
+                         "stepped_from": {"style": first["name"], "location": first_at["hangul"]}}
+    return yloc, ym, miss, stem_t, weight_from, hangul_at
+
+
+def fit_hangul(B, T, f, fy, yloc, hloc, cap_y, first_at, log):
+    """Move every Hangul glyph of the assembled font f by the first style's transform, from the base at hloc (fy,
+    the y instance, when the Hangul follows it), then read the measuring syllables of f again. Returns fit-log.json's
+    record: each target beside what the base draws at hloc and what the fitted font draws (before finish() scales
+    the em), the transform, and how many glyphs moved."""
+    xf = first_at["transform"]
+    rows, _ = resolve_hangul(B, hloc, T, cap_y)
+    moved, composites = L.transform_hangul(f, fy if hloc == yloc else B.full(hloc), xf)
+    got = L.hangul_geometry(L.Face(f))
+    for cls, row in rows["classes"].items():
+        g = got["classes"].get(cls, {})
+        for key, r in row.items():
+            if g.get(key, got.get(key)) is not None:
+                r["fitted"] = round(g.get(key, got.get(key)), 1)
+    for key in ("stem", "adv"):
+        if key in rows and got.get(key) is not None:
+            rows[key]["fitted"] = round(got[key], 1)
+    if "stem_h1" in rows and got["stem"] and "H1" in got["classes"]:
+        rows["stem_h1"]["fitted"] = round(got["stem"] / got["classes"]["H1"]["face_h"], 4)
+    limited = [c for c, t in xf["classes"].items() if "wanted" in t]
+    log.append(f"Hangul: {len(moved)} glyphs from {hloc}, {composites} composites decomposed first; scale {xf['scale']}"
+               + (f" (wanted {xf['scale_wanted']})" if xf["scale"] != xf["scale_wanted"] else "")
+               + (f"; at the class limit: {', '.join(limited)}" if limited else ""))
+    return {"location": hloc, **rows, "transform": xf, "glyphs_moved": len(moved), "composites_decomposed": composites}
+
+
+def fit_style(B, T, style, args, log, first_at):
+    tg = T["targets"]
+    yloc, ym, missed, stem_t, weight_from, hangul_at = locate(B, T, args, style, first_at, log)
     log.append(f"{style['name']}: y instance {yloc}: contrast {ym['contrast']} (target {tg.get('contrast')}), "
                f"bar/stem {ym['bar_stem']} (target {tg.get('bar_stem')}), x-height/cap {ym['xh_cap']} (target {tg.get('xh_cap')})")
     cap_y = B.tiny(yloc, "nHx").bounds("H")[3]
@@ -519,13 +708,14 @@ def fit_style(B, T, style, args, log):
             continue
         aim[cls] = widths[cls] / to_cap
         xloc[cls], factor[cls] = solve_class(cls, aim[cls])
-    # 3 and 4. assemble, measure, correct the factors
+    # 3 and 4. assemble the measuring subset, measure, correct the factors; then assemble the whole font once
     fy = B.full(yloc)
     cls_of = class_map(fy)
-    src = {cls: B.full(xloc[cls]) for cls in L.CLASSES}
+    my = B.measuring(yloc)
+    src = {cls: B.measuring(xloc[cls]) for cls in L.CLASSES}
     hist = []
     for it in range(args.iters):
-        f = mix(fy, src, cls_of, factor, [])
+        f = mix(my, src, cls_of, factor, [])
         if tg.get("sides") or tg.get("rhythm"):
             space_font.respace(f, tg, {})  # widths include the sides, so set the sides before measuring widths
         face = L.Face(f)
@@ -545,26 +735,30 @@ def fit_style(B, T, style, args, log):
                 # and take a new instance, instead of stretching.
                 aim[cls] /= (1 + e)
                 xloc[cls], factor[cls] = solve_class(cls, aim[cls])
-                src[cls] = B.full(xloc[cls])
+                src[cls] = B.measuring(xloc[cls])
                 continue
             factor[cls] = round(min(max(new, 1 - args.max_stretch), 1 + args.max_stretch), 4)
     alog = []
-    f = mix(fy, src, cls_of, factor, alog)
+    f = mix(fy, {cls: B.full(xloc[cls]) for cls in L.CLASSES}, cls_of, factor, alog)
     if tg.get("sides") or tg.get("rhythm"):
         slog = {}
         space_font.respace(f, tg, slog)
         alog.append(f"class sidebearings set inside the fit: moves {slog.get('side_moves')}")
+    hangul = fit_hangul(B, T, f, fy, yloc, hangul_at["location"], cap_y, first_at, alog) if hangul_at else None
     log.extend(alog)
-    hangul = resolve_hangul(B, yloc, T, weight_from) if T.get("hangul") else None
-    notes = finish(f, T.get("cap_em"), T.get("vmetrics"))
+    notes, em_scale, removed = finish(f, T.get("cap_em"), T.get("vmetrics"))
     log.extend(notes)
     stuck = [c for c, e in hist[-1]["error_pct"].items() if abs(e) > args.tol]
     info = {"style": style, "n_stem_target": round(stem_t, 1), "y_location": yloc, "x_locations": xloc,
             "factors": factor, "iterations": hist, "stretch_limit_hit": stuck,
-            "classes_measured": {c: L.CLASSES[c] for c in widths}}
+            "classes_measured": {c: L.CLASSES[c] for c in widths}, "em_scale": round(em_scale, 6),
+            "overlaps_removed": removed}
+    if missed and weight_from.startswith("n_stem"):
+        info["weight_missed_pct"] = round(missed * 100, 1)
     if hangul:
-        if missed:
-            hangul["weight_missed_pct"] = round(missed * 100, 1)
+        hangul.update({k: v for k, v in hangul_at.items() if k != "location"})
+        if style is T["styles"][0] and first_at["hangul_miss"]:
+            hangul["weight_missed_pct"] = round(first_at["hangul_miss"] * 100, 1)
         info["hangul"] = hangul
     return f, info
 
@@ -591,6 +785,7 @@ def main():
         L.charset_unicodes(T.get("scripts", ["latin"]))
     except ValueError as e:
         raise C.Refused(f"{a.targets}: {e}")
+    C.require_pinned_base(files, approved, T, a.targets)
     hangul_weight_aim(T)  # a stem target that cannot be solved is refused before anything is written
     fam = T["family"].replace(" ", "")
     styles = [s for s in T["styles"] if not a.style or s["name"] in a.style]
@@ -607,15 +802,18 @@ def main():
     out = {"base": os.path.basename(a.base), "base_axes": B.axes, "targets": os.path.basename(a.targets),
            "subset": sub_rec, "styles": []}
     written = []
+    first_at = locate_first(B, T, a)
     for style, p in zip(styles, style_paths):
         log = []
-        f, info = fit_style(B, T, style, a, log)
+        started = time.perf_counter()
+        f, info = fit_style(B, T, style, a, log, first_at)
+        info["seconds"] = round(time.perf_counter() - started, 1)
         # a plain TrueType file, whatever container the instances came through
         written.append(files.write(p, C.font_bytes(f)))
         info["file"] = os.path.basename(p)
         info["log"] = log
         out["styles"].append(info)
-        print(f"{style['name']}: wrote {p}")
+        print(f"{style['name']}: wrote {p} ({info['seconds']} s)")
         for line in log:
             print("  " + line)
         last = info["iterations"][-1]
@@ -623,14 +821,21 @@ def main():
         print(f"  factors: {info['factors']}")
         if "hangul" in info:
             h = info["hangul"]
-            print(f"  hangul: weight from {h['weight_from']}"
+            stem = h.get("stem") or {}
+            print(f"  hangul at {h['location']}: weight from {h['weight_from']}"
                   + (f", which no location tried reaches ({h['weight_missed_pct']:+.1f} %)"
                      if "weight_missed_pct" in h else "")
-                  + (f"; stem / H1 face height {h['stem_h1']['got']} (target {h['stem_h1']['target']})"
-                     if "stem_h1" in h else ""))
+                  + (f"; stem {stem.get('fitted')} (target {stem['target']} from {stem['from']}, base {stem['base']})"
+                     if stem else ""))
+            xf = h["transform"]
+            print(f"    scale {xf['scale']}" + (f" (wanted {xf['scale_wanted']})" if xf["scale"] != xf["scale_wanted"]
+                                                else ""))
             for cls, row in h["classes"].items():
-                print(f"    {cls}: " + ", ".join(f"{k} {r['target']} from {r['from']} (base {r['base']})"
-                                              for k, r in row.items() if k in ("face_w", "face_h")))
+                t = xf["classes"][cls]
+                print(f"    {cls}: x {t['sx']}, y {t['sy']}" + (f" (wanted {t['wanted']['sx']}, {t['wanted']['sy']})"
+                                                               if "wanted" in t else "") + "; "
+                      + ", ".join(f"{k} {r['target']} from {r['from']} (base {r['base']}, fitted {r.get('fitted')})"
+                                  for k, r in row.items() if k in ("face_w", "face_h")))
         if info["stretch_limit_hit"]:
             print(f"  stretch limit reached for {info['stretch_limit_hit']}: the base cannot reach these widths "
                   f"within {a.max_stretch * 100:.0f} %. Say so, or pick a base with a width axis.")

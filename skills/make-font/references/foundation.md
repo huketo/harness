@@ -28,6 +28,37 @@ on a hop to any other origin. A 403 or 429 stops the search with the requests le
 a token, waiting, or `--offline`. `--offline` downloads nothing: it reads the catalogue, the tree and the font
 files from `--cache` and skips what is not there.
 
+## Hangul: the pinned bases
+
+With `korean` in the targets' scripts, neither pass below runs. A coarse Latin file cannot measure Hangul, and few
+open fonts have both Latin and every modern syllable in one TrueType variable font. The candidates are the entries
+of `scripts/bases.json`, each pinned by URL (a commit, never a branch), version, sha256 of the font and of its
+`OFL.txt`, and Reserved Font Names, in the shape of awesome-slides' `fonts.json` (which pins static WOFF2 files, so
+its files are not reused). Each entry's font and licence go to `--cache/manifest/<entry>/` and are skipped unless
+both still have the pinned sha256 and the font qualifies again (`find_foundation.qualify`): a TrueType variable font
+(glyf, fvar, gvar), all 11,172 modern syllables and the basic Latin letters and figures, and an `OFL.txt` and name
+ID 13 that `record_base.py` accepts. The rows are ranked by the score below plus the Hangul ratios
+(`fontlib.HANGUL_DISTANCE`: each class's face width over height, face height over H1's and over the cap height, and
+the stem over the H1 face height when the weight is not solved from it), and each row lists how much of every asked
+script the font covers. `--local` and `--families` are refused there. A row from the manifest records its entry, so
+the approval question names "the pinned manifest entry" and its URL.
+
+The manifest is checked again on the bytes each later step reads (`chain.pinned_entry`), never on what a shortlist
+or a cache says. `record_base.py` asks about, and records, a manifest source only when the font and the `OFL.txt` it
+reads have the sha256 the entry pins and the URL is the one it pins for that font: a cached file that changed after
+the ranking is refused. A build with `korean` in its scripts (`fit_font.py`, `package.py`, `check_font.py`) takes
+only a base that `base.json` records as a manifest entry, and only while `bases.json` still pins both sha256 values
+of the files it read; a base approved as `local` or from Google Fonts is refused there, and `check_font.py` lists
+the entry among its chain rows.
+
+The manifest holds one base, `noto-sans-kr`: Noto Sans KR 2.004, `NotoSansKR[wght].ttf` from google/fonts at commit
+24ddc1f324ca, OFL-1.1, Reserved Font Name Source, wght 100 to 900 with its default at 100. Its Latin lacks Š š Ž ž
+Ÿ, so `latin` coverage is 180 of 185. Pretendard Variable has the format and the syllables, but its `OFL.txt` (a
+copyright statement over two lines and a trademark line) is not the form `record_base.py` accepts, so it serves as a
+reference only. To add an entry, download the file from the foundry's own release, check it the way `qualify` does
+and with `uv run scripts/record_base.py --font <file> --licence <OFL.txt> --source local --question-only --out
+<scratch>/base.json`, and pin the URL at that commit with both sha256 values.
+
 ## Two passes
 
 1. Coarse. A small Latin WOFF2 of each family near weight 400 from the jsDelivr Fontsource mirror, measured and

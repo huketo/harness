@@ -17,6 +17,12 @@ Two passes.
    its optical-size axis. A width axis makes width gaps cheap, but only in the direction it can move: an axis
    that only narrows does not help a font that is too narrow.
 
+With korean in the targets' scripts neither pass runs: the bases are the fonts pinned in bases.json beside this
+script (URL, version, sha256, Reserved Font Names), since a Latin coarse file cannot measure Hangul. Each is fetched
+to --cache, skipped unless it has the pinned sha256 and qualifies again (a TrueType variable font with every modern
+syllable and the basic Latin letters and figures, an OFL.txt and name ID 13 that record_base.py accepts), and ranked
+by the same distance plus the Hangul ratios (fontlib.hangul_distance). --local and --families are refused there.
+
 Only the SIL Open Font License 1.1 is kept, and only TrueType (glyf) variable fonts: the fit needs both.
 --local adds font files you already have; each needs the OFL notice in name ID 13 and is a candidate only. Put
 its OFL.txt beside it, since the approval step records that file.
@@ -35,6 +41,8 @@ The shortlist is for the person to choose from. Record their answer with record_
 """
 import argparse
 import glob
+import io
+import hashlib
 import json
 import os
 import re
@@ -50,6 +58,7 @@ sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fontTools.ttLib import TTFont  # noqa: E402
 
+import chain as C  # noqa: E402
 import fontlib as L  # noqa: E402
 
 UA = {"User-Agent": "make-font-skill/1.0"}
@@ -271,12 +280,19 @@ def axis_penalty(axes, deltas=None):
     return 1.5
 
 
-def evaluate(path, tg, styles, use, quick=False):
-    """Measure one candidate the way the targets were measured. Returns the best location and its distance."""
-    f = TTFont(path)
+def evaluate(path, tg, styles, use, quick=False, T=None):
+    """Measure one candidate the way the targets were measured. Returns the best location and its distance. With T
+    and its hangul object, the Hangul is measured too: without an n stem the wght is solved from the Hangul stem as
+    the fit solves it (before any transform), and the Hangul ratios add their distance (fontlib.hangul_distance)."""
+    f = path if isinstance(path, TTFont) else TTFont(path)
     axes = L.axes_of(f)
-    small = L.subset_font(f, L.SOLVE_TEXT, layout=False)
+    hangul = (T or {}).get("hangul")
+    small = L.subset_font(f, L.SOLVE_TEXT + (L.HANGUL_TEXT if hangul else ""), layout=False)
     stem = styles[0].get("n_stem") or tg.get("n_stem")
+    aim = None
+    if hangul and not stem and not quick:
+        import fit_font
+        aim = fit_font.hangul_weight_aim(T)
     opsz_try = [None]
     if "opsz" in axes and not quick:
         lo, de, hi = axes["opsz"]
@@ -292,11 +308,23 @@ def evaluate(path, tg, styles, use, quick=False):
                 w, _ = L.solve_axis(lambda v: L.Face(small, {**loc, "wght": v}), L.stem_cap700, stem,
                                     axes["wght"][0], axes["wght"][2], iters=10)
                 loc["wght"] = round(w, 1)
-            m = L.measure_face(L.Face(small, loc or None))
+            elif "wght" in axes and aim:
+                w, _ = L.solve_axis(lambda v: L.Face(small, {**loc, "wght": v}), aim[2], aim[1], axes["wght"][0],
+                                    axes["wght"][2])
+                loc["wght"] = round(w, 1)
+            face = L.Face(small, loc or None)
+            m = L.measure_face(face)
+            if hangul:
+                hm = L.hangul_measurement(L.hangul_geometry(face), {"cap700": L.CAP / face.bounds("H")[3],
+                                                                    "em1000": 1000 / face.upm}, n_stem=m.get("n_stem"))
         except Exception as e:  # a font without the letters the measurement needs
             return {"error": f"{type(e).__name__}: {e}"}
         skip = ("n_stem",) if quick or "wght" not in axes else ()
         d, deltas = L.distance(tg, m, width_weight(axes, loc), skip)
+        if hangul:
+            hd, hdeltas = L.hangul_distance(hangul, hm, skip=("stem_h1",) if aim and "wght" in axes else ())
+            d = round((d ** 2 + hd ** 2) ** 0.5, 3)
+            deltas.update({"hangul." + k: v for k, v in hdeltas.items()})
         if best is None or d < best["distance"]:
             best = {"distance": d, "deltas": deltas, "loc": loc, "measured": m}
     best["axes"] = axes
@@ -310,24 +338,89 @@ def glyf_vf(f):
     return "glyf" in f and "fvar" in f and "gvar" in f
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("targets")
-    ap.add_argument("--cache", required=True)
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--category", help="a Fontsource category; default from targets.json's category")
-    ap.add_argument("--shortlist", type=int, default=8)
-    ap.add_argument("--families", default="")
-    ap.add_argument("--local", action="append", default=[])
-    ap.add_argument("--offline", action="store_true")
-    a = ap.parse_args()
-    T = L.load_json(a.targets)
-    tg, styles, use = T["targets"], T["styles"], T.get("use", "text")
-    scripts = set(T.get("scripts", ["latin"]))
-    cat = T.get("category") or ("serif" if tg.get("serif") else "sans")
-    category = a.category or {"sans": "sans-serif", "serif": "serif", "mono": "monospace"}.get(cat, "sans-serif")
-    rows = []
+BASE_LATIN = L.LETTERS + "0123456789"  # the Latin every fit measures
 
+
+def qualify(font, ofl_text):
+    """Why a manifest font cannot be a Hangul base, or []: it must be a TrueType variable font (glyf, fvar, gvar)
+    with every modern Hangul syllable and the basic Latin letters and figures, and an OFL.txt and name ID 13 that
+    record_base.py accepts (the same fontlib checks)."""
+    out = [] if glyf_vf(font) else ["not a TrueType (glyf) variable font"]
+    cm = font.getBestCmap()
+    for what, chars in (("modern Hangul syllables", L.MODERN_SYLLABLES), ("basic Latin letters and figures", BASE_LATIN)):
+        miss = [c for c in chars if ord(c) not in cm]
+        if miss:
+            out.append(f"{len(miss)} of the {len(chars)} {what} missing ({''.join(miss[:10])})")
+    if problem := L.ofl_11_text_problem(ofl_text):
+        out.append(f"its OFL.txt: {problem}")
+    if problem := L.ofl_11_notice_problem(L.english_names(font).get(13)):
+        out.append(f"its name ID 13: {problem}")
+    return out
+
+
+def coverage_of(font, scripts):
+    """script -> "have of need", and the characters missing, for every script asked."""
+    cm = font.getBestCmap()
+    out = {}
+    for s in scripts:
+        need = L.COVERAGE.get(s, "")
+        miss = "".join(c for c in need if ord(c) not in cm)
+        out[s] = f"{len(need) - len(miss)} of {len(need)}" + (f", missing {miss[:20]}" if miss else "")
+    return out
+
+
+def manifest_rows(manifest, cache, T, offline=False):
+    """Every base the pinned manifest lists, ranked by the same distance as a fine candidate, Hangul included. Each
+    entry's font and OFL.txt go to cache/manifest/<entry>/ (read from there with --offline) and are skipped unless
+    both have the sha256 the manifest pins and qualify() finds nothing. Nothing else is searched."""
+    rows = []
+    for key, e in manifest["families"].items():
+        folder = os.path.join(cache, "manifest", safe(key))
+        font_url = e["files"][0]["url"]
+        try:
+            font_path = fetch(font_url, os.path.join(folder, safe_file(font_url)), offline)
+            lic_path = fetch(e["license"]["url"], os.path.join(folder, "OFL.txt"), offline)
+        except FetchError as err:
+            if not offline and "refused" in str(err):
+                raise SystemExit(str(err))
+            print(f"skip {e['family']}: {err}")
+            continue
+        # Read each file once: the bytes that pass the pin are the bytes qualified and ranked.
+        with open(font_path, "rb") as fh:
+            font_bytes = fh.read()
+        with open(lic_path, "rb") as fh:
+            lic_bytes = fh.read()
+        changed = [f"{os.path.basename(p)} has sha256 {got}, the manifest pins {want}"
+                   for p, data, want in ((font_path, font_bytes, e["files"][0]["sha256"]),
+                                         (lic_path, lic_bytes, e["license"]["sha256"]))
+                   if (got := hashlib.sha256(data).hexdigest()) != want]
+        if changed:
+            print(f"skip {e['family']}: {'; '.join(changed)}. Delete the cached file to download it again; a "
+                  "different file is not this entry.")
+            continue
+        f = TTFont(io.BytesIO(font_bytes))
+        ofl_text = lic_bytes.decode("utf-8", errors="replace")
+        problems = qualify(f, ofl_text)
+        if problems:
+            print(f"skip {e['family']}: {'; '.join(problems)}")
+            continue
+        r = evaluate(f, T["targets"], T["styles"], T.get("use", "text"), T=T)
+        rows.append({"family": e["family"], "file": os.path.abspath(font_path), "origin": f"manifest/{key}",
+                     "url": font_url, "manifest_entry": key, "version": e.get("version"),
+                     "licence_path": os.path.abspath(lic_path), "coverage": coverage_of(f, T.get("scripts", [])),
+                     **licence_of(f, ofl_text), **r})
+        print(f"manifest {e['family']:26s} distance {r.get('distance')} at {r.get('loc')}", flush=True)
+    return rows
+
+
+def safe_file(url):
+    """The file name at the end of a URL, as a cache file name (letters, digits, [ ] . _ and - only)."""
+    return re.sub(r"[^A-Za-z0-9_.\[\]-]", "_", urllib.parse.unquote(urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]))
+
+
+def search_rows(a, tg, styles, use, scripts, category):
+    """The Google Fonts candidates (coarse, then fine) and the --local fonts, measured."""
+    rows = []
     for d in a.local:
         for p in sorted(glob.glob(os.path.join(d, "*.[ot]tf")) + glob.glob(os.path.join(d, "*.woff2"))):
             f = TTFont(p)
@@ -423,7 +516,33 @@ def main():
                          "url": RAW + urllib.parse.quote(path), "licence_file": lic_file,
                          "licence_path": os.path.abspath(lic_path), **lic, **r})
             print(f"fine   {c['family']:28s} distance {r.get('distance')} at {r.get('loc')}", flush=True)
+    return rows
 
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("targets")
+    ap.add_argument("--cache", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--category", help="a Fontsource category; default from targets.json's category")
+    ap.add_argument("--shortlist", type=int, default=8)
+    ap.add_argument("--families", default="")
+    ap.add_argument("--local", action="append", default=[])
+    ap.add_argument("--offline", action="store_true")
+    a = ap.parse_args()
+    T = L.load_json(a.targets)
+    tg, styles, use = T["targets"], T["styles"], T.get("use", "text")
+    scripts = set(T.get("scripts", ["latin"]))
+    cat = T.get("category") or ("serif" if tg.get("serif") else "sans")
+    category = a.category or {"sans": "sans-serif", "serif": "serif", "mono": "monospace"}.get(cat, "sans-serif")
+    if "korean" in scripts:
+        if a.local or a.families:
+            raise SystemExit("with korean in the targets' scripts, the bases are the pinned manifest's (bases.json, "
+                             "references/foundation.md): --local and --families do not apply")
+        print(f"korean: ranking the pinned bases of {os.path.basename(C.MANIFEST)} only", flush=True)
+        rows = manifest_rows(L.load_json(C.MANIFEST), a.cache, T, a.offline)
+    else:
+        rows = search_rows(a, tg, styles, use, scripts, category)
     rows = [r for r in rows if "distance" in r]
     for r in rows:
         r["score"] = round(r["distance"] + axis_penalty(r["axes"], r["deltas"]), 3)
@@ -443,6 +562,11 @@ def main():
         print(f"  {r['family'][:26]:26s} {r['score']:6.2f} {','.join(r['useful_axes']):16s} " +
               " ".join(f"{dl.get(k, ''):>9}" for k in keys) + f"  {ws}  {r.get('licence')}{wd}"
               + (f" RFN {r['reserved_font_names']}" if r.get("reserved_font_names") else ""))
+        hd = {k.split(".", 1)[1]: v for k, v in dl.items() if k.startswith("hangul.")}
+        if hd:
+            print("    hangul " + ", ".join(f"{k} {v * 100:+.1f}%" for k, v in hd.items()))
+        if r.get("coverage"):
+            print("    covers " + "; ".join(f"{k} {v}" for k, v in r["coverage"].items()))
     print(f"\nwrote {a.out}")
     print("next: show the person the top rows and ask which to build on. For their pick, print the approval "
           f"question with record_base.py --shortlist {a.out} --family ... --question-only --out base.json, ask it "

@@ -25,8 +25,10 @@ given, by that path's folder resolved, or by the file it links to, so --replace 
 The package is built in a temporary folder beside DIR, private (0700) until it is published. Each TTF and WOFF2
 there is checked against the chain: a plain TrueType file with the subset's glyph order and character map, and
 the outlines and advances of the spaced font it came from. The package log, DIR/package-log.json, is written into
-the same folder: base.json's sha256, the spaced fonts as inputs, the TTF and WOFF2 as outputs, targets.json and
-the fit and space logs, each by file name and sha256. One rename then publishes the folder and its log together,
+the same folder: base.json's sha256, the spaced fonts as inputs, the TTF and WOFF2 as outputs (each with the
+sha256 of the spaced font it came from, under "from"), targets.json and
+the fit and space logs, each by file name and sha256, and under "webfonts" each WOFF2's size in bytes, its glyph
+count and the seconds it took to build. There is one WOFF2 per weight, never split by range. One rename then publishes the folder and its log together,
 and only then does the folder get the usual folder mode (0777 less the umask). An existing, non-empty DIR is
 refused unless --replace is given; then the old package is moved aside, and deleted only once the new one is in
 place.
@@ -51,6 +53,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -390,7 +393,7 @@ def main():
     tmp = os.path.join(private, STAGED)
     os.mkdir(tmp, 0o700)
     try:
-        faces, listed, built = [], [], []
+        faces, listed, built, webfonts = [], [], [], []
         for (p, style, ps, ttf_name, woff_name), src in zip(plan, spaced):
             f = src.font()
             set_names(f, bn, T["family"], style["name"], style["weight"], a, a.version)
@@ -398,6 +401,7 @@ def main():
             if fixed:
                 print(f"{style['name']}: {len(fixed)} spacing accents reclassed from mark to base in GDEF")
             ttf_data = C.font_bytes(f)
+            started = time.perf_counter()
             w = TTFont(io.BytesIO(ttf_data))
             opts = subset.Options()
             opts.layout_features = ["*"]
@@ -413,13 +417,16 @@ def main():
                 sub_.populate(glyphs=w.getGlyphOrder())
             sub_.subset(w)
             woff_data = C.font_bytes(w, "woff2")
+            seconds = time.perf_counter() - started
             for name, data in ((ttf_name, ttf_data), (woff_name, woff_data)):
                 files.write(os.path.join(tmp, name), data)
             built.append((src, ttf_name, ttf_data, woff_name, woff_data))
             faces.append((ps, style["weight"]))
             listed += [ttf_name, woff_name]
-            print(f"{style['name']}: {ttf_name} ({len(f.getGlyphOrder())} glyphs), {woff_name} "
-                  f"({len(w.getGlyphOrder())} glyphs)")
+            webfonts.append({"style": style["name"], "file": woff_name, "bytes": len(woff_data),
+                             "glyphs": len(w.getGlyphOrder()), "seconds": round(seconds, 1)})
+            print(f"{style['name']}: {ttf_name} ({len(f.getGlyphOrder())} glyphs, {len(ttf_data)} bytes), {woff_name} "
+                  f"({len(w.getGlyphOrder())} glyphs, {len(woff_data)} bytes, {seconds:.1f} s)")
         verify(built, b.subset)
         year = datetime.date.today().year
         with open(os.path.join(tmp, "OFL.txt"), "wb") as fh:
@@ -467,12 +474,12 @@ a larger work. A modified version keeps this licence and the copyright lines, an
         # Every sha256 is of the bytes this run read or wrote.
         name = os.path.basename
         chain = {"base_json_sha256": base_sha, "inputs": [s.entry(name(s.path)) for s in spaced],
-                 "outputs": [{"file": n, "sha256": C.sha256_bytes(d)} for _, tn, td, wn, wd in built
-                             for n, d in ((tn, td), (wn, wd))],
+                 "outputs": [{"file": n, "sha256": C.sha256_bytes(d), "from": src.sha256}
+                             for src, tn, td, wn, wd in built for n, d in ((tn, td), (wn, wd))],
                  "targets": b.targets.entry(name(a.targets))}
         L.save_json({"chain": chain, "fit_log": b.fit.blob.entry(name(a.fit_log)),
                      "space_logs": [sp.blob.entry(name(p)) for p, sp in zip(a.space_log, b.spaces)],
-                     "files": listed}, os.path.join(tmp, "package-log.json"))
+                     "files": listed, "webfonts": webfonts}, os.path.join(tmp, "package-log.json"))
         publish(private_fd, out_dir, a.replace)
     finally:
         os.close(private_fd)

@@ -118,20 +118,25 @@ class ApprovalIsBoundToTheFilesAsked(unittest.TestCase):
         self.refused(r, "question")
 
     def test_a_manifest_url_is_in_the_question_and_a_changed_one_is_refused(self):
-        src = ["--font", self.base, "--licence", self.ofl, "--source", "manifest", "--manifest-entry",
-               "fixtures/lumen-ledger@1"]
-        ask = T.run("record_base.py", *src, "--url", "https://example.org/fonts/lumen-ledger.ttf", "--question-only",
-                    "--out", self.out)
+        key, url = "fixtures/lumen-ledger@1", "https://example.org/fonts/lumen-ledger.ttf"
+        entry = T.manifest_entry(key, self.base, self.ofl)
+        entry["files"][0]["url"] = url
+        skill = T.pinned_skill(self.dir, {"families": {key: entry}})
+        src = ["--font", self.base, "--licence", self.ofl, "--source", "manifest", "--manifest-entry", key]
+        ask = T.run("record_base.py", *src, "--url", url, "--question-only", "--out", self.out, skill=skill)
         self.assertEqual(ask.returncode, 0, ask.stderr)
         question = ask.stdout.strip()
-        self.assertIn("fixtures/lumen-ledger@1", question)
-        self.assertIn("https://example.org/fonts/lumen-ledger.ttf", question)
+        self.assertIn(key, question)
+        self.assertIn(url, question)
         record = ["--question", question, "--answer", T.SYNTHETIC_ANSWER, "--decision", "approved",
                   "--font-sha256", sha(self.base), "--license-sha256", sha(self.ofl), "--out", self.out]
-        moved = T.run("record_base.py", *src, "--url", "https://example.org/elsewhere/lumen-ledger.ttf", *record)
-        self.refused(moved, "question")
-        self.refused(T.run("record_base.py", *src, *record), "question")
-        r = T.run("record_base.py", *src, "--url", "https://example.org/fonts/lumen-ledger.ttf", *record)
+        entry["files"][0]["url"] = moved = "https://example.org/elsewhere/lumen-ledger.ttf"
+        T.write(os.path.join(skill, "bases.json"), json.dumps({"families": {key: entry}}))
+        self.refused(T.run("record_base.py", *src, "--url", moved, *record, skill=skill), "question")
+        self.refused(T.run("record_base.py", *src, "--url", url, *record, skill=skill), "pinned manifest")
+        entry["files"][0]["url"] = url
+        T.write(os.path.join(skill, "bases.json"), json.dumps({"families": {key: entry}}))
+        r = T.run("record_base.py", *src, "--url", url, *record, skill=skill)
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_only_an_approved_decision_records_a_base(self):
@@ -161,6 +166,90 @@ class ApprovalIsBoundToTheFilesAsked(unittest.TestCase):
                 self.assertIn("approval", r.stderr)
                 self.assertFalse(os.path.exists(self.p("build")))
 
+
+
+class PinnedHangulBase(unittest.TestCase):
+    """A base recorded as from the pinned manifest is the entry it names, byte for byte, and a build with korean in
+    its scripts takes no other base. The skill copy's bases.json pins one synthetic base as lumen-ledger."""
+    KEY = "lumen-ledger"
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="mf-pinned-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.base = T.glyf_vf(self.p("LumenLedger[wght].ttf"))
+        self.ofl = T.write(self.p("OFL.txt"), T.ofl_text())
+        self.out = self.p("base.json")
+        self.skill = T.pinned_skill(self.dir, {"families": {self.KEY: T.manifest_entry(self.KEY, self.base, self.ofl)}})
+        self.targets = T.write(self.p("targets.json"), json.dumps(
+            {"family": T.NEW_FAMILY, "scripts": ["latin", "korean"], "styles": [{"name": "Regular", "weight": 400}],
+             "targets": {}, "tolerances": {}, "hangul": {"stem": [{"value": 90, "unit": "cap700", "confidence": "high"}]}}))
+
+    def p(self, *name):
+        return os.path.join(self.dir, *name)
+
+    def ask(self, *source):
+        return T.run("record_base.py", "--font", self.base, "--licence", self.ofl, *source, "--question-only",
+                     "--out", self.out, skill=self.skill)
+
+    def refused(self, r, *words):
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+        for w in ("refused",) + words:
+            self.assertIn(w, r.stderr)
+
+    def test_the_approval_step_asks_about_a_manifest_base_only_when_its_files_are_the_pinned_ones(self):
+        pinned = T.pinned_source(self.KEY, self.base)
+        r = self.ask(*pinned)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"from the pinned manifest entry {self.KEY}", r.stdout)
+        cases = {"an entry the manifest does not have": ("--source", "manifest", "--manifest-entry", "elsewhere",
+                                                         "--url", T.pinned_url(self.KEY, self.base)),
+                 "a URL the entry does not pin": ("--source", "manifest", "--manifest-entry", self.KEY,
+                                                  "--url", "https://fonts.example/elsewhere/LumenLedger[wght].ttf"),
+                 "no URL": ("--source", "manifest", "--manifest-entry", self.KEY)}
+        for case, source in cases.items():
+            with self.subTest(case=case):
+                self.refused(self.ask(*source), "pinned manifest")
+        T.write(self.ofl, T.ofl_text("Copyright 2026 Someone Else"))
+        with self.subTest(case="a licence the entry does not pin"):
+            self.refused(self.ask(*pinned), "pinned manifest", "licence")
+
+    def test_a_shortlist_row_whose_file_changed_after_the_ranking_is_refused(self):
+        T.write(self.p("shortlist.json"), json.dumps({"rows": [
+            {"family": T.BASE_FAMILY, "file": self.base, "licence_path": self.ofl, "origin": f"manifest/{self.KEY}",
+             "manifest_entry": self.KEY, "url": T.pinned_url(self.KEY, self.base)}]}))
+        src = ("--shortlist", self.p("shortlist.json"), "--family", T.BASE_FAMILY, "--question-only", "--out", self.out)
+        r = T.run("record_base.py", *src, skill=self.skill)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        T.glyf_vf(self.base, copyright_line="Copyright 2026 Someone Else")  # the cached file, other bytes
+        self.refused(T.run("record_base.py", *src, skill=self.skill), "pinned manifest", sha(self.base))
+
+    def build_steps(self, base_json):
+        """fit_font.py and package.py on these targets with this base.json, as far as they get."""
+        logs = ("--fit-log", self.p("build", "fit-log.json"), "--space-log", self.p("build", "x.space-log.json"))
+        return {"fit": T.run("fit_font.py", self.base, self.targets, "--base-json", base_json, "--out-dir",
+                             self.p("build"), skill=self.skill),
+                "package": T.run("package.py", self.base, "--targets", self.targets, "--base-json", base_json, *logs,
+                                 "--holder", "Synthetic Holder", "--out-dir", self.p("dist"), skill=self.skill)}
+
+    def test_a_build_with_korean_in_its_scripts_refuses_a_base_from_outside_the_manifest(self):
+        self.assertEqual(T.approve(self.base, self.ofl, self.p("local.json"), skill=self.skill).returncode, 0)
+        for step, r in self.build_steps(self.p("local.json")).items():
+            with self.subTest(step=step):
+                self.refused(r, "pinned manifest", "local")
+        self.assertFalse(os.path.exists(self.p("build")))
+
+    def test_a_build_with_korean_in_its_scripts_refuses_a_base_the_manifest_no_longer_pins(self):
+        r = T.approve(self.base, self.ofl, self.out, *T.pinned_source(self.KEY, self.base), skill=self.skill)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        fit = self.build_steps(self.out)["fit"]
+        self.assertNotIn("pinned manifest", fit.stderr)  # the pinned base passes, and the fit stops at its Hangul
+        self.assertIn("H1 syllables", fit.stderr)
+        entry = T.manifest_entry(self.KEY, self.base, self.ofl)
+        entry["files"][0]["sha256"] = "0" * 64
+        T.write(os.path.join(self.skill, "bases.json"), json.dumps({"families": {self.KEY: entry}}))
+        for step, r in self.build_steps(self.out).items():
+            with self.subTest(step=step):
+                self.refused(r, "pinned manifest", sha(self.base))
 
 if __name__ == "__main__":
     unittest.main()

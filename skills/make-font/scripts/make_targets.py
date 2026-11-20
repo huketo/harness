@@ -54,7 +54,7 @@ HANGUL_CLASS_SCHEMA = {
 }
 HANGUL_SCHEMA = {
     "classes": {cls: HANGUL_CLASS_SCHEMA for cls in L.HANGUL_CLASSES},
-    "stem": LENGTHS, "stem_h1": RATIO, "fixed_width": bool, "adv": LENGTHS, "adv_cap": RATIO,
+    "stem": LENGTHS, "stem_h1": RATIO, "stem_n": RATIO, "fixed_width": bool, "adv": LENGTHS, "adv_cap": RATIO,
     "report": {
         "overshoot": LENGTHS, "hstroke": LENGTHS, "overshoot_h1": RATIO, "hstroke_h1": RATIO, "contrast": RATIO,
         "pitch": {cls: ("cap700",) for cls in L.HANGUL_CLASSES}, "pitch_h1": {cls: RATIO for cls in L.HANGUL_CLASSES},

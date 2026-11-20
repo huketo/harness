@@ -13,8 +13,8 @@ Lengths are in cap-normalised units (cap height 700). The JSON also keeps cap_em
 1000 em, and the font's vertical metrics. Every number is a font-wide value or a class mean.
 
 A font with Hangul syllables also gets a `hangul` object: per structural class (H1 to H6) the face size, centre,
-sides and advance, the vertical stem and the report-only numbers, each value tagged with its unit (cap700 when the
-font has a Latin H, em1000 always, ratio). A font without the Latin letters gets the Hangul numbers alone; an H
+sides and advance, the vertical stem (and its ratio to the Latin n stem when the font has an n) and the report-only
+numbers, each value tagged with its unit (cap700 when the font has a Latin H, em1000 always, ratio). A font without the Latin letters gets the Hangul numbers alone; an H
 among them still sets the Hangul's cap700 lengths.
 """
 import argparse
@@ -62,7 +62,7 @@ def measure_path(path, loc=None, stem=None):
         lengths["em1000"] = 1000 / hface.upm
         geo = L.hangul_geometry(hface)
         if geo["classes"]:
-            m["hangul"] = L.hangul_measurement(geo, lengths)
+            m["hangul"] = L.hangul_measurement(geo, lengths, n_stem=m.get("n_stem"))
         else:
             print(f"Hangul left out: no class has {L.CLASS_MIN} syllables of its list (fontlib.HANGUL_CLASSES) "
                   "in this font", file=sys.stderr)
