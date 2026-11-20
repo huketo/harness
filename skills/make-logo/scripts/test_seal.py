@@ -107,14 +107,13 @@ class Seal(Project):
         os.makedirs(empty)
         self.refs = [empty]
         b = self.build(self.recipe())
-        here = os.path.dirname(os.path.abspath(C.__file__))
-        cal = json.load(open(os.path.join(here, "calibration.json")))
+        cal = R.read_json(R.calibration_file(None))
         cal["fused"]["limit"] = 0.0
         zero = self.ws.path("calibration-zero.json")
         R.write_bytes(zero, json.dumps(cal).encode())
         for extra, ok in (((), True), (("--calibration", zero), False)):
             self.check(b, extra=extra)
-            rows = {r["check"]: r for r in json.load(open(os.path.join(b, "check.json")))["checks"]}
+            rows = {r["check"]: r for r in R.read_json(os.path.join(b, "check.json"))["checks"]}
             self.assertEqual(rows["nearest reference"]["value"], "not checked")
             self.assertEqual(rows["nearest reference"]["ok"], ok, extra)
 
