@@ -190,9 +190,10 @@ def built_hangul(inst, fitted, track):
 
 def outline_far(g, want, adv, lsb=None):
     """How a fitted Hangul glyph g (with its advance and hmtx left side bearing) differs from the glyph the build
-    makes (built_hangul): a composite, another point structure, a point or the advance more than HANGUL_POINT_TOL
-    units away, or a left side bearing that is not the outline's left edge (renderers place the outline by the
-    bearing, so a moved bearing moves the drawn glyph). Returns (what is wrong or None, the largest distance)."""
+    makes (built_hangul): a composite, another point structure, or a point or the advance more than
+    HANGUL_POINT_TOL units away. Renderers place a TrueType outline by its left side bearing, so each point is
+    compared where it is drawn: its x moved by the bearing less the outline's left edge. Returns (what is wrong or
+    None, the largest distance)."""
     pts, ends, on, want_adv = want
     if g.isComposite():
         return "is a composite", None
@@ -201,17 +202,32 @@ def outline_far(g, want, adv, lsb=None):
     if (got_ends, [f & 1 for f in g.flags] if got else []) != (ends, on):
         return (f"has {len(got_ends)} contours and {len(got)} points, the build makes {len(ends)} and {len(pts)}",
                 None)
-    dist = max([abs(adv - want_adv)] + [max(abs(a - c), abs(b - d)) for (a, b), (c, d) in zip(got, pts)])
-    if lsb is not None and got:
-        edge = min(x for x, _ in got)
-        if abs(lsb - edge) > HANGUL_POINT_TOL:
-            return f"left side bearing {lsb}, the outline's left edge is {edge}", max(dist, abs(lsb - edge))
+    shift = lsb - min(x for x, _ in got) if lsb is not None and got else 0
+    drawn = [(x + shift, y) for x, y in got]
+    dist = max([abs(adv - want_adv)] + [max(abs(a - c), abs(b - d)) for (a, b), (c, d) in zip(drawn, pts)])
     if dist > HANGUL_POINT_TOL:
-        far = next(((i, p, q) for i, (p, q) in enumerate(zip(got, pts))
+        far = next(((i, p, q) for i, (p, q) in enumerate(zip(drawn, pts))
                     if max(abs(p[0] - q[0]), abs(p[1] - q[1])) > HANGUL_POINT_TOL), None)
-        return (f"point {far[0]} at {tuple(far[1])}, the build puts it at {far[2]}" if far
+        moved = f" (left side bearing {lsb}, {shift:+} from the outline's left edge)" if shift else ""
+        return (f"point {far[0]} drawn at {tuple(far[1])}{moved}, the build puts it at {far[2]}" if far
                 else f"advance {adv}, the build gives {want_adv}"), dist
     return None, dist
+
+
+def space_track(G, b, fit, fitted, spaced_sha):
+    """The track space_font.py added to the font this packaged font came from: the package log records the spaced
+    font's sha256 for each output, the space log that wrote that font gives the track, and that log must have read
+    this style's fitted font. Two space runs of one fit share an input, so the input alone does not say which."""
+    made = [sp for sp in b.spaces if spaced_sha and spaced_sha in C.outputs(sp)]
+    fit_out = {os.path.basename(o["file"]): o["sha256"] for o in fit["chain"]["outputs"]}
+    fitted_sha = fit_out.get(fitted.get("file"))
+    read = made and any(i.get("sha256") == fitted_sha for i in made[0]["chain"].get("inputs") or [])
+    G.add("provenance", "Hangul spacing from the space log that made this font", bool(read),
+          f"track {made[0].get('track', 0)} from {os.path.basename(made[0].blob.path)}" if read else
+          "the package log names no spaced font for this output" if not spaced_sha else
+          "no space log wrote the spaced font this output came from" if not made else
+          f"the space log that wrote it read another font than the fit's {fitted.get('file')}")
+    return made[0].get("track", 0) if read else 0
 
 
 def gate_hangul(G, f, base, fitted, track=0):
@@ -254,8 +270,8 @@ def gate_hangul(G, f, base, fitted, track=0):
             sides["base"].append(min(p.bounds[0], ihm[name][0] - p.bounds[2]) * k)
     G.add("provenance", OUTLINE_GATE, not far,
           f"{len(built) - len(far)} of {len(built)} simple, with the points the base at {h['location']} gets from the "
-          f"fit log's transform, overlap removal, the em scale and the track: every point, advance and left side bearing within "
-          f"{HANGUL_POINT_TOL} unit, the largest distance {worst:g}" + (": " + "; ".join(far[:4]) if far else ""))
+          f"fit log's transform, overlap removal, the em scale and the track: every point, where it is drawn, and the "
+          f"advance within {HANGUL_POINT_TOL} unit, the largest distance {worst:g}" + (": " + "; ".join(far[:4]) if far else ""))
     if sides["fitted"]:  # a face grown past its sides runs into the next syllable (references/fitting.md, Limits)
         G.add("hangul", "Hangul ink inside the advance", None, "; ".join(
             f"{what}: {sum(v < 0 for v in vals)} of {len(vals)} glyphs leave it, smallest side {min(vals):.0f}"
@@ -602,11 +618,7 @@ def main():
         hangul = L.hangul_glyphs(f) if fitted.get("hangul") else {}
         gate_provenance(G, f, subset_font, a.reference, fitted.get("y_location"), skip=hangul)
         if hangul:
-            # The space log that read this style's fitted font, found by content: a copy under another name is the same font.
-            fit_out = {os.path.basename(o["file"]): o["sha256"] for o in fit["chain"]["outputs"]}
-            fitted_sha = fit_out.get(fitted.get("file"))
-            track = next((sp.get("track", 0) for sp in b.spaces
-                          if any(i.get("sha256") == fitted_sha for i in (sp.get("chain") or {}).get("inputs", []))), 0)
+            track = space_track(G, b, fit, fitted, pk.made_from.get(blob.sha256))
             inst = gate_hangul(G, f, subset_font, fitted, track)
             gate_harmony(G, face, T)
             gate_strokes(G, face, inst, fitted["em_scale"])

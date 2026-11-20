@@ -418,11 +418,6 @@ def safe_file(url):
     return re.sub(r"[^A-Za-z0-9_.\[\]-]", "_", urllib.parse.unquote(urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]))
 
 
-def sha256_file(path):
-    with open(path, "rb") as fh:
-        return hashlib.sha256(fh.read()).hexdigest()
-
-
 def search_rows(a, tg, styles, use, scripts, category):
     """The Google Fonts candidates (coarse, then fine) and the --local fonts, measured."""
     rows = []

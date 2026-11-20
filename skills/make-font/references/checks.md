@@ -26,7 +26,8 @@ refuses to go on when a link is broken. `chain.verify_build` is the same check `
 with the arguments `fit-log.json` records does not have the recorded sha256 (the subset file is never read);
 `space_font.py` read anything but fitted fonts and this `targets.json`. Then the package log: it must record
 this `targets.json` and exactly the fit and space logs given (by sha256), have taken only spaced fonts, list
-every font checked here as an output, and find every output it lists (each TTF and WOFF2) in its own folder with
+every font checked here as an output, name for each output the spaced font (one of its inputs) it came from, and
+find every output it lists (each TTF and WOFF2) in its own folder with
 the recorded sha256. Each input is read once, so the gates run on the bytes the chain checked. When every link
 holds, the **chain** group lists them as PASS. That
 structure is the provenance guarantee: the steps that draw the font never opened a reference. It cannot rule
@@ -62,9 +63,12 @@ that leads to an input, through a link or not, is refused.
   compatibility jamo at the one scale, with no shift and no advance added. And every Hangul glyph must be the glyph
   the build makes from the subset's glyph at the fit's Hangul location, point by point: the logged transform
   (`fontlib.transform_hangul`, the fit's own function), overlap removal when the fit removed overlaps, the em scale
-  (`em_scale`, each coordinate rounded once, as fontTools' `scale_upem` does) and the space log's track. The glyph
-  must be simple, with the same contours and points, and each point and the advance within 1 unit, and its left side
-  bearing must be its outline's left edge (renderers place the outline by the bearing); the report gives
+  (`em_scale`, each coordinate rounded once, as fontTools' `scale_upem` does) and the track of the space log that
+  wrote the spaced font the package log names for this output, a log that must have read this style's fitted font
+  (two space runs of one fit read the same font, so the input alone does not pick the log). The glyph must be
+  simple, with the same contours and points, and each point, where it is drawn, and the advance within 1 unit:
+  renderers place the outline by its left side bearing, so a point is drawn at its x moved by the bearing less
+  the outline's left edge; the report gives
   the largest distance found (0 on the end-to-end runs). So the class scales the log records are the allowance, and
   any other outline change fails, inside the ink box or not, a composite left or made included. Remaking the
   overlap removal needs skia-pathops, which `check_font.py` lists; without it the gate fails. On Noto Sans KR

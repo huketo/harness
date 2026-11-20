@@ -482,26 +482,82 @@ class LatinCapGrowsWithWeight(StepsRan, Scratch):
         self.assertAlmostEqual(first["weight_missed_pct"], (160 * 700 / 840 / 150 - 1) * 100, delta=0.3)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class LeftSideBearing(unittest.TestCase):
+    @staticmethod
+    def box(left):
+        """A box glyph from x=left to left+500, and the build's glyph for it (its points, contours, flags, advance)."""
+        from fontTools.pens.ttGlyphPen import TTGlyphPen
+        pen = TTGlyphPen(None)
+        pen.moveTo((left, 0))
+        pen.lineTo((left, 700))
+        pen.lineTo((left + 500, 700))
+        pen.lineTo((left + 500, 0))
+        pen.closePath()
+        g = pen.glyph()
+        g.recalcBounds(None)
+        return g, (list(g.coordinates), list(g.endPtsOfContours), [f & 1 for f in g.flags], 800)
+
     def test_a_moved_left_side_bearing_is_a_moved_glyph(self):
         """Renderers place a TrueType outline by its hmtx left side bearing, so a bearing that is not the outline's
         left edge draws the glyph elsewhere even with every point in place."""
         import check_font
-        from fontTools.pens.ttGlyphPen import TTGlyphPen
-        pen = TTGlyphPen(None)
-        pen.moveTo((100, 0))
-        pen.lineTo((100, 700))
-        pen.lineTo((600, 700))
-        pen.lineTo((600, 0))
-        pen.closePath()
-        g = pen.glyph()
-        g.recalcBounds(None)
-        want = (list(g.coordinates), list(g.endPtsOfContours), [f & 1 for f in g.flags], 800)
+        g, want = self.box(100)
         self.assertEqual(check_font.outline_far(g, want, 800, 100), (None, 0))
         problem, dist = check_font.outline_far(g, want, 800, 130)
         self.assertIn("left side bearing 130", problem)
         self.assertEqual(dist, 30)
+
+    def test_points_and_a_bearing_each_within_the_tolerance_can_still_draw_the_glyph_too_far(self):
+        """Points one unit right and a bearing two units right of where the build puts them draw the glyph two units
+        right: the tolerance applies where the points are drawn."""
+        import check_font
+        g, want = self.box(100)
+        moved, _ = self.box(101)
+        self.assertEqual(check_font.outline_far(moved, want, 800, 101), (None, 1))
+        problem, dist = check_font.outline_far(moved, want, 800, 102)
+        self.assertIn("drawn at (102, 0)", problem)
+        self.assertEqual(dist, 2)
+
+
+class SpaceTrack(unittest.TestCase):
+    """Two space runs of one fit read the same fitted font. The package log names the spaced font each output came
+    from, and the track comes from the space log that wrote that font, whatever order the logs are given in."""
+
+    def setUp(self):
+        import chain as C
+        import check_font
+        self.check_font = check_font
+        fit = {"chain": {"outputs": [{"file": "build/A-Regular.fit.ttf", "sha256": "fit"}]}}
+        self.fit, self.fitted = fit, {"file": "A-Regular.fit.ttf"}
+
+        def space(track, out, read="fit"):
+            return C.Log(C.Blob(f"build/{out}.space-log.json", b""),
+                         {"track": track, "chain": {"inputs": [{"sha256": read}], "outputs": [{"sha256": out}]}})
+        self.space = space
+
+    def track(self, spaces, spaced_sha):
+        import types
+        from check_font import Gates
+        G = Gates()
+        got = self.check_font.space_track(G, types.SimpleNamespace(spaces=spaces), self.fit, self.fitted, spaced_sha)
+        return got, G.rows[-1]
+
+    def test_the_log_that_wrote_the_packaged_font_gives_the_track_in_either_order(self):
+        a, b = self.space(0, "spaced0"), self.space(8, "spaced8")
+        for spaces in ([a, b], [b, a]):
+            self.assertEqual(self.track(spaces, "spaced8")[0], 8)
+            self.assertEqual(self.track(spaces, "spaced0")[0], 0)
+            self.assertEqual(self.track(spaces, "spaced8")[1][2], "PASS")
+
+    def test_a_space_log_that_read_another_font_fails(self):
+        track, row = self.track([self.space(8, "spaced8", read="other")], "spaced8")
+        self.assertEqual(row[2], "FAIL")
+        self.assertIn("read another font", row[3])
+
+    def test_a_package_log_without_the_spaced_font_fails(self):
+        self.assertEqual(self.track([self.space(8, "spaced8")], None)[1][2], "FAIL")
+        self.assertEqual(self.track([self.space(8, "spaced8")], "elsewhere")[1][2], "FAIL")
+
+
+if __name__ == "__main__":
+    unittest.main()
