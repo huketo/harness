@@ -67,6 +67,12 @@ FALLBACK = {"sans": "sans-serif", "serif": "serif", "mono": "monospace"}
 LEGACY_ACCENTS = "`\u00a8\u00af\u00b4\u00b8\u02c6\u02c7\u02d8\u02d9\u02da\u02db\u02dc\u02dd"
 
 
+
+def _umask() -> int:
+    m = os.umask(0)
+    os.umask(m)
+    return m
+
 def fix_legacy_accents(f):
     """Spacing accents (U+00B4 and friends) are base glyphs, not marks. Some bases class them as marks in GDEF,
     which makes shapers zero their width. Returns the glyphs changed."""
@@ -321,6 +327,8 @@ def main():
     parent = os.path.dirname(out_dir)
     os.makedirs(parent, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix=".package-", dir=parent)
+    # mkdtemp makes the folder 0700; the published package is an ordinary folder like the rest of the build.
+    os.chmod(tmp, 0o777 & ~_umask())
     try:
         faces, listed, built = [], [], []
         for p, src in zip(fonts, spaced):
