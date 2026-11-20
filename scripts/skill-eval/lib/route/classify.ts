@@ -5,6 +5,7 @@
  * loads a skill or watches an agent decide to use one.
  */
 
+import { readFileSync } from "node:fs";
 import { checkFrontmatter, frontmatterFields } from "../../../check-repo.ts";
 import { git, resolveRef } from "../run/skills.ts";
 import { NONE } from "./cases.ts";
@@ -63,10 +64,43 @@ export function descriptionOf(skillMd: string): string {
 	const fields = frontmatterFields(skillMd);
 	const field = Array.isArray(fields) ? fields.findLast((f) => f.key === "description") : undefined;
 	if (!field) throw new Error("no description key in the frontmatter");
-	if (field.block !== null) return field.block;
-	if (field.raw.startsWith('"')) return yamlDoubleQuoted(field.raw);
-	if (field.raw.startsWith("'")) return field.raw.slice(1, -1).replaceAll("''", "'");
-	return field.raw;
+	let text: string;
+	if (field.block !== null) text = field.block.split(/\s+/).join(" ");
+	else if (field.raw.startsWith('"')) text = yamlDoubleQuoted(field.raw);
+	else if (field.raw.startsWith("'")) text = field.raw.slice(1, -1).replaceAll("''", "'");
+	else text = field.raw;
+	// A NUL cannot be passed to the CLI as an argument, so it is refused here with the file's name.
+	if (text.includes("\0")) throw new Error("the description holds a NUL character");
+	return text;
+}
+
+/** Where Claude Code reads managed (administrator) settings; their hooks run even in --safe-mode. */
+export const MANAGED_SETTINGS = [
+	"/etc/claude-code/managed-settings.json",
+	"/Library/Application Support/ClaudeCode/managed-settings.json",
+	"/mnt/c/Program Files/ClaudeCode/managed-settings.json",
+	"C:\\Program Files\\ClaudeCode\\managed-settings.json",
+];
+
+/**
+ * The managed settings files that define hooks. A managed hook runs in safe mode and can add context before the
+ * first model turn, so a paid run refuses while any exists: the classification would no longer read descriptions only.
+ */
+export function managedHookFiles(paths: readonly string[] = MANAGED_SETTINGS): string[] {
+	return paths.filter((p) => {
+		let text: string;
+		try {
+			text = readFileSync(p, "utf8");
+		} catch {
+			return false;
+		}
+		try {
+			const hooks = (JSON.parse(text) as { hooks?: unknown }).hooks;
+			return hooks !== undefined && hooks !== null && Object.keys(hooks as object).length > 0;
+		} catch {
+			return true; // unreadable managed settings cannot be shown to be free of hooks
+		}
+	});
 }
 
 /**

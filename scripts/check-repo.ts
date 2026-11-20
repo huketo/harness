@@ -43,7 +43,7 @@ export function frontmatterFields(text: string): FrontmatterField[] | Omit<Probl
 		if (BLOCK_SCALAR.test(raw)) {
 			// The text is the indented lines that follow; an empty block is an empty value.
 			const body = lines.slice(i + 1, end).findIndex((line) => !/^(\s+\S|\s*$)/.test(line));
-			block = lines.slice(i + 1, body < 0 ? end : i + 1 + body).map((line) => line.trim()).filter(Boolean).join(" ");
+			block = lines.slice(i + 1, body < 0 ? end : i + 1 + body).join(" ").trim();
 		}
 		fields.push({ key: match[1] ?? "", raw, block, line: i + 1 });
 	}

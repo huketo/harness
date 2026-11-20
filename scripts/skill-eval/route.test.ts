@@ -257,8 +257,8 @@ describe("description parsing", () => {
 	});
 
 	test("reads a double-quoted description with YAML's escapes, not JSON's", () => {
-		const yaml = String.raw`"\x41\u00e9\U0001F600 \/ \t \\ \"q\" \ \_\N\L\P\0\a\b\e\v\f\r\n"`;
-		assert.equal(descriptionOf(skillMd("a", yaml)), 'A\u00e9\u{1F600} / \t \\ "q"  \u00a0\u0085\u2028\u2029\0\x07\b\x1b\v\f\r\n');
+		const yaml = String.raw`"\x41\u00e9\U0001F600 \/ \t \\ \"q\" \ \_\N\L\P\a\b\e\v\f\r\n"`;
+		assert.equal(descriptionOf(skillMd("a", yaml)), 'A\u00e9\u{1F600} / \t \\ "q"  \u00a0\u0085\u2028\u2029\x07\b\x1b\v\f\r\n');
 		assert.throws(() => descriptionOf(skillMd("a", String.raw`"bad \q escape"`)), /\\q/);
 	});
 
@@ -381,4 +381,25 @@ describe("design routing cases", () => {
 		assert.equal(skills.length, 8);
 		for (const s of skills) assert.ok(s.description.length > 40, s.name);
 	});
+});
+
+
+test("a paid run is refused while managed settings define hooks; a description with NUL is refused by name", async () => {
+	const { managedHookFiles, descriptionOf } = await import("./lib/route/classify.ts");
+	const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "route-managed-"));
+	try {
+		const none = join(dir, "missing.json");
+		const empty = join(dir, "empty.json");
+		const hooked = join(dir, "hooked.json");
+		writeFileSync(empty, JSON.stringify({ permissions: {} }));
+		writeFileSync(hooked, JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "echo x" }] }] } }));
+		assert.deepEqual(managedHookFiles([none, empty]), []);
+		assert.deepEqual(managedHookFiles([none, empty, hooked]), [hooked]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+	assert.throws(() => descriptionOf('---\nname: demo\ndescription: "A \\0 null."\n---\n'), /NUL/);
 });

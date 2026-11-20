@@ -15,6 +15,7 @@ import { type Deps, defaultDeps } from "../run/runner.ts";
 import { gitText } from "../run/skills.ts";
 import { parseRouting, type RoutePrompt } from "./cases.ts";
 import {
+	managedHookFiles,
 	gradeAnswer,
 	readDescriptions,
 	ROUTE_SCOPE,
@@ -137,6 +138,11 @@ async function execute(opts: RouteOptions, deps: Deps): Promise<number> {
 		return 0;
 	}
 
+	const managed = managedHookFiles();
+	if (managed.length) {
+		log(`refused: managed settings define hooks that run even in --safe-mode and could add context to each call: ${managed.join(", ")}. Run on a machine without managed hooks.`);
+		return 2;
+	}
 	const startedAt = deps.now();
 	const runId = `run-${startedAt.toISOString().replace(/\.\d+Z$/, "Z").replaceAll(":", "-")}`;
 	const outRoot = opts.outRoot ? resolve(deps.cwd, opts.outRoot) : join(deps.repoRoot, "var", "skill-eval", "route");
