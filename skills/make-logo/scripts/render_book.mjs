@@ -32,7 +32,10 @@ async function launch() {
   if (existsSync(sibling)) {
     const { launchChromium } = await import(pathToFileURL(sibling).href);
     const r = await launchChromium({}, { root: opt("--root") || process.cwd() });
-    if (r.browser) return r.browser;
+    if (r.browser) {
+      console.log(`browser: ${r.how}, ${r.from}, through find-chromium.mjs`);
+      return r.browser;
+    }
     console.error(r.error);
   }
   const places = [opt("--root"), process.cwd()].filter(Boolean);
@@ -41,7 +44,9 @@ async function launch() {
     for (const name of ["playwright", "playwright-core"]) {
       try {
         const { chromium } = createRequire(join(p, "x.js"))(name);
-        return await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+        const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+        console.log(`browser: ${process.env.PW_CHROMIUM || "Playwright's own"}, ${name} from ${p}, the fallback`);
+        return browser;
       } catch {}
     }
   }
