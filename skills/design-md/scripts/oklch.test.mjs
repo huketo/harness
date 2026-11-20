@@ -1,7 +1,9 @@
 // Contract tests for skills/design-md/scripts/oklch.mjs: the color forms it reads, the ones it refuses, and the CLI output.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { NAMED_COLORS, deltaEOK, format, labToLch, parseColor } from "./oklch.mjs";
 
@@ -78,6 +80,8 @@ test("refuses color forms it does not read and malformed input", () => {
 		"rgb(1 2)",
 		"hsl(x 1% 1%)",
 		"oklch(0.5 0.1 10 / )",
+		"rgb(255,,0,0)",
+		"rgba(255, 0, 0,)",
 		"notacolor",
 	];
 	for (const input of refused) assert.equal(parseColor(input), null, `${input} is refused`);
@@ -127,10 +131,30 @@ test("CLI --delta says alpha differs past the opacity tolerance and not within i
 	const close = cli("--delta", "rgb(15 23 42 / 0.99)", "#0f172a");
 	assert.equal(close.status, 0, close.stderr);
 	assert.doesNotMatch(close.stdout, /alpha differs/);
+
+	const atLimit = cli("--delta", "rgb(15 23 42 / 98%)", "#0f172a");
+	assert.equal(atLimit.status, 0, atLimit.stderr);
+	assert.doesNotMatch(atLimit.stdout, /alpha differs/, "a difference equal to the limit is inside it");
+
+	const pastLimit = cli("--delta", "rgb(15 23 42 / 97%)", "#0f172a");
+	assert.match(pastLimit.stdout, /alpha differs/);
+});
+
+test("CLI runs when reached through a symbolic link to the skill directory, as the installer links it", () => {
+	const dir = mkdtempSync(join(tmpdir(), "oklch-link-"));
+	try {
+		const link = join(dir, "design-md");
+		symlinkSync(dirname(import.meta.dirname), link, "dir");
+		const run = spawnSync(process.execPath, [join(link, "scripts", "oklch.mjs"), "--delta", "#6b7280", "#737373"], { encoding: "utf8" });
+		assert.equal(run.status, 0, run.stderr);
+		assert.match(run.stdout, /deltaE OK x100 2\.38/);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 test("CLI exits 2 on an unreadable color, a bad --delta, an unknown flag or no input", () => {
-	for (const args of [["lab(50% 40 59)"], ["#ff0000", "color-mix(in oklch, red, blue)"], ["--delta", "red"], ["--delta", "red", "lch(50% 70 40)"], ["--nope"], []]) {
+	for (const args of [["lab(50% 40 59)"], ["rgb(255,,0,0)"], ["#ff0000", "color-mix(in oklch, red, blue)"], ["--delta", "red"], ["--delta", "red", "lch(50% 70 40)"], ["--nope"], []]) {
 		const run = cli(...args);
 		assert.equal(run.status, 2, `${JSON.stringify(args)} exits 2; stdout ${run.stdout}`);
 		assert.match(run.stderr, /^oklch: /, `${JSON.stringify(args)} explains on stderr`);

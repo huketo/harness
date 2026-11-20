@@ -82,11 +82,11 @@
     {
       "id": 8,
       "name": "token-mapping-report-read-only",
-      "prompt": "design-md로 설정 화면이 우리 토큰을 제대로 쓰는지 대응 보고서만 만들어 주세요. 토큰 소스 src/styles/tokens.css에는 --color-text-muted: #6b7280(보조 본문 텍스트)와 --color-border-default: #6b7280(입력 테두리)가 있습니다. src/settings/SettingsPanel.tsx 42행의 보조 설명 문단은 color: #737373을, 57행의 구분선은 border-color: #6b7280을 씁니다. 파일은 고치지 마세요.",
+      "prompt": "design-md로 설정 화면이 우리 토큰을 제대로 쓰는지 대응 보고서만 만들어 주세요. 토큰 소스 src/styles/tokens.css에는 --color-text-muted: #6b7280(보조 본문 텍스트)와 --color-border-default: #737373(입력 테두리)가 있습니다. src/settings/SettingsPanel.tsx 42행의 보조 설명 문단은 color: #737373을, 57행의 구분선은 border-color: #6b7280을 씁니다. 파일은 고치지 마세요.",
       "expected_output": "Delivers a read-only mapping report in the reply: classifies the muted paragraph color by its text job against the text token with a numeric deltaE OK, puts the border token under Do not use for text rows, edits no file, creates no token, and ends with a Coverage line.",
       "files": [],
       "expectations": [
-        "Classifies each value by its job before its value, so the paragraph color is compared with the text token and the border token is not offered as its match.",
+        "Classifies each value by its job before its value, so the paragraph color is compared with the text token and the border token, whose value equals the paragraph's, goes under Do not use rather than being offered as its match.",
         "States the color difference as a number (deltaE OK) computed with code rather than judged by eye.",
         "Edits no file, writes no design-system artifact, and names no new token.",
         "Ends the report with a line that starts with `Coverage:`."

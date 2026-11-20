@@ -4,7 +4,7 @@ Use this format when the user asks to document one shared component in depth: "d
 
 ## Destination and evidence
 
-Settle the destination with the main workflow's first step. Prefer the repository's existing component-documentation location; otherwise add the entry where documentation ownership puts it and link it from the artifact's Components and states section, so one place owns each component's contract.
+Prefer the repository's existing component-documentation location; otherwise put the entry where documentation ownership puts it. When a design-system artifact exists, link the entry from its Components and states section, so one place owns each component's contract. When none exists, the entry stands on its own and the link waits until an artifact is requested.
 
 The entry uses the artifact's evidence notation:
 
@@ -56,7 +56,7 @@ Every entry uses these nine H2s. Usage holds six fixed H3s, Examples holds `### 
 - *When to use, When not to use.* Two to four lines each, each a situation the designer is in, not a property of the component. Each "when not" names the other component to use instead.
 - *Rules.* States over time, input methods, focus, feedback, composition, placement, density.
 - *Content.* Rules per copy slot: casing, template, length, forbidden words.
-- *Agent defaults.* What an agent writes by default that this project does not, found by giving a fresh agent a task with the component and comparing its code with the call sites. Without that comparison, write `Unknown: not compared`.
+- *Agent defaults.* What an agent writes by default that this project does not, taken from a comparison that already exists (a review note, an eval result, or a recorded diff of agent code against the call sites), cited by path. Without one, write `Unknown: not compared`.
 - *Limits.* A number set below a measured break, with the measurement's path, or `Unknown: not measured` and what to measure.
 
 **Accessibility.** The native element or primitive it rests on, its role, the keys that operate it, where focus goes afterwards, and the accessible name in every variant. Say which facts came from code and which from a rendered story; neither establishes conformance for the whole product.

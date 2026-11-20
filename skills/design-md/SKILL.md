@@ -18,6 +18,8 @@ To learn rules from the user's corrections, settle the destination here, then fo
 
 To report how values in an existing implementation map onto the project's own tokens, follow [the token mapping report](references/mapping-rules.md) in place of sections 2–5. That mode is read-only: it writes no file, edits no code, token definition, or artifact, and delivers its report in the reply, so the destination rules below do not apply to it.
 
+To document one shared component and nothing else, follow [the component entry format](references/component.md) in place of sections 2–4; section 5's completion checks still apply to the entry. Link the entry from the existing design-system artifact when there is one. When there is none, the entry stands on its own: the rule below that creates an artifact applies to artifact requests, not to a link for one entry.
+
 - Honor an explicit output location.
 - Otherwise update the existing repository-owned artifact in place, even when it is not named `DESIGN.md`.
 - If no artifact exists, create one path consistent with repository documentation ownership. Do not create parallel root and docs copies.
@@ -56,7 +58,7 @@ Load deeper guidance only for a domain being documented or changed:
 
 These references guide documentation quality; they do not authorize a redesign or a full interface audit.
 
-To document one shared component in depth, write its entry in [the component entry format](references/component.md) and link it from the artifact's Components and states section.
+When the artifact you are writing needs one shared component documented in depth, write its entry in [the component entry format](references/component.md) and link it from the artifact's Components and states section.
 
 ## 4. Apply deliberate updates
 

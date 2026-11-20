@@ -31,7 +31,7 @@ Normalise both sides with code, never by eye:
 - Lengths to px, using a 16 px root for `rem` unless the project sets another. Line height to a unitless ratio.
 - Colors to OKLCH plus alpha with [`scripts/oklch.mjs`](../scripts/oklch.mjs) in this skill's directory. Run it by absolute path from the repository root: `node <design-md skill directory>/scripts/oklch.mjs <color>...` prints one OKLCH line per color, and `--delta <a> <b>` prints the deltaE OK (OKLab distance times 100) and both alphas. It reads hex (3, 4, 6 and 8 digits), `rgb()`, `hsl()`, `hwb()`, `oklch()`, `oklab()` and the CSS named colors, each with its alpha. It refuses `color()`, `lab()`, `lch()`, `color-mix()`, relative colors, `var()` and `currentColor` with exit code 2; resolve those through a browser's computed style and say so in Source, or leave the row's value **Unknown**.
 - A deltaE OK under 0.5 counts as identical, which absorbs 8-bit rounding.
-- Alpha is part of the color. `--delta` prints `alpha differs` when the alphas are more than 0.02 apart, and such a pair is never Exact.
+- Alpha is part of the color. `--delta` prints `alpha differs` when the alphas are more than 0.02 apart, the opacity tolerance, and such a pair is neither Exact nor Semantic.
 
 Complete when every row and every candidate token has a normalised value per mode, or an Unknown value with the reason.
 
@@ -42,7 +42,7 @@ Give each row one class per mode. Check purpose first, then value; tolerances ap
 | Class | Condition |
 | --- | --- |
 | Exact | The token's documented job covers the row and the normalised values match. |
-| Semantic | The job covers the row and the difference is within tolerance. State the difference in numbers. |
+| Semantic | The job covers the row and every difference is within its tolerance; for a color, both the deltaE OK and the alpha difference. State each difference in numbers. |
 | Ambiguous | Two or more tokens fit and no source picks one. Name every candidate. |
 | Gap | No token's job covers the row, or the only fitting token is out of tolerance. A gap gets no new token name. |
 
@@ -102,8 +102,6 @@ Report in the user's language, in this order:
 8. **Coverage** — the last line, `Coverage:` followed by what was scanned and what was not.
 
 When Gaps exceed 30% of rows and number 12 or more, the list is usually the wrong one for this scope. Say so, still deliver the table, and open the report with `Status: not actionable (gap threshold)`.
-
-Close with one prompt the user can paste to take the next step, such as a documentation update that records the gaps as Proposed.
 
 ### Consistency by role
 
