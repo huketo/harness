@@ -41,6 +41,7 @@ The shortlist is for the person to choose from. Record their answer with record_
 """
 import argparse
 import glob
+import io
 import hashlib
 import json
 import os
@@ -283,7 +284,7 @@ def evaluate(path, tg, styles, use, quick=False, T=None):
     """Measure one candidate the way the targets were measured. Returns the best location and its distance. With T
     and its hangul object, the Hangul is measured too: without an n stem the wght is solved from the Hangul stem as
     the fit solves it (before any transform), and the Hangul ratios add their distance (fontlib.hangul_distance)."""
-    f = TTFont(path)
+    f = path if isinstance(path, TTFont) else TTFont(path)
     axes = L.axes_of(f)
     hangul = (T or {}).get("hangul")
     small = L.subset_font(f, L.SOLVE_TEXT + (L.HANGUL_TEXT if hangul else ""), layout=False)
@@ -384,21 +385,26 @@ def manifest_rows(manifest, cache, T, offline=False):
                 raise SystemExit(str(err))
             print(f"skip {e['family']}: {err}")
             continue
+        # Read each file once: the bytes that pass the pin are the bytes qualified and ranked.
+        with open(font_path, "rb") as fh:
+            font_bytes = fh.read()
+        with open(lic_path, "rb") as fh:
+            lic_bytes = fh.read()
         changed = [f"{os.path.basename(p)} has sha256 {got}, the manifest pins {want}"
-                   for p, want in ((font_path, e["files"][0]["sha256"]), (lic_path, e["license"]["sha256"]))
-                   if (got := sha256_file(p)) != want]
+                   for p, data, want in ((font_path, font_bytes, e["files"][0]["sha256"]),
+                                         (lic_path, lic_bytes, e["license"]["sha256"]))
+                   if (got := hashlib.sha256(data).hexdigest()) != want]
         if changed:
             print(f"skip {e['family']}: {'; '.join(changed)}. Delete the cached file to download it again; a "
                   "different file is not this entry.")
             continue
-        f = TTFont(font_path)
-        with open(lic_path, encoding="utf-8", errors="replace") as fh:
-            ofl_text = fh.read()
+        f = TTFont(io.BytesIO(font_bytes))
+        ofl_text = lic_bytes.decode("utf-8", errors="replace")
         problems = qualify(f, ofl_text)
         if problems:
             print(f"skip {e['family']}: {'; '.join(problems)}")
             continue
-        r = evaluate(font_path, T["targets"], T["styles"], T.get("use", "text"), T=T)
+        r = evaluate(f, T["targets"], T["styles"], T.get("use", "text"), T=T)
         rows.append({"family": e["family"], "file": os.path.abspath(font_path), "origin": f"manifest/{key}",
                      "url": font_url, "manifest_entry": key, "version": e.get("version"),
                      "licence_path": os.path.abspath(lic_path), "coverage": coverage_of(f, T.get("scripts", [])),

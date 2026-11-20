@@ -188,10 +188,11 @@ def built_hangul(inst, fitted, track):
     return out
 
 
-def outline_far(g, want, adv):
-    """How a fitted Hangul glyph g (and its advance) differs from the glyph the build makes (built_hangul): a
-    composite, another point structure, or a point or the advance more than HANGUL_POINT_TOL units away. Returns
-    (what is wrong or None, the largest distance of a point or the advance)."""
+def outline_far(g, want, adv, lsb=None):
+    """How a fitted Hangul glyph g (with its advance and hmtx left side bearing) differs from the glyph the build
+    makes (built_hangul): a composite, another point structure, a point or the advance more than HANGUL_POINT_TOL
+    units away, or a left side bearing that is not the outline's left edge (renderers place the outline by the
+    bearing, so a moved bearing moves the drawn glyph). Returns (what is wrong or None, the largest distance)."""
     pts, ends, on, want_adv = want
     if g.isComposite():
         return "is a composite", None
@@ -201,6 +202,10 @@ def outline_far(g, want, adv):
         return (f"has {len(got_ends)} contours and {len(got)} points, the build makes {len(ends)} and {len(pts)}",
                 None)
     dist = max([abs(adv - want_adv)] + [max(abs(a - c), abs(b - d)) for (a, b), (c, d) in zip(got, pts)])
+    if lsb is not None and got:
+        edge = min(x for x, _ in got)
+        if abs(lsb - edge) > HANGUL_POINT_TOL:
+            return f"left side bearing {lsb}, the outline's left edge is {edge}", max(dist, abs(lsb - edge))
     if dist > HANGUL_POINT_TOL:
         far = next(((i, p, q) for i, (p, q) in enumerate(zip(got, pts))
                     if max(abs(p[0] - q[0]), abs(p[1] - q[1])) > HANGUL_POINT_TOL), None)
@@ -237,7 +242,7 @@ def gate_hangul(G, f, base, fitted, track=0):
     igs, ihm, ogs, oglyf, ohm = inst.getGlyphSet(), inst["hmtx"].metrics, f.getGlyphSet(), f["glyf"], f["hmtx"].metrics
     far, worst, sides, k = [], 0, {"fitted": [], "base": []}, fitted["em_scale"]
     for name, want in built.items():
-        problem, dist = outline_far(oglyf[name], want, ohm[name][0])
+        problem, dist = outline_far(oglyf[name], want, ohm[name][0], ohm[name][1])
         worst = max(worst, dist or 0)
         if problem:
             far.append(f"{name} {problem}")
@@ -249,7 +254,7 @@ def gate_hangul(G, f, base, fitted, track=0):
             sides["base"].append(min(p.bounds[0], ihm[name][0] - p.bounds[2]) * k)
     G.add("provenance", OUTLINE_GATE, not far,
           f"{len(built) - len(far)} of {len(built)} simple, with the points the base at {h['location']} gets from the "
-          f"fit log's transform, overlap removal, the em scale and the track: every point and advance within "
+          f"fit log's transform, overlap removal, the em scale and the track: every point, advance and left side bearing within "
           f"{HANGUL_POINT_TOL} unit, the largest distance {worst:g}" + (": " + "; ".join(far[:4]) if far else ""))
     if sides["fitted"]:  # a face grown past its sides runs into the next syllable (references/fitting.md, Limits)
         G.add("hangul", "Hangul ink inside the advance", None, "; ".join(
@@ -597,7 +602,11 @@ def main():
         hangul = L.hangul_glyphs(f) if fitted.get("hangul") else {}
         gate_provenance(G, f, subset_font, a.reference, fitted.get("y_location"), skip=hangul)
         if hangul:
-            track = next((sp.get("track", 0) for sp in b.spaces if sp.get("input") == fitted.get("file")), 0)
+            # The space log that read this style's fitted font, found by content: a copy under another name is the same font.
+            fit_out = {os.path.basename(o["file"]): o["sha256"] for o in fit["chain"]["outputs"]}
+            fitted_sha = fit_out.get(fitted.get("file"))
+            track = next((sp.get("track", 0) for sp in b.spaces
+                          if any(i.get("sha256") == fitted_sha for i in (sp.get("chain") or {}).get("inputs", []))), 0)
             inst = gate_hangul(G, f, subset_font, fitted, track)
             gate_harmony(G, face, T)
             gate_strokes(G, face, inst, fitted["em_scale"])

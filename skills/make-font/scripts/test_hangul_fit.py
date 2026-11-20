@@ -484,3 +484,24 @@ class LatinCapGrowsWithWeight(StepsRan, Scratch):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LeftSideBearing(unittest.TestCase):
+    def test_a_moved_left_side_bearing_is_a_moved_glyph(self):
+        """Renderers place a TrueType outline by its hmtx left side bearing, so a bearing that is not the outline's
+        left edge draws the glyph elsewhere even with every point in place."""
+        import check_font
+        from fontTools.pens.ttGlyphPen import TTGlyphPen
+        pen = TTGlyphPen(None)
+        pen.moveTo((100, 0))
+        pen.lineTo((100, 700))
+        pen.lineTo((600, 700))
+        pen.lineTo((600, 0))
+        pen.closePath()
+        g = pen.glyph()
+        g.recalcBounds(None)
+        want = (list(g.coordinates), list(g.endPtsOfContours), [f & 1 for f in g.flags], 800)
+        self.assertEqual(check_font.outline_far(g, want, 800, 100), (None, 0))
+        problem, dist = check_font.outline_far(g, want, 800, 130)
+        self.assertIn("left side bearing 130", problem)
+        self.assertEqual(dist, 30)
