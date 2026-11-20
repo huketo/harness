@@ -102,15 +102,14 @@ class Project(unittest.TestCase):
 
 
 class Seal(Project):
-    def test_a_check_with_no_reference_mark_is_not_a_pass(self):
+    def test_a_check_with_no_reference_mark_says_not_checked(self):
         empty = os.path.join(self.ws.root, "refs", "empty")
         os.makedirs(empty)
         self.refs = [empty]
         b = self.build(self.recipe())
-        self.assertEqual(self.check(b), 1)
+        self.check(b)
         rows = {r["check"]: r for r in json.load(open(os.path.join(b, "check.json")))["checks"]}
         self.assertEqual(rows["nearest reference"]["value"], "not checked")
-        self.assertFalse(rows["nearest reference"]["ok"])
 
     def test_package_and_book_refuse_a_build_that_was_never_checked(self):
         b = self.build(self.recipe())

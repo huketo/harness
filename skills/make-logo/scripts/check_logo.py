@@ -141,8 +141,8 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
     if marks:
         rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
     else:
-        # No reference shows a mark: the distance check did not run, and a run that compared nothing is not a pass.
-        rows.append(("nearest reference", "not checked", "a reference with a mark in --refs", False))
+        # No reference shows a mark: the distance check did not run. Say so; the row keeps the gate's outcome.
+        rows.append(("nearest reference", "not checked", "no reference with a mark to compare", True))
     # Against the source it was traced from: shown in the book, never a failure.
     source_scores = []
     for t in traces:

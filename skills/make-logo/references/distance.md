@@ -58,8 +58,9 @@ with it. With the person's own 30 or more, recalibrate on them.
 scores 0.90 against a ring-shaped reference (0.94 under a calibration fitted on 77 references). They do set such
 pairs apart: across eight of them `negative` is 0.26 to 0.42 and `skeleton` over 27, where the median edited copy is
 over 0.5 and under 15. Fitted with `calibrate.py`, they still leave those pairs over the limit. On 73 Are.na
-references (2026-11-20), every combination caught held-out copies at the three's rate, within half a point, or
-better (`negative`: three at once 82% to 97%). But the fit took the new measures as more evidence of a copy, the
+references (2026-11-20), three combinations caught slightly fewer held-out copies of one edit than the three alone
+(with `skeleton`, thinning fell 0.27 points); allowing half a point, every combination matched or beat them
+(`negative`: three at once 82% to 97%). But the fit took the new measures as more evidence of a copy, the
 limit fell with them, and seven of the eight pairs stayed over it in every combination; the coin went under only with
 `skeleton` and without `negative` (0.67 against 0.75). The references hold almost no different marks with one
 silhouette (2 of 2628 pairs overlap over 0.6), so the fit never learns what such a pair looks like. The shipped

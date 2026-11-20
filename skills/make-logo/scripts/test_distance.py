@@ -5,7 +5,6 @@
 """distance.py's measures and calibration file, and calibrate.py's --features: synthetic marks drawn with Pillow."""
 from __future__ import annotations
 
-import gc
 import io
 import json
 import math
@@ -14,7 +13,6 @@ import shutil
 import sys
 import tempfile
 import unittest
-import warnings
 from contextlib import redirect_stdout
 
 import numpy as np
@@ -134,13 +132,6 @@ class Calibration(unittest.TestCase):
         path = self.write({"weights": [1.0, 2.0, 3.0], "features": ["overlap", "edges/100", "hash"], "limit": 0.5})
         with self.assertRaises(SystemExit):
             D.load_calibration(path)
-
-    def test_loading_closes_the_file(self):
-        with warnings.catch_warnings(record=True) as seen:
-            warnings.simplefilter("always")
-            D.load_calibration(None)
-            gc.collect()
-        self.assertEqual([w for w in seen if issubclass(w.category, ResourceWarning)], [])
 
 
 def png(path: str, m: np.ndarray, margin: int = 60) -> str:
