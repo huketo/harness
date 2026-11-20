@@ -1,6 +1,6 @@
 ---
 name: awesome-interface
-description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures, mobile-web behavior. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, native-platform animation APIs, API interface design, or backend-only code review."
+description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures, mobile-web behavior. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system documentation or token mapping reports, native-platform animation APIs, API interface design, or backend-only code review."
 license: MIT
 ---
 
