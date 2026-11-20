@@ -1,18 +1,26 @@
 // Pulls photos for the logo book's mockups from Openverse (references/logo-book.md, "Photos"): free-to-use images,
 // public domain or CC BY only, with each one's creator and source kept for the book's credits page.
 //
-//   node fetch_photos.mjs "<what the product's world looks like>" <outDir> [count=4]
+//   node fetch_photos.mjs "<what the product's world looks like>" <collection name> [count=4]
 //
 // e.g. "support team laptop office". No key. Openverse answers anonymous requests at a low rate; a run is one search
-// and a few downloads. The images are for the book; the credits page lists every one.
-import {mkdir, writeFile} from 'node:fs/promises';
-import {extname, join} from 'node:path';
+// and a few downloads. The images are for the book; the credits page lists every one. They go to
+// ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<collection name>/, and manifest.json lists every file with its sha256
+// (collection.mjs), so trace_ref.py refuses them like any collected image. A photo already there is kept while it has
+// the sha256 the manifest recorded for it with its source, and downloaded again otherwise, so its credits are always
+// for its bytes. A collection that is a symbolic link, or holds one, is refused before anything is asked for.
+import {mkdir} from 'node:fs/promises';
+import {extname} from 'node:path';
 
-const [, , query, out = 'photos', countArg = '4'] = process.argv;
+import {collectionDir, keepOrFetch, recorded, refuseLinks, writeManifest} from './collection.mjs';
+
+const [, , query, name = 'photos', countArg = '4'] = process.argv;
 if (!query) {
-  console.error('Usage: node fetch_photos.mjs "<search words>" <outDir> [count=4]');
+  console.error('Usage: node fetch_photos.mjs "<search words>" <collection name> [count=4]');
   process.exit(1);
 }
+const out = collectionDir(name);
+await refuseLinks(out);
 const count = Number(countArg);
 const H = {'User-Agent': 'make-logo/0.1'};
 // Stock libraries first: StockSnap is CC0 stock photography, Flickr the fallback. Wikimedia is left out: it answers
@@ -36,19 +44,25 @@ for (let n = words.length; n >= 1 && results.length < count; n--) {
 if (!results.length) throw new Error(`No free photos for "${query}"; try other words`);
 if (used !== query) console.log(`searched "${used}" (the full "${query}" found too few)`);
 await mkdir(out, {recursive: true});
+const known = await recorded(out, 'source');
 const items = [];
 for (const p of results) {
   if (items.length >= count) break;
   try {
-    const img = await fetch(p.url, {headers: H});
-    if (!img.ok || !/image\/(jpeg|png|webp)/.test(img.headers.get('content-type') ?? '')) continue;
     const file = `${p.id}${extname(new URL(p.url).pathname) || '.jpg'}`;
-    await writeFile(join(out, file), Buffer.from(await img.arrayBuffer()));
+    const source = p.foreign_landing_url ?? p.url;
+    const sha = await keepOrFetch(out, file, known, async () => {
+      const img = await fetch(p.url, {headers: H});
+      const ok = img.ok && /image\/(jpeg|png|webp)/.test(img.headers.get('content-type') ?? '');
+      return ok ? Buffer.from(await img.arrayBuffer()) : null;
+    }, source);
+    if (!sha) continue;
     items.push({file, title: p.title ?? '', creator: p.creator ?? 'unknown', license: `${p.license.toUpperCase()} ${p.license_version ?? ''}`.trim(),
-      license_url: p.license_url ?? null, source: p.foreign_landing_url ?? p.url});
+      license_url: p.license_url ?? null, source, sha256: sha});
   } catch {
     // A dead link is skipped; the next result takes its place.
   }
 }
-await writeFile(join(out, 'manifest.json'), JSON.stringify({query, fetched: new Date().toISOString(), items}, null, 2));
-console.log(`${items.length} photos in ${out} (${[...new Set(items.map((i) => i.license))].join(', ')}). The book credits each one.`);
+await writeManifest(out, items, {query, fetched: new Date().toISOString()});
+console.log(`${items.length} photos in ${out} (${[...new Set(items.map((i) => i.license))].join(', ')}), each with its ` +
+  'sha256 in manifest.json. The book credits each one.');

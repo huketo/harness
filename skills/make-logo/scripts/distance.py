@@ -1,6 +1,10 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
+# ///
 """How close a logo is to each reference (references/distance.md). Used to keep every variant far from every reference.
 
-    python3 -I distance.py <candidate.png|svg-render.png> <reference image or folder> [...] [--json out.json]
+    uv run distance.py <candidate.png|svg-render.png> <reference image or folder> [...] [--json out.json]
 
 Three measures on the marks' silhouettes, each normalised so that size, position and the ground's colour don't count:
 - `overlap`: the best intersection over union after fitting both into the same box, trying the candidate as is,

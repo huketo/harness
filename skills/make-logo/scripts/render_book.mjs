@@ -3,15 +3,18 @@
 //
 //   node render_book.mjs <book-dir> [--pages 1,3] [--no-pdf] [--root <dir with node_modules/playwright>]
 //
-// Writes <book-dir>/pages/NN-slug.png (2x) and <book-dir>/logobook.pdf (1600 x 900 px pages). Exits 1 if the book's
+// Writes <book-dir>/pages/NN-slug.png (2x) and <book-dir>/logobook.pdf (1600 x 900 px pages). A full render (no
+// --pages) removes the page images pages.json no longer names, so pages/ holds this book only. Exits 1 if the book's
 // font didn't load (a page set in a fallback face) or anything runs off a page.
-// Playwright and a Chromium come from build-design-system/scripts/find-chromium.mjs when that skill is installed beside
+// Playwright and a Chromium come from awesome-interface/scripts/find-chromium.mjs when that skill is installed beside
 // this one, else from --root, the current folder or the global install. PW_CHROMIUM may point at any Chrome.
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execSync } from "node:child_process";
+
+import { pageFile, stalePages } from "./book_pages.mjs";
 
 const args = process.argv.slice(2);
 if (!args.length || args.includes("--help")) {
@@ -25,11 +28,14 @@ const book = JSON.parse(readFileSync(join(dir, "pages.json"), "utf8"));
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function launch() {
-  const sibling = join(here, "..", "..", "build-design-system", "scripts", "find-chromium.mjs");
+  const sibling = join(here, "..", "..", "awesome-interface", "scripts", "find-chromium.mjs");
   if (existsSync(sibling)) {
     const { launchChromium } = await import(pathToFileURL(sibling).href);
     const r = await launchChromium({}, { root: opt("--root") || process.cwd() });
-    if (r.browser) return r.browser;
+    if (r.browser) {
+      console.log(`browser: ${r.how}, ${r.from}, through find-chromium.mjs`);
+      return r.browser;
+    }
     console.error(r.error);
   }
   const places = [opt("--root"), process.cwd()].filter(Boolean);
@@ -38,7 +44,9 @@ async function launch() {
     for (const name of ["playwright", "playwright-core"]) {
       try {
         const { chromium } = createRequire(join(p, "x.js"))(name);
-        return await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+        const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+        console.log(`browser: ${process.env.PW_CHROMIUM || "Playwright's own"}, ${name} from ${p}, the fallback`);
+        return browser;
       } catch {}
     }
   }
@@ -81,11 +89,17 @@ const over = await page.evaluate(() => {
 console.log(`overflow: ${over.length}`);
 over.slice(0, 30).forEach((o) => console.log("  ", o));
 if (over.length) bad++;
-mkdirSync(join(dir, "pages"), { recursive: true });
+const pagesDir = join(dir, "pages");
+mkdirSync(pagesDir, { recursive: true });
 for (const [n, slug] of book.pages) {
   if (only && !only.split(",").includes(String(n))) continue;
   const el = await page.$(`#p${String(n).padStart(2, "0")}`);
-  await el.screenshot({ path: join(dir, "pages", `${String(n).padStart(2, "0")}-${slug}.png`) });
+  await el.screenshot({ path: join(pagesDir, pageFile(n, slug)) });
+}
+if (!only) {
+  const stale = stalePages(readdirSync(pagesDir), book.pages);
+  for (const f of stale) rmSync(join(pagesDir, f));
+  if (stale.length) console.log(`removed ${stale.length} page images from an earlier book: ${stale.join(", ")}`);
 }
 if (!only && !args.includes("--no-pdf")) {
   await page.emulateMedia({ media: "print" });

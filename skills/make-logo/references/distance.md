@@ -48,7 +48,7 @@ with it. With the person's own 30 or more, recalibrate on them.
 ## What it misses
 
 - The near copies come from these edits, not from real remixes. A remix that redraws a mark in a new style can keep
-  its idea and still score low. The look in step 7 is the backstop.
+  its idea and still score low. The look in step 8 is the backstop.
 - Silhouettes stop telling dense, heavy marks apart: a row of rounded bars drawn from nothing scored 0.84 against a
   heavy wordmark. About 1 original mark in 10 is flagged; that's the cost of the limit, and it's why a flag means
   "look at the three nearest", then build another variant.

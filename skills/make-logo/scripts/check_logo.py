@@ -1,10 +1,29 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "skia-pathops", "fonttools", "resvg-py"]
+# ///
 """Check a built direction before anyone sees it (references/building.md, "Checks").
 
-    python3 -I check_logo.py <build dir> [...] --refs <ref folder> [...] [--calibration calibration.json]
+    uv run check_logo.py <build dir> [...] --refs <ref folder> [...] [--calibration calibration.json]
 
 For each direction: the mark rendered at 16, 32, 64 and 512 px; its stroke at 16 px; its counters at 16 px against
 512 px; its palette's contrast; and its distance to every reference. Writes check.json into each build dir and exits 1
 if any direction fails. A failure goes back to the recipe.
+
+Every file build.json lists must still have its sha256, and the list must hold every part the build writes; the
+mark is read from those verified bytes. The references are the trace gates' own (trace_ref.reference_set): every
+--refs image, SVGs rasterised, fit to measure or not, one with transparency seen on white and on black, each read
+once. It refuses to check while one of them can't be read as a mark ("not-comparable") or a --refs path is not there
+("refs-missing"), and removes the builds' old check.json: take that file out, replace it, or mend the path. A traced
+direction (build.json `traces`, verified against its provenance) leaves out only its own source, by sha256, and never
+a collected file: every other reference keeps the usual limit. Its score against that source is recorded in
+`source_scores` for the book to show and fails nothing; a source the person holds rights in may be used unchanged.
+A trace whose gates saw other --refs images, another calibration or other collections than this check is refused,
+and the build's old check.json removed: build it again so the trace is gated against what the check sees. For a
+traced build, a collected file gone or changed since its manifest listed it ("collection-changed") and a file in a
+collection that its manifest does not list ("collection-unlisted") are refused too.
+check.json also records the sha256 of build.json, of the --refs images, of the calibration and, for a traced build,
+of the collections, which package_logo.py and logo_book.py recompute before they go on.
 """
 from __future__ import annotations
 
@@ -23,17 +42,18 @@ from skimage import morphology
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import distance as D  # noqa: E402
 import logolib as L  # noqa: E402
+import rights as R  # noqa: E402
+import trace_ref as T  # noqa: E402
 
 SIZES = (16, 32, 64, 512)
 
 
-def render(svg_path: str, px: int, pad: float = 0.0) -> np.ndarray:
+def render(svg: str, px: int) -> np.ndarray:
     """The mark's ink at `px` on its long side, as floats 0-1 (1 is ink)."""
-    s = open(svg_path).read()
-    png = bytes(resvg_py.svg_to_bytes(svg_string=s, width=px, background="#ffffff"))
+    png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=px, background="#ffffff"))
     im = np.asarray(Image.open(io.BytesIO(png)).convert("L"), dtype=float) / 255
     if im.shape[0] > px:  # a tall mark: refit on height
-        png = bytes(resvg_py.svg_to_bytes(svg_string=s, height=px, background="#ffffff"))
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, height=px, background="#ffffff"))
         im = np.asarray(Image.open(io.BytesIO(png)).convert("L"), dtype=float) / 255
     return 1 - im
 
@@ -51,9 +71,43 @@ def contrast(a: str, b: str) -> float:
     return (x + 0.05) / (y + 0.05)
 
 
-def check(build: str, refs: list[tuple[str, dict]], cal: dict) -> dict:
-    info = json.load(open(os.path.join(build, "build.json")))
-    mark = os.path.join(build, "mark.svg")
+GATE_INPUTS = {"refs_sha256": "--refs images", "calibration_sha256": "calibration", "collected_sha256": "collections"}
+
+
+def forget(build: str) -> None:
+    """Remove a build's check.json, so nothing after a refused check can go on from an earlier one."""
+    if os.path.exists(os.path.join(build, "check.json")):
+        os.remove(os.path.join(build, "check.json"))
+
+
+def check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict:
+    """Check one build against trace_ref.reference_set() and the calibration and write its check.json. A build this
+    refuses keeps no check.json."""
+    try:
+        return _check(build, refset, cal, calibration_sha256)
+    except R.Refused:
+        forget(build)
+        raise
+
+
+def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict:
+    raw = R.read_bytes(os.path.join(build, "build.json"))
+    info = json.loads(raw)
+    files = R.verified_files(build, info)
+    traces = R.traces(build, info, files)
+    # The collections matter only to a trace's gates: an untraced build records none.
+    collected = R.collected(verify=True) if traces else []
+    collected_sha = R.digest(sha for _, sha in collected) if traces else None
+    now = {"refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256, "collected_sha256": collected_sha}
+    for t in traces:
+        stale = [GATE_INPUTS[k] for k, v in now.items() if t["provenance"]["gate"].get(k) != v]
+        if stale:
+            raise R.Refused("trace-gate-stale", f"{build}/{t['svg']} was traced behind gates that saw other "
+                                                f"{' and '.join(stale)} than this check. Build it again with the "
+                                                "same --refs and --calibration, so its trace is gated against "
+                                                "them, then check it.")
+    own = {t["trace"]["source_sha256"] for t in traces} - {sha for _, sha in collected}
+    mark = files["mark.svg"].decode()
     big = render(mark, 512) > 0.5
     small = render(mark, 16)
     rows = []
@@ -79,15 +133,19 @@ def check(build: str, refs: list[tuple[str, dict]], cal: dict) -> dict:
         c = max(contrast(pal["accent"], pal["paper"]), contrast(pal["accent"], pal.get("ink", "#000000")))
         rows.append(("accent against paper or ink", f"{c:.2f}:1", ">= 3:1", c >= 3))
 
-    # Distance: the mark against every reference, scored with the calibrated model.
+    # Distance: the mark against every reference but its own verified source, scored with the calibrated model.
     cand = D.prepare(big, poses=True)
-    near = sorted(((D.fused(D.compare(cand, r), cal), f) for f, r in refs), reverse=True)[:3]
+    marks = [m for m in refset["marks"] if m[1] not in own]
+    near = sorted(((T.score(cand, feats, cal), f) for f, _, feats in marks), reverse=True)[:3]
     top = near[0][0] if near else 0.0
-    # A direction traced from a reference is meant to sit close to it: the score is reported, not held to the limit.
-    if info.get("traced_from"):
-        rows.append(("nearest reference", f"{top:.3f}", f"traced from {info['traced_from']}", True))
-    else:
-        rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
+    rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
+    # Against the source it was traced from: shown in the book, never a failure.
+    source_scores = []
+    for t in traces:
+        r = t["provenance"]["raster"]
+        src = T.ink_box(T.raster_mask(t["source"], r["crop"], r["threshold"], r["invert"], r["long_side"]))
+        score = D.fused(D.compare(cand, D.prepare(src, poses=False)), cal) if src is not None else 0.0
+        source_scores.append({"source_sha256": t["trace"]["source_sha256"], "score": score})
 
     sizes = {}
     for px in SIZES:
@@ -96,32 +154,38 @@ def check(build: str, refs: list[tuple[str, dict]], cal: dict) -> dict:
     report = {"direction": info.get("title", os.path.basename(build)), "checks": [
         {"check": n, "value": v, "pass_at": p, "ok": bool(ok)} for n, v, p, ok in rows],
         "nearest": [{"score": s, "ref": f} for s, f in near], "ink_share_by_size": sizes,
-        # A detailed trace may close up at 16 px (SKILL.md step 7): those rows are reported, and the build still passes.
-        "ok": all(r[3] for r in rows if not (info.get("traced_from") and r[0].endswith("at 16 px")))}
-    json.dump(report, open(os.path.join(build, "check.json"), "w"), indent=1)
+        "source_scores": source_scores, "refs_compared": len(marks), "limit": cal["limit"],
+        # A detailed trace may close up at 16 px (SKILL.md step 8): those rows are reported, and the build still passes.
+        "ok": all(r[3] for r in rows if not (traces and r[0].endswith("at 16 px"))),
+        "build_sha256": R.sha256_bytes(raw), "refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256,
+        "collected_sha256": collected_sha}
+    R.write_bytes(os.path.join(build, "check.json"), json.dumps(report, indent=1, ensure_ascii=False).encode())
     return report
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("builds", nargs="+")
     ap.add_argument("--refs", nargs="+", required=True)
     ap.add_argument("--calibration")
-    a = ap.parse_args()
-    cal = D.load_calibration(a.calibration)
-    refs = []
-    for p in L.images(a.refs):
-        seg = L.segment(L.load(p))
-        if L.usable(seg)[0]:
-            refs.append((p, D.prepare(seg["mask"], poses=False)))
-    print(f"{len(refs)} references to check against, limit {cal['limit']:.3f}")
+    a = ap.parse_args(argv)
+    cal, cal_sha = T.calibration_snapshot(a.calibration)
+    try:
+        refset = T.reference_set(a.refs)
+    except R.Refused:
+        for b in a.builds:
+            forget(b)
+        raise
+    print(f"{len(refset['marks'])} references to check against, limit {cal['limit']:.3f}")
     ok = True
     for b in a.builds:
-        rep = check(b, refs, cal)
+        rep = check(b, refset, cal, cal_sha)
         ok &= rep["ok"]
         print(f"\n{rep['direction']}: {'pass' if rep['ok'] else 'FAIL'}")
         for c in rep["checks"]:
             print(f"  {'ok  ' if c['ok'] else 'FAIL'} {c['check']:28s} {c['value']:>12s}   {c['pass_at']}")
+        for sc in rep["source_scores"]:
+            print(f"  info score against its own traced source {sc['source_sha256'][:12]}: {sc['score']:.3f} (shown, not checked)")
     sys.exit(0 if ok else 1)
 
 

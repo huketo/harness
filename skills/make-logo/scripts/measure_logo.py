@@ -1,6 +1,10 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
+# ///
 """Measure reference logos as whole-mark numbers (references/measuring.md). Never writes an outline.
 
-    python3 -I measure_logo.py <image or folder> [...] --out measurements.json [--sheet rejects.png]
+    uv run measure_logo.py <image or folder> [...] --out measurements.json [--sheet rejects.png]
 
 Lengths are per 1000 units of the mark's height, like make-font's cap at 700. Every reference gets a row; one we
 can't measure (a photo, a scene, a mark running off the edge) gets `usable: false` and the reason.

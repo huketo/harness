@@ -1,14 +1,20 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "resvg-py"]
+# ///
 """Shared image handling for make-logo: load a reference, find its ink on any ground, and normalise it.
 
-A reference is a raster: a screenshot, a photo of a sign, a sheet of marks. Nothing here keeps an outline. The mask
-lives in memory long enough to be measured or compared, then it's gone (references/measuring.md).
+A reference is a raster (a screenshot, a photo of a sign, a sheet of marks) or an SVG, which is rasterised with resvg
+first. Nothing here keeps an outline. The mask lives in memory long enough to be measured or compared, then it's gone
+(references/measuring.md).
 """
 from __future__ import annotations
 
+import io
 import os
 
 import numpy as np
-from PIL import Image, ImageSequence
+from PIL import Image, ImageSequence, UnidentifiedImageError
 from scipy import ndimage as ndi
 from skimage import color, filters, measure, morphology, transform
 
@@ -16,19 +22,59 @@ WORK = 1024  # long side, in pixels, that every reference is measured at
 CANON = 256  # side of the square a mark is normalised into for comparing
 
 
-def load(path: str) -> np.ndarray:
-    """RGB floats 0-1, long side WORK, first frame of an animation, transparency flattened onto white."""
-    im = Image.open(path)
-    im = next(ImageSequence.Iterator(im))
-    if im.mode in ("RGBA", "LA", "P"):
-        im = im.convert("RGBA")
-        ground = Image.new("RGBA", im.size, (255, 255, 255, 255))
-        im = Image.alpha_composite(ground, im)
+def open_image(src) -> Image.Image:
+    """The picture in a path, bytes or open file: a raster's first frame, or an SVG rasterised by resvg to WORK on its
+    long side, transparent around its ink, with a margin of an eighth of WORK each side (an SVG's box is often its
+    ink's, and the ground is read from the border)."""
+    if isinstance(src, (bytes, bytearray)):
+        data = bytes(src)
+    elif hasattr(src, "read"):
+        data = src.read()
+    else:
+        with open(src, "rb") as f:
+            data = f.read()
+    try:
+        im = next(ImageSequence.Iterator(Image.open(io.BytesIO(data))))
+        im.load()
+        return im
+    except UnidentifiedImageError:
+        if b"<svg" not in data:
+            raise
+    import resvg_py  # only an SVG needs it
+
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("latin-1")
+    im = Image.open(io.BytesIO(bytes(resvg_py.svg_to_bytes(svg_string=text, width=WORK))))
+    if im.height > WORK:  # a tall mark: fit its height instead
+        im = Image.open(io.BytesIO(bytes(resvg_py.svg_to_bytes(svg_string=text, height=WORK))))
+    pad = WORK // 8
+    out = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
+    out.paste(im.convert("RGBA"), (pad, pad))
+    return out
+
+
+def transparent(im: Image.Image) -> bool:
+    return im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+
+
+def flatten(im: Image.Image, ground: tuple[int, int, int] = (255, 255, 255), side: int | None = None) -> np.ndarray:
+    """RGB floats 0-1 with any transparency flattened onto `ground`, the long side brought down to WORK, or, given
+    `side`, resized to it either way."""
+    if im.mode == "P" or transparent(im):
+        im = Image.alpha_composite(Image.new("RGBA", im.size, (*ground, 255)), im.convert("RGBA"))
     im = im.convert("RGB")
-    s = WORK / max(im.size)
-    if s < 1:
-        im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    s = (side or WORK) / max(im.size)
+    if s < 1 or (side and s != 1):
+        im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
     return np.asarray(im, dtype=np.float64) / 255
+
+
+def load(path) -> np.ndarray:
+    """RGB floats 0-1, long side at most WORK, first frame of an animation, transparency flattened onto white; an SVG
+    rasterised first (open_image)."""
+    return flatten(open_image(path))
 
 
 def segment(rgb: np.ndarray) -> dict:
@@ -39,6 +85,9 @@ def segment(rgb: np.ndarray) -> dict:
       photo is well under.
     - `ground_share`: the share of border pixels close to the ground colour. Low means the mark runs off the edge or
       the ground isn't plain.
+    - `kept`: the share of the ink seen above the threshold that the mask keeps once specks are dropped, also when
+      none is kept ("no ink found"). Under 1 when something was too small to keep: dust, or a small mark beside a
+      larger one.
     """
     lab = color.rgb2lab(rgb)
     b = np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])
@@ -53,13 +102,15 @@ def segment(rgb: np.ndarray) -> dict:
     between = lo.size * hi.size / flat.size**2 * (lo.mean() - hi.mean()) ** 2 if lo.size and hi.size else 0.0
     separation = float(between / flat.var())
     ink = dist > max(t, 12)  # under 12 Lab units the eye barely tells ink from ground
+    seen = int(ink.sum())
     speck = max(16, int(ink.size * 2e-4))
     try:  # scikit-image 0.26 renamed min_size to max_size; older releases only know min_size.
         ink = morphology.remove_small_objects(ink, max_size=speck)
     except TypeError:
         ink = morphology.remove_small_objects(ink, min_size=speck + 1)
+    kept = float(ink.sum() / seen) if seen else 1.0
     if ink.sum() < 64:
-        return {"ok": False, "why": "no ink found"}
+        return {"ok": False, "why": "no ink found", "kept": kept}
     rows, cols = np.where(ink)
     r0, r1, c0, c1 = rows.min(), rows.max() + 1, cols.min(), cols.max() + 1
     ink_rgb = rgb[ink]
@@ -70,6 +121,7 @@ def segment(rgb: np.ndarray) -> dict:
         "image_size": [int(rgb.shape[0]), int(rgb.shape[1])],
         "separation": separation,
         "ground_share": ground_share,
+        "kept": kept,
         "ground_lab": [round(float(v), 1) for v in ground],
         "ink_colours": colour_count(ink_rgb),
         "reversed": bool(ground[0] < 50),
@@ -134,16 +186,17 @@ def holes(mask: np.ndarray, min_share: float = 0.002) -> list[float]:
     return sorted([round(float(s), 4) for s in sizes if s >= min_share], reverse=True)
 
 
-IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".svg"}
 
 
-def images(paths: list[str]) -> list[str]:
+def images(paths: list[str], onerror=None) -> list[str]:
     """Every image under the given files and folders, at any depth, sorted. fetch_arena.mjs writes one folder per
-    channel, so refs/arena/ holds images a level down."""
+    channel, so refs/arena/ holds images a level down. A folder that can't be listed is passed over unless `onerror`
+    is given: os.walk() calls it with the OSError."""
     out = []
     for p in paths:
         if os.path.isdir(p):
-            for root, dirs, names in os.walk(p):
+            for root, dirs, names in os.walk(p, onerror=onerror):
                 dirs.sort()
                 out += [os.path.join(root, n) for n in sorted(names) if os.path.splitext(n)[1].lower() in IMAGE_EXT]
         elif os.path.splitext(p)[1].lower() in IMAGE_EXT:
