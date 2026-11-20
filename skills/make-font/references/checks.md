@@ -64,12 +64,12 @@ that leads to an input, through a link or not, is refused.
   straight bar. A match is a reason to look, not a verdict: the chain already shows the build never opened the
   reference, and a reference built on the same open base matches by design. A CFF reference cannot be compared
   with TrueType outlines, so the comparison is NOT RUN, and the report and the font book say so.
-- **hangul** (a fit with Hangul targets), per weight:
+- **hangul** (a fit with Hangul targets), per weight. The first two are the weight harmony, and both are NOT RUN
+  when no reference measured Latin (a screenshot of Hangul alone):
   - `Hangul stem / Latin n stem`: the fitted font's ratio within ±0.05 of `hangul.stem_n`, the ratio a reference
-    measured with its own Latin n. NOT RUN when no reference measured both (a screenshot of Hangul alone, or Hangul
-    and Latin from different references).
+    measured with its own Latin n. NOT RUN also when no one reference measured both.
   - `Hangul face centre heights`: every class's mean face centre within ±15 units at cap 700 of its `cy` target.
-    NOT RUN without one (a screenshot has no baseline under the Hangul).
+    NOT RUN also without one (only a font file gives it).
   - `vertical strokes across the classes` (INFO): each class's vertical strokes, read on its measuring syllables
     (`fontlib.hangul_class_strokes`), fitted against the base at the fit's Hangul location, and how far apart the
     classes are in each. The fit promises no stem balance between classes: their x scales may differ by 6 %.

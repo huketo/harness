@@ -217,6 +217,12 @@ class Transform(StepsRan, Scratch):
         got = {name: (state, detail) for _, name, state, detail in G.rows}
         self.assertEqual(got["Hangul stem / Latin n stem"][0], "PASS", got)
         self.assertEqual(got["Hangul face centre heights"][0], "PASS", got)
+        no_latin = copy.deepcopy(t)  # the same Hangul targets, centre heights included, from a reference without Latin
+        del no_latin["targets"]["n_stem"]
+        G = check_font.Gates()
+        check_font.gate_harmony(G, L.Face(font), no_latin)
+        self.assertEqual({name: state for _, name, state, _ in G.rows},
+                         {"Hangul stem / Latin n stem": "NOT RUN", "Hangul face centre heights": "NOT RUN"})
 
 
 class Coverage(unittest.TestCase):

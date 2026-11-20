@@ -234,16 +234,20 @@ def gate_hangul(G, f, base, fitted, track=0):
 
 
 def gate_harmony(G, face, T):
-    """Per weight, the Hangul stem over the Latin n stem against the reference's ratio, and every class's Hangul face
-    centre height against its target. NOT RUN without a reference that measured them: a screenshot of Hangul alone
-    gives neither."""
+    """Weight harmony, per weight: the Hangul stem over the Latin n stem against the reference's ratio, and every
+    class's Hangul face centre height against its target. Both are NOT RUN when no reference measured Latin (a
+    screenshot of Hangul alone); each also needs its own target."""
     tg, h = T["targets"], T.get("hangul") or {}
+    if not tg.get("n_stem"):
+        for name in ("Hangul stem / Latin n stem", "Hangul face centre heights"):
+            G.add("hangul", name, None, "no reference measured Latin", state="NOT RUN")
+        return
     want = L.tagged_value(h.get("stem_n"), "ratio")
     geo = L.hangul_geometry(face)
     cap = face.bounds("H")[3]
-    if not want or not tg.get("n_stem"):
-        G.add("hangul", "Hangul stem / Latin n stem", None, "no reference measured the Hangul stem beside a Latin n "
-              "(a reference without Latin)", state="NOT RUN")
+    if not want:
+        G.add("hangul", "Hangul stem / Latin n stem", None, "no reference measured the Hangul stem beside its own "
+              "Latin n", state="NOT RUN")
     elif geo["stem"]:
         got = geo["stem"] / (L.stem_cap700(face) * cap / L.CAP)
         G.add("hangul", "Hangul stem / Latin n stem", abs(got - want) <= HARMONY_RATIO,
@@ -255,8 +259,8 @@ def gate_harmony(G, face, T):
         if unit and cls in geo["classes"]:
             off[cls] = (geo["classes"][cls]["cy"] - L.tagged_value(w["cy"], unit) * per[unit]) * L.CAP / cap
     if not off:
-        G.add("hangul", "Hangul face centre heights", None, "no reference gave a centre height (a screenshot has no "
-              "baseline under the Hangul)", state="NOT RUN")
+        G.add("hangul", "Hangul face centre heights", None, "no reference gave a centre height (only a font file does)",
+              state="NOT RUN")
     else:
         G.add("hangul", "Hangul face centre heights", all(abs(v) <= HARMONY_CENTRE for v in off.values()),
               ", ".join(f"{c} {v:+.1f}" for c, v in off.items()) + f" from the targets, ±{HARMONY_CENTRE} (cap 700)")
