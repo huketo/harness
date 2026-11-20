@@ -280,6 +280,8 @@ export function parseWrites(lines) {
 export function prove(lines, opts = {}) {
 	const { writes, bad } = parseWrites(lines);
 	if (bad.length) throw new Error(bad.map((b) => `line ${b.line}: ${b.why}: ${JSON.stringify(b.text)}`).join("\n"));
+	// An empty list proves nothing; a surface that sends no writes is captured with --no-backend instead.
+	if (!writes.length) throw new Error("no write is listed, so nothing was judged; list the surface's writes, or capture with --no-backend if it sends none");
 	return writes.map(({ method, url, body }) => ({ method, url, ...decide({ method, url, postData: body }, opts) })).filter((d) => d.action === "continue");
 }
 

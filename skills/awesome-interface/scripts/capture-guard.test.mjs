@@ -64,6 +64,8 @@ test("prove refuses a malformed row with its line number", () => {
 	assert.deepEqual(writes.map((w) => [w.line, w.method]), [[4, "PUT"]]);
 	assert.deepEqual(bad.map((b) => b.line), [3, 5]);
 	assert.throws(() => prove(["POST"]), /line 1/);
+	assert.throws(() => prove([]), /no write is listed/);
+	assert.throws(() => prove(["# only a comment", ""]), /no write is listed/);
 	const file = join(dir, "malformed.txt");
 	writeFileSync(file, `POST ${rpc("items/update")}\nPOST\n`);
 	const r = spawnSync(process.execPath, [GUARD, "prove", "--writes", file], { encoding: "utf8" });
