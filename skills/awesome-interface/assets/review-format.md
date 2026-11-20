@@ -2,6 +2,8 @@
 
 Use with [review.md](../references/review.md), which owns evidence, severity, ranking, caps and verdicts. Replace template instructions with observed facts; omit empty optional sections.
 
+Start the report with the ship line that [review.md](../references/review.md#coverage-and-verdict) defines for the selected verdict, before the scope.
+
 ## Scope
 
 State mode (full, partial or change), requested surfaces, reviewed boundary, stack/styling conventions and project guidance consulted. Name exclusions and uninspected surfaces. For a screenshot, identify the artifact and captured state; for runtime, identify the reviewed route and viewport without exposing private data.
@@ -34,7 +36,7 @@ Full reviews include all six rows. Partial reviews include requested domains and
 
 | Severity | Domain | Location and evidence | Before | Proposed correction | Why: rule and user impact |
 | --- | --- | --- | --- | --- | --- |
-| Confirmed severity | Owning domain | Source path:line and/or runtime artifact, state and observation | Current implementation | Smallest effective fix | Demonstrated harm |
+| Confirmed severity | Owning domain | Source path:line and/or runtime artifact, state and observation | Current implementation | Smallest effective fix, stated as a check that fails on the reviewed build | Demonstrated harm |
 
 Change mode adds a `Status` column containing `Introduced` or `Regression`. One row per source cause; list its confirmed locations in that row. State overflow counts as required by review.md. With no findings, omit the table and say “No actionable interface findings” (or “No confirmed introduced or regression interface findings” in change mode), without implying all checks passed.
 
@@ -52,8 +54,10 @@ List at most three, highest severity first, with location, issue and base eviden
 | --- | --- | --- |
 | Exact executed steps | Source-only, local runtime, screenshot, or other actual boundary | Pass or observed failure |
 
+Record a capture run with its command, exit code and `Coverage:` line, and a pixdiff run with each changed region and how it is explained. Record an Event Timing probe with the interaction and each entry's name and duration, and a focus check with its Tab sequence and the capture of the focused state.
+
 List checks not exercised under **Not verified**, with the missing prerequisite and resulting limitation. Do not count a proposed command as a run or a source inspection as visual verification.
 
 ## Verdict
 
-Use the verdict selected by [review.md](../references/review.md#coverage-and-verdict), its precise reviewed scope, remaining findings and any evidence gaps. A report with no findings but missing required runtime coverage is not an approval.
+Use the verdict selected by [review.md](../references/review.md#coverage-and-verdict), its precise reviewed scope, remaining findings and any evidence gaps. It agrees with the opening ship line. A report with no findings but missing required runtime coverage is not an approval.

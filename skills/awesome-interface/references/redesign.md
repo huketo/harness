@@ -20,6 +20,8 @@ Choose the authorized mode:
 - **Visual overhaul:** change the authorized visual language while retaining working destinations, content, and interactions. A visual redesign alone does not authorize brand replacement or data changes.
 - **Structural redesign:** change navigation, content organization, or flow only where explicitly in scope. Identify affected destinations and transitions, migrate their consumers, and verify old required tasks remain reachable.
 
+A broad complaint with no named scope, such as "the UI is a mess, fix it", authorizes a check first. [Review](review.md) the named or most-used surfaces, then report the findings with the size of the redesign they imply (screens, shared components and tokens touched) and offer it. Start changing screens once that scope is agreed.
+
 For missing runtime access, distinguish source findings from unverified visual hypotheses. Do not claim to have audited states or screens that were not inspected.
 
 ## Diagnose before decorating
@@ -39,7 +41,7 @@ Apply the relevant domain reference for a confirmed issue. Do not fabricate soci
 
 ## Change and verify in coherent slices
 
-Capture a before state for the affected view when available. Implement the smallest coherent slice that serves the redesign, preserving existing components and data contracts. Use existing fixtures or synthetic content rather than changing production records to preview states.
+Capture the affected views before changing them, and the same surfaces, states, widths and themes after each slice. For a locally served web build, use capture.mjs `--kind before` and `--kind after` and compare with pixdiff as [capture and compare](review.md#capture-and-compare) describes. Each changed region belongs to the slice; a region outside it is an unexplained difference and a finding, and often marks a preserved area the slice touched. Implement the smallest coherent slice that serves the redesign, preserving existing components and data contracts. Use existing fixtures or synthetic content rather than changing production records to preview states.
 
 For a visual overhaul, use [art direction](art-direction.md) only where the new visual language needs a decision. Do not generate multiple alternatives, a brand board, screenshots, or DESIGN.md by default. A requested comparison uses the main skill's alternatives workflow and retains the original until selection.
 
