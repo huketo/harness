@@ -22,11 +22,13 @@ In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's ow
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
 fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
 white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
-any of them still can't be read as a mark ("not-comparable": take it out or replace it), while a --refs folder or
-file named is not there or an image is a broken link ("refs-missing"), while a collection holds a file its manifest
-does not list ("collection-unlisted": a pull that stopped, or a file put there by hand), and while a collected file
-is gone or no longer has the sha256 its manifest lists ("collection-changed"). Each file, the source, every
-reference and the calibration, is read once, and the hashes recorded are of the bytes judged.
+any of them still can't be read as a mark, or its mask leaves out a tenth of the ink seen (a sheet of several marks)
+("not-comparable": take it out, or replace it with one mark cropped out of it), while a --refs folder or file named
+is not there, a folder in them can't be listed, or an image is a broken link ("refs-missing"), while a collection is
+or holds a symbolic link ("collection-linked"), while a collection holds a file its manifest does not list
+("collection-unlisted": a pull that stopped, or a file put there by hand), and while a collected file is gone or no
+longer has the sha256 its manifest lists ("collection-changed"). Each file, the source, every reference and the
+calibration, is read once, and the hashes recorded are of the bytes judged.
 Beside the SVG it writes <svg>.provenance.json: the source and its sha256, the person's statement, the brief's
 sha256, every raster and potrace argument, the scores, the potrace binary, and the SVG's sha256.
 """
@@ -35,6 +37,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import math
 import os
 import re
 import subprocess
@@ -128,27 +131,41 @@ def run_potrace(mask_pbm: bytes, potrace: str) -> str:
 
 _SEGMENT_WHY = {"blank image": "blank", "no ink found": "no-ink"}
 _PREPARED: dict[str, tuple[list[dict], str]] = {}  # sha256 -> (features of each mask, "") or ([], why)
+# On each ground a reference's mask must keep this share of the ink logolib.segment() sees there before it drops
+# specks. On one flat mark the specks are dust, a few percent at most; of the 156 collected and reference images of a
+# real run, the three under 90% (86 to 88%) were two photos and a menu.
+KEEP = 0.9
 
 
 def gate_masks(data: bytes) -> tuple[list[np.ndarray], str]:
-    """A reference's ink for the distance gates, one mask for each ground it is seen on, or ([], why) with why a
-    rights.UNCOMPARABLE code. An opaque image is split as logolib.load() gives it, as measuring sees it. One with
-    transparency is split on white and on black, and both masks are kept: a sheet with a dark logo and a light one
-    shows one on each. On each ground, while no ink is found, the image is enlarged to logolib.WORK when it is smaller
-    (a favicon)."""
+    """A reference's ink for the distance gates, one mask for each ground it is seen on, or ([], why) with why the
+    words for the refusal (rights.UNCOMPARABLE). An opaque image is split as logolib.load() gives it, as measuring
+    sees it. One with transparency is split on white and on black, and both masks are kept: a sheet with a dark logo
+    and a light one shows one on each. On each ground, while no ink is found, or the mask keeps under KEEP of the ink
+    seen, the image is enlarged to logolib.WORK when it is smaller (a favicon). A ground on which every size tried
+    keeps under KEEP ("partial") means more than one mark, or a mark too small to keep beside a larger one: the gates
+    would compare with part of the image only, so it is not comparable until it is cropped to one mark. The best size
+    counts, as enlarging blurs a mark that is not there on that ground into specks."""
     try:
         im = L.open_image(data)
     except Exception:  # neither Pillow nor resvg can read it
-        return [], "unreadable"
-    masks, why = [], ""
-    for ground in [(255, 255, 255)] + ([(0, 0, 0)] if L.transparent(im) else []):
+        return [], R.UNCOMPARABLE["unreadable"]
+    masks, why, short = [], "", []
+    for name, ground in [("white", (255, 255, 255))] + ([("black", (0, 0, 0))] if L.transparent(im) else []):
+        best = 0.0
         for side in (None, L.WORK) if max(im.size) < L.WORK else (None,):
             seg = L.segment(L.flatten(im, ground, side))
-            if seg["ok"]:
+            if seg["ok"] and seg["kept"] >= KEEP:
                 masks.append(seg["mask"])
                 break
-            why = why or seg["why"]
-    return masks, "" if masks else _SEGMENT_WHY.get(why, why)
+            best = max(best, seg.get("kept", 1.0))
+            why = why or seg.get("why", "")
+        else:
+            if best < KEEP:
+                short.append(f"{math.floor(best * 1000) / 10:g}% of the ink on {name}")
+    if short:
+        return [], R.UNCOMPARABLE["partial"].format(kept=" and ".join(short), need=f"{KEEP:.0%}")
+    return masks, "" if masks else R.UNCOMPARABLE.get(_SEGMENT_WHY.get(why, why), why)
 
 
 def _prepared(sha: str, data: bytes) -> tuple[list[dict], str]:
@@ -195,7 +212,7 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
         if feats:
             marks.append((f, sha, feats))
         else:
-            uncomparable.append(f"{f} ({R.UNCOMPARABLE.get(why, why)})")
+            uncomparable.append(f"{f} ({why})")
     if missing:
         raise R.Refused("refs-missing", f"these --refs images could not be read: {'; '.join(missing)}. Put them back "
                                         "or take them out of the --refs folders, then run this again.")
@@ -209,7 +226,7 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
                                           f"{'; '.join(uncomparable)}, so they can't say the result is far from it. "
                                           "Take each one out of the --refs folder (or out of its collection, then "
                                           "`node scripts/collection.mjs <name>`), or replace it with a copy that "
-                                          "shows the mark on a plain ground, then run this again.")
+                                          "shows one mark on a plain ground, then run this again.")
     return {"marks": marks, "refs_sha256": R.digest(ref_shas)}
 
 

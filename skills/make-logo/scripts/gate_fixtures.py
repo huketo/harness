@@ -114,6 +114,19 @@ def dark_and_light_on_clear(dark: Image.Image, light: Image.Image) -> Image.Imag
     return out
 
 
+SMALL_MARK_BOX = (900, 300, 924, 324)  # where dark_mark_and_small_light_mark() puts its small mark, padded
+
+
+def dark_mark_and_small_light_mark() -> Image.Image:
+    """A 1200 x 600 transparent sheet: a large dark `tee` and, far from it, `badge` 16 px across in light grey.
+    Flattened onto white only the tee shows; onto black only the badge, which logolib.segment() drops as a speck."""
+    out = Image.new("RGBA", (1200, 600), (0, 0, 0, 0))
+    out.alpha_composite(light_on_clear(mark_image(tee, 500), grey=0), (50, 50))
+    x0, y0, x1, _ = SMALL_MARK_BOX
+    out.alpha_composite(light_on_clear(mark_image(badge, x1 - x0)), (x0, y0))
+    return out
+
+
 def font_bytes(family: str) -> bytes:
     """A TrueType font whose letters are plain boxes: enough for HarfBuzz to shape and for outlines to exist."""
     from fontTools.fontBuilder import FontBuilder

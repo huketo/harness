@@ -147,6 +147,27 @@ class Seal(Project):
         self.check_refused("refs-missing", b)
         self.assertFalse(os.path.exists(os.path.join(b, "check.json")), "a refused check left its old check.json")
 
+    def test_refuses_a_reference_folder_it_cannot_list(self):
+        if os.geteuid() == 0:
+            self.skipTest("root lists any folder")
+        b = self.build(self.recipe())
+        named = os.path.dirname(self.ws.image("refs/named/hidden.png", G.mark_image(G.own)))
+        inner = os.path.dirname(self.ws.image("refs/mine/inner/hidden.png", G.mark_image(G.own)))
+        self.refs = [self.mine, named]
+        for locked in (named, inner):
+            os.chmod(locked, 0)
+            self.addCleanup(os.chmod, locked, 0o755)
+            # check_logo.py; package_logo.py and logo_book.py (rights.sealed); trace_ref.py
+            for step in (lambda: C.main([b, "--refs", *self.refs]), lambda: R.refs_sha256(self.refs),
+                         lambda: T.reference_set(self.refs)):
+                with self.assertRaises(SystemExit) as cm:
+                    step()
+                self.assertIsInstance(cm.exception, R.Refused, f"exited {cm.exception.code} instead of refusing")
+                self.assertEqual(cm.exception.reason, "refs-missing", str(cm.exception))
+                self.assertIn(locked, str(cm.exception))
+            os.chmod(locked, 0o755)
+        self.assertEqual(self.check(b), 0)
+
     def test_refuses_a_file_changed_after_the_check(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
@@ -333,12 +354,13 @@ class CheckReferences(Project):
         blank = self.ws.image("refs/mine/blank.png", Image.new("RGB", (300, 300), "white"))
         broken = self.ws.path("refs", "mine", "broken.png")
         R.write_bytes(broken, b"not an image")
+        sheet = self.ws.image("refs/mine/sheet.png", G.dark_mark_and_small_light_mark())  # the split misses a mark
         with self.assertRaises(SystemExit) as cm:
             C.main([b, "--refs", *self.refs])
         e = cm.exception
         self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
         self.assertEqual(e.reason, "not-comparable", str(e))
-        for f in (blank, broken):
+        for f in (blank, broken, sheet):
             self.assertIn(f, str(e))
         self.assertFalse(os.path.exists(os.path.join(b, "check.json")), "a refused check left its old check.json")
 

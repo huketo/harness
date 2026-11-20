@@ -7,11 +7,12 @@
 // and a few downloads. The images are for the book; the credits page lists every one. They go to
 // ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<collection name>/, and manifest.json lists every file with its sha256
 // (collection.mjs), so trace_ref.py refuses them like any collected image. A photo already there is kept while it has
-// the sha256 the manifest recorded for it, and downloaded again otherwise, so its credits are always for its bytes.
+// the sha256 the manifest recorded for it with its source, and downloaded again otherwise, so its credits are always
+// for its bytes. A collection that is a symbolic link, or holds one, is refused before anything is asked for.
 import {mkdir} from 'node:fs/promises';
 import {extname} from 'node:path';
 
-import {collectionDir, keepOrFetch, recorded, writeManifest} from './collection.mjs';
+import {collectionDir, keepOrFetch, recorded, refuseLinks, writeManifest} from './collection.mjs';
 
 const [, , query, name = 'photos', countArg = '4'] = process.argv;
 if (!query) {
@@ -19,6 +20,7 @@ if (!query) {
   process.exit(1);
 }
 const out = collectionDir(name);
+await refuseLinks(out);
 const count = Number(countArg);
 const H = {'User-Agent': 'make-logo/0.1'};
 // Stock libraries first: StockSnap is CC0 stock photography, Flickr the fallback. Wikimedia is left out: it answers
@@ -42,7 +44,7 @@ for (let n = words.length; n >= 1 && results.length < count; n--) {
 if (!results.length) throw new Error(`No free photos for "${query}"; try other words`);
 if (used !== query) console.log(`searched "${used}" (the full "${query}" found too few)`);
 await mkdir(out, {recursive: true});
-const known = await recorded(out);
+const known = await recorded(out, 'source');
 const items = [];
 for (const p of results) {
   if (items.length >= count) break;

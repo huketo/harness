@@ -7,9 +7,10 @@
 //
 // lists what a collection holds now, after files were deleted or replaced by hand: every file still there with its
 // sha256. A file keeps its earlier details (a photo's credits) only while its bytes are the ones they were recorded
-// for. It also clears what a pull that stopped left behind (`*.part`). Nothing is downloaded.
+// for. It also clears what a pull that stopped left behind (`*.part`). Nothing is downloaded. A collection that is a
+// symbolic link, or holds one, is refused here and by every pull.
 import {createHash} from 'node:crypto';
-import {readdir, readFile, rename, rm, stat, writeFile} from 'node:fs/promises';
+import {lstat, readdir, readFile, rename, rm, stat, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {isAbsolute, join, posix, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -51,19 +52,51 @@ export async function writeAtomic(path, data) {
   await rename(path + PART, path);
 }
 
-/** file -> sha256, as the collection's manifest.json lists them now; empty when it has none. */
-export async function recorded(dir) {
+/**
+ * file -> sha256 of each item the collection's manifest.json lists with `origin`, the field a pull records for where
+ * those bytes came from (a photo's `source`, an Are.na image's `image_url`); empty when it has no manifest. An item
+ * listed without it, a file replaced by hand that collection.mjs listed by its sha256 alone, is left out, so a pull
+ * fetches it again instead of giving those bytes the origin of the file they replaced.
+ */
+export async function recorded(dir, origin) {
   try {
-    return new Map((JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).items ?? []).map((it) => [it.file, it.sha256]));
+    const items = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).items ?? [];
+    return new Map(items.filter((it) => it[origin]).map((it) => [it.file, it.sha256]));
   } catch {
     return new Map();
   }
 }
 
 /**
+ * Refuses a collection folder that is a symbolic link or holds one: a pull would write through it, out of the cache,
+ * and neither the manifest nor rights.py would see what is behind it. A folder not made yet passes.
+ */
+export async function refuseLinks(dir) {
+  const links = [];
+  const walk = async (d) => {
+    for (const e of await readdir(d, {withFileTypes: true})) {
+      if (e.isSymbolicLink()) links.push(join(d, e.name));
+      else if (e.isDirectory()) await walk(join(d, e.name));
+    }
+  };
+  try {
+    if ((await lstat(dir)).isSymbolicLink()) links.push(dir);
+    else await walk(dir);
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+  if (links.length) {
+    throw new Error(`these are symbolic links in a collection: ${links.join(', ')}. A collection and everything in it ` +
+      'must be plain folders and files in the cache. Remove each link, moving what it points to into the collection ' +
+      'if it belongs there, then run this again.');
+  }
+}
+
+/**
  * Puts one pulled file in the collection and returns its sha256. A file already there is kept when it still has the
- * sha256 the manifest recorded for it (`known`, from recorded()); otherwise `download()` fetches it again, and its
- * bytes are written whole. `download()` resolves to the bytes, or to null to skip the file; this then returns null.
+ * sha256 the manifest recorded for it with its origin (`known`, from recorded()); otherwise `download()` fetches it
+ * again, and its bytes are written whole. `download()` resolves to the bytes, or to null to skip the file; this then
+ * returns null.
  */
 export async function keepOrFetch(dir, file, known, download) {
   const path = join(dir, file);
@@ -100,9 +133,10 @@ async function clearParts(dir, prefix = '') {
  * order, then files from earlier pulls, then any other file found there. A file keeps the details of an item (this
  * pull's, else an earlier pull's) only when that item's sha256 is the file's sha256 now: the details describe those
  * bytes. A file changed since is listed with its sha256 alone, so the book credits none of it. A listed file that is
- * gone is dropped, and what an unfinished write left (`*.part`) is removed first.
+ * gone is dropped, and what an unfinished write left (`*.part`) is removed first. Refuses a folder with a link in it.
  */
 export async function writeManifest(dir, items, extra = {}) {
+  await refuseLinks(dir);
   let earlier = [];
   try {
     earlier = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).items ?? [];

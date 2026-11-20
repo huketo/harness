@@ -28,7 +28,9 @@ RIGHTS = ("own-drawing", "own-brand", "licensed")
 HEX64 = re.compile(r"[0-9a-f]{64}")
 # Why the distance gates could not read a mark in an image (trace_ref.gate_masks), for the refusal that names it.
 UNCOMPARABLE = {"blank": "a blank image", "no-ink": "no ink found, enlarged or on either ground",
-                "unreadable": "not readable as an image or an SVG"}
+                "unreadable": "not readable as an image or an SVG",
+                "partial": "more than one mark, or a split that misses part of the mark: the mask keeps {kept}, under "
+                           "{need}; crop it to one mark"}
 
 
 class Refused(SystemExit):
@@ -83,17 +85,19 @@ def calibration_file(path: str | None) -> str:
 
 
 def ref_images(folders: list[str]) -> list[str]:
-    """logolib.images() of the --refs folders and files, refusing ("refs-missing") while one named is not there or an
-    image found is a link to nothing: the gates and the seal would compare and hash nothing in its place."""
+    """logolib.images() of the --refs folders and files, refusing ("refs-missing") while one named is not there, a
+    folder in them can't be listed, or an image found is a link to nothing: the gates and the seal would compare and
+    hash nothing in its place."""
     sys.path.insert(0, HERE)
     import logolib as L
 
-    found = L.images(folders)
-    missing = [p for p in folders if not os.path.exists(p)] + [p for p in found if not os.path.isfile(p)]
+    unlisted = []
+    found = L.images(folders, onerror=lambda e: unlisted.append(f"{e.filename} (can't be listed: {e.strerror})"))
+    missing = [p for p in folders if not os.path.exists(p)] + unlisted + [p for p in found if not os.path.isfile(p)]
     if missing:
-        raise Refused("refs-missing", f"these --refs paths are not there, or are links to nothing: "
-                                      f"{'; '.join(dict.fromkeys(missing))}. Pass folders and files that exist, and "
-                                      "remove or mend each broken link, then run this again.")
+        raise Refused("refs-missing", f"these --refs paths are not there, can't be listed, or are links to nothing: "
+                                      f"{'; '.join(dict.fromkeys(missing))}. Pass folders and files that exist and you "
+                                      "can read, and remove or mend each broken link, then run this again.")
     return found
 
 
@@ -108,27 +112,38 @@ NOT_COLLECTIONS = ("fonts", "potrace")  # the caches beside the collections; col
 MANIFEST = "manifest.json"
 
 
-def _files_under(d: str) -> set[str]:
-    """Every file under `d`, as a path relative to it with forward slashes, the way a manifest names it."""
-    out = set()
+def _contents(d: str) -> tuple[set[str], list[str]]:
+    """(every file under `d`, as a path relative to it with forward slashes, the way a manifest names it; every
+    symbolic link under it). os.walk() lists a link but never goes into one."""
+    files, links = set(), []
     for root, dirs, names in os.walk(d):
         dirs.sort()
-        out |= {os.path.relpath(os.path.join(root, n), d).replace(os.sep, "/") for n in names}
-    return out
+        links += [os.path.join(root, n) for n in sorted(dirs + names) if os.path.islink(os.path.join(root, n))]
+        files |= {os.path.relpath(os.path.join(root, n), d).replace(os.sep, "/") for n in names}
+    return files, links
 
 
 def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, str]]:
     """(file, sha256 listed for it) for every item of every collection: each folder under the cache but the font and
-    potrace caches. Refuses ("collection-unlisted") while a collection holds a file its manifest.json does not list:
-    a pull that stopped before it rewrote the manifest (its files, a `.part` it was writing, or no manifest at all) or
-    a file added by hand would otherwise be compared with nothing and change no digest. With `verify`, it also
-    refuses ("collection-changed") while a listed file is gone or its bytes no longer have that sha256."""
+    potrace caches. Refuses ("collection-linked") while a collection, or anything in it, is a symbolic link: a pull
+    writes through it, and collection.mjs lists nothing behind it. Refuses ("collection-unlisted") while a collection
+    holds a file its manifest.json does not list: a pull that stopped before it rewrote the manifest (its files, a
+    `.part` it was writing, or no manifest at all) or a file added by hand would otherwise be compared with nothing and
+    change no digest. With `verify`, it also refuses ("collection-changed") while a listed file is gone or its bytes no
+    longer have that sha256."""
     root = root or cache_root()
-    out, unlisted = [], []
+    out, unlisted, linked = [], [], []
     for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         d = os.path.join(root, name)
-        if name in NOT_COLLECTIONS or not os.path.isdir(d):
+        if name in NOT_COLLECTIONS:
             continue
+        if os.path.islink(d):
+            linked.append(d)
+            continue
+        if not os.path.isdir(d):
+            continue
+        files, links = _contents(d)
+        linked += links
         man = os.path.join(d, MANIFEST)
         listed = set()
         for it in read_json(man).get("items", []) if os.path.isfile(man) else []:
@@ -138,9 +153,15 @@ def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, 
                                           "again with this version of fetch_arena.mjs or fetch_photos.mjs.")
             out.append((os.path.join(d, it["file"]), sha))
             listed.add(os.path.normpath(it["file"]).replace(os.sep, "/"))
-        extra = sorted(_files_under(d) - listed - {MANIFEST})
+        extra = sorted(files - listed - {MANIFEST})
         if extra:
             unlisted.append(f"{', '.join(os.path.join(d, f) for f in extra)} (run `node scripts/collection.mjs {name}`)")
+    if linked:
+        raise Refused("collection-linked", f"these are symbolic links where collections are kept: {', '.join(linked)}. A "
+                                           "pull writes through a link, and collection.mjs lists nothing behind one, so "
+                                           "what is there would never be compared. Remove each link, moving what it "
+                                           "points to into the collection if it belongs there, then run "
+                                           "`node scripts/collection.mjs <name>` and run this again.")
     if unlisted:
         raise Refused("collection-unlisted", f"these files are in a collection whose manifest does not list them: "
                                              f"{'; '.join(unlisted)}. A pull that stopped before it finished, or a "

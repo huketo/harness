@@ -151,6 +151,39 @@ class TraceGates(unittest.TestCase):
         print(f"\n  light mark on a transparent sheet: mask {e.detail['mask_nearest']['score']:.4f}, limit {LIMIT:.4f}")
         self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("sheet.png"), e.detail)
 
+    def test_refuses_a_sheet_whose_split_leaves_a_mark_out(self):
+        sheet = self.ws.image("refs/mine/sheet.png", G.dark_mark_and_small_light_mark())
+        self.assertFalse(L.segment(L.flatten(Image.open(sheet), (0, 0, 0)))["ok"],
+                         "the fixture's small light mark must be dropped as a speck on black")
+        copy = self.ws.image("sketches/badge.jpg", reencoded(G.mark_image(G.badge)), "JPEG", quality=90)
+        e = self.refused("not-comparable", copy, [self.ws.entry(copy)])
+        self.assertIn(sheet, str(e))
+        self.assertIn("one mark", str(e))
+        print(f"\n  sheet with a 16 px light mark: {T.gate_masks(R.read_bytes(sheet))[1]}")
+        # The person crops the sheet into one file for each mark; the small one is compared, and the copy refused.
+        with Image.open(sheet) as im:
+            self.ws.image("refs/mine/sheet-tee.png", im.crop((0, 0, 600, 600)))
+            self.ws.image("refs/mine/sheet-badge.png", im.crop(G.SMALL_MARK_BOX))
+        os.remove(sheet)
+        e = self.refused("mask-too-close", copy, [self.ws.entry(copy)])
+        print(f"  the small mark cropped on its own: mask {e.detail['mask_nearest']['score']:.4f}, limit {LIMIT:.4f}")
+        self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("sheet-badge.png"), e.detail)
+
+    def test_refuses_a_collection_or_a_folder_in_it_that_is_a_link(self):
+        entry = self.ws.entry(self.sketch)
+        elsewhere = os.path.dirname(self.ws.image("elsewhere/channel/1.png", G.mark_image(G.badge)))
+        channel = os.path.join(self.arena, "channel")  # a pull would write through it, and no manifest would list it
+        whole = os.path.join(R.cache_root(), "linked")
+        for link, target in ((channel, elsewhere), (whole, os.path.dirname(elsewhere))):
+            os.symlink(target, link)
+            e = self.refused("collection-linked", self.sketch, [entry])
+            self.assertIn(link, str(e))
+            with self.assertRaises(R.Refused) as cm:  # and so do package_logo.py and logo_book.py (rights.sealed)
+                R.collected_sha256()
+            self.assertEqual(cm.exception.reason, "collection-linked", str(cm.exception))
+            os.remove(link)
+        self.assertEqual(self.trace(self.sketch, [entry])["svg"], self.out)
+
     def test_refuses_a_reference_that_is_not_there_by_name(self):
         entry = self.ws.entry(self.sketch)
         named = self.ws.path("refs", "named.png")  # on the command line, never written

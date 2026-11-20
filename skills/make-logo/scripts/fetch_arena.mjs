@@ -5,13 +5,14 @@
 //
 // The images go to ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<collection name>/, outside the project, and its
 // manifest.json lists every file with its sha256 (collection.mjs). A file already there is kept while it has the sha256
-// the manifest recorded for it, and downloaded again otherwise; each file is written whole (`.part`, then renamed), and
-// the manifest last. --default pulls from the channels below, split evenly. Guests get 30 API requests a minute; a run of 100 is a
-// few requests plus the image downloads. The CDN refuses a request with no User-Agent.
+// the manifest recorded for it with its image URL, and downloaded again otherwise; each file is written whole (`.part`,
+// then renamed), and the manifest last. A collection that is a symbolic link, or holds one, is refused before anything
+// is asked for. --default pulls from the channels below, split evenly. Guests get 30 API requests a minute; a run of
+// 100 is a few requests plus the image downloads. The CDN refuses a request with no User-Agent.
 import {mkdir} from 'node:fs/promises';
 import {extname, join, posix} from 'node:path';
 
-import {collectionDir, keepOrFetch, recorded, writeManifest} from './collection.mjs';
+import {collectionDir, keepOrFetch, recorded, refuseLinks, writeManifest} from './collection.mjs';
 
 /** Public channels of flat logos, checked 2026-11-15. Any channel the person names works too. */
 const DEFAULT = ['logotype-logomark', 'marks-monograms-symbols', 'design-logomark-wordmark-symbol', 'gd-logos-marks-symbols'];
@@ -22,6 +23,7 @@ if (!arg) {
   process.exit(1);
 }
 const out = collectionDir(name);
+await refuseLinks(out);
 const max = Number(maxArg);
 const H = {'User-Agent': 'make-logo/0.1', ...(process.env.ARENA_TOKEN && {Authorization: `Bearer ${process.env.ARENA_TOKEN}`})};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -64,7 +66,7 @@ async function pull(slug, n, items, known) {
 
 const slugs = arg === '--default' ? DEFAULT : [arg.replace(/\/+$/, '').split('/').pop()];
 const items = [];
-const known = await recorded(out);
+const known = await recorded(out, 'image_url');
 for (const [k, slug] of slugs.entries()) {
   const share = Math.ceil((max - items.length) / (slugs.length - k));
   console.log(`${slug}: ${await pull(slug, share, items, known)} images`);

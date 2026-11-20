@@ -85,6 +85,9 @@ def segment(rgb: np.ndarray) -> dict:
       photo is well under.
     - `ground_share`: the share of border pixels close to the ground colour. Low means the mark runs off the edge or
       the ground isn't plain.
+    - `kept`: the share of the ink seen above the threshold that the mask keeps once specks are dropped, also when
+      none is kept ("no ink found"). Under 1 when something was too small to keep: dust, or a small mark beside a
+      larger one.
     """
     lab = color.rgb2lab(rgb)
     b = np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])
@@ -99,13 +102,15 @@ def segment(rgb: np.ndarray) -> dict:
     between = lo.size * hi.size / flat.size**2 * (lo.mean() - hi.mean()) ** 2 if lo.size and hi.size else 0.0
     separation = float(between / flat.var())
     ink = dist > max(t, 12)  # under 12 Lab units the eye barely tells ink from ground
+    seen = int(ink.sum())
     speck = max(16, int(ink.size * 2e-4))
     try:  # scikit-image 0.26 renamed min_size to max_size; older releases only know min_size.
         ink = morphology.remove_small_objects(ink, max_size=speck)
     except TypeError:
         ink = morphology.remove_small_objects(ink, min_size=speck + 1)
+    kept = float(ink.sum() / seen) if seen else 1.0
     if ink.sum() < 64:
-        return {"ok": False, "why": "no ink found"}
+        return {"ok": False, "why": "no ink found", "kept": kept}
     rows, cols = np.where(ink)
     r0, r1, c0, c1 = rows.min(), rows.max() + 1, cols.min(), cols.max() + 1
     ink_rgb = rgb[ink]
@@ -116,6 +121,7 @@ def segment(rgb: np.ndarray) -> dict:
         "image_size": [int(rgb.shape[0]), int(rgb.shape[1])],
         "separation": separation,
         "ground_share": ground_share,
+        "kept": kept,
         "ground_lab": [round(float(v), 1) for v in ground],
         "ink_colours": colour_count(ink_rgb),
         "reversed": bool(ground[0] < 50),
@@ -183,13 +189,14 @@ def holes(mask: np.ndarray, min_share: float = 0.002) -> list[float]:
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".svg"}
 
 
-def images(paths: list[str]) -> list[str]:
+def images(paths: list[str], onerror=None) -> list[str]:
     """Every image under the given files and folders, at any depth, sorted. fetch_arena.mjs writes one folder per
-    channel, so refs/arena/ holds images a level down."""
+    channel, so refs/arena/ holds images a level down. A folder that can't be listed is passed over unless `onerror`
+    is given: os.walk() calls it with the OSError."""
     out = []
     for p in paths:
         if os.path.isdir(p):
-            for root, dirs, names in os.walk(p):
+            for root, dirs, names in os.walk(p, onerror=onerror):
                 dirs.sort()
                 out += [os.path.join(root, n) for n in sorted(names) if os.path.splitext(n)[1].lower() in IMAGE_EXT]
         elif os.path.splitext(p)[1].lower() in IMAGE_EXT:
