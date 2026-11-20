@@ -31,7 +31,7 @@ Normalise both sides with code, never by eye:
 - Lengths to px, using a 16 px root for `rem` unless the project sets another. Line height to a unitless ratio.
 - Colors to OKLCH plus alpha with [`scripts/oklch.mjs`](../scripts/oklch.mjs) in this skill's directory. Run it by absolute path from the repository root: `node <design-md skill directory>/scripts/oklch.mjs <color>...` prints one OKLCH line per color, and `--delta <a> <b>` prints the deltaE OK (OKLab distance times 100) and both alphas. It reads hex (3, 4, 6 and 8 digits), `rgb()`, `hsl()`, `hwb()`, `oklch()`, `oklab()` and the CSS named colors, each with its alpha. It refuses `color()`, `lab()`, `lch()`, `color-mix()`, relative colors, `var()` and `currentColor` with exit code 2; resolve those through a browser's computed style and say so in Source, or leave the row's value **Unknown**.
 - A deltaE OK under 0.5 counts as identical, which absorbs 8-bit rounding.
-- Alpha is part of the color. `--delta` prints `alpha differs` when the alphas are more than 0.02 apart, the opacity tolerance, and such a pair is neither Exact nor Semantic.
+- Alpha is part of the color. `--delta` prints `alpha differs` when the alphas are more than 0.02 apart, which is the default opacity tolerance. When the project documents another opacity tolerance (Tolerances below), classify by that tolerance instead and treat the `alpha differs` marker as a reading against the default only. A pair whose alphas differ by more than the tolerance in use is neither Exact nor Semantic.
 
 Complete when every row and every candidate token has a normalised value per mode, or an Unknown value with the reason.
 
