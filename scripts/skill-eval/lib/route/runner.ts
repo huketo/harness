@@ -15,6 +15,7 @@ import { type Deps, defaultDeps } from "../run/runner.ts";
 import { gitText } from "../run/skills.ts";
 import { parseRouting, type RoutePrompt } from "./cases.ts";
 import {
+	MANAGED_SETTINGS,
 	managedHookFiles,
 	gradeAnswer,
 	readDescriptions,
@@ -97,7 +98,7 @@ function parseCli(argv: string[]): RouteOptions {
 	};
 }
 
-export async function main(argv: string[], partial: Partial<Deps> = {}): Promise<number> {
+export async function main(argv: string[], partial: Partial<Deps> = {}, managedDirs: readonly string[] = MANAGED_SETTINGS): Promise<number> {
 	const warn = partial.warn ?? ((l: string) => console.error(l));
 	let opts: RouteOptions;
 	try {
@@ -107,7 +108,7 @@ export async function main(argv: string[], partial: Partial<Deps> = {}): Promise
 		return 2;
 	}
 	try {
-		return await execute(opts, { ...defaultDeps(), ...partial });
+		return await execute(opts, { ...defaultDeps(), ...partial }, managedDirs);
 	} catch (e) {
 		warn(`error: ${(e as Error).message}`);
 		return 1;
@@ -116,7 +117,7 @@ export async function main(argv: string[], partial: Partial<Deps> = {}): Promise
 
 const shellWord = (arg: string) => (/^[\w./=:@-]+$/.test(arg) ? arg : JSON.stringify(arg));
 
-async function execute(opts: RouteOptions, deps: Deps): Promise<number> {
+async function execute(opts: RouteOptions, deps: Deps, managedDirs: readonly string[]): Promise<number> {
 	const { log } = deps;
 	const casesFile = resolve(deps.cwd, opts.cases);
 	const routing = parseRouting(readFileSync(casesFile, "utf8"), casesFile);
@@ -138,7 +139,7 @@ async function execute(opts: RouteOptions, deps: Deps): Promise<number> {
 		return 0;
 	}
 
-	const managed = managedHookFiles();
+	const managed = managedHookFiles(managedDirs);
 	if (managed.length) {
 		log(`refused: managed settings define hooks that run even in --safe-mode and could add context to each call: ${managed.join(", ")}. Run on a machine without managed hooks.`);
 		return 2;

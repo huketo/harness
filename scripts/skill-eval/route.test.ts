@@ -96,7 +96,8 @@ function setup(answers: Record<string, string | null> = {}) {
 			return { rc: 0, timedOut: false };
 		},
 	};
-	const run = (...args: string[]) => main(["--cases", casesFile, "--out-root", outRoot, ...args], deps);
+	// No managed settings folders: the run stays hermetic on a machine that has them.
+	const run = (...args: string[]) => main(["--cases", casesFile, "--out-root", outRoot, ...args], deps, []);
 	const runDir = join(outRoot, "demo-routing", "run-2026-01-02T03-04-05Z");
 	const results = (): RouteResults => JSON.parse(readFileSync(join(runDir, "results.json"), "utf8"));
 	return { repo, sha, casesFile, calls, cwdEntries, lines, deps, run, runDir, results, routing };
@@ -105,6 +106,22 @@ function setup(answers: Record<string, string | null> = {}) {
 const requestOf = (inv: AgentInvocation) => inv.args[inv.args.indexOf("-p") + 1] ?? "";
 
 describe("description-based routing run", () => {
+	test("a managed settings drop-in with a hook refuses the paid run before any call", async () => {
+		const t = setup({ "Draw an alpha.": "alpha" });
+		const managed = mkdtempSync(join(tmpdir(), "route-managed-"));
+		try {
+			mkdirSync(join(managed, "managed-settings.d"));
+			writeFileSync(join(managed, "managed-settings.d", "20-hook.json"),
+				JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "cat notes.md" }] }] } }));
+			const rc = await main(["--cases", t.casesFile, "--out-root", mkdtempSync(join(tmpdir(), "route-out-"))], t.deps, [managed]);
+			assert.equal(rc, 2);
+			assert.equal(t.calls.length, 0);
+			assert.match(t.lines.join("\n"), /managed settings define hooks/);
+		} finally {
+			rmSync(managed, { recursive: true, force: true });
+		}
+	});
+
 	test("sends one classification call per distinct prompt, with every description from the commit", async () => {
 		const t = setup({
 			"Draw an alpha.": "alpha",
@@ -391,13 +408,23 @@ test("a paid run is refused while managed settings define hooks; a description w
 	const { join } = await import("node:path");
 	const dir = mkdtempSync(join(tmpdir(), "route-managed-"));
 	try {
-		const none = join(dir, "missing.json");
-		const empty = join(dir, "empty.json");
-		const hooked = join(dir, "hooked.json");
-		writeFileSync(empty, JSON.stringify({ permissions: {} }));
-		writeFileSync(hooked, JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "echo x" }] }] } }));
-		assert.deepEqual(managedHookFiles([none, empty]), []);
-		assert.deepEqual(managedHookFiles([none, empty, hooked]), [hooked]);
+		const { mkdirSync } = await import("node:fs");
+		const clean = join(dir, "clean");
+		const filed = join(dir, "filed");
+		const dropped = join(dir, "dropped");
+		mkdirSync(join(clean, "managed-settings.d"), { recursive: true });
+		mkdirSync(filed);
+		mkdirSync(join(dropped, "managed-settings.d"), { recursive: true });
+		const hook = JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "echo x" }] }] } });
+		writeFileSync(join(clean, "managed-settings.json"), JSON.stringify({ permissions: {} }));
+		writeFileSync(join(clean, "managed-settings.d", "10-perm.json"), JSON.stringify({ permissions: {} }));
+		writeFileSync(join(filed, "managed-settings.json"), hook);
+		writeFileSync(join(dropped, "managed-settings.d", "20-hook.json"), hook);
+		assert.deepEqual(managedHookFiles([join(dir, "missing"), clean]), []);
+		assert.deepEqual(managedHookFiles([clean, filed, dropped]), [
+			join(filed, "managed-settings.json"),
+			join(dropped, "managed-settings.d", "20-hook.json"),
+		]);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

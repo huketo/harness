@@ -5,7 +5,8 @@
  * loads a skill or watches an agent decide to use one.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { checkFrontmatter, frontmatterFields } from "../../../check-repo.ts";
 import { git, resolveRef } from "../run/skills.ts";
 import { NONE } from "./cases.ts";
@@ -74,20 +75,36 @@ export function descriptionOf(skillMd: string): string {
 	return text;
 }
 
-/** Where Claude Code reads managed (administrator) settings; their hooks run even in --safe-mode. */
+/**
+ * Where Claude Code reads managed (administrator) settings: each file and its `managed-settings.d/` drop-in folder.
+ * Their hooks run even in --safe-mode.
+ */
 export const MANAGED_SETTINGS = [
-	"/etc/claude-code/managed-settings.json",
-	"/Library/Application Support/ClaudeCode/managed-settings.json",
-	"/mnt/c/Program Files/ClaudeCode/managed-settings.json",
-	"C:\\Program Files\\ClaudeCode\\managed-settings.json",
+	"/etc/claude-code",
+	"/Library/Application Support/ClaudeCode",
+	"/mnt/c/Program Files/ClaudeCode",
+	"C:\\Program Files\\ClaudeCode",
 ];
 
 /**
- * The managed settings files that define hooks. A managed hook runs in safe mode and can add context before the
- * first model turn, so a paid run refuses while any exists: the classification would no longer read descriptions only.
+ * The managed settings files under the given folders (managed-settings.json and every managed-settings.d/*.json) that
+ * define hooks, or that cannot be read as JSON and so cannot be shown free of them. A managed hook runs in safe mode
+ * and can add context before the first model turn, so a paid run refuses while any is found.
  */
-export function managedHookFiles(paths: readonly string[] = MANAGED_SETTINGS): string[] {
-	return paths.filter((p) => {
+export function managedHookFiles(dirs: readonly string[] = MANAGED_SETTINGS): string[] {
+	const files: string[] = [];
+	for (const dir of dirs) {
+		files.push(join(dir, "managed-settings.json"));
+		const dropIns = join(dir, "managed-settings.d");
+		let names: string[] = [];
+		try {
+			names = readdirSync(dropIns).filter((n) => n.endsWith(".json")).sort();
+		} catch {
+			// no drop-in folder
+		}
+		for (const n of names) files.push(join(dropIns, n));
+	}
+	return files.filter((p) => {
 		let text: string;
 		try {
 			text = readFileSync(p, "utf8");
