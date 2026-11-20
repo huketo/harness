@@ -53,15 +53,15 @@ export async function writeAtomic(path, data) {
 }
 
 /**
- * file -> sha256 of each item the collection's manifest.json lists with `origin`, the field a pull records for where
- * those bytes came from (a photo's `source`, an Are.na image's `image_url`); empty when it has no manifest. An item
- * listed without it, a file replaced by hand that collection.mjs listed by its sha256 alone, is left out, so a pull
- * fetches it again instead of giving those bytes the origin of the file they replaced.
+ * file -> {sha256, origin} of each item the collection's manifest.json lists with `origin`, the field a pull records
+ * for where those bytes came from (a photo's `source`, an Are.na image's `image_url`); empty when it has no manifest.
+ * An item listed without it, a file replaced by hand that collection.mjs listed by its sha256 alone, is left out, so a
+ * pull fetches it again instead of giving those bytes the origin of the file they replaced.
  */
 export async function recorded(dir, origin) {
   try {
     const items = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).items ?? [];
-    return new Map(items.filter((it) => it[origin]).map((it) => [it.file, it.sha256]));
+    return new Map(items.filter((it) => it[origin]).map((it) => [it.file, {sha256: it.sha256, origin: it[origin]}]));
   } catch {
     return new Map();
   }
@@ -93,16 +93,18 @@ export async function refuseLinks(dir) {
 }
 
 /**
- * Puts one pulled file in the collection and returns its sha256. A file already there is kept when it still has the
- * sha256 the manifest recorded for it with its origin (`known`, from recorded()); otherwise `download()` fetches it
- * again, and its bytes are written whole. `download()` resolves to the bytes, or to null to skip the file; this then
+ * Puts one pulled file in the collection and returns its sha256. A file already there is kept only when it still has
+ * the sha256 the manifest recorded for it and the pull names the same origin (`known`, from recorded()); otherwise
+ * `download()` fetches it again, and its bytes are written whole. A result whose origin changed is fetched again, so
+ * new credits are never written against bytes pulled from somewhere else. `download()` resolves to the bytes, or to null to skip the file; this then
  * returns null.
  */
-export async function keepOrFetch(dir, file, known, download) {
+export async function keepOrFetch(dir, file, known, download, origin) {
   const path = join(dir, file);
-  if (await exists(path)) {
+  const was = known.get(file);
+  if (was && was.origin === origin && await exists(path)) {
     const sha = sha256(await readFile(path));
-    if (known.get(file) === sha) return sha;
+    if (was.sha256 === sha) return sha;
   }
   const data = await download();
   if (!data) return null;

@@ -168,6 +168,21 @@ class Seal(Project):
             os.chmod(locked, 0o755)
         self.assertEqual(self.check(b), 0)
 
+    def test_refuses_a_linked_folder_inside_the_references(self):
+        b = self.build(self.recipe())
+        target = os.path.dirname(self.ws.image("elsewhere/kept/away.png", G.mark_image(G.own)))
+        link = os.path.join(self.mine, "linked")
+        os.symlink(target, link)
+        for step in (lambda: C.main([b, "--refs", *self.refs]), lambda: R.refs_sha256(self.refs),
+                     lambda: T.reference_set(self.refs)):
+            with self.assertRaises(SystemExit) as cm:
+                step()
+            self.assertIsInstance(cm.exception, R.Refused, f"exited {cm.exception.code} instead of refusing")
+            self.assertEqual(cm.exception.reason, "refs-missing", str(cm.exception))
+            self.assertIn(link, str(cm.exception))
+        os.remove(link)
+        self.assertEqual(self.check(b), 0)
+
     def test_refuses_a_file_changed_after_the_check(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)

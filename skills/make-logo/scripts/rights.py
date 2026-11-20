@@ -86,14 +86,18 @@ def calibration_file(path: str | None) -> str:
 
 def ref_images(folders: list[str]) -> list[str]:
     """logolib.images() of the --refs folders and files, refusing ("refs-missing") while one named is not there, a
-    folder in them can't be listed, or an image found is a link to nothing: the gates and the seal would compare and
-    hash nothing in its place."""
+    folder in them can't be listed or is a link to a folder (os.walk() never goes into one), or an image found is a
+    link to nothing: the gates and the seal would compare and hash nothing in its place."""
     sys.path.insert(0, HERE)
     import logolib as L
 
     unlisted = []
     found = L.images(folders, onerror=lambda e: unlisted.append(f"{e.filename} (can't be listed: {e.strerror})"))
-    missing = [p for p in folders if not os.path.exists(p)] + unlisted + [p for p in found if not os.path.isfile(p)]
+    linked = [f"{os.path.join(root, d)} (a link to a folder: name its target in --refs instead)"
+              for p in folders if os.path.isdir(p) for root, dirs, _ in os.walk(p) for d in dirs
+              if os.path.islink(os.path.join(root, d))]
+    missing = ([p for p in folders if not os.path.exists(p)] + unlisted + linked
+               + [p for p in found if not os.path.isfile(p)])
     if missing:
         raise Refused("refs-missing", f"these --refs paths are not there, can't be listed, or are links to nothing: "
                                       f"{'; '.join(dict.fromkeys(missing))}. Pass folders and files that exist and you "

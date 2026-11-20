@@ -37,7 +37,7 @@ trademark sheet. It doesn't know whether the statement is true.
   not: SVGs rasterised, a favicon too small to split enlarged, an image with transparency seen on white and on black
   (its higher score counts). It refuses while one of them still can't be read as one mark (`not-comparable`, also a
   sheet whose mask leaves out a tenth of the ink seen on a ground), while a `--refs` folder or file named is not
-  there, a folder in them can't be listed, or an image is a broken link (`refs-missing`), while a collection is or
+  there, a folder in them can't be listed or is a link to a folder, or an image is a broken link (`refs-missing`), while a collection is or
   holds a symbolic link (`collection-linked`), while a collection holds a file its manifest does not list
   (`collection-unlisted`: a pull that stopped, or a file put there by hand), or while a collected file is gone or no
   longer has the sha256 its manifest lists (`collection-changed`). The person's
@@ -56,6 +56,9 @@ trademark sheet. It doesn't know whether the statement is true.
   build writes (the mark, its grid, the lockups of a build with a wordmark) is refused at every step.
 - A shape the agent types in as `polygon` points has no source the chain can see: only the distance check stands
   between it and a copy.
+- A reference sheet that holds a second mark too small to survive segmentation (a badge of a few pixels beside a
+  large mark) is compared as the large mark alone; the tenth-of-the-ink rule above does not see specks. Crop every
+  reference to one mark before it goes in `refs/` (step 3), and drop sheets of several marks.
 
 ## Decisions only the person makes
 

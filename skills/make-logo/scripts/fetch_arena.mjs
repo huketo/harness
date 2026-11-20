@@ -50,7 +50,7 @@ async function pull(slug, n, items, known) {
       // One image that fails to download is skipped, not the whole pull.
       let sha;
       try {
-        sha = await keepOrFetch(out, file, known, async () => Buffer.from(await (await get(b.image.src)).arrayBuffer()));
+        sha = await keepOrFetch(out, file, known, async () => Buffer.from(await (await get(b.image.src)).arrayBuffer()), b.image.src);
       } catch (e) {
         console.warn(`skipped ${b.id}: ${e.message}`);
         continue;

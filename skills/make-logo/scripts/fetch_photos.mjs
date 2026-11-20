@@ -50,14 +50,15 @@ for (const p of results) {
   if (items.length >= count) break;
   try {
     const file = `${p.id}${extname(new URL(p.url).pathname) || '.jpg'}`;
+    const source = p.foreign_landing_url ?? p.url;
     const sha = await keepOrFetch(out, file, known, async () => {
       const img = await fetch(p.url, {headers: H});
       const ok = img.ok && /image\/(jpeg|png|webp)/.test(img.headers.get('content-type') ?? '');
       return ok ? Buffer.from(await img.arrayBuffer()) : null;
-    });
+    }, source);
     if (!sha) continue;
     items.push({file, title: p.title ?? '', creator: p.creator ?? 'unknown', license: `${p.license.toUpperCase()} ${p.license_version ?? ''}`.trim(),
-      license_url: p.license_url ?? null, source: p.foreign_landing_url ?? p.url, sha256: sha});
+      license_url: p.license_url ?? null, source, sha256: sha});
   } catch {
     // A dead link is skipped; the next result takes its place.
   }

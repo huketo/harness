@@ -121,16 +121,17 @@ test('a pull keeps a file only while it has the sha256 recorded for it, and fetc
   t.after(() => rm(dir, {recursive: true, force: true}));
   await writeFile(join(dir, 'kept.jpg'), 'as pulled');
   await writeFile(join(dir, 'edited.jpg'), 'edited by hand');
-  const known = new Map([['kept.jpg', hex('as pulled')], ['edited.jpg', hex('as pulled too')]]);
+  const at = 'https://example.org/1';
+  const known = new Map([['kept.jpg', {sha256: hex('as pulled'), origin: at}], ['edited.jpg', {sha256: hex('as pulled too'), origin: at}]]);
   const fetched = [];
   const download = (file, bytes) => async () => {
     fetched.push(file);
     return bytes && Buffer.from(bytes);
   };
-  assert.equal(await keepOrFetch(dir, 'kept.jpg', known, download('kept.jpg', 'x')), hex('as pulled'));
-  assert.equal(await keepOrFetch(dir, 'edited.jpg', known, download('edited.jpg', 'as pulled too')), hex('as pulled too'));
-  assert.equal(await keepOrFetch(dir, 'new.jpg', known, download('new.jpg', 'new')), hex('new'));
-  assert.equal(await keepOrFetch(dir, 'refused.jpg', known, download('refused.jpg', null)), null);
+  assert.equal(await keepOrFetch(dir, 'kept.jpg', known, download('kept.jpg', 'x'), at), hex('as pulled'));
+  assert.equal(await keepOrFetch(dir, 'edited.jpg', known, download('edited.jpg', 'as pulled too'), at), hex('as pulled too'));
+  assert.equal(await keepOrFetch(dir, 'new.jpg', known, download('new.jpg', 'new'), at), hex('new'));
+  assert.equal(await keepOrFetch(dir, 'refused.jpg', known, download('refused.jpg', null), at), null);
   assert.deepEqual(fetched, ['edited.jpg', 'new.jpg', 'refused.jpg']);
   assert.equal(await readFile(join(dir, 'edited.jpg'), 'utf8'), 'as pulled too');
   assert.deepEqual((await readdir(dir)).sort(), ['edited.jpg', 'kept.jpg', 'new.jpg']);
@@ -182,7 +183,22 @@ test('the bytes a pull keeps are the ones whose origin the manifest records', as
     {file: 'credited.jpg', creator: 'Synthetic Creator', source: 'https://example.org/1', sha256: hex('as pulled')},
     {file: 'listed.jpg', sha256: hex('put there by hand')},
   ]}));
-  assert.deepEqual(await recorded(dir, 'source'), new Map([['credited.jpg', hex('as pulled')]]));
+  assert.deepEqual(await recorded(dir, 'source'), new Map([['credited.jpg', {sha256: hex('as pulled'), origin: 'https://example.org/1'}]]));
+});
+
+test('a result whose origin changed is fetched again, not credited to the bytes already there', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'make-logo-collection-'));
+  t.after(() => rm(dir, {recursive: true, force: true}));
+  await writeFile(join(dir, 'p1.jpg'), 'pulled from the first source');
+  const known = new Map([['p1.jpg', {sha256: hex('pulled from the first source'), origin: 'https://example.org/first'}]]);
+  const fetched = [];
+  const sha = await keepOrFetch(dir, 'p1.jpg', known, async () => {
+    fetched.push('p1.jpg');
+    return Buffer.from('pulled from the second source');
+  }, 'https://example.org/second');
+  assert.deepEqual(fetched, ['p1.jpg']);
+  assert.equal(sha, hex('pulled from the second source'));
+  assert.equal(await readFile(join(dir, 'p1.jpg'), 'utf8'), 'pulled from the second source');
 });
 
 test('a collection that is a link, or holds one, is refused before a pull and when it is listed', async (t) => {
