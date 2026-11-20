@@ -1,6 +1,6 @@
 # /// script
 # requires-python = "==3.12.*"
-# dependencies = []
+# dependencies = ["fonttools"]
 # ///
 """The provenance chain: base.json, the record of the base a person approved, and the chain object each step
 writes into its log.
@@ -16,8 +16,13 @@ only if the previous step's log lists its sha256 as an output, and lists its own
 "targets" is the targets.json the step read; it is the only other file a building step opens.
 """
 import hashlib
+import io
 import json
 import os
+
+from fontTools.ttLib import TTFont
+
+import fontlib as L
 
 SCHEMA = "make-font/base@1"
 LICENCE_ID = "OFL-1.1"
@@ -41,6 +46,54 @@ def sha256_file(path):
 
 def entry(path):
     return {"file": os.path.abspath(path), "sha256": sha256_file(path)}
+
+
+# ------------------------------------------------------------------ the base's files
+CONTAINERS = {b"wOFF": "a WOFF file", b"wOF2": "a WOFF2 file", b"ttcf": "a font collection",
+              b"OTTO": "a font with CFF outlines"}
+TRUETYPE = (b"\x00\x01\x00\x00", b"true")
+
+
+def read_base(font_path, lic_path):
+    """The one check of a base's files. record_base.py runs it before it asks and before it records, and every
+    step that reads base.json runs it again. Each file is read once, so what is checked is what is hashed.
+    Returns what base.json records about the files."""
+    try:
+        with open(font_path, "rb") as fh:
+            data = fh.read()
+        with open(lic_path, "rb") as fh:
+            lic = fh.read()
+    except OSError as e:
+        raise Refused(f"cannot read the base's files: {e}")
+    kind = CONTAINERS.get(data[:4])
+    if kind:
+        raise Refused(f"{font_path} is {kind}. The base must be one TrueType (glyf) variable font in a plain .ttf "
+                      "file; WOFF, WOFF2, collections and CFF fonts are not bases.")
+    if data[:4] not in TRUETYPE:
+        raise Refused(f"{font_path} is not a TrueType font file")
+    try:
+        f = TTFont(io.BytesIO(data))
+        has = set(f.keys())
+    except Exception as e:  # a file fontTools cannot read is not a font
+        raise Refused(f"{font_path} is not a font fontTools can read: {e}")
+    if "glyf" not in has or "CFF " in has or "CFF2" in has:
+        raise Refused(f"{font_path} has no TrueType (glyf) outlines. The base must be a glyf variable font.")
+    if "fvar" not in has or "gvar" not in has:
+        raise Refused(f"{font_path} is a static font. The base must be a variable font (fvar and gvar).")
+    try:
+        text = lic.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = ""
+    if not L.is_ofl_11_text(text):
+        raise Refused(f"{lic_path} is not the SIL Open Font License 1.1 text (copyright lines, then the licence "
+                      f"word for word). This skill builds only on {LICENCE_ID} fonts; a licence title alone, an "
+                      "edited licence, Apache-2.0 or any other licence is not a base.")
+    n13 = L.english_names(f).get(13)
+    if not L.is_ofl_11_notice(n13):
+        raise Refused(f"{font_path}: name ID 13 is {n13!r}, not a notice of the {LICENCE_ID} alone. The font itself "
+                      "must declare the SIL Open Font License, Version 1.1.")
+    return {"font_sha256": sha256_bytes(data), "license_sha256": sha256_bytes(lic), "name_id_13": n13,
+            "reserved_font_names": L.reserved_font_names(text)}
 
 
 # ------------------------------------------------------------------ base.json
@@ -96,6 +149,16 @@ def load_base(path):
         if got != rec_.get("sha256"):
             raise Refused(f"the {what} {f} has sha256 {got}, but {path} records {rec_.get('sha256')}. It changed "
                           "after the person approved it.")
+    files = read_base(font["file"], lic["file"])
+    if (files["font_sha256"], files["license_sha256"]) != (font["sha256"], lic["sha256"]):
+        raise Refused(f"the base's files changed while {path} was being checked")
+    if files["name_id_13"] != lic.get("name_id_13"):
+        raise Refused(f"{path} records name ID 13 as {lic.get('name_id_13')!r}, but the base says "
+                      f"{files['name_id_13']!r}. base.json was edited after the approval step wrote it.")
+    if files["reserved_font_names"] != lic.get("reserved_font_names"):
+        raise Refused(f"{path} records the Reserved Font Names {lic.get('reserved_font_names')!r}, but the licence "
+                      f"declares {files['reserved_font_names']!r}. base.json was edited after the approval step "
+                      "wrote it.")
     return rec, sha256_bytes(raw)
 
 

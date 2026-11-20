@@ -22,6 +22,7 @@ NEW_FAMILY = "Tessera Sans"
 OFL_NOTICE = ("This Font Software is licensed under the SIL Open Font License, Version 1.1. "
               "This license is available with a FAQ at: https://openfontlicense.org")
 APACHE_NOTICE = "Licensed under the Apache License, Version 2.0"
+OFL_10_NOTICE = "This Font Software is licensed under the SIL Open Font License, Version 1.0."
 APACHE_TEXT = ("\n                                 Apache License\n                           Version 2.0, January 2004\n"
                "                        http://www.apache.org/licenses/\n\n"
                "   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n")
@@ -123,6 +124,11 @@ OFL_BODY = "\n".join([
     "OTHER DEALINGS IN THE FONT SOFTWARE.",
     "",
 ])
+
+
+# An OFL.txt with the licence's title and headings but none of its words: a label, not the licence.
+TITLE_ONLY_TEXT = ("Copyright 2026 The Lumen Ledger Project Authors\n\nSIL OPEN FONT LICENSE Version 1.1\n\n"
+                   "PERMISSION & CONDITIONS\n\nTERMINATION\n")
 
 
 def ofl_text(copyright_line="Copyright 2026 The Lumen Ledger Project Authors (https://example.org/lumen-ledger)"):
@@ -244,11 +250,27 @@ def cff_static(path, family=BASE_FAMILY, notice=OFL_NOTICE):
     return path
 
 
+def flavoured(src, dst, flavor):
+    """The same font in a WOFF ("woff") or WOFF2 ("woff2") container."""
+    from fontTools.ttLib import TTFont
+    f = TTFont(src)
+    f.flavor = flavor
+    f.save(dst)
+    return dst
+
+
 # ------------------------------------------------------------------ running the scripts
 def run(script, *args, cwd=None):
     """Run one skill script with this interpreter. Returns the CompletedProcess (never raises on exit code)."""
     return subprocess.run([sys.executable, "-I", os.path.join(HERE, script), *map(str, args)],
                           capture_output=True, text=True, cwd=cwd)
+
+
+def approve(font, licence, out, *source, answer=SYNTHETIC_ANSWER):
+    """The approval step as an agent runs it, with a synthetic answer. Returns the CompletedProcess of the step
+    that ended it: the first refusal, or the run that wrote base.json."""
+    return run("record_base.py", "--font", font, "--licence", licence, *(source or ("--source", "local")),
+               "--question", SYNTHETIC_QUESTION, "--answer", answer, "--out", out)
 
 
 def write(path, text):

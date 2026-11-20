@@ -26,25 +26,9 @@ import sys
 
 sys.dont_write_bytecode = True  # keep the skill folder free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fontTools.ttLib import TTFont  # noqa: E402
-
 import chain as C  # noqa: E402
-import fontlib as L  # noqa: E402
 
 SOURCES = ("google-fonts", "manifest", "local")
-
-
-def check_font_file(path):
-    """The base must be one TrueType-flavoured variable font."""
-    try:
-        f = TTFont(path)
-    except Exception as e:  # a file fontTools cannot read is not a font
-        raise C.Refused(f"{path} is not a font fontTools can read: {e}")
-    if "CFF " in f or "CFF2" in f or "glyf" not in f:
-        raise C.Refused(f"{path} has CFF outlines. The base must be a TrueType (glyf) variable font.")
-    if "fvar" not in f or "gvar" not in f:
-        raise C.Refused(f"{path} is a static font. The base must be a variable font (fvar and gvar).")
-    return f
 
 
 def from_shortlist(path, family):
@@ -79,24 +63,14 @@ def build(a):
     if not question.strip() or not answer.strip():
         raise C.Refused("--question and --answer are both required, verbatim: the approval is the person's, "
                         "and base.json keeps their words")
-    f = check_font_file(font_path)
-    with open(lic_path, "rb") as fh:
-        lic_bytes = fh.read()
-    lic_text = lic_bytes.decode("utf-8", errors="replace")
-    if not L.is_ofl_11_text(lic_text):
-        raise C.Refused(f"{lic_path} is not the SIL Open Font License 1.1 text. This skill builds only on OFL-1.1 "
-                        "fonts; an Apache-2.0 or other licence is not a base.")
-    n13 = L.english_names(f).get(13)
-    if not L.names_ofl(n13):
-        raise C.Refused(f"{font_path}: name ID 13 is {n13!r}, not the OFL-1.1 notice. The font itself must "
-                        "declare the OFL-1.1.")
+    files = C.read_base(font_path, lic_path)
     return {
         "schema": C.SCHEMA,
-        "font": {"file": os.path.abspath(font_path), "sha256": C.sha256_file(font_path)},
+        "font": {"file": os.path.abspath(font_path), "sha256": files["font_sha256"]},
         "source": {"kind": kind, "url": url if kind != "local" else None,
                    "manifest_entry": a.manifest_entry if kind == "manifest" else None},
-        "license": {"id": C.LICENCE_ID, "file": os.path.abspath(lic_path), "sha256": C.sha256_bytes(lic_bytes),
-                    "name_id_13": n13, "reserved_font_names": L.reserved_font_names(lic_text)},
+        "license": {"id": C.LICENCE_ID, "file": os.path.abspath(lic_path), "sha256": files["license_sha256"],
+                    "name_id_13": files["name_id_13"], "reserved_font_names": files["reserved_font_names"]},
         "approval": {"question": question, "answer": answer,
                      "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")},
     }

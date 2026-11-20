@@ -166,7 +166,7 @@ def licence_of(font, ofl_text=None):
     """OFL-1.1 when name ID 13 carries the OFL notice and the licence text, if given, is the OFL 1.1. Anything else
     (Apache-2.0 included) is None: not a base."""
     n = L.english_names(font)
-    ok = L.names_ofl(n.get(13)) and (ofl_text is None or L.is_ofl_11_text(ofl_text))
+    ok = L.is_ofl_11_notice(n.get(13)) and (ofl_text is None or L.is_ofl_11_text(ofl_text))
     return {"licence": "OFL-1.1" if ok else None,
             "reserved_font_names": L.reserved_font_names(ofl_text or ""),
             "copyright": n.get(0), "trademark": n.get(7)}

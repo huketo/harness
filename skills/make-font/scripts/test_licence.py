@@ -103,6 +103,91 @@ class OflOnly(unittest.TestCase):
                 self.assertEqual(got, ["Lumen Ledger"])
 
 
+class RecordAndLoadCheckTheSameThings(unittest.TestCase):
+    """record_base.py and every step that reads base.json run one check of the base's files: a TrueType variable
+    font in a plain SFNT file, the OFL 1.1 text word for word, a name ID 13 that names the OFL 1.1 and no other
+    version, and the notice and Reserved Font Names base.json records equal to what the files say now."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="mf-shared-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.base = T.glyf_vf(self.p("base.ttf"))
+        self.ofl = T.write(self.p("OFL.txt"), T.ofl_text())
+        r = T.approve(self.base, self.ofl, self.p("base.json"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(self.p("base.json"), encoding="utf-8") as fh:
+            self.rec = json.load(fh)
+        self.targets = T.write(self.p("targets.json"), json.dumps({"family": T.NEW_FAMILY, "styles": [], "targets": {}}))
+
+    def p(self, name):
+        return os.path.join(self.dir, name)
+
+    def refused_at_record(self, font, licence, *words):
+        out = self.p(os.path.basename(font) + ".json")
+        r = T.approve(font, licence, out)
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+        for w in ("refused",) + words:
+            self.assertIn(w, r.stderr)
+        self.assertFalse(os.path.exists(out))
+
+    def refused_at_load(self, font, *words, **edit):
+        """base.json edited by hand to name these files, with their true sha256: fit_font.py must still refuse."""
+        rec = json.loads(json.dumps(self.rec))
+        for key, value in edit.items():
+            section, field = key.split("__")
+            rec[section][field] = value
+        for section in ("font", "license"):
+            rec[section]["sha256"] = sha(rec[section]["file"])
+        T.write(self.p("edited.json"), json.dumps(rec))
+        r = T.run("fit_font.py", font, self.targets, "--base-json", self.p("edited.json"), "--out-dir", self.p("build"))
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+        for w in ("refused",) + words:
+            self.assertIn(w, r.stderr)
+        self.assertFalse(os.path.exists(self.p("build")))
+
+    def test_a_licence_file_with_only_the_title_is_refused_at_record(self):
+        self.refused_at_record(self.base, T.write(self.p("title.txt"), T.TITLE_ONLY_TEXT), "OFL-1.1")
+
+    def test_a_licence_file_with_only_the_title_is_refused_at_load(self):
+        title = T.write(self.p("title.txt"), T.TITLE_ONLY_TEXT)
+        self.refused_at_load(self.base, "OFL-1.1", license__file=title)
+
+    def test_a_licence_text_with_a_changed_condition_is_refused(self):
+        edited = T.ofl_text().replace("may be sold by itself", "may be sold")
+        self.refused_at_record(self.base, T.write(self.p("edited.txt"), edited), "OFL-1.1")
+
+    def test_a_name_id_13_that_names_ofl_1_0_is_refused_at_record(self):
+        font = T.glyf_vf(self.p("ofl10.ttf"), notice=T.OFL_10_NOTICE)
+        self.refused_at_record(font, self.ofl, "name ID 13")
+
+    def test_a_name_id_13_that_names_ofl_1_0_is_refused_at_load(self):
+        font = T.glyf_vf(self.p("ofl10.ttf"), notice=T.OFL_10_NOTICE)
+        self.refused_at_load(font, "name ID 13", font__file=font, license__name_id_13=T.OFL_10_NOTICE)
+
+    def test_a_recorded_notice_other_than_the_fonts_is_refused_at_load(self):
+        self.refused_at_load(self.base, "name ID 13", license__name_id_13=T.OFL_NOTICE + " (edited)")
+
+    def test_recorded_reserved_font_names_other_than_the_licences_are_refused_at_load(self):
+        self.assertEqual(self.rec["license"]["reserved_font_names"], [])
+        self.refused_at_load(self.base, "Reserved Font Name", license__reserved_font_names=["Lumen"])
+
+    def test_a_woff_or_woff2_base_is_refused_at_record(self):
+        for flavor in ("woff", "woff2"):
+            with self.subTest(flavor=flavor):
+                font = T.flavoured(self.base, self.p(f"base.{flavor}"), flavor)
+                self.refused_at_record(font, self.ofl, flavor.upper())
+
+    def test_a_woff2_base_is_refused_at_load(self):
+        font = T.flavoured(self.base, self.p("base.woff2"), "woff2")
+        self.refused_at_load(font, "WOFF2", font__file=font)
+
+
+def sha(path):
+    import hashlib
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
 class EnglishNames(unittest.TestCase):
     def test_english_record_wins_over_a_later_language(self):
         d = tempfile.mkdtemp(prefix="mf-names-")

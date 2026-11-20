@@ -61,13 +61,6 @@ def parse_loc(s):
     return {k.strip(): float(v) for k, v in (p.split("=") for p in s.split(",") if p.strip())} if s else {}
 
 
-def check_glyf_vf(f, path):
-    if "glyf" not in f:
-        raise C.Refused(f"{path}: the base must be a TrueType-flavoured variable font (glyf/gvar). CFF is not handled.")
-    if "fvar" not in f or "gvar" not in f:
-        raise C.Refused(f"{path} is not a variable font. Pick a variable candidate from the shortlist.")
-
-
 def make_subset(base_path, base_sha, scripts, out_dir):
     """Subset the verified base to the scripts' characters, with its layout closure. Returns the subset, reread
     from the file it was written to, and the record fit-log.json keeps of it."""
@@ -425,7 +418,6 @@ def main():
     a = ap.parse_args()
     rec, base_sha = C.load_base(a.base_json)
     font_sha = C.require_base_font(a.base, rec, a.base_json)
-    check_glyf_vf(TTFont(a.base, lazy=True), a.base)
     T = L.load_json(a.targets)
     try:
         L.charset_unicodes(T.get("scripts", ["latin"]))
