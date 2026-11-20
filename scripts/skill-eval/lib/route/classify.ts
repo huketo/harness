@@ -87,37 +87,43 @@ export const MANAGED_SETTINGS = [
 ];
 
 /**
- * The managed settings files under the given folders (managed-settings.json and every managed-settings.d/*.json) that
- * define hooks, or that cannot be read as JSON and so cannot be shown free of them. A managed hook runs in safe mode
+ * The managed settings files under the given folders (managed-settings.json and every non-hidden
+ * managed-settings.d/*.json) that define hooks or a policy helper, or that cannot be listed, read or parsed and so
+ * cannot be shown free of them. A managed hook runs in safe mode
  * and can add context before the first model turn, so a paid run refuses while any is found.
  */
 export function managedHookFiles(dirs: readonly string[] = MANAGED_SETTINGS): string[] {
+	const missing = (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT";
+	const found: string[] = [];
 	const files: string[] = [];
 	for (const dir of dirs) {
 		files.push(join(dir, "managed-settings.json"));
 		const dropIns = join(dir, "managed-settings.d");
-		let names: string[] = [];
 		try {
-			names = readdirSync(dropIns).filter((n) => n.endsWith(".json")).sort();
-		} catch {
-			// no drop-in folder
+			// Claude Code skips hidden files in the drop-in folder.
+			files.push(...readdirSync(dropIns).filter((n) => n.endsWith(".json") && !n.startsWith(".")).sort().map((n) => join(dropIns, n)));
+		} catch (e) {
+			if (!missing(e)) found.push(dropIns); // a folder that cannot be listed cannot be shown free of hooks
 		}
-		for (const n of names) files.push(join(dropIns, n));
 	}
-	return files.filter((p) => {
+	for (const p of files) {
 		let text: string;
 		try {
 			text = readFileSync(p, "utf8");
-		} catch {
-			return false;
+		} catch (e) {
+			if (!missing(e)) found.push(p);
+			continue;
 		}
 		try {
-			const hooks = (JSON.parse(text) as { hooks?: unknown }).hooks;
-			return hooks !== undefined && hooks !== null && Object.keys(hooks as object).length > 0;
+			const settings = JSON.parse(text) as { hooks?: unknown; policyHelper?: unknown };
+			const hooks = settings.hooks;
+			// A policy helper supplies settings this check cannot read, hooks included.
+			if ((hooks !== undefined && hooks !== null && Object.keys(hooks as object).length > 0) || settings.policyHelper !== undefined) found.push(p);
 		} catch {
-			return true; // unreadable managed settings cannot be shown to be free of hooks
+			found.push(p); // unreadable managed settings cannot be shown to be free of hooks
 		}
-	});
+	}
+	return found;
 }
 
 /**

@@ -113,7 +113,7 @@ describe("description-based routing run", () => {
 			mkdirSync(join(managed, "managed-settings.d"));
 			writeFileSync(join(managed, "managed-settings.d", "20-hook.json"),
 				JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "cat notes.md" }] }] } }));
-			const rc = await main(["--cases", t.casesFile, "--out-root", mkdtempSync(join(tmpdir(), "route-out-"))], t.deps, [managed]);
+			const rc = await main(["--cases", t.casesFile, "--out-root", tmp()], t.deps, [managed]);
 			assert.equal(rc, 2);
 			assert.equal(t.calls.length, 0);
 			assert.match(t.lines.join("\n"), /managed settings define hooks/);
@@ -425,6 +425,22 @@ test("a paid run is refused while managed settings define hooks; a description w
 			join(filed, "managed-settings.json"),
 			join(dropped, "managed-settings.d", "20-hook.json"),
 		]);
+		const helped = join(dir, "helped");
+		mkdirSync(join(helped, "managed-settings.d"), { recursive: true });
+		writeFileSync(join(helped, "managed-settings.d", "30-helper.json"), JSON.stringify({ policyHelper: { command: "/usr/local/bin/policy" } }));
+		writeFileSync(join(clean, "managed-settings.d", ".40-hidden.json"), hook);
+		assert.deepEqual(managedHookFiles([clean, helped]), [join(helped, "managed-settings.d", "30-helper.json")]);
+		if (process.getuid?.() !== 0) {
+			const locked = join(dir, "locked");
+			mkdirSync(join(locked, "managed-settings.d"), { recursive: true });
+			const { chmodSync } = await import("node:fs");
+			chmodSync(join(locked, "managed-settings.d"), 0);
+			try {
+				assert.deepEqual(managedHookFiles([locked]), [join(locked, "managed-settings.d")]);
+			} finally {
+				chmodSync(join(locked, "managed-settings.d"), 0o755);
+			}
+		}
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
