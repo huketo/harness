@@ -170,11 +170,12 @@ p { font-size: 14px; }
 .lic-right p { margin-bottom: 14px; }
 .lic-right .sec { margin-top: 4px; }
 /* provenance */
-.prov-page { display: grid; grid-template-columns: 1fr 640px; gap: 72px; }
+.prov-page { display: grid; grid-template-columns: minmax(0, 1fr) 640px; gap: 72px; }
 .prov-left .h2 { margin-bottom: 22px; }
 .prov-left .lede { margin-bottom: 26px; }
+.prov-t { table-layout: fixed; }
 .prov-t th { width: 170px; vertical-align: top; padding-top: 7px; border-bottom: 1px solid var(--rule); }
-.prov-t td { vertical-align: top; }
+.prov-t td { vertical-align: top; overflow-wrap: anywhere; word-break: break-all; }
 .hash { overflow-wrap: anywhere; word-break: break-all; }
 .prov-right .ofl p { overflow-wrap: anywhere; }
 .prov-right > p { margin-top: 8px; }

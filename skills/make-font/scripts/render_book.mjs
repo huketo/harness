@@ -32,7 +32,10 @@ async function launch() {
   if (existsSync(sibling)) {
     const { launchChromium } = await import(pathToFileURL(sibling).href);
     const r = await launchChromium({}, { root: opt("--root") || process.cwd() });
-    if (r.browser) return r.browser;
+    if (r.browser) {
+      console.log(`chromium: find-chromium.mjs, ${r.how} (playwright from ${r.from})`);
+      return r.browser;
+    }
     console.error(r.error);
   }
   const places = [opt("--root"), process.cwd()].filter(Boolean);
@@ -42,7 +45,9 @@ async function launch() {
       try {
         const pw = createRequire(join(p, "noop.js"))(name);
         const exe = process.env.PW_CHROMIUM;
-        return await pw.chromium.launch(exe ? { executablePath: exe } : {});
+        const browser = await pw.chromium.launch(exe ? { executablePath: exe } : {});
+        console.log(`chromium: fallback, ${exe ? `PW_CHROMIUM ${exe}` : "Playwright's own"} (${name} from ${p})`);
+        return browser;
       } catch {}
     }
   }
