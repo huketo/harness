@@ -127,6 +127,44 @@ def dark_mark_and_small_light_mark() -> Image.Image:
     return out
 
 
+def photo(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
+    """A 3D mockup photographed against a wall, the kind of picture collections hold that has no one mark to split: a
+    lit gradient ground, a soft shadow, a box with three shaded faces and a printed word, a shaded ball, and sensor
+    noise. Each seed places, sizes and colours them differently."""
+    import numpy as np
+    from PIL import ImageFilter
+
+    rng = np.random.default_rng(seed)
+    W, H = size
+    y, x = np.mgrid[0:H, 0:W].astype(np.float32)
+    top, bottom = rng.uniform(0.78, 0.9), rng.uniform(0.5, 0.62)
+    light = top + (bottom - top) * y / H - 0.08 * ((x - W * rng.uniform(0.3, 0.7)) / W) ** 2
+    wall = np.stack([light * c for c in rng.uniform(0.92, 1.0, 3)], -1)
+    im = Image.fromarray((np.clip(wall, 0, 1) * 255).astype(np.uint8))
+    bx, by = rng.uniform(0.15, 0.35) * W, rng.uniform(0.25, 0.4) * H
+    bw, bh, depth = rng.uniform(0.3, 0.45) * W, rng.uniform(0.18, 0.28) * H, rng.uniform(0.08, 0.14) * W
+    shadow = Image.new("L", size, 0)
+    ImageDraw.Draw(shadow).ellipse([bx - 20, by + bh - 10, bx + bw + 60, by + bh + 50], fill=110)
+    im = Image.composite(Image.new("RGB", size, (40, 40, 45)), im, shadow.filter(ImageFilter.GaussianBlur(18)))
+    d = ImageDraw.Draw(im)
+    front = tuple(int(v) for v in rng.uniform(215, 245, 3))
+    d.polygon([(bx, by), (bx + depth, by - depth / 2), (bx + bw + depth, by - depth / 2), (bx + bw, by)],
+              fill=tuple(min(255, int(v * 1.04)) for v in front))
+    d.polygon([(bx + bw, by), (bx + bw + depth, by - depth / 2), (bx + bw + depth, by + bh - depth / 2), (bx + bw, by + bh)],
+              fill=tuple(int(v * 0.72) for v in front))
+    d.rectangle([bx, by, bx + bw, by + bh], fill=front)
+    ink = tuple(int(v) for v in rng.uniform(10, 60, 3))
+    for i in range(int(rng.integers(4, 7))):  # a printed word: letters as blocks of varied widths
+        lx = bx + bw * (0.1 + i * 0.12)
+        d.rectangle([lx, by + bh * 0.38, lx + bw * rng.uniform(0.05, 0.1), by + bh * 0.62], fill=ink)
+    cx, cy, r = rng.uniform(0.65, 0.85) * W, rng.uniform(0.55, 0.75) * H, rng.uniform(0.07, 0.11) * W
+    lit = np.clip(1.15 - np.hypot(x - cx + r * 0.4, y - cy + r * 0.4) / (1.6 * r), 0.25, 1)
+    a = np.asarray(im, dtype=np.float32) / 255
+    a = np.where((np.hypot(x - cx, y - cy) < r)[..., None], lit[..., None] * rng.uniform(0.5, 0.95, 3), a)
+    a = a + rng.normal(0, 0.012, a.shape)
+    return Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
+
+
 def font_bytes(family: str) -> bytes:
     """A TrueType font whose letters are plain boxes: enough for HarfBuzz to shape and for outlines to exist."""
     from fontTools.fontBuilder import FontBuilder

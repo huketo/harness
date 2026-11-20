@@ -81,9 +81,12 @@ traced, and the scripts refuse them by hash and by likeness.
    collection that is or holds a symbolic link (`collection-linked`), one that holds a file its manifest does not
    list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or a
    collected file that is gone or no longer has the sha256 its manifest lists (`collection-changed`), is refused too;
-   `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. The
-   person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison; a collected file
-   never is, whatever `trace_sources` lists.
+   `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. Last,
+   the file and the part `--crop` takes are compared as pictures with every collected image and `--refs` image, and
+   one that is the same picture saved again, resized, cut a little or made lighter or darker is refused
+   (`collected-copy`, or `reference-copy` for a `--refs` image no collection lists; see Same picture). The person's
+   own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of these comparisons; a collected file never
+   is, whatever `trace_sources` lists.
    potrace draws the curves and drops specks; check for stray type in the crop and cut it.
 3. Place it: `{"shape": "trace", "file": "trace/<n>.svg", "x": 2, "y": 2, "size": 44}`, with `rotate` and `mirror` as
    usual. The path is found from the working folder first, then from the recipe's folder. Then change one thing with
@@ -99,6 +102,38 @@ traced, and the scripts refuse them by hash and by likeness.
 
 The book shows where a traced mark came from, the kind of right, the person's answer and the score against the
 source; the trademark sheet says the same in words.
+
+### Same picture
+
+The mask and path gates compare marks: the source cut at `--threshold`, each reference split from its ground. A
+photo (a 3D mockup, a sign on a wall) has no one mark to split, so the two masks can cover different parts of the same
+picture: in a real run a re-saved or slightly cut copy of a collected photo scored 0.37 to 0.45 against a limit of
+0.795. `same_picture.py` compares the pictures themselves. Each image is seen in grey, squeezed into a square (a
+crop changes the aspect), on white and, with transparency, on black and as its colour channels alone (what potrace
+gets of a source). One is compared with every window of the other that leaves out up to an eighth of each side, at
+32 px, both ways round, and the best window is refined to 1/128 of a side at 64 px. Each view is compared less its
+blur (sigma an eighth of its side), so light falling across a wall counts for nothing, and the score is the
+correlation of the pixels, 1 for the same picture at any brightness and contrast. The gate refuses at `LIMIT` = 0.85
+and over.
+
+Measured on the 150 collected images of a real run (Are.na pulls and stock photos; 74 flat marks, 76 photos,
+scenes and sheets):
+
+| Pairs | n | Score |
+|-|-|-|
+| Each image against its copies: saved again as PNG, JPEG q75 or WebP; 2 to 10% cut off every side, one side or at random; 50% and 200% size; 10% darker or lighter; cut, halved and saved as JPEG at once; a plain ground made clear | 3,225 | lowest 0.9076 |
+| Every pair of different images | 11,175 | highest 0.7197 (two white-on-black wordmarks from one studio, checked by eye: different marks); 99.9th percentile 0.5889 |
+| The test fixtures' own marks and photos against each image | 1,950 | highest 0.5825 |
+| Two test photos staged the same way, in other colours | 1 | 0.8375 |
+
+0.85 sits in that gap, nearer the copies, so a person's own photo staged like a collected one still passes. A window
+is refined only when it scores 0.5 at 32 px; every copy scored 0.7447 or more there. The gate reads each image once
+more and adds about 3 to 5 seconds to a trace against 152 images, which takes about 30 seconds.
+
+It does not see a copy turned or mirrored, cut by more than an eighth on a side, shown as a small part of a larger
+picture, or with its tones inverted; the mask and path gates still compare its mark. A photo whose ground is keyed out
+with the ground's colour zeroed loses part of its subject with it: one of 75 such copies scored 0.8111 and passes this
+gate (with the colour kept, all 75 scored 1.0).
 
 ## Type
 
@@ -135,9 +170,13 @@ every `--refs` image, SVGs included, read the same way, and the check refuses to
 mark (`not-comparable`), removing the builds' old `check.json`. `check.json` records `refs_compared` and the `limit`.
 Before checking, `check_logo.py` confirms every file `build.json` lists still has its sha256 and that the list holds
 the mark, its grid and, with a wordmark, the wordmark and both lockups; it renders the mark from those verified
-bytes. It refuses a traced direction whose trace was gated against other `--refs` images, another calibration or
-other collections than the check's (`trace-gate-stale`), or while a collected file is gone or changed
-(`collection-changed`), and removes its old `check.json`: build it again. `check.json` then records the sha256 of
+bytes. For a traced direction it first runs the same-picture gate again on the source, against the collections and
+`--refs` images as they are now: a source a collection now lists (`collected`), or a copy of a collected or `--refs`
+image other than the build's own sources (`collected-copy`, `reference-copy`), is refused, so a copy collected after
+the trace, or a trace made before this gate, goes no further. It refuses a traced direction whose trace was gated
+against other `--refs` images, another calibration or other collections than the check's (`trace-gate-stale`), or
+while a collected file is gone or changed (`collection-changed`), and removes its old `check.json`: build it again,
+or, for a copy, drop the direction. `check.json` then records the sha256 of
 `build.json`, of the `--refs` images, of the calibration and, for a traced direction, of the collections
 (`collected_sha256`; `null` for one with no trace).
 
@@ -157,5 +196,6 @@ other collections than the check's (`trace-gate-stale`), or while a collected fi
 
 It reads only the verified bytes of the files `build.json` lists, so a part an earlier build left in the folder never
 ships, and it refuses a build whose `check.json` is missing, failed, or no longer matches `build.json`, its files, the
-`--refs` images or the calibration, or, for a traced direction, its source or the collections (`collections-changed`).
-It verifies all of that before it creates the output folder.
+`--refs` images or the calibration, or, for a traced direction, its source or the collections (`collections-changed`);
+a traced source must also pass the same-picture gate again (`collected`, `collected-copy`, `reference-copy`). It
+verifies all of that before it creates the output folder.

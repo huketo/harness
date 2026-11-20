@@ -18,10 +18,14 @@ once. It refuses to check while one of them can't be read as a mark ("not-compar
 direction (build.json `traces`, verified against its provenance) leaves out only its own source, by sha256, and never
 a collected file: every other reference keeps the usual limit. Its score against that source is recorded in
 `source_scores` for the book to show and fails nothing; a source the person holds rights in may be used unchanged.
-A trace whose gates saw other --refs images, another calibration or other collections than this check is refused,
-and the build's old check.json removed: build it again so the trace is gated against what the check sees. For a
-traced build, a collected file gone or changed since its manifest listed it ("collection-changed") and a file in a
-collection that its manifest does not list ("collection-unlisted") are refused too.
+A traced source is held to the same-picture gate again (same_picture.recheck), against the collections and --refs
+images as they are now: one whose sha256 a collection lists ("collected"), or the same picture as a collected image
+("collected-copy") or a --refs image other than its build's own sources ("reference-copy"), is refused, and the build's
+old check.json removed: drop that direction. A trace whose gates saw other --refs images, another calibration or other
+collections than this check is refused too ("trace-gate-stale"): build it again so the trace is gated against what
+the check sees. For a traced build, a collected file gone or changed since its manifest listed it
+("collection-changed") and a file in a collection that its manifest does not list ("collection-unlisted") are refused
+as well.
 check.json also records the sha256 of build.json, of the --refs images, of the calibration and, for a traced build,
 of the collections, which package_logo.py and logo_book.py recompute before they go on.
 """
@@ -43,6 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import distance as D  # noqa: E402
 import logolib as L  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 import trace_ref as T  # noqa: E402
 
 SIZES = (16, 32, 64, 512)
@@ -96,8 +101,10 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
     files = R.verified_files(build, info)
     traces = R.traces(build, info, files)
     # The collections matter only to a trace's gates: an untraced build records none.
-    collected = R.collected(verify=True) if traces else []
-    collected_sha = R.digest(sha for _, sha in collected) if traces else None
+    collected = R.collected_files() if traces else []
+    collected_sha = R.digest(sha for _, sha, _ in collected) if traces else None
+    if traces:  # before the stale-gate check, so a copy collected since the trace is named
+        SP.recheck(traces, refset["pictures"], collected)
     now = {"refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256, "collected_sha256": collected_sha}
     for t in traces:
         stale = [GATE_INPUTS[k] for k, v in now.items() if t["provenance"]["gate"].get(k) != v]
@@ -106,7 +113,7 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
                                                 f"{' and '.join(stale)} than this check. Build it again with the "
                                                 "same --refs and --calibration, so its trace is gated against "
                                                 "them, then check it.")
-    own = {t["trace"]["source_sha256"] for t in traces} - {sha for _, sha in collected}
+    own = {t["trace"]["source_sha256"] for t in traces} - {sha for _, sha, _ in collected}
     mark = files["mark.svg"].decode()
     big = render(mark, 512) > 0.5
     small = render(mark, 16)

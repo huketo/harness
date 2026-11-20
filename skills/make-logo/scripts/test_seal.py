@@ -13,6 +13,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import unittest
 from contextlib import redirect_stdout
@@ -30,6 +31,7 @@ import logo_book as LB  # noqa: E402
 import logolib as L  # noqa: E402
 import package_logo as PK  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 import trace_ref as T  # noqa: E402
 
 LIMIT = D.load_calibration(None)["limit"]
@@ -463,12 +465,40 @@ class TracedDocuments(Project):
         self.assertEqual(self.check(cut), 0)
         self.assertIn("`cut rect`", self.sheet(cut, "package-cut"))
 
-    def test_package_and_book_refuse_once_a_collection_holds_the_source(self):
+    def test_package_and_book_refuse_once_the_collections_changed(self):
         chk = R.read_json(os.path.join(self.b, "check.json"))
         self.assertEqual(chk.get("collected_sha256"), R.collected_sha256())
-        self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
+        self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})  # outside --refs
         self.refused("collections-changed", self.package, self.b)
         self.refused("collections-changed", self.book, self.b)
+
+    def test_package_and_book_refuse_once_a_collection_holds_the_source_or_a_copy(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
+        self.refused("collected", self.package, self.b)
+        self.refused("collected", self.book, self.b)
+        shutil.rmtree(world)
+        buf = io.BytesIO()
+        G.mark_image(G.own).resize((450, 450), Image.LANCZOS).save(buf, "JPEG", quality=80)
+        self.ws.collection("world", {"cafe/60000002.jpg": buf.getvalue()})
+        self.refused("collected-copy", self.package, self.b)
+        self.refused("collected-copy", self.book, self.b)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
+
+    def test_package_and_book_refuse_a_trace_checked_without_the_same_picture_gate(self):
+        # The photo is collected before the trace, so the collections' digest still matches check.json: only the
+        # gate's own run in package_logo.py and logo_book.py stops the copy.
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        copy = self.ws.image("sketches/mockup.jpg", G.photo(0), "JPEG", quality=75)
+        self.brief = self.ws.brief([self.entry, self.ws.entry(copy)])
+        with mock.patch.object(SP, "LIMIT", 2.0):  # as a version without the gate traced, built and checked it
+            T.trace(copy, brief=self.brief, refs=self.refs, out=self.ws.path("trace", "mockup.svg"))
+            b = self.build(self.recipe("mockup", mark=[{"shape": "trace", "file": "trace/mockup.svg", "x": 2, "y": 2,
+                                                         "size": 44}]), "build/mockup")
+            self.check(b)
+        self.assertTrue(os.path.exists(os.path.join(b, "check.json")))
+        self.refused("collected-copy", self.package, b)
+        self.refused("collected-copy", self.book, b)
 
     def test_package_and_book_refuse_a_pull_that_stopped_before_its_manifest(self):
         # The first pull of a collection wrote the source's bytes, then stopped before it wrote manifest.json: the

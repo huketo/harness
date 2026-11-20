@@ -33,7 +33,11 @@ trademark sheet. It doesn't know whether the statement is true.
 
 - `trace_ref.py` traces only a file listed in `brief.json` `trace_sources` by sha256, never one whose sha256 is in a
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
-  calibrated limit against a collected image or a `--refs` logo. It compares with every image, fit to measure or
+  calibrated limit against a collected image or a `--refs` logo. A photo has no one mark to split, so a copy of one
+  can pass those masks; the file, and the part `--crop` takes, is also compared as a picture with every collected
+  image (`collected-copy`) and `--refs` image (`reference-copy`), and refused when it is one of them saved again,
+  resized, cut a little at the edges or made lighter or darker (`same_picture.py`; its limit, and what it does not
+  see, are in `references/building.md`, "Same picture"). It compares with every image, fit to measure or
   not: SVGs rasterised, a favicon too small to split enlarged, an image with transparency seen on white and on black
   (its higher score counts). It refuses while one of them still can't be read as one mark (`not-comparable`, also a
   sheet whose mask leaves out a tenth of the ink seen on a ground), while a `--refs` folder or file named is not
@@ -48,12 +52,16 @@ trademark sheet. It doesn't know whether the statement is true.
   recorded, and refuses a recipe that says `traced_from`. `check_logo.py` compares with the same references, refuses
   the same unreadable ones, and leaves out only a direction's own verified source; every other reference keeps the
   usual limit. It refuses a traced direction whose trace was gated against other `--refs` images, another
-  calibration or other collections than it is given, and removes that `check.json`. With no reference that shows a mark, its nearest-reference row reads `not checked`.
+  calibration or other collections than it is given, and removes that `check.json`. Before that, it runs the
+  same-picture gate again on each traced source against the collections and `--refs` as they are now: a source a
+  collection now lists (`collected`) or a copy of it (`collected-copy`, `reference-copy`) stops the direction. With
+  no reference that shows a mark, its nearest-reference row reads `not checked`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
   file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw; for a traced
-  direction, its source and the collections (`collected_sha256`) must match too. They verify all of it before they
-  write anything, and read the build's files only as those verified bytes. A `build.json` that leaves out a part the
-  build writes (the mark, its grid, the lockups of a build with a wordmark) is refused at every step.
+  direction, its source must pass the same-picture gate again and the collections (`collected_sha256`) must match
+  too. They verify all of it before they write anything, and read the build's files only as those verified bytes. A
+  `build.json` that leaves out a part the build writes (the mark, its grid, the lockups of a build with a wordmark) is
+  refused at every step.
 - A shape the agent types in as `polygon` points has no source the chain can see: only the distance check stands
   between it and a copy.
 - A reference sheet that holds a second mark too small to survive segmentation (a badge of a few pixels beside a
@@ -133,10 +141,11 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    kinds (`references/building.md`): idea marks built from shapes, typographic marks in a display face with
    character, and, when step 6 gave you a source, traced marks: `uv run scripts/trace_ref.py sketches/l.png --brief
    brief.json --refs <refs> --calibration calibration.json --crop x,y,w,h --out trace/<n>.svg`, then change one thing
-   with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image:
-   drop that source, never work around it. `not-comparable` names a reference the gates can't read as one mark: take
-   it out of `refs/mine/` (or delete it from its collection and run `collection.mjs`), or replace it with one mark
-   cropped out of it on a plain ground, then trace again. At least half carry the idea as a picture, not a letter. Each
+   with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image
+   (`collected-copy`, `reference-copy`: the same picture, saved again or cut): drop that source, never work around
+   it. `not-comparable` names a reference the gates can't read as one mark: take it out of `refs/mine/` (or delete it
+   from its collection and run `collection.mjs`), or replace it with one mark cropped out of it on a plain ground,
+   then trace again. At least half carry the idea as a picture, not a letter. Each
    is a recipe (`references/building.md`): a title, the idea in one sentence, grid shapes, an OFL wordmark, a
    palette. Build each: `uv run scripts/build_logo.py dirs/<n>.json --out build/<n> --brief brief.json --refs <refs>
    --calibration calibration.json`. Render all six on one sheet and look: a mark that reads as a stock icon, the
@@ -149,7 +158,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    but its own source; its score against that source is recorded and shown, never failed. A detailed trace may fail
    the 16 px checks; keep it if it's strong, and say it needs a simpler favicon. A `trace-gate-stale` refusal means
    the references, the calibration or the collections changed after that direction was built (a new photo pull
-   counts): build it again, then check it. `not-comparable` is the same as in step 7.
+   counts): build it again, then check it. `collected`, `collected-copy` or `reference-copy` means the traced source
+   is, or is a copy of, a collected or reference image: drop that direction. `not-comparable` is the same as in step 7.
    Done when every direction passes, a traced one failing nothing but the 16 px rows.
 
 9. **Logo book.** With the photos from step 2:
@@ -157,9 +167,10 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    --name "<name>" --line "<what it does>" --tagline "<...>" --note "<a notification the app would send>" --photos
    "$C/photos"`, then `node scripts/render_book.mjs book` (`references/logo-book.md`). A direction that failed the
    check is left out; `--include-failed` shows it, marked. This step and step 10 refuse a traced direction whose
-   collections changed after its check (`collections-changed`): build and check it again. Open every page. Send
-   `book/logobook.pdf` and ask the person to choose; record the question and their answer verbatim in `brief.json`
-   as `"choice"`.
+   collections changed after its check (`collections-changed`): build and check it again. They refuse one whose
+   source a collection or `--refs` image now matches (`collected`, `collected-copy`, `reference-copy`): drop it.
+   Open every page. Send `book/logobook.pdf` and ask the person to choose; record the question and their answer
+   verbatim in `brief.json` as `"choice"`.
    Done when render_book.mjs exits 0 and the person's pick is recorded in their words.
 
 10. **Package.** `uv run scripts/package_logo.py build/<chosen> --out package --refs <refs> --calibration
@@ -184,7 +195,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
 - `scripts/logolib.py`: loading, finding the ink, normalising. `scripts/rights.py`: hashes, the brief's
   `trace_sources`, collection manifests, and the seal between steps.
 - `scripts/measure_logo.py`: step 3. `scripts/calibrate.py`: step 4. `scripts/distance.py`: the distance check.
-- `scripts/trace_ref.py` (with `scripts/potrace_bin.py`), `scripts/build_logo.py`, `scripts/fonts.py`: step 7.
+- `scripts/trace_ref.py` (with `scripts/potrace_bin.py` and `scripts/same_picture.py`), `scripts/build_logo.py`,
+  `scripts/fonts.py`: step 7.
   `scripts/check_logo.py`: step 8.
 - `scripts/logo_book.py`, `scripts/render_book.mjs`: step 9. `scripts/package_logo.py`: step 10.
 - `scripts/calibration.json`: default weights and limit, fitted on 98 references.

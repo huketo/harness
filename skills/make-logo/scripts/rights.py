@@ -12,7 +12,8 @@ collected material it must never be, and seals each step's output so the next st
 - collections: every folder under `${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/` but the font and potrace caches,
   each with a `manifest.json` listing every file in it with its sha256 (fetch_arena.mjs, fetch_photos.mjs).
 - build.json `files` and check.json `build_sha256`, `refs_sha256`, `calibration_sha256`, and for a traced build
-  `collected_sha256`: what package_logo.py and logo_book.py recompute before they go on.
+  `collected_sha256`: what package_logo.py and logo_book.py recompute before they go on, after they run the
+  same-picture gate (same_picture.recheck) again on each traced source.
 """
 from __future__ import annotations
 
@@ -105,9 +106,26 @@ def ref_images(folders: list[str]) -> list[str]:
     return found
 
 
+def ref_files(folders: list[str]) -> list[tuple[str, str, bytes]]:
+    """(file, sha256, bytes) of every image ref_images() finds, each read once, so a sha256 recorded is of the bytes
+    judged. Refuses ("refs-missing") while one is gone between the listing and the read."""
+    out, gone = [], []
+    for p in ref_images(folders):
+        try:
+            data = read_bytes(p)
+        except OSError:
+            gone.append(p)
+            continue
+        out.append((p, sha256_bytes(data), data))
+    if gone:
+        raise Refused("refs-missing", f"these --refs images could not be read: {'; '.join(gone)}. Put them back or take "
+                                      "them out of the --refs folders, then run this again.")
+    return out
+
+
 def refs_sha256(folders: list[str]) -> str:
     """Over every image file in the --refs folders as they are now, never from a saved list."""
-    return digest(sha256_file(p) for p in ref_images(folders))
+    return digest(sha for _, sha, _ in ref_files(folders))
 
 
 # Collections ------------------------------------------------------------------------------------------------------
@@ -127,14 +145,13 @@ def _contents(d: str) -> tuple[set[str], list[str]]:
     return files, links
 
 
-def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, str]]:
+def collected(root: str | None = None) -> list[tuple[str, str]]:
     """(file, sha256 listed for it) for every item of every collection: each folder under the cache but the font and
     potrace caches. Refuses ("collection-linked") while a collection, or anything in it, is a symbolic link: a pull
     writes through it, and collection.mjs lists nothing behind it. Refuses ("collection-unlisted") while a collection
     holds a file its manifest.json does not list: a pull that stopped before it rewrote the manifest (its files, a
     `.part` it was writing, or no manifest at all) or a file added by hand would otherwise be compared with nothing and
-    change no digest. With `verify`, it also refuses ("collection-changed") while a listed file is gone or its bytes no
-    longer have that sha256."""
+    change no digest."""
     root = root or cache_root()
     out, unlisted, linked = [], [], []
     for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
@@ -172,18 +189,29 @@ def collected(root: str | None = None, verify: bool = False) -> list[tuple[str, 
                                              "file put there by hand, leaves them. collection.mjs clears what an "
                                              "unfinished pull left and lists the rest with its sha256; run it for "
                                              "each collection named, then run this again.")
-    if verify:
-        changed = [f for f, sha in out if not (os.path.isfile(f) and sha256_file(f) == sha)]
-        if changed:
-            raise Refused("collection-changed", f"these collected files are gone or changed since their manifest listed "
-                                                f"them: {', '.join(changed)}. Fetch the collection again, or list what is "
-                                                "in it now with `node scripts/collection.mjs <name>`.")
+    return out
+
+
+def collected_files(root: str | None = None) -> list[tuple[str, str, bytes]]:
+    """collected(), each listed file read once: (file, sha256, bytes). Refuses ("collection-changed") while a listed
+    file is gone or its bytes no longer have that sha256."""
+    out, changed = [], []
+    for f, sha in collected(root):
+        data = read_bytes(f) if os.path.isfile(f) else None
+        if data is None or sha256_bytes(data) != sha:
+            changed.append(f)
+        else:
+            out.append((f, sha, data))
+    if changed:
+        raise Refused("collection-changed", f"these collected files are gone or changed since their manifest listed "
+                                            f"them: {', '.join(changed)}. Fetch the collection again, or list what is "
+                                            "in it now with `node scripts/collection.mjs <name>`.")
     return out
 
 
 def collected_sha256(root: str | None = None) -> str:
     """The digest of every sha256 the collection manifests list, once each listed file is confirmed to have it."""
-    return digest(sha for _, sha in collected(root, verify=True))
+    return digest(sha for _, sha, _ in collected_files(root))
 
 
 # The brief --------------------------------------------------------------------------------------------------------
@@ -308,8 +336,9 @@ def sealed(build: str, refs: list[str], calibration: str | None,
            require_ok: bool = True) -> tuple[dict, dict, dict[str, bytes], list[dict]]:
     """(build.json, check.json, verified_files(), traces()) of a build whose check still holds, or a refusal naming
     what changed. Everything is verified before it returns, so a step that writes calls this first and writes only
-    after: a traced build's sources, and the collections its traces were gated against (check.json
-    `collected_sha256`), must also be as they were."""
+    after: a traced build's sources must pass the same-picture gate again against the collections and --refs images
+    as they are now (same_picture.recheck), and the collections its traces were gated against (check.json
+    `collected_sha256`) must be as they were."""
     bpath, cpath = os.path.join(build, "build.json"), os.path.join(build, "check.json")
     if not os.path.isfile(bpath):
         raise Refused("not-built", f"{build} has no build.json")
@@ -320,17 +349,24 @@ def sealed(build: str, refs: list[str], calibration: str | None,
     if chk.get("build_sha256") != sha256_bytes(raw):
         raise Refused("stale-check", f"{build}/build.json changed since check_logo.py ran (a new build?). Check it again.")
     files = verified_files(build, info)
-    if chk.get("refs_sha256") != refs_sha256(refs):
+    ref_list = ref_files(refs)
+    if chk.get("refs_sha256") != digest(sha for _, sha, _ in ref_list):
         raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
                                       "same folders, or check again against these.")
     if chk.get("calibration_sha256") != sha256_file(calibration_file(calibration)):
         raise Refused("calibration-changed", f"{build} was checked with another calibration. Pass the same --calibration, "
                                              "or check again.")
     found = traces(build, info, files)
-    if found and chk.get("collected_sha256") != collected_sha256():
-        raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a file "
-                                             "added or removed), and its trace was gated against the old ones. Build "
-                                             "it again, so the trace is gated against them, and check it.")
+    if found:
+        sys.path.insert(0, HERE)
+        import same_picture as SP
+
+        now = collected_files()
+        SP.recheck(found, [(f, sha, SP.cached(sha, data)) for f, sha, data in ref_list], now)
+        if chk.get("collected_sha256") != digest(sha for _, sha, _ in now):
+            raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a "
+                                                 "file added or removed), and its trace was gated against the old ones. "
+                                                 "Build it again, so the trace is gated against them, and check it.")
     if require_ok and not chk.get("ok"):
         raise Refused("check-failed", f"{build} failed check_logo.py. Change the recipe, build and check again.")
     return info, chk, files, found

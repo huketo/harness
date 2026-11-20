@@ -17,8 +17,11 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
 2. a file whose sha256 is in any collection manifest under the cache (fetch_arena.mjs, fetch_photos.mjs);
 3. a mask, the exact pixels passed to potrace after the crop, threshold and invert, that scores at or over the
    calibrated limit against any collected image or --refs logo;
-4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3).
-In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
+4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3);
+5. a file, or the part --crop takes, that is the same picture as any collected image ("collected-copy") or --refs
+   image ("reference-copy"): saved again, resized, cut a little at the edges or made lighter or darker
+   (same_picture.py). A photo has no one mark to split, so 3 and 4 can miss a copy of one.
+In 3, 4 and 5 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
 fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
 white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
@@ -57,6 +60,7 @@ import distance as D  # noqa: E402
 import logolib as L  # noqa: E402
 import potrace_bin as P  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 
 SCHEMA = "make-logo/trace@1"
 LONG_SIDE = 1200  # potrace gets about this many pixels on the long side, so it has edges to fit
@@ -183,15 +187,16 @@ def _read(path: str) -> bytes | None:
 
 
 def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
-    """What the distance checks compare with: every image in the --refs folders and files and every collected file,
-    each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, [features of each
-    mask])], once per sha256, "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+    """What the distance and same-picture checks compare with: every image in the --refs folders and files and every
+    collected file, each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256,
+    [features of each mask])], "pictures": [(file, sha256, same_picture.Picture)], each once per sha256,
+    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
 
     Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing,
     ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest lists,
     and ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say
     nothing about a picture they could not compare."""
-    marks, uncomparable, changed, missing, seen, ref_shas, read = [], [], [], [], set(), [], {}
+    marks, pictures, uncomparable, changed, missing, seen, ref_shas, read = [], [], [], [], [], set(), [], {}
     for f, listed in [(f, None) for f in R.ref_images(refs)] + list(collected):
         if f not in read:
             data = _read(f)
@@ -208,6 +213,7 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
         if sha in seen:
             continue
         seen.add(sha)
+        pictures.append((f, sha, SP.cached(sha, data)))
         feats, why = _prepared(sha, data)
         if feats:
             marks.append((f, sha, feats))
@@ -227,7 +233,7 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
                                           "Take each one out of the --refs folder (or out of its collection, then "
                                           "`node scripts/collection.mjs <name>`), or replace it with a copy that "
                                           "shows one mark on a plain ground, then run this again.")
-    return {"marks": marks, "refs_sha256": R.digest(ref_shas)}
+    return {"marks": marks, "pictures": pictures, "refs_sha256": R.digest(ref_shas)}
 
 
 def calibration_snapshot(path: str | None) -> tuple[dict, str]:
@@ -315,6 +321,9 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                                             f"{vector_near['ref']} (limit {cal['limit']:.3f}; the mask scored "
                                             f"{mask_near['score']:.3f}, the specks potrace dropped hid it).",
                         mask_nearest=mask_near, vector_nearest=vector_near)
+    pictures = [p for p in refset["pictures"] if p[1] not in own]
+    copy_near = SP.gate(source, SP.source(data, crop), pictures, {sha for _, sha in collected},
+                        mask_nearest=mask_near, vector_nearest=vector_near)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     svg_bytes = svg.encode()
@@ -329,7 +338,8 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
         "mask_sha256": mask_sha,
         "gate": {"calibration_sha256": cal_sha, "limit": cal["limit"], "refs_sha256": refset["refs_sha256"],
                  "collected_sha256": R.digest(sha for _, sha in collected), "compared": len(marks),
-                 "mask_nearest": mask_near, "vector_nearest": vector_near},
+                 "mask_nearest": mask_near, "vector_nearest": vector_near, "copy_nearest": copy_near,
+                 "copy_limit": SP.LIMIT},
         "potrace": potrace,
         "svg_sha256": R.sha256_bytes(svg_bytes),
     }
@@ -354,7 +364,8 @@ def main(argv: list[str] | None = None) -> None:
     g = r["provenance"]["gate"]
     print(f"traced {os.path.basename(a.image)} into {a.out} ({r['provenance']['trace_source']['rights']}): nearest of "
           f"{g['compared']} images compared {g['mask_nearest']['score']:.3f} as a mask, {g['vector_nearest']['score']:.3f} "
-          f"as a path, limit {g['limit']:.3f}; provenance in {r['record']}")
+          f"as a path, limit {g['limit']:.3f}; {g['copy_nearest']['score']:.3f} as a picture, limit {g['copy_limit']}; "
+          f"provenance in {r['record']}")
 
 
 if __name__ == "__main__":
