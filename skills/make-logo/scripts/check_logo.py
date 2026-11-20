@@ -12,9 +12,10 @@ if any direction fails. A failure goes back to the recipe.
 
 Every file build.json lists must still have its sha256, and the list must hold every part the build writes; the
 mark is read from those verified bytes. The references are the trace gates' own (trace_ref.reference_set): every
---refs image, SVGs rasterised, fit to measure or not, one with transparency seen on white and on black, each read
-once. It refuses to check while one of them can't be read as a mark ("not-comparable") or a --refs path is not there
-("refs-missing"), and removes the builds' old check.json: take that file out, replace it, or mend the path. A traced
+--refs image, SVGs rasterised, fit to measure or not, one with transparency seen on white and on black, one with an
+EXIF orientation as stored and as shown, each read once. It refuses to check while one of them can't be read as a
+mark ("not-comparable") or a --refs path is not there ("refs-missing"), and removes the builds' old check.json: take
+that file out, replace it, or mend the path. A traced
 direction (build.json `traces`, verified against its provenance) leaves out only its own source, by sha256, and never
 a collected file: every other reference keeps the usual limit. Its score against that source is recorded in
 `source_scores` for the book to show and fails nothing; a source the person holds rights in may be used unchanged.

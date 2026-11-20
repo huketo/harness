@@ -380,6 +380,21 @@ class CheckReferences(Project):
         self.assertTrue(chk["nearest"][0]["ref"].endswith("sheet.png"), chk["nearest"])
         self.assertEqual(chk["refs_compared"], 2, "a sheet compared on both grounds is still one reference image")
 
+    def test_check_compares_a_reference_as_its_exif_orientation_shows_it(self):
+        # An L with a flag: turned a quarter, mirrored or not, it is not itself.
+        b = self.build(self.recipe(mark=[{"shape": "rect", "x": 8, "y": 4, "w": 10, "h": 40},
+                                         {"shape": "rect", "x": 8, "y": 34, "w": 34, "h": 10},
+                                         {"shape": "polygon", "points": [[24, 6], [42, 6], [42, 24]]}]))
+        self.assertEqual(self.check(b), 0)
+        svg = R.read_bytes(os.path.join(b, "mark.svg")).decode()
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=400, background="#ffffff"))
+        R.write_bytes(self.ws.path("refs", "mine", "turned.jpg"),
+                      G.exif_turned(G.padded(Image.open(io.BytesIO(png)).convert("RGB"))))
+        self.assertEqual(self.check(b), 1)
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("turned.jpg"), chk["nearest"])
+        self.assertEqual(chk["refs_compared"], 2, "a reference seen both ways is still one reference image")
+
     def test_check_refuses_while_a_reference_cannot_be_compared(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)

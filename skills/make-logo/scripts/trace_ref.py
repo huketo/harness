@@ -24,8 +24,9 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
    collected image whatever trace_sources lists.
 In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
-fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
-white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
+fit to measure or not: an SVG rasterised, a raster too small to split enlarged, one with transparency split on white
+and on black (a sheet may hold a dark logo and a light one), and one with an EXIF orientation split as stored and as
+shown, its highest score counting. The source is read as stored, as potrace traces it. It also refuses while
 any of them still can't be read as a mark, or its mask leaves out a tenth of the ink seen (a sheet of several marks)
 ("not-comparable": take it out, or replace it with one mark cropped out of it), while a --refs folder or file named
 is not there, a folder in them can't be listed, or an image is a broken link ("refs-missing"), while a collection is
@@ -143,31 +144,34 @@ KEEP = 0.9
 
 
 def gate_masks(data: bytes) -> tuple[list[np.ndarray], str]:
-    """A reference's ink for the distance gates, one mask for each ground it is seen on, or ([], why) with why the
-    words for the refusal (rights.UNCOMPARABLE). An opaque image is split as logolib.load() gives it, as measuring
+    """A reference's ink for the distance gates, one mask for each way and ground it is seen on, or ([], why) with why
+    the words for the refusal (rights.UNCOMPARABLE). An opaque image is split as logolib.load() gives it, as measuring
     sees it. One with transparency is split on white and on black, and both masks are kept: a sheet with a dark logo
-    and a light one shows one on each. On each ground, while no ink is found, or the mask keeps under KEEP of the ink
-    seen, the image is enlarged to logolib.WORK when it is smaller (a favicon). A ground on which every size tried
-    keeps under KEEP ("partial") means more than one mark, or a mark too small to keep beside a larger one: the gates
-    would compare with part of the image only, so it is not comparable until it is cropped to one mark. The best size
-    counts, as enlarging blurs a mark that is not there on that ground into specks."""
+    and a light one shows one on each. One with an EXIF orientation is split as stored and as shown
+    (logolib.orientations), and the masks of both are kept: a copy may be drawn from what the file shows or from its
+    pixels. On each ground, while no ink is found, or the mask keeps under KEEP of the ink seen, the image is enlarged
+    to logolib.WORK when it is smaller (a favicon). A ground on which every size tried keeps under KEEP ("partial")
+    means more than one mark, or a mark too small to keep beside a larger one: the gates would compare with part of
+    the image only, so it is not comparable until it is cropped to one mark. The best size counts, as enlarging blurs
+    a mark that is not there on that ground into specks."""
     try:
         im = L.open_image(data)
     except Exception:  # neither Pillow nor resvg can read it
         return [], R.UNCOMPARABLE["unreadable"]
     masks, why, short = [], "", []
-    for name, ground in [("white", (255, 255, 255))] + ([("black", (0, 0, 0))] if L.transparent(im) else []):
-        best = 0.0
-        for side in (None, L.WORK) if max(im.size) < L.WORK else (None,):
-            seg = L.segment(L.flatten(im, ground, side))
-            if seg["ok"] and seg["kept"] >= KEEP:
-                masks.append(seg["mask"])
-                break
-            best = max(best, seg.get("kept", 1.0))
-            why = why or seg.get("why", "")
-        else:
-            if best < KEEP:
-                short.append(f"{math.floor(best * 1000) / 10:g}% of the ink on {name}")
+    for view, seen in zip(L.orientations(im), ("", " as its EXIF orientation shows it")):
+        for name, ground in [("white", (255, 255, 255))] + ([("black", (0, 0, 0))] if L.transparent(view) else []):
+            best = 0.0
+            for side in (None, L.WORK) if max(view.size) < L.WORK else (None,):
+                seg = L.segment(L.flatten(view, ground, side))
+                if seg["ok"] and seg["kept"] >= KEEP:
+                    masks.append(seg["mask"])
+                    break
+                best = max(best, seg.get("kept", 1.0))
+                why = why or seg.get("why", "")
+            else:
+                if best < KEEP:
+                    short.append(f"{math.floor(best * 1000) / 10:g}% of the ink on {name}{seen}")
     if short:
         return [], R.UNCOMPARABLE["partial"].format(kept=" and ".join(short), need=f"{KEEP:.0%}")
     return masks, "" if masks else R.UNCOMPARABLE.get(_SEGMENT_WHY.get(why, why), why)

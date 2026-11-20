@@ -71,8 +71,9 @@ traced, and the scripts refuse them by hash and by likeness.
    light mark on dark). It refuses a file not in `trace_sources`, a file whose sha256 is in any collection manifest,
    and a crop whose mask, or whose traced path, scores at or over the limit against a collected image or a `--refs`
    logo. Every image counts, even one `measure_logo.py` skips (a logo cut close out of a screenshot): an SVG is
-   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, and an image with transparency
-   is seen on white and on black, its higher score counting (a sheet may hold a dark logo and a light one). While an
+   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, an image with transparency is
+   seen on white and on black (a sheet may hold a dark logo and a light one), and one with an EXIF orientation (a
+   camera's JPEG stored on its side) as stored and as shown, its highest score counting. While an
    image still can't be read as one mark, the trace is refused (`not-comparable`, naming it): take it out of the
    folder, or out of its collection, or replace it with one mark cropped out of it on a plain ground. That includes a
    sheet whose mask, on white or on black, keeps under 90% of the ink seen there: a second mark, or a favicon beside a
@@ -142,7 +143,10 @@ It does not see a copy turned (other than by its EXIF orientation) or mirrored, 
 shown as a small part of a larger picture, keyed until under a tenth of it shows (the views without alpha still
 compare it: the copy keyed to 6% scored 0.8590), or with its tones inverted; the mask and path gates still compare its
 mark. A copy of a `--refs` image that no collection lists is left to the mask and path gates, which can miss a photo.
-Those gates, and the check's distance check, see an image as stored, not as its EXIF orientation shows it.
+Those gates, and the check's distance check, see a reference with an EXIF orientation both as stored and as shown,
+so a mark drawn again from what such a file shows is compared too. They read a source as stored, as potrace traces
+it: one that its EXIF orientation turns is compared as the turned mark it holds, and they can miss a mark turned a
+quarter.
 
 ## Type
 

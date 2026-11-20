@@ -313,6 +313,38 @@ class TraceGates(unittest.TestCase):
         e = self.refused("collected-copy", turned, [self.ws.entry(turned)])
         self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
 
+    def test_refuses_a_redrawing_of_the_mark_a_reference_shows_by_its_exif_orientation(self):
+        # A JPEG of a mark stored on its side with the EXIF orientation that shows it upright, collected or in --refs.
+        # The mark drawn again on a wide page is another picture, which the same-picture gate passes, so only the mask
+        # gate can see the copy: it must compare the reference as shown and as stored.
+        for name, draw in (("L", G.own), ("triangle", G.badge)):
+            turned = G.exif_turned(G.mark_image(draw))
+            for where in ("collected", "refs"):
+                if where == "collected":
+                    ref = os.path.join(self.ws.collection("world", {"logos/90000001.jpg": turned}), "logos",
+                                       "90000001.jpg")
+                else:
+                    ref = self.ws.path("refs", "mine", "turned.jpg")
+                    R.write_bytes(ref, turned)
+                for seen in ("shown", "stored"):
+                    with self.subTest(name, where=where, seen=seen):
+                        page, d = G.canvas(900, 500)
+                        draw(d, 60, 50, 400)
+                        if seen == "stored":
+                            page = page.transpose(Image.Transpose.ROTATE_90)
+                        redrawn = self.ws.image(f"sketches/{name}-{where}-{seen}.png", page)
+                        self.out = self.ws.path("trace", f"{name}-{where}-{seen}.svg")
+                        self.assertLess(SP.score(SP.source(R.read_bytes(redrawn)), SP.picture(turned)), SP.LIMIT,
+                                        "the redrawing must be another picture")
+                        e = self.refused("mask-too-close", redrawn, [self.ws.entry(redrawn)])
+                        print(f"\n  {name} redrawn as a {where} EXIF 6 JPEG is {seen}: mask "
+                              f"{e.detail['mask_nearest']['score']:.4f}")
+                        self.assertEqual(e.detail["mask_nearest"]["ref"], ref)
+                if where == "collected":
+                    shutil.rmtree(os.path.dirname(os.path.dirname(ref)))
+                else:
+                    os.remove(ref)
+
     def test_refuses_a_collected_file_that_no_longer_has_its_manifest_hash(self):
         world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
         listed = os.path.join(world, "cafe", "60000001.png")

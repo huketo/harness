@@ -34,7 +34,7 @@ import os
 import sys
 
 import numpy as np
-from PIL import ExifTags, Image, ImageOps
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import logolib as L  # noqa: E402
@@ -73,12 +73,11 @@ def _grounds(im: Image.Image) -> list[tuple[np.ndarray, np.ndarray | None]]:
 
 def views(im: Image.Image, crop=WHOLE) -> list[tuple[np.ndarray, np.ndarray | None]]:
     """The (grey, alpha or None) squares `im` is compared as, of the part `crop` (x, y, w, h in fractions) takes:
-    _grounds() of it as stored and, with an EXIF orientation, as shown. Floats 0-1."""
+    _grounds() of it as stored and, with an EXIF orientation, as shown (logolib.orientations). Floats 0-1."""
     x, y, w, h = (float(v) for v in crop)
     W, H = im.size
     part = im.crop((round(x * W), round(y * H), round((x + w) * W), round((y + h) * H)))
-    turned = part.getexif().get(ExifTags.Base.Orientation, 1) in range(2, 9)
-    return [v for p in [part] + ([ImageOps.exif_transpose(part)] if turned else []) for v in _grounds(p)]
+    return [v for p in L.orientations(part) for v in _grounds(p)]
 
 
 def _resample(m: int, n: int, a: float, b: float) -> np.ndarray:

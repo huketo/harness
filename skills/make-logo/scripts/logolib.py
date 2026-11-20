@@ -14,7 +14,7 @@ import io
 import os
 
 import numpy as np
-from PIL import Image, ImageSequence, UnidentifiedImageError
+from PIL import ExifTags, Image, ImageOps, ImageSequence, UnidentifiedImageError
 from scipy import ndimage as ndi
 from skimage import color, filters, measure, morphology, transform
 
@@ -53,6 +53,14 @@ def open_image(src) -> Image.Image:
     out = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
     out.paste(im.convert("RGBA"), (pad, pad))
     return out
+
+
+def orientations(im: Image.Image) -> list[Image.Image]:
+    """`im` as stored and, when its EXIF orientation (2 to 8) turns or mirrors it, as shown: a camera often stores a
+    JPEG on its side with the tag that shows it upright. open_image() and load() give it as stored."""
+    if im.getexif().get(ExifTags.Base.Orientation, 1) in range(2, 9):
+        return [im, ImageOps.exif_transpose(im)]
+    return [im]
 
 
 def transparent(im: Image.Image) -> bool:
