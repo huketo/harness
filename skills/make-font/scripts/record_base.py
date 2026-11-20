@@ -2,21 +2,28 @@
 # requires-python = "==3.12.*"
 # dependencies = ["fonttools"]
 # ///
-"""Record the base the person approved, in base.json. Run it only after the person answered.
+"""Ask the person to approve a base, then record their answer in base.json. Two runs, a person between them.
 
-  uv run record_base.py --shortlist shortlist.json --family "Family" \\
-      --question "the question you asked, verbatim" --answer "their answer, verbatim" --out base.json
-  uv run record_base.py --font <base-vf.ttf> --licence <OFL.txt> --source google-fonts|manifest|local \\
-      [--url URL] [--manifest-entry ID] --question "..." --answer "..." --out base.json
+  1. uv run record_base.py --shortlist shortlist.json --family "Family" --question-only --out base.json
+     uv run record_base.py --font <base-vf.ttf> --licence <OFL.txt> --source google-fonts|manifest|local \\
+         [--url URL] [--manifest-entry ID] --question-only --out base.json
+  2. the same file arguments, then
+         --question "<the printed question, verbatim>" --answer "<their answer, verbatim>" \\
+         --decision approved --font-sha256 <hash from the question> --license-sha256 <hash from the question>
 
 Only a person can decide that a font may be the base. This script cannot check that decision; it binds it to the
-files: the font's sha256, the OFL text's sha256, name ID 13 exactly as the font carries it, the Reserved Font
-Names from the OFL's copyright lines, where the font came from, and the question and answer word for word.
+files. Run 1 checks the files and prints the question, which names the font's and the OFL text's sha256, and
+writes nothing. Run 2 writes base.json only when both files still have the sha256 values the question named,
+the question passed in names them, and --decision is "approved". The answer is kept word for word and never
+read for a yes; a person who declines gets no base.json.
 
-It refuses a base that this skill cannot build on: an OFL text that is not the SIL Open Font License 1.1 (an
-Apache-2.0 font is not a base), a name ID 13 that does not carry the OFL notice, CFF outlines, or a static font.
-base.json is written once. A second run with the same record leaves it as it is; any other content is refused.
-fit_font.py, space_font.py, package.py and check_font.py all start from it.
+Both runs refuse a base this skill cannot build on (chain.read_base, the same check every later step runs): a
+file that is not a plain TrueType variable font (WOFF, WOFF2, CFF, static and collections are refused), an OFL
+text that is not the SIL Open Font License 1.1 word for word, or a name ID 13 that does not name the OFL 1.1
+alone. base.json holds the font's and the licence's sha256, name ID 13 exactly, the Reserved Font Names from the
+OFL's copyright lines, where the font came from, and the question, answer and decision. It is written once: a
+second run with the same record leaves it as it is, any other content is refused. fit_font.py, space_font.py,
+package.py and check_font.py all start from it.
 """
 import argparse
 import datetime
@@ -43,6 +50,19 @@ def from_shortlist(path, family):
     return row["file"], row["licence_path"], kind, row.get("url")
 
 
+def question(font_path, lic_path, kind, url, manifest_entry, files):
+    """The approval question, with the sha256 of both files, so the answer belongs to these exact bytes."""
+    where = {"google-fonts": f"from Google Fonts ({url})", "manifest": f"from the pinned manifest entry {manifest_entry}",
+             "local": "a file you supplied"}[kind]
+    rfn = files["reserved_font_names"]
+    rfn = (f"Its Reserved Font Names, which the new name may not use: {', '.join(rfn)}." if rfn
+           else "It declares no Reserved Font Name.")
+    return (f"May I build the new font on {files['family']}, {where}? The font file is {os.path.basename(font_path)}, "
+            f"sha256 {files['font_sha256']}. Its licence is the SIL Open Font License 1.1, "
+            f"{os.path.basename(lic_path)}, sha256 {files['license_sha256']}. {rfn} The new font stays under the OFL "
+            "1.1 with a new name. Only these exact files are approved; a changed file needs a new question.")
+
+
 def build(a):
     font_path, lic_path, kind, url = a.font, a.licence, a.source, a.url
     if a.shortlist:
@@ -59,11 +79,24 @@ def build(a):
         raise C.Refused("--source manifest needs --manifest-entry, the pinned entry the font came from")
     if kind == "local" and (url or a.manifest_entry):
         raise C.Refused("--source local takes neither --url nor --manifest-entry")
-    question, answer = a.question or "", a.answer or ""
-    if not question.strip() or not answer.strip():
+    files = C.read_base(font_path, lic_path)
+    if a.question_only:
+        return question(font_path, lic_path, kind, url, a.manifest_entry, files)
+    asked = {"font": a.font_sha256, "licence": a.license_sha256}
+    if not all(asked.values()):
+        raise C.Refused("--font-sha256 and --license-sha256 are required: the two sha256 values the question "
+                        "named. Ask with --question-only first.")
+    for what, now in (("font", files["font_sha256"]), ("licence", files["license_sha256"])):
+        if asked[what] != now:
+            raise C.Refused(f"the {what} has sha256 {now} now, but the question named {asked[what]}. It changed "
+                            "while the question waited, so the answer is not about this file. Ask again with "
+                            "--question-only.")
+    question_, answer = a.question or "", a.answer or ""
+    if not question_.strip() or not answer.strip():
         raise C.Refused("--question and --answer are both required, verbatim: the approval is the person's, "
                         "and base.json keeps their words")
-    files = C.read_base(font_path, lic_path)
+    C.require_approval({"question": question_, "answer": answer, "decision": a.decision},
+                       files["font_sha256"], files["license_sha256"], "--question, --answer and --decision")
     return {
         "schema": C.SCHEMA,
         "font": {"file": os.path.abspath(font_path), "sha256": files["font_sha256"]},
@@ -71,7 +104,7 @@ def build(a):
                    "manifest_entry": a.manifest_entry if kind == "manifest" else None},
         "license": {"id": C.LICENCE_ID, "file": os.path.abspath(lic_path), "sha256": files["license_sha256"],
                     "name_id_13": files["name_id_13"], "reserved_font_names": files["reserved_font_names"]},
-        "approval": {"question": question, "answer": answer,
+        "approval": {"question": question_, "answer": answer, "decision": a.decision,
                      "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")},
     }
 
@@ -85,11 +118,20 @@ def main():
     ap.add_argument("--source", choices=SOURCES)
     ap.add_argument("--url")
     ap.add_argument("--manifest-entry")
-    ap.add_argument("--question", help="the question shown to the person, verbatim")
+    ap.add_argument("--question-only", action="store_true",
+                    help="check the files, print the approval question and write nothing")
+    ap.add_argument("--question", help="the question the person saw, verbatim (the one --question-only printed)")
     ap.add_argument("--answer", help="the person's answer, verbatim")
+    ap.add_argument("--decision", help='"approved" when the person approved this base; anything else writes nothing')
+    ap.add_argument("--font-sha256", help="the font sha256 the question named")
+    ap.add_argument("--license-sha256", help="the licence sha256 the question named")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    rec = build(a)
+    made = build(a)
+    if a.question_only:
+        print(made)  # the question, and nothing else, so it can be passed back verbatim
+        return
+    rec = made
     _, wrote = C.write_base(a.out, rec)
     lic = rec["license"]
     print(f"{'wrote' if wrote else 'unchanged, already records this approval:'} {a.out}")

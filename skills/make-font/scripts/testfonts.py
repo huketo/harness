@@ -8,6 +8,7 @@ No downloaded font is used. Every font here is made of rectangles, so its number
 x-height 500, an n with two stems, an o and an O with a hole, and a weight axis that thickens the stems.
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -267,10 +268,19 @@ def run(script, *args, cwd=None):
 
 
 def approve(font, licence, out, *source, answer=SYNTHETIC_ANSWER):
-    """The approval step as an agent runs it, with a synthetic answer. Returns the CompletedProcess of the step
-    that ended it: the first refusal, or the run that wrote base.json."""
-    return run("record_base.py", "--font", font, "--licence", licence, *(source or ("--source", "local")),
-               "--question", SYNTHETIC_QUESTION, "--answer", answer, "--out", out)
+    """The approval step as an agent runs it, with a synthetic answer: print the question, then record it with the
+    two sha256 values it names and the decision. Returns the CompletedProcess of the step that ended it (the first
+    refusal, or the run that wrote base.json), with the question asked as .question."""
+    src = source or ("--source", "local")
+    ask = run("record_base.py", "--font", font, "--licence", licence, *src, "--question-only", "--out", out)
+    if ask.returncode:
+        return ask
+    question = ask.stdout.strip()
+    font_sha, licence_sha = re.findall(r"\b[0-9a-f]{64}\b", question)[:2]
+    r = run("record_base.py", "--font", font, "--licence", licence, *src, "--question", question, "--answer", answer,
+            "--decision", "approved", "--font-sha256", font_sha, "--license-sha256", licence_sha, "--out", out)
+    r.question = question
+    return r
 
 
 def write(path, text):

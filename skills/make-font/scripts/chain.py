@@ -92,8 +92,9 @@ def read_base(font_path, lic_path):
     if not L.is_ofl_11_notice(n13):
         raise Refused(f"{font_path}: name ID 13 is {n13!r}, not a notice of the {LICENCE_ID} alone. The font itself "
                       "must declare the SIL Open Font License, Version 1.1.")
+    names = L.english_names(f)
     return {"font_sha256": sha256_bytes(data), "license_sha256": sha256_bytes(lic), "name_id_13": n13,
-            "reserved_font_names": L.reserved_font_names(text)}
+            "reserved_font_names": L.reserved_font_names(text), "family": names.get(16) or names.get(1)}
 
 
 # ------------------------------------------------------------------ base.json
@@ -139,8 +140,6 @@ def load_base(path):
     lic, font, appr = rec.get("license") or {}, rec.get("font") or {}, rec.get("approval") or {}
     if lic.get("id") != LICENCE_ID:
         raise Refused(f"{path} records the licence {lic.get('id')!r}. This skill builds only on {LICENCE_ID} fonts.")
-    if not (appr.get("question") or "").strip() or not (appr.get("answer") or "").strip():
-        raise Refused(f"{path} holds no approval: the question and the person's answer are both required")
     for what, rec_ in (("base font", font), ("licence text", lic)):
         f = rec_.get("file")
         if not f or not os.path.exists(f):
@@ -159,7 +158,25 @@ def load_base(path):
         raise Refused(f"{path} records the Reserved Font Names {lic.get('reserved_font_names')!r}, but the licence "
                       f"declares {files['reserved_font_names']!r}. base.json was edited after the approval step "
                       "wrote it.")
+    require_approval(appr, font["sha256"], lic["sha256"], path)
     return rec, sha256_bytes(raw)
+
+
+APPROVED = "approved"
+
+
+def require_approval(appr, font_sha, licence_sha, where):
+    """The approval binds the person's answer to these files: the question they saw named both sha256 values,
+    their answer is kept verbatim, and the decision is the word "approved", never read out of the answer."""
+    if not (appr.get("question") or "").strip() or not (appr.get("answer") or "").strip():
+        raise Refused(f"{where}: no approval. The question and the person's answer are both required, verbatim.")
+    missing = [what for what, h in (("font", font_sha), ("licence", licence_sha)) if h not in appr["question"]]
+    if missing:
+        raise Refused(f"{where}: the approval question does not name the {' and '.join(missing)} sha256. Ask the "
+                      "question record_base.py --question-only prints, so the answer is about these exact files.")
+    if appr.get("decision") != APPROVED:
+        raise Refused(f"{where}: the approval decision is {appr.get('decision')!r}. Only --decision {APPROVED} "
+                      "records a base, and only when the person approved it.")
 
 
 def require_base_font(path, rec, base_json):

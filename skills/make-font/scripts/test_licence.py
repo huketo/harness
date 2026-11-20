@@ -54,8 +54,7 @@ class OflOnly(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def record(self, font, licence, out="base.json"):
-        return T.run("record_base.py", "--font", font, "--licence", licence, "--source", "local",
-                     "--question", T.SYNTHETIC_QUESTION, "--answer", T.SYNTHETIC_ANSWER, "--out", self.p(out))
+        return T.approve(font, licence, self.p(out))
 
     def test_apache_licence_text_is_refused(self):
         font = T.glyf_vf(self.p("base.ttf"))

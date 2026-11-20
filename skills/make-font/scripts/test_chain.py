@@ -68,9 +68,7 @@ class Pipeline(unittest.TestCase):
         cls.steps["targets"] = T.run("make_targets.py", p("m2.json"), "--family", T.NEW_FAMILY, "--use", "text",
                                      "--style", "Regular:400", "--out", p("targets.json"))
         cls.targets = p("targets.json")
-        cls.steps["approve"] = T.run("record_base.py", "--font", cls.base, "--licence", cls.ofl, "--source", "local",
-                                     "--question", T.SYNTHETIC_QUESTION, "--answer", T.SYNTHETIC_ANSWER,
-                                     "--out", p("base.json"))
+        cls.steps["approve"] = T.approve(cls.base, cls.ofl, p("base.json"))
         cls.base_json = p("base.json")
         cls.steps["fit"] = T.run("fit_font.py", cls.base, cls.targets, "--base-json", cls.base_json,
                                  "--out-dir", p("build"))
@@ -112,8 +110,11 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(rec["license"]["sha256"], sha(self.ofl))
         self.assertEqual(rec["license"]["name_id_13"], T.OFL_NOTICE)
         self.assertEqual(rec["license"]["reserved_font_names"], [])
-        self.assertEqual(rec["approval"]["question"], T.SYNTHETIC_QUESTION)
+        self.assertEqual(rec["approval"]["question"], self.steps["approve"].question)
+        self.assertIn(sha(self.base), rec["approval"]["question"])
+        self.assertIn(sha(self.ofl), rec["approval"]["question"])
         self.assertEqual(rec["approval"]["answer"], T.SYNTHETIC_ANSWER)
+        self.assertEqual(rec["approval"]["decision"], "approved")
         self.assertRegex(rec["approval"]["recorded_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|\+00:00)$")
 
     def test_fit_log_records_its_own_subset(self):
@@ -173,22 +174,17 @@ class Pipeline(unittest.TestCase):
     # ---------------------------------------------------------------- base.json is written once
     def test_base_json_is_never_rewritten(self):
         before = raw(self.base_json)
-        r = T.run("record_base.py", "--font", self.base, "--licence", self.ofl, "--source", "local",
-                  "--question", T.SYNTHETIC_QUESTION, "--answer", "synthetic e2e approval: a different answer",
-                  "--out", self.base_json)
+        r = T.approve(self.base, self.ofl, self.base_json, answer="synthetic e2e approval: a different answer")
         refused(self, r, "base.json")
         self.assertEqual(raw(self.base_json), before)
-        same = T.run("record_base.py", "--font", self.base, "--licence", self.ofl, "--source", "local",
-                     "--question", T.SYNTHETIC_QUESTION, "--answer", T.SYNTHETIC_ANSWER, "--out", self.base_json)
-        ok(self, same)
+        ok(self, T.approve(self.base, self.ofl, self.base_json))
         self.assertEqual(raw(self.base_json), before)
 
     def test_static_and_cff_bases_are_refused(self):
         q = self.scratch()
         for maker, name in ((T.glyf_static, "static.ttf"), (T.cff_static, "cff.otf")):
             with self.subTest(base=name):
-                r = T.run("record_base.py", "--font", maker(q(name)), "--licence", self.ofl, "--source", "local",
-                          "--question", T.SYNTHETIC_QUESTION, "--answer", T.SYNTHETIC_ANSWER, "--out", q(name + ".json"))
+                r = T.approve(maker(q(name)), self.ofl, q(name + ".json"))
                 refused(self, r, "variable")
                 self.assertFalse(os.path.exists(q(name + ".json")))
 
