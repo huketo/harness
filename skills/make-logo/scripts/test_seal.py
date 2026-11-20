@@ -107,9 +107,16 @@ class Seal(Project):
         os.makedirs(empty)
         self.refs = [empty]
         b = self.build(self.recipe())
-        self.check(b)
-        rows = {r["check"]: r for r in json.load(open(os.path.join(b, "check.json")))["checks"]}
-        self.assertEqual(rows["nearest reference"]["value"], "not checked")
+        here = os.path.dirname(os.path.abspath(C.__file__))
+        cal = json.load(open(os.path.join(here, "calibration.json")))
+        cal["fused"]["limit"] = 0.0
+        zero = self.ws.path("calibration-zero.json")
+        R.write_bytes(zero, json.dumps(cal).encode())
+        for extra, ok in (((), True), (("--calibration", zero), False)):
+            self.check(b, extra=extra)
+            rows = {r["check"]: r for r in json.load(open(os.path.join(b, "check.json")))["checks"]}
+            self.assertEqual(rows["nearest reference"]["value"], "not checked")
+            self.assertEqual(rows["nearest reference"]["ok"], ok, extra)
 
     def test_package_and_book_refuse_a_build_that_was_never_checked(self):
         b = self.build(self.recipe())
