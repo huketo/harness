@@ -51,21 +51,29 @@ Scripts are in `scripts/`. Each Python script declares its own dependencies (PEP
 1. **Ask once.** In one message ask for: the fonts they like, as font files or screenshots (two to four is
    plenty), what the font is for (text, display or UI), which scripts and languages it must cover, which weights,
    and a new family name. If they can type in the font (a foundry's type tester, a design tool), ask them to
-   screenshot the four lines of `SAMPLE_LINES` in `scripts/fontlib.py`, large, cap height 80 px or more. Take
-   defaults for anything unanswered and say which: text, Latin, Regular and Medium, a name you propose.
+   screenshot the four lines of `SAMPLE_LINES` in `scripts/fontlib.py`, large, cap height 80 px or more; for
+   Korean, also the six lines of `SAMPLE_LINES_KO` (each syllable between two 으), in the same screenshot as the
+   Latin lines when the font has Latin. Take defaults for anything unanswered and say which: text, Latin, Regular
+   and Medium, a name you propose.
    Done when the references, use, scripts, weights and name are written down.
 
 2. **Measure.** Files: `uv run scripts/measure_font.py <file> --out m1.json`. Screenshots:
    `uv run scripts/measure_image.py <shot.png> --text "line|line" --out m2.json`. Before trusting a screenshot,
    run `uv run scripts/measure_image.py --selftest <any open font> --px <its px per em>` at the screenshot's size:
-   it prints how far pixel readings land from the file's numbers. Report every number marked low confidence.
-   Method, definitions and error sizes: `references/measuring.md`.
+   it prints how far pixel readings land from the file's numbers, for the Korean lines too. Report every number
+   marked low confidence. Hangul is measured per structural class (H1 to H6), and every Hangul value carries its
+   unit: `cap700` when a Latin H was measured with it, `em1000` from a file, `ratio` always. A screenshot of
+   Hangul alone needs no H and gives ratios. A class needs two different syllables of its list and the stem all of
+   이 니 미; the script names what it left out. Method, definitions and error sizes: `references/measuring.md`.
    Done when each reference has a measurement file and the person has seen the main numbers.
 
 3. **Targets.** `uv run scripts/make_targets.py m1.json m2.json --family "New Name" --use text --scripts latin
    --style Regular:400 --style Medium:500 --out targets.json`. It records the category (sans, serif or mono;
-   `--category` to set it). Where references disagree, the script lists the spread. Ask which way to lean instead
-   of averaging a serif with a sans.
+   `--category` to set it). With Hangul, add `korean` to `--scripts` (`latin,korean`): the Hangul targets go in
+   one `hangul` object, and only values of one unit are merged. No Latin number is needed; without an n stem, the
+   fit solves the weight from the Hangul stem, as a length when a reference gave one, else as its ratio to the H1
+   face. Where references disagree, the script lists the spread. Ask which way to lean instead of averaging a serif
+   with a sans.
    Done when `targets.json` exists and every spread has an answer or a stated default.
 
 4. **Find the foundation.** `uv run scripts/find_foundation.py targets.json --cache <dir> --out shortlist.json`.
@@ -145,7 +153,8 @@ link the PDF. Name the fonts' provenance plainly: built on an open font they app
 
 ## Files
 
-- `scripts/fontlib.py` shared geometry, classes, character sets, Reserved Font Names, sample lines, rasteriser.
+- `scripts/fontlib.py` shared geometry, Latin and Hangul classes, Hangul measures, character sets, Reserved Font
+  Names, sample lines, rasteriser.
 - `scripts/chain.py` `base.json` and the chain each step's log carries.
 - `scripts/measure_font.py`, `measure_image.py`, `make_targets.py`: steps 2 and 3.
 - `scripts/find_foundation.py`: step 4. `record_base.py`: step 5. `fit_font.py`: step 6. `space_font.py`: step 7.

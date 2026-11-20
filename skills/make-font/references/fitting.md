@@ -10,8 +10,9 @@ person approved them, and the font given on the command line must be that file, 
 copy made elsewhere is refused. The base must be a TrueType variable font (glyf, fvar, gvar) in a plain `.ttf`
 file: `chain.read_base` checks it again here, as at the approval step.
 
-It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`) plus
-ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
+It then subsets the verified base itself, to the characters of the targets' scripts (`fontlib.COVERAGE`, and
+`fontlib.SUBSET_ONLY` for `korean`, every modern syllable and the compatibility jamo, which `check_font.py` does
+not gate yet) plus ASCII, Latin-1 and common punctuation, keeping every layout feature and glyph name. The subset goes to
 `build/subset/base.subset.ttf`, and `fit-log.json` records it under `subset`: the base's sha256, the file, its
 sha256, the pyftsubset arguments in order and the fontTools version. `chain.build_subset` makes it, always with
 fontTools' own GSUB and GPOS serializer (HarfBuzz's repacker, used whenever uharfbuzz is installed, gives other
@@ -34,8 +35,9 @@ follow x.
 ## The steps
 
 1. **y instance.** For each optical size tried (nine across the axis, unless `--loc` fixes it), solve the weight
-   axis so the n stem meets the target, then measure contrast, bar to stem and x-height to cap. Keep the size
-   with the smallest error. With `--no-contrast` the opsz scan is skipped.
+   axis so the n stem meets the target (without a Latin n stem, the Hangul stem: see [Hangul](#hangul)), then
+   measure contrast, bar to stem and x-height to cap. Keep the size with the smallest error (for the Hangul stem,
+   among the sizes where the wght axis reaches it). With `--no-contrast` the opsz scan is skipped.
 2. **x instance per class.** For each width class: on a width axis, bisect wdth so the class's mean advance meets
    its target. At every wdth tried, solve wght again so the class's stem (n for lowercase, H for capitals and
    figures) meets its target, because width changes stems. Without a width axis, or where it runs out, scale the
@@ -79,3 +81,59 @@ follow x.
 The first style's stem comes from the measurement. Other styles take an explicit stem (`--style Medium:500:88`)
 or keep the base's own stem ratio between the two weights. Each style gets its own y instance and class instances.
 All styles share the vertical metrics, so they can mix in one line.
+
+## Hangul
+
+When `targets.json` has a `hangul` object (`references/measuring.md`, its last table), the targets' scripts
+must have `korean`, so the subset keeps the base's Hangul. This version fits the weight from Hangul and states
+every other Hangul target; it moves no Hangul glyph. The Hangul takes its outlines from the y instance, so it
+keeps the base's sizes, centres and spacing at the weight the fit chose.
+
+**Weight.** A style with an n stem, or after a first style with one, solves the weight from Latin as above. When
+the targets have no Latin n stem, the first style's wght is solved from the Hangul stem (ㅣ in 이 니 미), taken in
+this order:
+
+1. `stem` at `cap700` (a reference with a Latin H): the base's stem times 700 over its cap height meets it.
+2. `stem` at `em1000` (a font file without an H): the base's stem per 1000 of the finished em meets it, the em
+   being the cap height over `cap_em` when the targets have one, else the base's em.
+3. `stem_h1` (a screenshot of Hangul alone): the base's stem over its H1 mean face height meets the ratio.
+
+The cap height and the face height move a little with the weight, so each try reads them and the stem at the same
+wght. The wght is solved at every optical size the y instance is chosen from (step 1). At some sizes the wght axis
+may not reach the stem: it is thicker than the boldest the axis draws there, or thinner than the lightest. The scan
+keeps a size where the axis reaches it, the one nearest the contrast, bar and x-height targets among those. When no
+size reaches it, the scan keeps the size whose axis end comes nearest, and `fit-log.json` records the miss
+(`weight_missed_pct`, and a line in the style's log).
+
+Each later style takes the first style's y location, its optical size included, with the wght moved by the
+weight-class difference (Bold 700 after Regular 400: +300) and clamped to the axis. It scans no optical size of its
+own, so the weight classes stay as far apart on the axis as their numbers. Targets with neither an n stem nor a
+Hangul stem are refused. Without a Latin target, the Latin takes the wght the Hangul chose, which keeps the base's
+own balance between the two.
+
+**Units, before `finish()`.** Every Hangul target is stated in the y instance's own units, beside the base's value
+there, and only then does `finish()` scale the em, once, at the end:
+
+- `cap700`: value × the y instance's cap height / 700.
+- `em1000`: value × the finished font's em / 1000. That em is the y instance's cap height over `cap_em` when a
+  file gave one, else the base's em.
+- `ratio`: never turned into a cap length. `face_h_h1` multiplies the base's own H1 face height at the y instance,
+  `aspect` that height, `stem_h1` the same H1 height. A screenshot of Hangul alone so keeps the base's Hangul
+  scale, centre heights and advances, and gives shapes and the weight only.
+
+A key with a length uses `cap700` first, then `em1000`; the ratios fill in where no length was measured.
+`finish()` scales x and y alike, so a ratio to the cap height survives it (checked by measuring the fitted font).
+The saved font rounds every point to a whole unit, so a stem lands up to a unit from the solve: about 1 % of an
+80-unit stem at 1000 units per em.
+
+`fit-log.json` records this under each style's `hangul`:
+
+| Field | Value |
+|-|-|
+| `weight_from` | `n_stem`, `stem cap700`, `stem em1000` or `stem_h1`, with ", stepped from the first style" after the first |
+| `weight_missed_pct` | only when no optical size tried lets the wght axis reach the Hangul stem: the stem the base draws at the chosen location over the target, minus 1, in percent |
+| `units` | font units of the y instance per `cap700` and per `em1000` unit |
+| `classes.Hn.<key>` | `{"target", "base", "from"}` in font units of the y instance, for `face_w`, `face_h`, `cx`, `cy`, `side`, `side_asym` and `adv`; `from` is the unit the target came in |
+| `stem`, `adv` | the same, font-wide (`adv` for fixed-width Hangul) |
+| `stem_h1` | `{"target", "got"}`: the ratio aimed at, and the base's at the chosen wght |
+
