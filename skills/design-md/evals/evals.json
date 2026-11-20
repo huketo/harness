@@ -78,6 +78,32 @@
         "States briefly that the session had no design corrections.",
         "Writes no rule and creates or edits no design-system artifact."
       ]
+    },
+    {
+      "id": 8,
+      "name": "token-mapping-report-read-only",
+      "prompt": "design-md로 설정 화면이 우리 토큰을 제대로 쓰는지 대응 보고서만 만들어 주세요. 토큰 소스 src/styles/tokens.css에는 --color-text-muted: #6b7280(보조 본문 텍스트)와 --color-border-default: #6b7280(입력 테두리)가 있습니다. src/settings/SettingsPanel.tsx 42행의 보조 설명 문단은 color: #737373을, 57행의 구분선은 border-color: #6b7280을 씁니다. 파일은 고치지 마세요.",
+      "expected_output": "Delivers a read-only mapping report in the reply: classifies the muted paragraph color by its text job against the text token with a numeric deltaE OK, puts the border token under Do not use for text rows, edits no file, creates no token, and ends with a Coverage line.",
+      "files": [],
+      "expectations": [
+        "Classifies each value by its job before its value, so the paragraph color is compared with the text token and the border token is not offered as its match.",
+        "States the color difference as a number (deltaE OK) computed with code rather than judged by eye.",
+        "Edits no file, writes no design-system artifact, and names no new token.",
+        "Ends the report with a line that starts with `Coverage:`."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "component-entry-unknowns",
+      "prompt": "design-md로 Badge 컴포넌트 문서 항목을 작성해 주세요. src/ui/Badge.tsx의 props 타입은 tone: \"neutral\" | \"warning\"와 label: string이며 tone 기본값은 \"neutral\"입니다. 스토리 파일 src/ui/Badge.stories.tsx에는 Neutral과 Warning 두 스토리만 있고, 실제 사용처는 src/orders/OrderRow.tsx 하나뿐입니다. 접근성 동작과 로딩 상태에 관한 근거는 없습니다.",
+      "expected_output": "Writes one component entry in the nine-heading format with only the sourced variants and props, marks the single use as such, records accessibility behavior and loading state as Unknown, and does not edit the component or write example code.",
+      "files": [],
+      "expectations": [
+        "Uses the component entry headings in order and documents only the `neutral` and `warning` tone values and the two sourced props.",
+        "Marks the usage evidence as a single use rather than inventing further call sites.",
+        "Records accessibility behavior and any loading state as Unknown instead of inventing them.",
+        "Does not edit the component, its stories, or write new example files."
+      ]
     }
   ]
 }
