@@ -5,7 +5,9 @@ measured and dropped.
 
 ## Finding the ink
 
-The ground is the median colour of the image's border; ink is anything more than 12 Lab units from it, split by Otsu.
+An SVG is first rasterised with resvg, 1024 px on its long side with a margin, transparent around its ink.
+Transparency is flattened onto white. The ground is the median colour of the image's border; ink is anything more
+than 12 Lab units from it, split by Otsu.
 That handles dark marks on light, light on dark (`reversed`), and colour on a coloured ground. Specks under 0.02% of
 the image are dropped, and the mark is cropped to its box.
 
@@ -23,7 +25,8 @@ mark with its caption, a sheet of several marks. That's why step 3 makes you loo
 mask side by side, and drop the bad ones.
 
 These tests choose what is measured, not what a mark is compared with: the distance checks in `trace_ref.py` and
-`check_logo.py` take every image whose ink they can find, skipped here or not (`building.md`).
+`check_logo.py` take every image, skipped here or not, enlarge one too small to split, set a light mark on a
+transparent ground on black, and refuse to go on while one still shows no mark (`building.md`).
 
 ## The numbers
 

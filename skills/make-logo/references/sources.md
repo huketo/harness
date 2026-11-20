@@ -6,7 +6,8 @@ collection manifest lists or whose mask looks like one of these.
 
 ## The person's references
 
-Normalise the logos they like into `refs/mine/` as image files (their own drawings go in `sketches/`):
+Normalise the logos they like into `refs/mine/` as image files, raster or SVG (their own drawings go in
+`sketches/`):
 
 - files they upload: copy them in;
 - image URLs: download with a User-Agent header;
@@ -19,7 +20,9 @@ Normalise the logos they like into `refs/mine/` as image files (their own drawin
 `${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/<name>/`, outside any project. Each collection's `manifest.json` lists
 every file in its folder with its sha256 (`collection.mjs`): this pull's items, earlier pulls' items still on disk,
 and any other file found there. A file already in the folder is hashed, not downloaded again. `trace_ref.py` reads
-every manifest under that folder.
+every manifest under that folder, and refuses while a listed file is gone or no longer has its sha256: after deleting
+or replacing a file by hand, `node scripts/collection.mjs <name>` rewrites the manifest from what the folder holds,
+keeping each file's details, with no download.
 
 ## Are.na
 

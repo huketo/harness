@@ -33,19 +33,23 @@ trademark sheet. It doesn't know whether the statement is true.
 
 - `trace_ref.py` traces only a file listed in `brief.json` `trace_sources` by sha256, never one whose sha256 is in a
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
-  calibrated limit against a collected image or a `--refs` logo. It compares with every image whose ink it can tell
-  from the ground, fit to measure or not, and names each one it can't read as "not checked". The person's own sketch
-  on the moodboard (same sha256 as a `trace_sources` entry) is left out of that comparison. Each trace gets
+  calibrated limit against a collected image or a `--refs` logo. It compares with every image, fit to measure or
+  not: SVGs rasterised, a favicon too small to split enlarged, a light mark on a transparent ground set on black. It
+  refuses while one of them still can't be read as a mark (`not-comparable`), or while a collected file is gone or
+  no longer has the sha256 its manifest lists (`collection-changed`). The person's own sketch on the moodboard (same
+  sha256 as a `trace_sources` entry) is left out of that comparison; a collected file never is. Each trace gets
   `<svg>.provenance.json`.
 - `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
   today's collections and references, goes on only while the record's raster arguments give back the mask it
-  recorded, and refuses a recipe that says `traced_from`. `check_logo.py` leaves out only a direction's own verified
-  source; every other reference keeps the usual limit. It refuses a traced direction whose trace was gated against
-  other `--refs` images, another calibration or other collections than it is given, and removes that `check.json`.
+  recorded, and refuses a recipe that says `traced_from`. `check_logo.py` compares with the same references, refuses
+  the same unreadable ones, and leaves out only a direction's own verified source; every other reference keeps the
+  usual limit. It refuses a traced direction whose trace was gated against other `--refs` images, another
+  calibration or other collections than it is given, and removes that `check.json`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
-  file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw. They read the
-  build's files only as those verified bytes. A `build.json` that leaves out a part the build writes (the mark, its
-  grid, the lockups of a build with a wordmark) is refused at every step.
+  file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw; for a traced
+  direction, its source and the collections (`collected_sha256`) must match too. They verify all of it before they
+  write anything, and read the build's files only as those verified bytes. A `build.json` that leaves out a part the
+  build writes (the mark, its grid, the lockups of a build with a wordmark) is refused at every step.
 - A shape the agent types in as `polygon` points has no source the chain can see: only the distance check stands
   between it and a copy.
 
@@ -85,9 +89,14 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    "identity", and fetch the two or three with the most blocks into one collection:
    `node scripts/fetch_arena.mjs <slug> world 40`. The general set gives craft; this one gives pictures that fit the
    idea. Run the distance check (step 8) against logo references only: photos of books, rooms or products match any
-   plain mark by silhouette and say nothing about copying.
-   Done when `refs/mine/` holds the person's references and `$C/arena/` and `$C/world/` each hold a `manifest.json`
-   with a sha256 for every file.
+   plain mark by silhouette and say nothing about copying. Last, the photos for the book's mockups:
+   `node scripts/fetch_photos.mjs "<one or two mood words>" photos 6` (free CC0 and CC BY stock from Openverse, into
+   `$C/photos/`; `references/logo-book.md`). Look at them and delete any that don't fit. Every collection is in
+   place before anything is traced: a trace is gated against all of them, and a later pull or deletion stops a traced
+   direction's book and package until it is built and checked again. After deleting or replacing a collected file by
+   hand, `node scripts/collection.mjs <name>` lists what the collection holds now.
+   Done when `refs/mine/` holds the person's references and `$C/arena/`, `$C/world/` and `$C/photos/` each hold a
+   `manifest.json` listing every file there with its sha256.
 
 3. **Measure.** `uv run scripts/measure_logo.py <refs> --out measurements.json --sheet measured.png`. Open the sheet
    and look: every mask should be the mark and nothing else. Drop any that caught a photo, a caption or a sheet of
@@ -116,11 +125,13 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    character, and, when step 6 gave you a source, traced marks: `uv run scripts/trace_ref.py sketches/l.png --brief
    brief.json --refs <refs> --calibration calibration.json --crop x,y,w,h --out trace/<n>.svg`, then change one thing
    with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image:
-   drop that source, never work around it. At least half carry the idea as a picture, not a letter. Each is a recipe
-   (`references/building.md`): a title, the idea in one sentence, grid shapes, an OFL wordmark, a palette. Build
-   each: `uv run scripts/build_logo.py dirs/<n>.json --out build/<n> --brief brief.json --refs <refs> --calibration
-   calibration.json`. Render all six on one sheet and look: a mark that reads as a stock icon, the wrong letter, or a
-   random pictogram gets rewritten, not kept.
+   drop that source, never work around it. `not-comparable` names a reference the gates can't read as a mark: take it
+   out of `refs/mine/` (or delete it from its collection and run `collection.mjs`), or replace it with a copy that
+   shows the mark on a plain ground, then trace again. At least half carry the idea as a picture, not a letter. Each
+   is a recipe (`references/building.md`): a title, the idea in one sentence, grid shapes, an OFL wordmark, a
+   palette. Build each: `uv run scripts/build_logo.py dirs/<n>.json --out build/<n> --brief brief.json --refs <refs>
+   --calibration calibration.json`. Render all six on one sheet and look: a mark that reads as a stock icon, the
+   wrong letter, or a random pictogram gets rewritten, not kept.
    Done when six directions build, each reads as its idea at 64 px, and no two are the same move.
 
 8. **Check.** `uv run scripts/check_logo.py build/* --refs <refs> --calibration calibration.json`: stroke at 16 px,
@@ -129,16 +140,17 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    but its own source; its score against that source is recorded and shown, never failed. A detailed trace may fail
    the 16 px checks; keep it if it's strong, and say it needs a simpler favicon. A `trace-gate-stale` refusal means
    the references, the calibration or the collections changed after that direction was built (a new photo pull
-   counts): build it again, then check it.
+   counts): build it again, then check it. `not-comparable` is the same as in step 7.
    Done when every direction passes, a traced one failing nothing but the 16 px rows.
 
-9. **Logo book.** Fetch photos for the mockups: `node scripts/fetch_photos.mjs "<one or two mood words>" photos 6`
-   (free CC0 and CC BY stock from Openverse, into `$C/photos/`; look at them and delete any that don't fit). Then
+9. **Logo book.** With the photos from step 2:
    `uv run scripts/logo_book.py build/* --out book --refs <refs> --calibration calibration.json --brief brief.json
    --name "<name>" --line "<what it does>" --tagline "<...>" --note "<a notification the app would send>" --photos
    "$C/photos"`, then `node scripts/render_book.mjs book` (`references/logo-book.md`). A direction that failed the
-   check is left out; `--include-failed` shows it, marked. Open every page. Send `book/logobook.pdf` and ask the
-   person to choose; record the question and their answer verbatim in `brief.json` as `"choice"`.
+   check is left out; `--include-failed` shows it, marked. This step and step 10 refuse a traced direction whose
+   collections changed after its check (`collections-changed`): build and check it again. Open every page. Send
+   `book/logobook.pdf` and ask the person to choose; record the question and their answer verbatim in `brief.json`
+   as `"choice"`.
    Done when render_book.mjs exits 0 and the person's pick is recorded in their words.
 
 10. **Package.** `uv run scripts/package_logo.py build/<chosen> --out package --refs <refs> --calibration
@@ -159,7 +171,7 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
 
 ## Files
 
-- `scripts/fetch_arena.mjs`, `scripts/fetch_photos.mjs`, `scripts/collection.mjs`: steps 2 and 9, into the cache.
+- `scripts/fetch_arena.mjs`, `scripts/fetch_photos.mjs`, `scripts/collection.mjs`: step 2, into the cache.
 - `scripts/logolib.py`: loading, finding the ink, normalising. `scripts/rights.py`: hashes, the brief's
   `trace_sources`, collection manifests, and the seal between steps.
 - `scripts/measure_logo.py`: step 3. `scripts/calibrate.py`: step 4. `scripts/distance.py`: the distance check.

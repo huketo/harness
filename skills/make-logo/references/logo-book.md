@@ -12,7 +12,8 @@ with `--include-failed`, `pages/` holds the new book only.
 ## What goes in
 
 `logo_book.py` takes the same `--refs` and `--calibration` as `check_logo.py` and refuses a build whose `check.json`
-is missing or no longer matches `build.json`, the files it lists, the `--refs` images or the calibration. It reads a
+is missing or no longer matches `build.json`, the files it lists, the `--refs` images or the calibration, or, for a
+traced direction, its source or the collections (`collections-changed`), before it writes anything. It reads a
 direction's pictures only as the verified bytes of `build.json` `files`: a build with no wordmark has no lockup, and
 the book draws its mark, larger, wherever a lockup would go. A direction that failed the check is left out;
 `--include-failed` puts it in with "Failed a check" under its title, for a person who asked to see everything.
@@ -44,10 +45,13 @@ No page carries a numbered label or a dot separator, and the cover carries no li
 
 `fetch_photos.mjs` (`node scripts/fetch_photos.mjs "<words>" photos 6`) searches Openverse for free photos, public
 domain and CC BY only, StockSnap's CC0 stock first and Flickr after, and keeps each one's creator, licence and source
-for the credits page. They go to the `photos` collection in the cache, each with its sha256 (`sources.md`). Broad mood
-words work ("laptop office", "doctor", "architect"); specific ones return museum scans and news photos. Look at every
-photo and delete any that doesn't fit before printing. The book uses a photo only when its manifest entry names its
-creator, licence and source; a file listed without them (one put in the folder by hand) is left out, and named.
+for the credits page. They go to the `photos` collection in the cache, each with its sha256 (`sources.md`). Pull them
+while gathering (SKILL.md step 2), before anything is traced: the trace gates compare with every collection, so a
+pull after a traced direction's check stops its book and package (`collections-changed`) until it is built and
+checked again. Broad mood words work ("laptop office", "doctor", "architect"); specific ones return museum scans and
+news photos. Look at every photo and delete any that doesn't fit, then `node scripts/collection.mjs photos` so the
+manifest lists what is left. The book uses a photo only when its manifest entry names its creator, licence and
+source; a file listed without them (one put in the folder by hand) is left out, and named.
 Without `--photos` the cover and posters use each direction's colour field.
 
 ## Guides
