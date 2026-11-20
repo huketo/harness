@@ -1,7 +1,11 @@
-"""Build a logo from a recipe of grid shapes and an OFL wordmark (references/building.md). Reads the recipe and any
-`trace` file it names (an SVG written by trace_ref.py); it never opens a reference image itself.
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "skia-pathops", "fonttools", "uharfbuzz", "resvg-py"]
+# ///
+"""Build a logo from a recipe of grid shapes and an OFL wordmark (references/building.md).
 
-    python3 -I build_logo.py <direction.json> --out <dir> [--fonts <cache dir>]
+    uv run build_logo.py <direction.json> --out <dir> [--fonts <cache dir>]
+        [--brief brief.json --refs <ref folder> [...] [--calibration calibration.json]]
 
 The recipe (units are grid squares, y down, on a `grid` x `grid` canvas):
 
@@ -24,8 +28,16 @@ The recipe (units are grid squares, y down, on a `grid` x `grid` canvas):
 `op` is add (default), cut, keep (intersect) or xor, applied in order. Any shape takes `rotate` (degrees about its
 own centre or `about`), `mirror` ("x" or "y" across the grid's centre) and `repeat`.
 
+A `trace` file is an SVG trace_ref.py wrote, found from the working folder first, then from the recipe's folder. Its
+SVG is never used: the build checks its .provenance.json (the SVG's and the source's sha256, the person's statement
+still in --brief), then traces the source again with trace_ref.trace() and every gate, against --refs and the
+collections as they are now, and uses that path. A recipe that says `traced_from` is refused: whether and from what a
+mark was traced comes from the verified record only.
+
 Writes mark.svg (tight), mark-grid.svg (on its grid, for the construction page), wordmark.svg, lockup.svg,
-lockup-stacked.svg and build.json (boxes, guides, the font and its licence).
+lockup-stacked.svg, trace/<n>.svg with its provenance, LICENSES/ (each font's OFL.txt) and build.json: boxes, guides,
+the fonts, `traces` (the verified record of each trace) and `files` (every file this build wrote, with its sha256;
+package_logo.py and logo_book.py use only those).
 """
 from __future__ import annotations
 
@@ -43,8 +55,7 @@ from fontTools.pens.transformPen import TransformPen
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fonts as F  # noqa: E402
-
-RECIPE_DIR = "."  # set in main(); a trace file is found next to its recipe
+import rights as R  # noqa: E402
 
 K = 0.5522847498  # cubic handle length for a quarter circle
 
@@ -140,7 +151,7 @@ def centre_of(s) -> tuple[float, float]:
     return s.get("x", 0), s.get("y", 0)
 
 
-def shape_path(s: dict, grid: float, fonts_dir: str, m=(1, 0, 0, 1, 0, 0)) -> pathops.Path:
+def shape_path(s: dict, grid: float, fonts_dir: str, m=(1, 0, 0, 1, 0, 0), traced: str | None = None) -> pathops.Path:
     if "rotate" in s:
         cx, cy = s.get("about") or centre_of(s)
         m = mul(rot(s["rotate"], cx, cy), m)
@@ -180,11 +191,9 @@ def shape_path(s: dict, grid: float, fonts_dir: str, m=(1, 0, 0, 1, 0, 0)) -> pa
         gm = mul((sc, 0, 0, -sc, s["x"], s["y"]), m)
         t["pen"].replay(TransformPen(d.pen, gm))
     elif k == "trace":
-        # A traced reference from trace_ref.py: one path in a 48 x 48 box, placed at (x, y) and scaled to `size`.
-        src = s["file"] if os.path.isabs(s["file"]) else os.path.join(RECIPE_DIR, s["file"])
-        dd = re.search(r'<path[^>]* d="([^"]+)"', open(src).read()).group(1)
+        # The path trace_ref.trace() just made for this shape: one path in a 48 x 48 box, placed at (x, y), scaled to `size`.
         sc = s.get("size", 48) / 48
-        parse_path(dd, TransformPen(d.pen, mul((sc, 0, 0, sc, s.get("x", 0), s.get("y", 0)), m)))
+        parse_path(traced, TransformPen(d.pen, mul((sc, 0, 0, sc, s.get("x", 0), s.get("y", 0)), m)))
     else:
         raise SystemExit(f"unknown shape {k!r}")
     return d.path
@@ -193,10 +202,10 @@ def shape_path(s: dict, grid: float, fonts_dir: str, m=(1, 0, 0, 1, 0, 0)) -> pa
 OPS = {"add": pathops.PathOp.UNION, "cut": pathops.PathOp.DIFFERENCE, "keep": pathops.PathOp.INTERSECTION, "xor": pathops.PathOp.XOR}
 
 
-def build_mark(spec: dict, fonts_dir: str) -> pathops.Path:
+def build_mark(spec: dict, fonts_dir: str, traced: dict[int, str] | None = None) -> pathops.Path:
     grid = spec.get("grid", 48)
     acc = pathops.Path()
-    for s in spec["mark"]:
+    for i, s in enumerate(spec["mark"]):
         rep = s.get("repeat")
         copies = [(1, 0, 0, 1, 0, 0)]
         if rep:
@@ -206,7 +215,7 @@ def build_mark(spec: dict, fonts_dir: str) -> pathops.Path:
                 copies = [(1, 0, 0, 1, rep["step"][0] * i, rep["step"][1] * i) for i in range(rep["count"])]
         piece = pathops.Path()
         for m in copies:
-            piece = pathops.op(piece, shape_path(s, grid, fonts_dir, m), pathops.PathOp.UNION)
+            piece = pathops.op(piece, shape_path(s, grid, fonts_dir, m, (traced or {}).get(i)), pathops.PathOp.UNION)
         acc = pathops.op(acc, piece, OPS[s.get("op", "add")])
     return pathops.simplify(acc)
 
@@ -244,16 +253,94 @@ def svg(d: str, box, fill="#151515", pad=0.0) -> str:
             f'width="{w:.2f}" height="{h:.2f}"><path fill="{fill}" fill-rule="nonzero" d="{d}"/></svg>\n')
 
 
-def build(spec: dict, out: str, fonts_dir: str) -> dict:
+def says_traced_from(v) -> bool:
+    if isinstance(v, dict):
+        return "traced_from" in v or any(says_traced_from(x) for x in v.values())
+    return isinstance(v, list) and any(says_traced_from(x) for x in v)
+
+
+def trace_file(f: str, recipe_dir: str) -> str:
+    """A recipe's trace path: from the working folder, else from the recipe's folder."""
+    if os.path.isabs(f) or os.path.exists(f):
+        return os.path.abspath(f)
+    return os.path.join(recipe_dir, f)
+
+
+def admit_traces(spec: dict, out: str, recipe_dir: str, brief: str | None, refs: list[str] | None,
+                 calibration: str | None) -> tuple[dict[int, str], list[dict], list[str]]:
+    """Check each trace shape's record, trace its source again behind every gate, and return the new paths by shape
+    index, the build.json `traces` entries, and the files written."""
+    import trace_ref as T
+
+    traced, entries, written = {}, [], []
+    for i, s in enumerate(spec["mark"]):
+        if s.get("shape") != "trace":
+            continue
+        if not brief or not refs:
+            raise SystemExit("a recipe with a trace shape needs --brief and --refs: the build traces it again and checks it")
+        svg = trace_file(s["file"], recipe_dir)
+        if not os.path.isfile(svg):
+            raise SystemExit(f"no trace file {s['file']} (looked in the working folder and beside the recipe)")
+        rec = svg + ".provenance.json"
+        if not os.path.isfile(rec):
+            raise R.Refused("no-provenance", f"{svg} has no {os.path.basename(rec)}. Trace it with trace_ref.py; an SVG "
+                                             "from anywhere else can't go into a build.")
+        prov = R.read_json(rec)
+        if prov.get("schema") != T.SCHEMA:
+            raise R.Refused("no-provenance", f"{rec} is not a {T.SCHEMA} record. Trace again with trace_ref.py.")
+        if R.sha256_file(svg) != prov.get("svg_sha256"):
+            raise R.Refused("svg-changed", f"{svg} changed after trace_ref.py wrote it. Trace again; change the mark "
+                                           "with recipe shapes, not by editing the SVG.")
+        src = prov["source"]["file"]
+        if not os.path.isfile(src) or R.sha256_file(src) != prov["source"]["sha256"]:
+            raise R.Refused("source-changed", f"the source {src} recorded in {rec} is gone or changed. Trace again.")
+        if R.trace_source(R.load_brief(brief), src, prov["source"]["sha256"]) != prov.get("trace_source"):
+            raise R.Refused("brief-changed", f"the person's statement for {src} in {brief} differs from the one in {rec}. "
+                                             "Trace again so the record holds what they said.")
+        raster = prov["raster"]
+        rel = f"trace/{i}.svg"
+        r = T.trace(src, brief=brief, refs=refs, out=os.path.join(out, rel), calibration=calibration,
+                    crop=raster["crop"], threshold=raster["threshold"], invert=raster["invert"], long_side=raster["long_side"])
+        traced[i] = r["d"]
+        p = r["provenance"]
+        entries.append({"source_sha256": p["source"]["sha256"], "rights": p["trace_source"]["rights"],
+                        "answer": p["trace_source"]["answer"], "provenance_sha256": R.sha256_file(r["record"]),
+                        "svg_sha256": p["svg_sha256"]})
+        written += [rel, rel + ".provenance.json"]
+    return traced, entries, written
+
+
+def build(spec: dict, out: str, fonts_dir: str, recipe_dir: str = ".", brief: str | None = None,
+          refs: list[str] | None = None, calibration: str | None = None) -> dict:
+    if says_traced_from(spec):
+        raise R.Refused("traced-from", "the recipe says traced_from. Leave it out: the build writes where a trace came "
+                                       "from, from the record trace_ref.py made.")
     os.makedirs(out, exist_ok=True)
-    mark = build_mark(spec, fonts_dir)
+    traced, traces, written = admit_traces(spec, out, recipe_dir, brief, refs, calibration)
+
+    def put(rel: str, text: str) -> None:
+        R.write_bytes(os.path.join(out, rel), text.encode())
+        written.append(rel)
+
+    mark = build_mark(spec, fonts_dir, traced)
     if mark.bounds == (0, 0, 0, 0):
         raise SystemExit("The mark is empty")
     g = spec.get("grid", 48)
     md = d_of(mark)
-    open(os.path.join(out, "mark.svg"), "w").write(svg(md, bounds(mark)))
-    open(os.path.join(out, "mark-grid.svg"), "w").write(svg(md, (0, 0, g, g)))
+    put("mark.svg", svg(md, bounds(mark)))
+    put("mark-grid.svg", svg(md, (0, 0, g, g)))
     result = {"name": spec["name"], "grid": g, "mark_box": [round(v, 3) for v in bounds(mark)], "guides": guides(spec)}
+
+    fonts = {}
+
+    def licence(family: str, info: dict) -> str:
+        rel = f"LICENSES/{re.sub(r'[^A-Za-z0-9]+', '-', family)}-OFL.txt"
+        if rel not in written:
+            os.makedirs(os.path.join(out, "LICENSES"), exist_ok=True)
+            R.write_bytes(os.path.join(out, rel), R.read_bytes(info["licence"]))
+            written.append(rel)
+        fonts[family] = rel
+        return rel
 
     wm = spec.get("wordmark")
     if wm:
@@ -262,7 +349,7 @@ def build(spec: dict, out: str, fonts_dir: str) -> dict:
         wpath = pathops.Path()
         t["pen"].replay(TransformPen(wpath.getPen(), (1, 0, 0, -1, 0, 0)))  # y down, baseline at 0
         wpath = pathops.simplify(wpath)
-        open(os.path.join(out, "wordmark.svg"), "w").write(svg(d_of(wpath), bounds(wpath)))
+        put("wordmark.svg", svg(d_of(wpath), bounds(wpath)))
         cap = t["cap"]
         lk = spec.get("lockup", {})
         mx0, my0, mx1, my1 = bounds(mark)
@@ -275,7 +362,7 @@ def build(spec: dict, out: str, fonts_dir: str) -> dict:
         lock = pathops.Path()
         mark.draw(TransformPen(lock.getPen(), hm))
         lock = pathops.op(lock, wpath, pathops.PathOp.UNION)
-        open(os.path.join(out, "lockup.svg"), "w").write(svg(d_of(lock), bounds(lock)))
+        put("lockup.svg", svg(d_of(lock), bounds(lock)))
         # Stacked: the mark centred above the wordmark.
         wx0, wy0, wx1, wy1 = bounds(wpath)
         sm_h = 2.2 * cap
@@ -284,33 +371,36 @@ def build(spec: dict, out: str, fonts_dir: str) -> dict:
         stack = pathops.Path()
         mark.draw(TransformPen(stack.getPen(), sm))
         stack = pathops.op(stack, wpath, pathops.PathOp.UNION)
-        open(os.path.join(out, "lockup-stacked.svg"), "w").write(svg(d_of(stack), bounds(stack)))
+        put("lockup-stacked.svg", svg(d_of(stack), bounds(stack)))
         result["wordmark"] = {"text": wm["text"], "font": wm["font"], "weight": wm.get("weight", 500), "cap": cap,
-                              "licence": info["licence"], "reserved_names": info["reserved_names"]}
+                              "licence": licence(wm["font"], info), "reserved_names": info["reserved_names"]}
         if any(n.lower() in wm["text"].lower() for n in info["reserved_names"]):
             print(f"warning: the wordmark uses the font's Reserved Font Name {info['reserved_names']}")
     for part in spec["mark"]:
         if part["shape"] == "glyph":
-            i = F.fetch(part["font"], fonts_dir)
-            result.setdefault("fonts", {})[part["font"]] = i["licence"]
-    if wm:
-        result.setdefault("fonts", {})[wm["font"]] = result["wordmark"]["licence"]
-    result.update({k: spec[k] for k in ("title", "idea", "palette", "traced_from") if k in spec})
-    json.dump(result, open(os.path.join(out, "build.json"), "w"), indent=1)
+            licence(part["font"], F.fetch(part["font"], fonts_dir))
+    if fonts:
+        result["fonts"] = fonts
+    result.update({k: spec[k] for k in ("title", "idea", "palette") if k in spec})
+    result["traces"] = traces
+    result["files"] = {rel: R.sha256_file(os.path.join(out, rel)) for rel in written}
+    R.write_bytes(os.path.join(out, "build.json"), json.dumps(result, indent=1, ensure_ascii=False).encode())
     return result
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("recipe")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--fonts", default=os.path.expanduser("~/.cache/make-logo/fonts"))
-    a = ap.parse_args()
-    global RECIPE_DIR
-    RECIPE_DIR = os.path.dirname(os.path.abspath(a.recipe))
-    a.fonts = os.path.abspath(a.fonts)  # build.json keeps font paths; absolute so the package step works from anywhere
-    r = build(json.load(open(a.recipe)), a.out, a.fonts)
-    print(f"built {r['name']}: mark box {r['mark_box']}, {len(r['guides']['x'])} x and {len(r['guides']['y'])} y guides")
+    ap.add_argument("--fonts", default=None, help="font cache; default ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/fonts")
+    ap.add_argument("--brief", help="brief.json with trace_sources; needed when the recipe has a trace shape")
+    ap.add_argument("--refs", nargs="+", help="every reference folder, as check_logo.py gets them; needed with a trace shape")
+    ap.add_argument("--calibration", help="calibration.json from calibrate.py; default the one shipped here")
+    a = ap.parse_args(argv)
+    fonts_dir = a.fonts or os.path.join(R.cache_root(), "fonts")
+    r = build(R.read_json(a.recipe), a.out, fonts_dir, os.path.dirname(os.path.abspath(a.recipe)), a.brief, a.refs, a.calibration)
+    traced = f", traced from {len(r['traces'])} checked source(s)" if r["traces"] else ""
+    print(f"built {r['name']}: mark box {r['mark_box']}, {len(r['guides']['x'])} x and {len(r['guides']['y'])} y guides{traced}")
 
 
 if __name__ == "__main__":

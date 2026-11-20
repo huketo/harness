@@ -1,6 +1,10 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow"]
+# ///
 """Set the distance limit from the references themselves (references/distance.md).
 
-    python3 -I calibrate.py measurements.json --out calibration.json [--false-alarm 0.10]
+    uv run calibrate.py measurements.json --out calibration.json [--false-alarm 0.10]
 
 Two sets of pairs:
 - different: every pair of distinct references. Real, clearly different logos; the limit must pass almost all of them.

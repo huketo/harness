@@ -5,7 +5,7 @@
 //
 // Writes <book-dir>/pages/NN-slug.png (2x) and <book-dir>/logobook.pdf (1600 x 900 px pages). Exits 1 if the book's
 // font didn't load (a page set in a fallback face) or anything runs off a page.
-// Playwright and a Chromium come from build-design-system/scripts/find-chromium.mjs when that skill is installed beside
+// Playwright and a Chromium come from awesome-interface/scripts/find-chromium.mjs when that skill is installed beside
 // this one, else from --root, the current folder or the global install. PW_CHROMIUM may point at any Chrome.
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -25,7 +25,7 @@ const book = JSON.parse(readFileSync(join(dir, "pages.json"), "utf8"));
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function launch() {
-  const sibling = join(here, "..", "..", "build-design-system", "scripts", "find-chromium.mjs");
+  const sibling = join(here, "..", "..", "awesome-interface", "scripts", "find-chromium.mjs");
   if (existsSync(sibling)) {
     const { launchChromium } = await import(pathToFileURL(sibling).href);
     const r = await launchChromium({}, { root: opt("--root") || process.cwd() });

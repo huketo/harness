@@ -1,15 +1,25 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "fonttools", "uharfbuzz"]
+# ///
 """Write the logo book: every direction presented the way a studio presents logo directions (references/logo-book.md).
 
-    python3 -I logo_book.py <build dir> [...] --out <book dir> --name "Fieldnote" --line "Inspections and permits from
-        the job site" [--tagline "From site to sign-off"] [--note "a notification the app would send"]
-        [--fonts <cache>]
+    uv run logo_book.py <build dir> [...] --out <book dir> --refs <ref folder> [...] --name "Fieldnote"
+        --line "Inspections and permits from the job site" [--tagline "From site to sign-off"]
+        [--note "a notification the app would send"] [--photos <folder>] [--brief brief.json] [--lang en|ko]
+        [--calibration calibration.json] [--include-failed] [--fonts <cache>]
 
 Then print it: `node render_book.mjs <book dir>` writes pages/*.png and logobook.pdf.
 
 Pages: a cover; the directions side by side; for each direction a spread of the mark in use (a dark lockup, a browser
-tab, a poster), a spread of its construction (a light lockup, the grid, a phone), its colour, and its small sizes; then
-one page comparing them with their checks. No photographs and no reference logos: where a studio would use a photo,
-the book uses the direction's own colour as a field.
+tab, a poster), a spread of its construction (a light lockup, the grid, a phone), where a traced mark came from, its
+colour, and its small sizes; then one page comparing them with their checks. No reference logos; photos only from
+--photos, credited at the end.
+
+Each build must still match its check.json (build.json, every file it lists, the --refs images, the calibration), and
+the book reads only the files build.json lists: a build with no lockup shows its mark in the lockup's place. A
+direction that failed check_logo.py is left out unless --include-failed, which shows it marked as failed. The book is
+written in the brief's language, Korean for a Korean brief, set in an OFL face from Google Fonts that has the script.
 """
 from __future__ import annotations
 
@@ -23,9 +33,43 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fonts as F  # noqa: E402
+import rights as R  # noqa: E402
 
 W, H = 1600, 900
-BOOK_FONT = "Inter Tight"
+BOOK_FONT = {"en": "Inter Tight", "ko": "Noto Sans KR"}
+
+TEXT = {
+    "en": {
+        "title": "{name} logo directions", "logo_directions": "Logo directions", "directions": "{n} directions",
+        "direction": "1 direction", "colour": "Colour", "sizes": "Sizes and versions", "side": "Side by side",
+        "photos": "Photos", "photo": "Photo", "small": "Small sizes", "reversed": "Reversed", "on_colour": "On colour",
+        "stroke": "Stroke at 16 px: {v}", "not_checked": "not checked", "checks": "Checks", "not_run": "not run",
+        "failed": "Failed a check, shown on request",
+        "tracing": "Where it came from", "traced": "Traced from {file}", "source": "Source file", "sha": "SHA-256",
+        "kind": "Rights", "asked": "Question shown", "answer": "Their answer, verbatim",
+        "score": "Score against the source", "score_line": "{s} against the source, shown and not checked",
+        "unverified": "make-logo recorded this statement and bound it to the file's hash. It did not verify it.",
+        "rights": {"own-drawing": "The person's own drawing", "own-brand": "The person's own brand",
+                   "licensed": "Licensed to the person"},
+        "check_names": {},
+    },
+    "ko": {
+        "title": "{name} 로고 방향", "logo_directions": "로고 방향", "directions": "방향 {n}가지", "direction": "방향 1가지",
+        "colour": "색", "sizes": "크기와 변형", "side": "나란히 비교", "photos": "사진", "photo": "사진",
+        "small": "작은 크기", "reversed": "반전", "on_colour": "색 바탕", "stroke": "16 px에서 획 굵기: {v}",
+        "not_checked": "검사하지 않음", "checks": "검사", "not_run": "실행하지 않음",
+        "failed": "검사에 실패했지만 요청에 따라 넣은 방향입니다",
+        "tracing": "마크의 출처", "traced": "{file}을 트레이싱했습니다", "source": "원본 파일", "sha": "SHA-256",
+        "kind": "권리 유형", "asked": "사용자에게 보인 질문", "answer": "사용자의 답(원문)",
+        "score": "원본과의 점수", "score_line": "원본과의 점수 {s}(표시만 하며 검사하지 않습니다)",
+        "unverified": "make-logo는 이 진술을 기록하고 파일의 해시에 묶었을 뿐이며, 진술이 사실인지는 확인하지 않았습니다.",
+        "rights": {"own-drawing": "사용자가 직접 그린 그림", "own-brand": "사용자 자신의 브랜드",
+                   "licensed": "사용자가 이용 허락을 받은 자료"},
+        "check_names": {"stroke at 16 px": "16 px 획 굵기", "counters at 16 px": "16 px 속공간",
+                        "ink on paper": "바탕 위 잉크 대비", "accent against paper or ink": "포인트 색 대비",
+                        "nearest reference": "가장 가까운 참고 로고"},
+    },
+}
 
 
 def esc(s: str) -> str:
@@ -34,7 +78,7 @@ def esc(s: str) -> str:
 
 def read_svg(path: str) -> tuple[str, str]:
     """(viewBox, path d) of a single-path SVG written by build_logo.py."""
-    s = open(path).read()
+    s = R.read_bytes(path).decode()
     return re.search(r'viewBox="([^"]+)"', s).group(1), re.search(r' d="([^"]+)"', s).group(1)
 
 
@@ -194,57 +238,111 @@ section.page.cover { background: #161616; color: #fff; }
 .grid { position: absolute; inset: 0; }
 .credits { position: absolute; left: 64px; right: 64px; top: 200px; border-collapse: collapse; font-size: 15px; }
 .credits td { padding: 12px 16px 12px 0; border-bottom: 1px solid #e5e5e5; word-break: break-all; }
+.three p.prov { font-size: 13px; line-height: 1.4; opacity: .8; margin-top: 12px; white-space: pre-wrap; }
+.three p.fail, .cmp p.fail { font-size: 14px; color: #b42318; opacity: 1; margin-top: 10px; }
+.provtable { position: absolute; left: 610px; right: 64px; top: 190px; border-collapse: collapse; font-size: 16px; line-height: 1.4; }
+.provtable td { padding: 12px 16px 12px 0; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+.provtable td:first-child { width: 230px; opacity: .6; }
+.provtable td.v { white-space: pre-wrap; word-break: break-word; }
+.provtable td.sha { word-break: break-all; font-size: 14px; }
+.unverified { position: absolute; left: 610px; right: 64px; bottom: 64px; font-size: 14px; opacity: .6; }
 """
 
 
-def poster(p: dict, bdir: str, tagline: str, img: str | None) -> str:
+def lockup(bdir: str, files: dict, fill: str, height: float, stacked: bool = False) -> str:
+    """The lockup this build wrote, or its mark, larger, when it wrote none (a mark-only build)."""
+    name = "lockup-stacked.svg" if stacked else "lockup.svg"
+    if name in files:
+        return logo(os.path.join(bdir, name), fill, height=height)
+    return logo(os.path.join(bdir, "mark.svg"), fill, height=height if stacked else height * 2.2)
+
+
+def poster(p: dict, bdir: str, files: dict, tagline: str, img: str | None) -> str:
     """The tall poster tile: a photo with the tagline and lockup in paper over a dark foot, or, with no photos, the
     direction's colour field with ink type."""
     box = "left:1014px;top:30px;width:556px;height:840px;"
     if img:
         return (f'<div class="tile" style="{box}background:#000 url({img}) center/cover">'
                 f'<div class="poster" style="background:linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.25) 45%, rgba(0,0,0,0) 70%);justify-content:flex-end;gap:36px">'
-                f'<h4 style="color:{p["paper"]}">{esc(tagline)}</h4><div class="lk">{logo(os.path.join(bdir, "lockup.svg"), p["paper"], height=40)}</div></div></div>')
+                f'<h4 style="color:{p["paper"]}">{esc(tagline)}</h4><div class="lk">{lockup(bdir, files, p["paper"], 40)}</div></div></div>')
     return (f'<div class="tile" style="{box}{field(p)}"><div class="poster"><h4 style="color:{p["ink"]}">{esc(tagline)}</h4>'
-            f'<div class="lk">{logo(os.path.join(bdir, "lockup.svg"), p["ink"], height=40)}</div></div></div>')
+            f'<div class="lk">{lockup(bdir, files, p["ink"], 40)}</div></div></div>')
+
+
+def trace_lines(t: dict, traces: list[dict], scores: dict[str, float]) -> str:
+    """The overview card's note on a traced direction: source, rights, score against the source, the answer."""
+    out = []
+    for tr in traces:
+        ts, sha = tr["provenance"]["trace_source"], tr["trace"]["source_sha256"]
+        score = t["score_line"].format(s=f"{scores[sha]:.3f}") if sha in scores else ""
+        out.append(f'<p class="prov">{esc(t["traced"].format(file=ts["file"]))}\n{esc(t["rights"][ts["rights"]])}'
+                   f'\n{esc(score)}\n\u201c{esc(ts["answer"])}\u201d</p>')
+    return "".join(out)
+
+
+def trace_page(t: dict, bdir: str, p: dict, traces: list[dict], scores: dict[str, float]) -> str:
+    """A traced direction's page: its mark beside the person's statement about the source, verbatim."""
+    rows = []
+    for tr in traces:
+        ts, sha = tr["provenance"]["trace_source"], tr["trace"]["source_sha256"]
+        rows += [(t["source"], ts["file"], "v"), (t["sha"], sha, "sha"), (t["kind"], t["rights"][ts["rights"]], "v"),
+                 (t["asked"], ts["question"], "v"), (t["answer"], ts["answer"], "v"),
+                 (t["score"], f"{scores[sha]:.3f}" if sha in scores else "-", "v")]
+    trs = "".join(f'<tr><td>{esc(k)}</td><td class="{c}">{esc(v)}</td></tr>' for k, v, c in rows)
+    return (f'<div class="label"><h2>{esc(t["tracing"])}</h2></div>'
+            f'<div class="tile" style="left:64px;top:190px;width:500px;height:646px;background:{p["paper"]}">'
+            f'{logo(os.path.join(bdir, "mark.svg"), p["ink"], height=230)}</div>'
+            f'<table class="provtable">{trs}</table><p class="unverified">{esc(t["unverified"])}</p><div class="num">{{N}}</div>')
 
 
 def page(pid: str, body: str, cls: str = "", style: str = "") -> str:
     return f'<section class="page {cls}" id="{pid}" style="{style}">{body}</section>'
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("builds", nargs="+")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--refs", nargs="+", required=True, help="the reference folders check_logo.py was given")
+    ap.add_argument("--calibration", help="the calibration check_logo.py was given; default the one shipped here")
     ap.add_argument("--name", required=True)
     ap.add_argument("--line", required=True, help="what the product does, one line")
     ap.add_argument("--tagline", default=None)
     ap.add_argument("--note", default=None, help="the phone mockup's notification text; default: the tagline")
     ap.add_argument("--photos", default=None, help="a folder from fetch_photos.mjs: photos for the cover and posters, credited at the end")
-    ap.add_argument("--fonts", default=os.path.expanduser("~/.cache/make-logo/fonts"))
-    a = ap.parse_args()
-    os.makedirs(os.path.join(a.out, "fonts"), exist_ok=True)
-    info = F.fetch(BOOK_FONT, a.fonts)
-    shutil.copy(info["files"][0], os.path.join(a.out, "fonts", "book.ttf"))
-    shutil.copy(info["licence"], os.path.join(a.out, "fonts", "OFL.txt"))
+    ap.add_argument("--brief", help="brief.json: the book is written in its language")
+    ap.add_argument("--lang", choices=("en", "ko"), help="the book's language; default from --brief, else en")
+    ap.add_argument("--include-failed", action="store_true", help="show directions that failed check_logo.py, marked as failed")
+    ap.add_argument("--fonts", default=None, help="font cache; default ${XDG_CACHE_HOME:-~/.cache}/hstack/make-logo/fonts")
+    a = ap.parse_args(argv)
+    lang = a.lang or R.language(R.load_brief(a.brief)["data"] if a.brief else None)
+    t = TEXT[lang]
     dirs = []
     for b in a.builds:
-        build = json.load(open(os.path.join(b, "build.json")))
-        chk = json.load(open(os.path.join(b, "check.json"))) if os.path.exists(os.path.join(b, "check.json")) else None
-        dirs.append((b, build, chk))
+        build, chk = R.sealed(b, a.refs, a.calibration, require_ok=False)
+        if not chk["ok"] and not a.include_failed:
+            print(f"left out {b}: it failed check_logo.py (--include-failed shows it, marked)")
+            continue
+        scores = {sc["source_sha256"]: sc["score"] for sc in chk.get("source_scores", [])}
+        dirs.append((b, build, chk, R.traces(b, build), scores))
+    if not dirs:
+        raise SystemExit("no direction passed check_logo.py; fix the recipes, or pass --include-failed to show them marked")
+    os.makedirs(os.path.join(a.out, "fonts"), exist_ok=True)
+    info = F.fetch(BOOK_FONT[lang], a.fonts or os.path.join(R.cache_root(), "fonts"))
+    shutil.copy(info["files"][0], os.path.join(a.out, "fonts", "book.ttf"))
+    shutil.copy(info["licence"], os.path.join(a.out, "fonts", "OFL.txt"))
     tagline = a.tagline or a.line
     # Photos, copied in beside the book, used in turn: the cover, then each direction's poster.
     photos = []
     if a.photos:
-        man = json.load(open(os.path.join(a.photos, "manifest.json")))
+        man = R.read_json(os.path.join(a.photos, "manifest.json"))
         os.makedirs(os.path.join(a.out, "photos"), exist_ok=True)
         for it in man["items"]:
             if not os.path.exists(os.path.join(a.photos, it["file"])):
                 continue  # deleted as not fitting the brand (SKILL.md step 8): drop it, credit and all
             shutil.copy(os.path.join(a.photos, it["file"]), os.path.join(a.out, "photos", it["file"]))
             photos.append(it)
-    photo = lambda k: f"photos/{photos[k % len(photos)]['file']}" if photos else None
+    photo = lambda k: f"photos/{photos[k % len(photos)]['file']}" if photos else None  # noqa: E731
     pages, order = [], []
 
     def add(slug, html_):
@@ -256,73 +354,81 @@ def main():
     p0 = first[1]["palette"]
     add("cover", page("p{N}", f"""
       <div class="left"><div class="kicker">{esc(a.line)}</div></div>
-      <h1>{esc(a.name)}</h1><div class="sub">Logo directions</div>
+      <h1>{esc(a.name)}</h1><div class="sub">{esc(t["logo_directions"])}</div>
       {f'<div class="right" style="background:#000 url({photo(0)}) center/cover"></div>' if photos else
        f'<div class="right" style="{field(p0)}display:flex;align-items:center;justify-content:center">{logo(os.path.join(first[0], "mark.svg"), p0["ink"], height=300)}</div>'}
     """, "cover"))
 
+    count = t["direction"] if len(dirs) == 1 else t["directions"].format(n=len(dirs))
     cards = []
-    for i, (b, build, _) in enumerate(dirs, 1):
+    for b, build, chk, traces, scores in dirs:
         p = build["palette"]
+        fail = "" if chk["ok"] else f'<p class="fail">{esc(t["failed"])}</p>'
         cards.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(os.path.join(b, 'mark.svg'), p['ink'], height=150)}</div>
-          <h3>{esc(build.get('title', ''))}</h3><p>{esc(build.get('idea', ''))}</p></div>""")
+          <h3>{esc(build.get('title', ''))}</h3><p>{esc(build.get('idea', ''))}</p>{trace_lines(t, traces, scores)}{fail}</div>""")
     # Three to a page, like side by side: six cards on one page leave no room around the marks.
     for k in range(0, len(cards), 3):
-        add(f"directions-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>{len(dirs)} directions</h2></div>
+        add(f"directions-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>{esc(count)}</h2></div>
       <div class="three">{''.join(cards[k:k + 3])}</div><div class="foot">{esc(a.line)}</div><div class="num">{{N}}</div>"""))
 
-    for i, (b, build, chk) in enumerate(dirs, 1):
+    for i, (b, build, chk, traces, scores) in enumerate(dirs, 1):
         p = build["palette"]
+        files = build["files"]
         dark = p["ink"]
         # Spread A: in use. A dark lockup, a browser tab, a poster.
         add(f"d{i}-use", page("p{N}", f"""
-          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{dark}">{logo(os.path.join(b, 'lockup.svg'), p['paper'], height=64)}</div>
+          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{dark}">{lockup(b, files, p['paper'], 64)}</div>
           <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{p['tint']}">{browser(a.name, b, p)}</div>
-          {poster(p, b, tagline, photo(i))}"""))
+          {poster(p, b, files, tagline, photo(i))}"""))
         # Spread B: construction. A light lockup, the grid, a phone.
         add(f"d{i}-build", page("p{N}", f"""
-          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{p['paper']}">{logo(os.path.join(b, 'lockup.svg'), dark, height=64)}</div>
+          <div class="tile" style="left:30px;top:30px;width:954px;height:400px;background:{p['paper']}">{lockup(b, files, dark, 64)}</div>
           <div class="tile" style="left:30px;top:460px;width:954px;height:410px;background:{dark}">{construction(build, b, p, 954, 410)}</div>
           <div class="tile" style="left:1014px;top:30px;width:556px;height:840px;background:{p['neutral']}">{phone(a.name, b, p, a.note or tagline)}</div>"""))
+        if traces:
+            add(f"d{i}-trace", page("p{N}", trace_page(t, b, p, traces, scores)))
         # Colour.
         sw = [("paper", 36, 32, 336, 684), ("accent", 400, 32, 336, 296), ("tint", 764, 32, 286, 136), ("neutral", 764, 196, 286, 132), ("ink", 400, 356, 650, 360)]
         cells = "".join(
             f'<div class="sw" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;background:{p[k]};color:{"#161616" if lum(p[k]) > .3 else "#ffffff"}">{p[k].upper()}</div>'
             for k, x, y, w, h in sw)
-        add(f"d{i}-colour", page("p{N}", f"""<div class="label"><h2>Colour</h2></div>
+        add(f"d{i}-colour", page("p{N}", f"""<div class="label"><h2>{esc(t["colour"])}</h2></div>
           <div class="swatches">{cells}</div><div class="num">{{N}}</div>"""))
         # Small sizes and versions.
         m = os.path.join(b, "mark.svg")
         sizes = "".join(f'<div style="display:flex;flex-direction:column;align-items:center;gap:10px">{logo(m, dark, height=s)}<span style="font-size:12px;opacity:.55">{s}px</span></div>' for s in (16, 24, 32, 64))
-        stroke = next((c["value"] for c in (chk or {}).get("checks", []) if c["check"] == "stroke at 16 px"), "not checked")
-        add(f"d{i}-sizes", page("p{N}", f"""<div class="label"><h2>Sizes and versions</h2></div>
+        stroke = next((c["value"] for c in chk.get("checks", []) if c["check"] == "stroke at 16 px"), t["not_checked"])
+        add(f"d{i}-sizes", page("p{N}", f"""<div class="label"><h2>{esc(t["sizes"])}</h2></div>
           <div class="sizes">
-            <div class="t" style="background:{p['paper']}"><small>Small sizes</small>{sizes}<span class="cap">Stroke at 16 px: {esc(stroke)}</span></div>
-            <div class="t" style="background:{dark};align-items:center;padding:0">{logo(m, p['paper'], height=120)}<small style="color:{p['paper']}">Reversed</small></div>
-            <div class="t" style="background:{p['accent']};align-items:center;padding:0">{logo(m, dark if lum(p['accent']) > .45 else '#ffffff', height=120)}<small>On colour</small></div>
+            <div class="t" style="background:{p['paper']}"><small>{esc(t["small"])}</small>{sizes}<span class="cap">{esc(t["stroke"].format(v=stroke))}</span></div>
+            <div class="t" style="background:{dark};align-items:center;padding:0">{logo(m, p['paper'], height=120)}<small style="color:{p['paper']}">{esc(t["reversed"])}</small></div>
+            <div class="t" style="background:{p['accent']};align-items:center;padding:0">{logo(m, dark if lum(p['accent']) > .45 else '#ffffff', height=120)}<small>{esc(t["on_colour"])}</small></div>
           </div>
-          <div class="tile" style="left:64px;right:64px;top:550px;height:290px;background:{p['tint']}">{logo(os.path.join(b, 'lockup-stacked.svg'), dark, height=170)}</div>
+          <div class="tile" style="left:64px;right:64px;top:550px;height:290px;background:{p['tint']}">{lockup(b, files, dark, 170, stacked=True)}</div>
           <div class="num">{{N}}</div>"""))
 
     rows = []
-    for i, (b, build, chk) in enumerate(dirs, 1):
+    for b, build, chk, traces, scores in dirs:
         p = build["palette"]
-        checks = (chk or {}).get("checks", [])
-        trs = "".join(f"<tr><td>{esc(c['check'])}</td><td>{esc(c['value'])} {'✓' if c['ok'] else '✗'}</td></tr>" for c in checks) or "<tr><td>Checks</td><td>not run</td></tr>"
+        checks = [(t["check_names"].get(c["check"], c["check"]), f"{c['value']} {'✓' if c['ok'] else '✗'}") for c in chk.get("checks", [])]
+        checks += [(t["score"], f"{s:.3f}") for s in scores.values()]
+        trs = "".join(f"<tr><td>{esc(k)}</td><td>{esc(v)}</td></tr>" for k, v in checks) or f"<tr><td>{esc(t['checks'])}</td><td>{esc(t['not_run'])}</td></tr>"
+        fail = "" if chk["ok"] else f'<p class="fail">{esc(t["failed"])}</p>'
         rows.append(f"""<div><div class="t" style="background:{p['paper']}">{logo(os.path.join(b, 'mark.svg'), p['ink'], height=110)}{logo(os.path.join(b, 'mark.svg'), p['ink'], height=16)}</div>
-          <h3 style="font-weight:500;font-size:20px;margin-top:22px">{esc(build.get('title', ''))}</h3><table>{trs}</table></div>""")
+          <h3 style="font-weight:500;font-size:20px;margin-top:22px">{esc(build.get('title', ''))}</h3>{fail}<table>{trs}</table></div>""")
     # Three to a page: six on one page left the tiles cramped and the checks cut down.
     for k in range(0, len(rows), 3):
-        add(f"compare-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>Side by side</h2></div>
+        add(f"compare-{k // 3 + 1}", page("p{N}", f"""<div class="label"><h2>{esc(t["side"])}</h2></div>
       <div class="cmp">{''.join(rows[k:k + 3])}</div><div class="num">{{N}}</div>"""))
     if photos:
-        lines = "".join(f'<tr><td>{esc(it["title"] or "Photo")}</td><td>{esc(it["creator"])}</td><td>{esc(it["license"])}</td><td>{esc(it["source"])}</td></tr>' for it in photos)
-        add("credits", page("p{N}", f"""<div class="label"><h2>Photos</h2></div>
+        lines = "".join(f'<tr><td>{esc(it["title"] or t["photo"])}</td><td>{esc(it["creator"])}</td><td>{esc(it["license"])}</td><td>{esc(it["source"])}</td></tr>' for it in photos)
+        add("credits", page("p{N}", f"""<div class="label"><h2>{esc(t["photos"])}</h2></div>
       <table class="credits">{lines}</table>"""))
 
-    open(os.path.join(a.out, "index.html"), "w").write(
-        f'<!doctype html><html><head><meta charset="utf-8"><title>{esc(a.name)} logo directions</title><style>{CSS}</style></head><body>{"".join(pages)}</body></html>')
-    json.dump({"family": "Book", "name": a.name, "pages": order}, open(os.path.join(a.out, "pages.json"), "w"), indent=1)
+    doc = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{esc(t["title"].format(name=a.name))}</title>'
+           f'<style>{CSS}</style></head><body>{"".join(pages)}</body></html>')
+    R.write_bytes(os.path.join(a.out, "index.html"), doc.encode())
+    R.write_bytes(os.path.join(a.out, "pages.json"), json.dumps({"family": "Book", "name": a.name, "lang": lang, "pages": order}, indent=1, ensure_ascii=False).encode())
     print(f"wrote {len(order)} pages to {a.out}")
 
 
