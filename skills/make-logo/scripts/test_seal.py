@@ -102,6 +102,21 @@ class Project(unittest.TestCase):
 
 
 class Seal(Project):
+    def test_a_check_with_no_reference_mark_says_not_checked(self):
+        empty = os.path.join(self.ws.root, "refs", "empty")
+        os.makedirs(empty)
+        self.refs = [empty]
+        b = self.build(self.recipe())
+        cal = R.read_json(R.calibration_file(None))
+        cal["fused"]["limit"] = 0.0
+        zero = self.ws.path("calibration-zero.json")
+        R.write_bytes(zero, json.dumps(cal).encode())
+        for extra, ok in (((), True), (("--calibration", zero), False)):
+            self.check(b, extra=extra)
+            rows = {r["check"]: r for r in R.read_json(os.path.join(b, "check.json"))["checks"]}
+            self.assertEqual(rows["nearest reference"]["value"], "not checked")
+            self.assertEqual(rows["nearest reference"]["ok"], ok, extra)
+
     def test_package_and_book_refuse_a_build_that_was_never_checked(self):
         b = self.build(self.recipe())
         self.refused("not-checked", self.package, b)

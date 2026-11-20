@@ -138,7 +138,9 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
     marks = [m for m in refset["marks"] if m[1] not in own]
     near = sorted(((T.score(cand, feats, cal), f) for f, _, feats in marks), reverse=True)[:3]
     top = near[0][0] if near else 0.0
-    rows.append(("nearest reference", f"{top:.3f}", f"< {cal['limit']:.3f}", top < cal["limit"]))
+    # With no reference that shows a mark the distance check did not run: the row says so and keeps its outcome.
+    shown = f"{top:.3f}" if marks else "not checked"
+    rows.append(("nearest reference", shown, f"< {cal['limit']:.3f}", top < cal["limit"]))
     # Against the source it was traced from: shown in the book, never a failure.
     source_scores = []
     for t in traces:

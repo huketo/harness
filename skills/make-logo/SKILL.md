@@ -48,7 +48,7 @@ trademark sheet. It doesn't know whether the statement is true.
   recorded, and refuses a recipe that says `traced_from`. `check_logo.py` compares with the same references, refuses
   the same unreadable ones, and leaves out only a direction's own verified source; every other reference keeps the
   usual limit. It refuses a traced direction whose trace was gated against other `--refs` images, another
-  calibration or other collections than it is given, and removes that `check.json`.
+  calibration or other collections than it is given, and removes that `check.json`. With no reference that shows a mark, its nearest-reference row reads `not checked`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
   file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw; for a traced
   direction, its source and the collections (`collected_sha256`) must match too. They verify all of it before they
