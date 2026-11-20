@@ -20,8 +20,6 @@ Choose the authorized mode:
 - **Visual overhaul:** change the authorized visual language while retaining working destinations, content, and interactions. A visual redesign alone does not authorize brand replacement or data changes.
 - **Structural redesign:** change navigation, content organization, or flow only where explicitly in scope. Identify affected destinations and transitions, migrate their consumers, and verify old required tasks remain reachable.
 
-A broad complaint with no named scope, such as "the UI is a mess, fix it", authorizes a check first. [Review](review.md) the named or most-used surfaces, then report the findings with the size of the redesign they imply (screens, shared components and tokens touched) and offer it. Start changing screens once that scope is agreed.
-
 For missing runtime access, distinguish source findings from unverified visual hypotheses. Do not claim to have audited states or screens that were not inspected.
 
 ## Diagnose before decorating
