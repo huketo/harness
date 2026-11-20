@@ -2,8 +2,8 @@
 
 Every image here sets proportions or fills a mockup. None is ever traced: `trace_ref.py` takes only a file the person
 holds rights in, listed in `brief.json` `trace_sources` (SKILL.md step 6), and refuses any file whose sha256 a
-collection manifest lists, whose mask looks like one of these, or that is one of them saved again, resized or cut a
-little (`collected-copy`, `reference-copy`; `building.md`, "Same picture").
+collection manifest lists, whose mask looks like one of these, or that is a collected one saved again, resized or
+cut a little (`collected-copy`; `building.md`, "Same picture").
 
 ## The person's references
 

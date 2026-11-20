@@ -21,7 +21,9 @@ keep to it.
   set and outlined, permissive icon sets, and a trace of a file the person holds rights in (their own drawing, their
   own brand, or material licensed to them).
 - Reference logos, Are.na pulls and stock photos are for measuring and mockups only (the owner's decision,
-  2026-11-20). The scripts refuse to trace them, however they are renamed, re-saved or cropped.
+  2026-11-20). The scripts refuse to trace a collected file renamed, re-saved, resized or cut a little, and a trace
+  whose mask is close to a collected image or a `--refs` logo; what they miss is in `references/building.md`, "Same
+  picture".
 - Refuse "recreate X's logo" or any famous brand named as the target.
 - Nothing here is a legal clearance. Say so, and give the trademark search sheet.
 
@@ -35,9 +37,10 @@ trademark sheet. It doesn't know whether the statement is true.
   collection manifest, and never when the exact mask passed to potrace, or potrace's path rendered, reaches the
   calibrated limit against a collected image or a `--refs` logo. A photo has no one mark to split, so a copy of one
   can pass those masks; the file, and the part `--crop` takes, is also compared as a picture with every collected
-  image (`collected-copy`) and `--refs` image (`reference-copy`), and refused when it is one of them saved again,
-  resized, cut a little at the edges or made lighter or darker (`same_picture.py`; its limit, and what it does not
-  see, are in `references/building.md`, "Same picture"). It compares with every image, fit to measure or
+  image, whatever `trace_sources` lists, and refused when it is one of them saved again, resized, cut a little at
+  the edges, made lighter or darker, or partly made clear (`collected-copy`, `same_picture.py`; its limit, and what it
+  does not see, are in `references/building.md`, "Same picture"). A `--refs` image is compared by the masks only.
+  The masks are compared with every image, fit to measure or
   not: SVGs rasterised, a favicon too small to split enlarged, an image with transparency seen on white and on black
   (its higher score counts). It refuses while one of them still can't be read as one mark (`not-comparable`, also a
   sheet whose mask leaves out a tenth of the ink seen on a ground), while a `--refs` folder or file named is not
@@ -45,16 +48,16 @@ trademark sheet. It doesn't know whether the statement is true.
   holds a symbolic link (`collection-linked`), while a collection holds a file its manifest does not list
   (`collection-unlisted`: a pull that stopped, or a file put there by hand), or while a collected file is gone or no
   longer has the sha256 its manifest lists (`collection-changed`). The person's
-  own sketch on the moodboard (same sha256 as a `trace_sources` entry) is left out of that comparison; a collected
-  file never is. Each trace gets `<svg>.provenance.json`.
+  own sketch on the moodboard (same sha256 as a `trace_sources` entry) is left out of the mask comparison; a
+  collected file never is. Each trace gets `<svg>.provenance.json`.
 - `build_logo.py` trusts no trace SVG: it checks the provenance, traces the source again with the same gates against
   today's collections and references, goes on only while the record's raster arguments give back the mask it
   recorded, and refuses a recipe that says `traced_from`. `check_logo.py` compares with the same references, refuses
   the same unreadable ones, and leaves out only a direction's own verified source; every other reference keeps the
   usual limit. It refuses a traced direction whose trace was gated against other `--refs` images, another
   calibration or other collections than it is given, and removes that `check.json`. Before that, it runs the
-  same-picture gate again on each traced source against the collections and `--refs` as they are now: a source a
-  collection now lists (`collected`) or a copy of it (`collected-copy`, `reference-copy`) stops the direction. With
+  same-picture gate again on each traced source against the collections as they are now: a source a collection now
+  lists (`collected`) or a copy of a collected image (`collected-copy`) stops the direction. With
   no reference that shows a mark, its nearest-reference row reads `not checked`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
   file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw; for a traced
@@ -142,7 +145,7 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    character, and, when step 6 gave you a source, traced marks: `uv run scripts/trace_ref.py sketches/l.png --brief
    brief.json --refs <refs> --calibration calibration.json --crop x,y,w,h --out trace/<n>.svg`, then change one thing
    with recipe shapes so it carries the idea. A refusal means the picture is another logo or a collected image
-   (`collected-copy`, `reference-copy`: the same picture, saved again or cut): drop that source, never work around
+   (`collected-copy`: a collected picture, saved again or cut): drop that source, never work around
    it. `not-comparable` names a reference the gates can't read as one mark: take it out of `refs/mine/` (or delete it
    from its collection and run `collection.mjs`), or replace it with one mark cropped out of it on a plain ground,
    then trace again. At least half carry the idea as a picture, not a letter. Each
@@ -158,8 +161,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    but its own source; its score against that source is recorded and shown, never failed. A detailed trace may fail
    the 16 px checks; keep it if it's strong, and say it needs a simpler favicon. A `trace-gate-stale` refusal means
    the references, the calibration or the collections changed after that direction was built (a new photo pull
-   counts): build it again, then check it. `collected`, `collected-copy` or `reference-copy` means the traced source
-   is, or is a copy of, a collected or reference image: drop that direction. `not-comparable` is the same as in step 7.
+   counts): build it again, then check it. `collected` or `collected-copy` means the traced source is, or is a
+   copy of, a collected image: drop that direction. `not-comparable` is the same as in step 7.
    Done when every direction passes, a traced one failing nothing but the 16 px rows.
 
 9. **Logo book.** With the photos from step 2:
@@ -168,7 +171,7 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    "$C/photos"`, then `node scripts/render_book.mjs book` (`references/logo-book.md`). A direction that failed the
    check is left out; `--include-failed` shows it, marked. This step and step 10 refuse a traced direction whose
    collections changed after its check (`collections-changed`): build and check it again. They refuse one whose
-   source a collection or `--refs` image now matches (`collected`, `collected-copy`, `reference-copy`): drop it.
+   source a collection now holds, or holds a copy of (`collected`, `collected-copy`): drop it.
    Open every page. Send `book/logobook.pdf` and ask the person to choose; record the question and their answer
    verbatim in `brief.json` as `"choice"`.
    Done when render_book.mjs exits 0 and the person's pick is recorded in their words.

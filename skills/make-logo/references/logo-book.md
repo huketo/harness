@@ -14,7 +14,7 @@ with `--include-failed`, `pages/` holds the new book only.
 `logo_book.py` takes the same `--refs` and `--calibration` as `check_logo.py` and refuses a build whose `check.json`
 is missing or no longer matches `build.json`, the files it lists, the `--refs` images or the calibration, or, for a
 traced direction, its source or the collections (`collections-changed`), or whose traced source is, or is the same
-picture as, a collected or `--refs` image (`collected`, `collected-copy`, `reference-copy`), before it writes
+picture as, a collected image (`collected`, `collected-copy`), before it writes
 anything. It reads a
 direction's pictures only as the verified bytes of `build.json` `files`: a build with no wordmark has no lockup, and
 the book draws its mark, larger, wherever a lockup would go. A direction that failed the check is left out;

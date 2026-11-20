@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import ExifTags, Image, ImageDraw, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import potrace_bin as P  # noqa: E402
@@ -127,10 +127,11 @@ def dark_mark_and_small_light_mark() -> Image.Image:
     return out
 
 
-def photo(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
+def photo(seed: int = 0, size: tuple[int, int] = (640, 480), cut_out: bool = False) -> Image.Image:
     """A 3D mockup photographed against a wall, the kind of picture collections hold that has no one mark to split: a
     lit gradient ground, a soft shadow, a box with three shaded faces and a printed word, a shaded ball, and sensor
-    noise. Each seed places, sizes and colours them differently."""
+    noise. Each seed places, sizes and colours them differently. With `cut_out`, what a background remover leaves:
+    the box and the ball on a clear ground whose colour is zeroed."""
     import numpy as np
     from PIL import ImageFilter
 
@@ -147,6 +148,9 @@ def photo(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
     ImageDraw.Draw(shadow).ellipse([bx - 20, by + bh - 10, bx + bw + 60, by + bh + 50], fill=110)
     im = Image.composite(Image.new("RGB", size, (40, 40, 45)), im, shadow.filter(ImageFilter.GaussianBlur(18)))
     d = ImageDraw.Draw(im)
+    subject = Image.new("L", size, 0)
+    ImageDraw.Draw(subject).polygon([(bx, by), (bx + depth, by - depth / 2), (bx + bw + depth, by - depth / 2),
+                                     (bx + bw + depth, by + bh - depth / 2), (bx + bw, by + bh), (bx, by + bh)], fill=255)
     front = tuple(int(v) for v in rng.uniform(215, 245, 3))
     d.polygon([(bx, by), (bx + depth, by - depth / 2), (bx + bw + depth, by - depth / 2), (bx + bw, by)],
               fill=tuple(min(255, int(v * 1.04)) for v in front))
@@ -162,7 +166,23 @@ def photo(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
     a = np.asarray(im, dtype=np.float32) / 255
     a = np.where((np.hypot(x - cx, y - cy) < r)[..., None], lit[..., None] * rng.uniform(0.5, 0.95, 3), a)
     a = a + rng.normal(0, 0.012, a.shape)
-    return Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
+    out = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
+    if not cut_out:
+        return out
+    ImageDraw.Draw(subject).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    out = Image.composite(out, Image.new("RGB", size, (0, 0, 0)), subject).convert("RGBA")
+    out.putalpha(subject)
+    return out
+
+
+def exif_turned(im: Image.Image, quality: int = 95) -> bytes:
+    """`im` as a camera writes it: JPEG pixels stored on their side, with an EXIF orientation (6) that shows them
+    upright."""
+    exif = Image.Exif()
+    exif[ExifTags.Base.Orientation] = 6
+    buf = io.BytesIO()
+    im.transpose(Image.Transpose.ROTATE_90).save(buf, "JPEG", quality=quality, exif=exif.tobytes())
+    return buf.getvalue()
 
 
 def font_bytes(family: str) -> bytes:

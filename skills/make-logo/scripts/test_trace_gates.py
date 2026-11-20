@@ -3,10 +3,9 @@
 # dependencies = ["numpy", "scipy", "scikit-image", "pillow", "skia-pathops", "fonttools", "uharfbuzz", "resvg-py"]
 # ///
 """The tracing gates: trace_ref.trace() refuses a source the person holds no stated rights in, a collected file, a
-mask or vector close to a collected or reference logo, and the same picture as a collected or reference image (a
-photo the masks can't read); build_logo.py re-runs it for every trace shape, and check_logo.py leaves out only the
-verified source and runs the same-picture gate again. Synthetic marks and photos, a temporary cache, potrace from
-potrace_bin."""
+mask or vector close to a collected or reference logo, and the same picture as a collected image (a photo the masks
+can't read); build_logo.py re-runs it for every trace shape, and check_logo.py leaves out only the verified source and
+runs the same-picture gate again. Synthetic marks and photos, a temporary cache, potrace from potrace_bin."""
 from __future__ import annotations
 
 import io
@@ -20,7 +19,7 @@ from contextlib import redirect_stdout
 from unittest import mock
 
 import resvg_py
-from PIL import Image, ImageDraw, ImageEnhance
+from PIL import Image, ImageEnhance
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_logo as B  # noqa: E402
@@ -286,14 +285,33 @@ class TraceGates(unittest.TestCase):
         whole = self.trace(board, [self.ws.entry(board)])["provenance"]["gate"]
         self.assertLess(whole["copy_nearest"]["score"], SP.LIMIT, "the whole page is not the photo")
 
-    def test_refuses_a_copy_of_a_reference_photo_unless_the_person_said_it_is_theirs(self):
-        mood = self.ws.image("refs/mine/mood.png", G.photo(2))
-        copy = self.ws.image("sketches/mood.jpg", G.photo(2), "JPEG", quality=75)
-        e = self.refused("reference-copy", copy, [self.ws.entry(copy)])
-        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("mood.png"), e.detail)
-        # Their answer about the moodboard photo too leaves it out, as their own sketches are.
-        r = self.trace(copy, [self.ws.entry(copy), self.ws.entry(mood)])
-        self.assertLess(r["provenance"]["gate"]["copy_nearest"]["score"], SP.LIMIT)
+    def test_refuses_a_cut_out_of_a_collected_photo_whose_clear_ground_hides_no_colour(self):
+        # A background remover's cut-out keeps a fifth of the photo and zeroes the colour under the rest, so flattened
+        # on any ground it is mostly not the photo; the pixels it shows are the photo's own.
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        copy = self.ws.image("sketches/cut-out.png", G.photo(0, cut_out=True))
+        e = self.refused("collected-copy", copy, [self.ws.entry(copy)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+
+    def test_traces_a_cut_out_of_another_photo(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        own = self.ws.image("sketches/own-cut-out.png", G.photo(1, cut_out=True))
+        gate = self.trace(own, [self.ws.entry(own)])["provenance"]["gate"]
+        print(f"\n  another photo's cut-out: same picture {gate['copy_nearest']['score']:.4f}")
+        self.assertLess(gate["copy_nearest"]["score"], SP.LIMIT)
+
+    def test_refuses_the_picture_a_collected_jpeg_shows_once_its_exif_orientation_turns_it(self):
+        self.ws.collection("world", {"mockups/90000001.jpg": G.exif_turned(G.photo(0))})
+        shown = self.ws.image("sketches/shown.png", G.photo(0))
+        e = self.refused("collected-copy", shown, [self.ws.entry(shown)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.jpg"), e.detail)
+
+    def test_refuses_a_jpeg_whose_exif_orientation_shows_a_collected_photo(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        turned = self.ws.path("sketches", "turned.jpg")
+        R.write_bytes(turned, G.exif_turned(G.photo(0)))
+        e = self.refused("collected-copy", turned, [self.ws.entry(turned)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
 
     def test_refuses_a_collected_file_that_no_longer_has_its_manifest_hash(self):
         world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
@@ -527,7 +545,7 @@ class BuildGates(unittest.TestCase):
         self.assertEqual(e.reason, "collection-unlisted", str(e))
         self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
 
-    def test_check_refuses_once_a_copy_of_the_source_is_collected_or_named_in_refs(self):
+    def test_check_refuses_once_a_copy_of_the_source_is_collected(self):
         out = self.assembled()
         self.assertEqual(self.check_exit(out).code, 0)
         world = self.ws.collection("world", {"cafe/60000001.png": reencoded(G.mark_image(G.own))})
@@ -536,27 +554,6 @@ class BuildGates(unittest.TestCase):
         self.assertEqual(e.reason, "collected-copy", str(e))
         self.assertIn(os.path.join(world, "cafe", "60000001.png"), str(e))
         self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
-        shutil.rmtree(world)
-        self.assertEqual(self.check_exit(out).code, 0)
-        self.ws.image("refs/mine/sketch-copy.jpg", reencoded(G.mark_image(G.own)), "JPEG", quality=90)
-        e = self.check_exit(out)
-        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
-        self.assertEqual(e.reason, "reference-copy", str(e))
-        self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
-
-    def test_check_refuses_a_trace_made_without_the_same_picture_gate(self):
-        # The collection holds the photo before the trace, so the collections' digest is the same at the check: only
-        # the check's own run of the gate stands between the copy and the book.
-        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
-        copy = self.ws.image("sketches/mockup.jpg", G.photo(0), "JPEG", quality=75)
-        self.brief = self.ws.brief([self.ws.entry(self.sketch), self.ws.entry(copy)])
-        with mock.patch.object(SP, "LIMIT", 2.0):  # as a version without the gate traced and built it
-            T.trace(copy, brief=self.brief, refs=[self.mine, self.arena], out=self.ws.path("trace", "mockup.svg"))
-            out = self.build(self.recipe("trace/mockup.svg"), "build/mockup")
-        e = self.check_exit(out)
-        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
-        self.assertEqual(e.reason, "collected-copy", str(e))
-        self.assertIn("90000001.png", str(e))
 
     def test_check_refuses_a_trace_gated_before_a_collection_was_added(self):
         out = self.assembled()

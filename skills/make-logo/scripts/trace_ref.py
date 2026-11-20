@@ -18,10 +18,11 @@ trace() is the only way to trace, and build_logo.py runs it again for every trac
 3. a mask, the exact pixels passed to potrace after the crop, threshold and invert, that scores at or over the
    calibrated limit against any collected image or --refs logo;
 4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3);
-5. a file, or the part --crop takes, that is the same picture as any collected image ("collected-copy") or --refs
-   image ("reference-copy"): saved again, resized, cut a little at the edges or made lighter or darker
-   (same_picture.py). A photo has no one mark to split, so 3 and 4 can miss a copy of one.
-In 3, 4 and 5 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
+5. a file, or the part --crop takes, that is the same picture as any collected image ("collected-copy"): saved
+   again, resized, cut a little at the edges, made lighter or darker, or partly made clear (same_picture.py). A
+   photo has no one mark to split, so 3 and 4 can miss a copy of one. 5 compares no --refs image, and every
+   collected image whatever trace_sources lists.
+In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
 fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
 white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
@@ -189,14 +190,14 @@ def _read(path: str) -> bytes | None:
 def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
     """What the distance and same-picture checks compare with: every image in the --refs folders and files and every
     collected file, each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256,
-    [features of each mask])], "pictures": [(file, sha256, same_picture.Picture)], each once per sha256,
-    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+    [features of each mask])] of them all, "pictures": [(file, sha256, same_picture.Picture)] of the collected files,
+    each once per sha256, "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
 
     Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing,
     ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest lists,
     and ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say
     nothing about a picture they could not compare."""
-    marks, pictures, uncomparable, changed, missing, seen, ref_shas, read = [], [], [], [], [], set(), [], {}
+    marks, pictures, uncomparable, changed, missing, seen, ref_shas, read = [], {}, [], [], [], set(), [], {}
     for f, listed in [(f, None) for f in R.ref_images(refs)] + list(collected):
         if f not in read:
             data = _read(f)
@@ -210,10 +211,11 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
         elif sha != listed:
             changed.append(f"{f} ({'gone' if data is None else 'changed'})")
             continue
+        else:
+            pictures.setdefault(sha, (f, sha, SP.cached(sha, data)))
         if sha in seen:
             continue
         seen.add(sha)
-        pictures.append((f, sha, SP.cached(sha, data)))
         feats, why = _prepared(sha, data)
         if feats:
             marks.append((f, sha, feats))
@@ -233,7 +235,7 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
                                           "Take each one out of the --refs folder (or out of its collection, then "
                                           "`node scripts/collection.mjs <name>`), or replace it with a copy that "
                                           "shows one mark on a plain ground, then run this again.")
-    return {"marks": marks, "pictures": pictures, "refs_sha256": R.digest(ref_shas)}
+    return {"marks": marks, "pictures": list(pictures.values()), "refs_sha256": R.digest(ref_shas)}
 
 
 def calibration_snapshot(path: str | None) -> tuple[dict, str]:
@@ -321,9 +323,8 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                                             f"{vector_near['ref']} (limit {cal['limit']:.3f}; the mask scored "
                                             f"{mask_near['score']:.3f}, the specks potrace dropped hid it).",
                         mask_nearest=mask_near, vector_nearest=vector_near)
-    pictures = [p for p in refset["pictures"] if p[1] not in own]
-    copy_near = SP.gate(source, SP.source(data, crop), pictures, {sha for _, sha in collected},
-                        mask_nearest=mask_near, vector_nearest=vector_near)
+    copy_near = SP.gate(source, SP.source(data, crop), refset["pictures"], mask_nearest=mask_near,
+                        vector_nearest=vector_near)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     svg_bytes = svg.encode()

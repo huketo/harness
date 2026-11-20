@@ -106,26 +106,9 @@ def ref_images(folders: list[str]) -> list[str]:
     return found
 
 
-def ref_files(folders: list[str]) -> list[tuple[str, str, bytes]]:
-    """(file, sha256, bytes) of every image ref_images() finds, each read once, so a sha256 recorded is of the bytes
-    judged. Refuses ("refs-missing") while one is gone between the listing and the read."""
-    out, gone = [], []
-    for p in ref_images(folders):
-        try:
-            data = read_bytes(p)
-        except OSError:
-            gone.append(p)
-            continue
-        out.append((p, sha256_bytes(data), data))
-    if gone:
-        raise Refused("refs-missing", f"these --refs images could not be read: {'; '.join(gone)}. Put them back or take "
-                                      "them out of the --refs folders, then run this again.")
-    return out
-
-
 def refs_sha256(folders: list[str]) -> str:
     """Over every image file in the --refs folders as they are now, never from a saved list."""
-    return digest(sha for _, sha, _ in ref_files(folders))
+    return digest(sha256_file(p) for p in ref_images(folders))
 
 
 # Collections ------------------------------------------------------------------------------------------------------
@@ -336,9 +319,9 @@ def sealed(build: str, refs: list[str], calibration: str | None,
            require_ok: bool = True) -> tuple[dict, dict, dict[str, bytes], list[dict]]:
     """(build.json, check.json, verified_files(), traces()) of a build whose check still holds, or a refusal naming
     what changed. Everything is verified before it returns, so a step that writes calls this first and writes only
-    after: a traced build's sources must pass the same-picture gate again against the collections and --refs images
-    as they are now (same_picture.recheck), and the collections its traces were gated against (check.json
-    `collected_sha256`) must be as they were."""
+    after: a traced build's sources must pass the same-picture gate again against the collections as they are now
+    (same_picture.recheck), and the collections its traces were gated against (check.json `collected_sha256`) must
+    be as they were."""
     bpath, cpath = os.path.join(build, "build.json"), os.path.join(build, "check.json")
     if not os.path.isfile(bpath):
         raise Refused("not-built", f"{build} has no build.json")
@@ -349,8 +332,7 @@ def sealed(build: str, refs: list[str], calibration: str | None,
     if chk.get("build_sha256") != sha256_bytes(raw):
         raise Refused("stale-check", f"{build}/build.json changed since check_logo.py ran (a new build?). Check it again.")
     files = verified_files(build, info)
-    ref_list = ref_files(refs)
-    if chk.get("refs_sha256") != digest(sha for _, sha, _ in ref_list):
+    if chk.get("refs_sha256") != refs_sha256(refs):
         raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
                                       "same folders, or check again against these.")
     if chk.get("calibration_sha256") != sha256_file(calibration_file(calibration)):
@@ -362,7 +344,7 @@ def sealed(build: str, refs: list[str], calibration: str | None,
         import same_picture as SP
 
         now = collected_files()
-        SP.recheck(found, [(f, sha, SP.cached(sha, data)) for f, sha, data in ref_list], now)
+        SP.recheck(found, now)
         if chk.get("collected_sha256") != digest(sha for _, sha, _ in now):
             raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a "
                                                  "file added or removed), and its trace was gated against the old ones. "

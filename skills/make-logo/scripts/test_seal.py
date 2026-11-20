@@ -485,21 +485,6 @@ class TracedDocuments(Project):
         for wrote in ("package", "book"):
             self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
 
-    def test_package_and_book_refuse_a_trace_checked_without_the_same_picture_gate(self):
-        # The photo is collected before the trace, so the collections' digest still matches check.json: only the
-        # gate's own run in package_logo.py and logo_book.py stops the copy.
-        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
-        copy = self.ws.image("sketches/mockup.jpg", G.photo(0), "JPEG", quality=75)
-        self.brief = self.ws.brief([self.entry, self.ws.entry(copy)])
-        with mock.patch.object(SP, "LIMIT", 2.0):  # as a version without the gate traced, built and checked it
-            T.trace(copy, brief=self.brief, refs=self.refs, out=self.ws.path("trace", "mockup.svg"))
-            b = self.build(self.recipe("mockup", mark=[{"shape": "trace", "file": "trace/mockup.svg", "x": 2, "y": 2,
-                                                         "size": 44}]), "build/mockup")
-            self.check(b)
-        self.assertTrue(os.path.exists(os.path.join(b, "check.json")))
-        self.refused("collected-copy", self.package, b)
-        self.refused("collected-copy", self.book, b)
-
     def test_package_and_book_refuse_a_pull_that_stopped_before_its_manifest(self):
         # The first pull of a collection wrote the source's bytes, then stopped before it wrote manifest.json: the
         # collections' digest is unchanged, and nothing lists the file.
@@ -526,6 +511,61 @@ class TracedDocuments(Project):
         self.assertIn(self.entry["answer"], sheet)
         self.assertIn(self.entry["sha256"], sheet)
         self.assertIn(f"{self.score:.3f}", sheet)
+
+
+@G.needs_potrace
+class SamePictureAtEveryStep(Project):
+    """trace, check, package and book judge one traced source alike: each compares it as a picture with every
+    collected image, whatever the brief claims, and with no --refs image."""
+
+    def setUp(self):
+        super().setUp()
+        mood = self.ws.image("refs/mine/mood.png", G.photo(2))  # the person's own photo, on the moodboard
+        self.ws.image("refs/mine/found.png", G.photo(3))  # a photo they found
+        world = self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        # They claim the collected photo too: a collected image is compared all the same.
+        self.claims = [self.ws.entry(mood), self.ws.entry(os.path.join(world, "mockups", "90000001.png"))]
+        cwd = os.getcwd()
+        os.chdir(self.ws.root)
+        self.addCleanup(os.chdir, cwd)
+
+    def verdicts(self, name: str, picture: Image.Image) -> dict[str, str | None]:
+        """Each step's refusal of a JPEG copy of `picture` traced into a direction, or None. The direction is traced,
+        built and checked as a version without the same-picture gate would, so each step has one to judge."""
+        copy = self.ws.image(f"sketches/{name}.jpg", picture, "JPEG", quality=75)
+        self.brief = self.ws.brief([*self.claims, self.ws.entry(copy)])
+        with mock.patch.object(SP, "LIMIT", 2.0):
+            T.trace(copy, brief=self.brief, refs=self.refs, out=self.ws.path("trace", f"{name}.svg"))
+            b = self.build(self.recipe(name, mark=[{"shape": "trace", "file": f"trace/{name}.svg", "x": 2, "y": 2,
+                                                    "size": 44}]), f"build/{name}")
+            self.assertEqual(self.check(b), 0)
+
+        def refusal(step) -> str | None:
+            try:
+                with redirect_stdout(io.StringIO()):
+                    step()
+            except R.Refused as e:
+                return e.reason
+            except SystemExit as e:  # check_logo.py's exit status
+                self.assertEqual(e.code, 0)
+            return None
+
+        return {"trace": refusal(lambda: T.trace(copy, brief=self.brief, refs=self.refs,
+                                                 out=self.ws.path("trace", f"{name}-again.svg"))),
+                "package": refusal(lambda: self.package(b, f"package-{name}")),
+                "book": refusal(lambda: LB.main([b, "--out", self.ws.path(f"book-{name}"), "--name", "Tessera",
+                                                 "--line", "Synthetic test product", "--refs", *self.refs, "--brief",
+                                                 self.brief, "--fonts", self.ws.fonts])),
+                "check": refusal(lambda: C.main([b, "--refs", *self.refs]))}  # last: a refusal removes check.json
+
+    def test_every_step_refuses_a_copy_of_a_collected_photo(self):
+        self.assertEqual(self.verdicts("collected", G.photo(0)), dict.fromkeys(("trace", "package", "book", "check"),
+                                                                                "collected-copy"))
+
+    def test_every_step_passes_a_copy_of_a_refs_photo(self):
+        for name, seed in (("mood", 2), ("found", 3)):  # in trace_sources, and not
+            with self.subTest(name):
+                self.assertEqual(self.verdicts(name, G.photo(seed)), dict.fromkeys(("trace", "package", "book", "check")))
 
 
 if __name__ == "__main__":
