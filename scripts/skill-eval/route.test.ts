@@ -116,7 +116,7 @@ describe("description-based routing run", () => {
 			const rc = await main(["--cases", t.casesFile, "--out-root", tmp()], t.deps, [managed]);
 			assert.equal(rc, 2);
 			assert.equal(t.calls.length, 0);
-			assert.match(t.lines.join("\n"), /managed settings define hooks/);
+			assert.match(t.lines.join("\n"), /could not be verified as hook-free/);
 		} finally {
 			rmSync(managed, { recursive: true, force: true });
 		}

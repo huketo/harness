@@ -43,7 +43,7 @@ node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interfac
   - `--setting-sources ""`는 사용자, 프로젝트, 로컬 설정 파일을 읽지 않게 합니다.
   - safe mode에서도 내장 플러그인은 남습니다. 그중 `AGENTS.md`를 맥락에 넣는 `cc-plugin-agents-md`는 `--settings`의 `enabledPlugins`로 끕니다. 스킬만 제공하는 내장 플러그인은 `--disable-slash-commands`로 스킬이 꺼지므로 그대로 둡니다.
   - `--max-turns 1`은 호출을 한 턴으로 제한합니다. 이 플래그는 2.1.329의 `--help`에 나오지 않지만 실행 파일이 받아들이므로, Claude Code를 올린 뒤에는 `--dry-run`으로 보낼 인자를 다시 확인합니다.
-  - 한계: 관리자가 배포한 정책 설정(managed settings)과 관리 플러그인의 hook은 `--safe-mode`에서도 적용되며, 이를 끄는 플래그는 없습니다. 그래서 실제 실행은 `managed-settings.json`이나 숨김 파일이 아닌 `managed-settings.d/*.json`에 hook이나 `policyHelper`가 있으면 모델을 부르기 전에 거부합니다. 목록을 읽거나 파일을 읽거나 해석할 수 없을 때(없는 경우는 제외)도 거부합니다. `--bare`는 이것까지 줄이지만 OAuth 로그인을 읽지 않으므로 쓰지 않습니다.
+  - 한계: 관리자가 배포한 정책 설정(managed settings)과 관리 플러그인의 hook은 `--safe-mode`에서도 적용되며, 이를 끄는 플래그는 없습니다. 그래서 실제 실행은 `managed-settings.json`이나 숨김 파일이 아닌 `managed-settings.d/*.json`에 hook이나 `policyHelper`가 있으면 모델을 부르기 전에 거부합니다. 목록을 읽거나 파일을 읽거나 해석할 수 없을 때(없는 경우는 제외)도 거부합니다. `--bare`는 이것까지 줄이지만 OAuth 로그인을 읽지 않으므로 쓰지 않습니다. Team·Enterprise 로그인은 서버가 관리하는 정책(server-managed settings)으로 hook을 받을 수 있는데, 이 실행기는 그 정책을 보거나 끌 수 없습니다. 그래서 결과는 서버 관리 정책이 없는 개인 로그인에서 실행했다는 가정 아래에서만 설명 기반 점수이며, 보고서 머리의 범위 문장이 이 가정을 적습니다.
 - 답은 다섯 가지로 채점합니다: `correct`(기대한 답), `wrong`(다른 후보 스킬), `none`(스킬을 기대했는데 `none`), `malformed`(후보 이름이나 `none`이 아닌 답), `failed`(호출이 답 없이 끝남). 모두 `correct`일 때만 종료 코드가 0입니다.
 
 ```bash

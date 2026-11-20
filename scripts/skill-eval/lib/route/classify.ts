@@ -14,7 +14,7 @@ import { NONE } from "./cases.ts";
 export const ROUTE_TITLE = "Description-based routing";
 
 export const ROUTE_SCOPE =
-	"This check reads skill descriptions only: each prompt is classified once from the candidate skills' frontmatter descriptions, and it does not observe whether an agent actually activates or loads a skill.";
+	"This check reads skill descriptions only: each prompt is classified once from the candidate skills' frontmatter descriptions, and it does not observe whether an agent actually activates or loads a skill. It assumes a login with no server-managed policy: a Team or Enterprise login can receive managed hooks that this run cannot see or turn off.";
 
 export const ROUTER_SYSTEM =
 	"You route user requests to agent skills. You see only each skill's name and description. Answer with one skill name or none, and nothing else.";

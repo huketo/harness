@@ -141,7 +141,7 @@ async function execute(opts: RouteOptions, deps: Deps, managedDirs: readonly str
 
 	const managed = managedHookFiles(managedDirs);
 	if (managed.length) {
-		log(`refused: managed settings define hooks that run even in --safe-mode and could add context to each call: ${managed.join(", ")}. Run on a machine without managed hooks.`);
+		log(`refused: these managed settings could not be verified as hook-free (a hook, a policy helper, or a path that cannot be read); managed hooks run even in --safe-mode and could add context to each call: ${managed.join(", ")}. Run on a machine without managed policy.`);
 		return 2;
 	}
 	const startedAt = deps.now();
