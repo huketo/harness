@@ -30,12 +30,12 @@ cropped copy of a collected photo passes them. This compares the pictures themse
    What a window holds is measured at COARSE px in the refinement too: at FINE px a picture's sharpest edges weigh
    more, so a copy whose clear part takes them would hold less of its detail at the window that undoes its cut.
 6. Two views, one or both with alpha, that reach FLOOR are then compared at their own size (_native): a pixel of a
-   square averages what a copy shows with what it hides, so where the clear pixels are finer than that (stripes a
-   pixel or two wide), each pixel of the other image's square holds what the copy hides. The view with alpha is laid
-   on the other where the refinement put it, the way round it scored higher, and moved to within an eighth of its
-   own pixel by the fine detail of what it shows (_register); then each FINE px averages only its pixels that show
-   and the other's resampled onto them, each weighted by how much both show (_cells), and scores as in step 5. The
-   searches only find where: a mask laid a pixel off picks what it hides as surely as no mask.
+   square averages what a copy shows with what it hides, so where the clear pixels are finer than that (stripes a pixel
+   or two wide), each pixel of the other image's square holds what the copy hides. The view with alpha is laid on the
+   other where the refinement put it, each way round, and moved to within an eighth of its own pixel by the fine detail
+   of what it shows (_register); then each FINE px averages only its pixels that show and the other's resampled onto
+   them, each weighted by how much both show (_cells), and scores as in step 5. The searches only find where: a mask
+   laid a pixel off picks what it hides as surely as no mask.
 
 A pairing's score is its refined score (with alpha, its score at their own size), or its coarse score under FLOOR;
 two images score the highest of their pairings. The gate refuses at LIMIT and over. It does not see a picture turned
@@ -593,12 +593,10 @@ def _native(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, floa
 
 
 def score(a: Picture, b: Picture) -> float:
-    """How much `a` and `b` are the same picture, 0 to 1: the highest over their views, each way round. Two views one
-    or both with alpha whose coarse search reaches FLOOR either way round score as _native() gives it, laid the way
-    round _refine() scored higher."""
+    """How much `a` and `b` are the same picture, 0 to 1: the highest over their views, each way round. A pairing of
+    views one or both with alpha whose coarse search reaches FLOOR scores as _native() gives it."""
     best = 0.0
     k = len(SPANS)
-    laid = {}  # (a's view, b's view) with alpha -> (refined score, big, i, small, j, window)
     for big, small in ((b, a), (a, b)):
         for i in range(len(big.squares) if small.squares else 0):
             for j in range(len(small.squares)):
@@ -609,14 +607,9 @@ def score(a: Picture, b: Picture) -> float:
                     continue
                 (t, bt), (l, r) = SPANS[w // k], SPANS[w % k]
                 fine, cut = _refine(big, i, small, j, (l, t, r, bt))
-                if big.alphas[i] is None and small.alphas[j] is None:
-                    best = max(best, fine)
-                    continue
-                pair = (i, j) if big is a else (j, i)
-                if pair not in laid or fine > laid[pair][0]:
-                    laid[pair] = (fine, big, i, small, j, cut)
-    for _, big, i, small, j, cut in laid.values():
-        best = max(best, _native(big, i, small, j, cut))
+                if big.alphas[i] is not None or small.alphas[j] is not None:
+                    fine = _native(big, i, small, j, cut)
+                best = max(best, fine)
     return best
 
 
