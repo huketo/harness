@@ -49,9 +49,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import logolib as L  # noqa: E402
 import rights as R  # noqa: E402
 
-# Measured on 150 collected images (references/building.md, "Same picture"): their edited copies scored 0.8590 or more,
-# every pair of different images, a clear-ground copy against another image included, 0.7246 or less; every copy
-# reached FLOOR before refining. At MIN_SHOWN 0.05 a clear-ground copy scored 0.7636 against another image.
+# Measured on 150 collected images and the test fixtures' photos (references/building.md, "Same picture"): edited
+# copies scored 0.8590 or more and every pair of different images 0.7197 or less. Partly clear copies scored 0.8576 or
+# more but for 17 of 3,605 (0.40 to 0.84: a one-colour mark on a clear ground, two holding under MIN_HELD once cut, a
+# thin band); a clear copy against another image 0.8490 or less but for 2 of 22,282 thin bands (0.88, 0.90), and the
+# fixture photos, staged alike, up to 0.93 (14 of 952 at LIMIT or over). MIN_SHOWN 0.25 would pass those 16 pairs, and
+# a keyed copy of a logo (0.81).
 LIMIT = 0.85
 FLOOR = 0.5
 MIN_SHOWN = 0.1

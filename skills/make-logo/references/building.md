@@ -111,42 +111,78 @@ picture: in a real run a re-saved or slightly cut copy of a collected photo scor
 0.795. `same_picture.py` compares the pictures themselves, at every step (trace, check, package, book), with every
 collected image whatever `trace_sources` lists, and with no `--refs` image. Each image is seen in grey, squeezed into
 a square (a crop changes the aspect), on white and, with transparency, on black and as its colour channels alone (what
-potrace gets of a source). One with clear pixels is also seen on white and on black with its alpha, and one with an
-EXIF orientation both as stored and as shown. One is compared with every window of the other that leaves out up to an
+potrace gets of a source). One with clear pixels is also seen on black with its alpha, and one with an EXIF
+orientation both as stored and as shown. One is compared with every window of the other that leaves out up to an
 eighth of each side, at 32 px, both ways round, and the best window is refined to 1/128 of a side at 64 px. Each view
 is compared less its blur (sigma an eighth of its side), so light falling across a wall counts for nothing, and the
-score is the correlation of the pixels, 1 for the same picture at any brightness and contrast. With alpha, each pixel
-counts as much as both pictures show of it, and a window where they show under a tenth of it (`MIN_SHOWN`) scores 0,
-so the colour under a clear pixel, which a copy can set to anything, counts for nothing. The gate refuses at `LIMIT` =
-0.85 and over.
+score is the correlation of the pixels, 1 for the same picture at any brightness and contrast. Where either picture
+has clear pixels, only what both show counts: each pixel counts as much as both show of it, and each view is less a
+plane fitted around each pixel to what both show, so the colour under a clear pixel, which a copy can set to
+anything, reaches no pixel that shows. A window where both show under a tenth of it (`MIN_SHOWN`) scores 0, and so
+does one where what both show holds under a quarter of either picture's own detail (`MIN_HELD`), measured at 32 px
+for the refined windows too: one edge of a mark, or one side of a ball, matches a window of other pictures as well.
+The gate refuses at `LIMIT` = 0.85 and over.
 
-Measured on the 150 collected images of a real run (Are.na pulls and stock photos; 74 flat marks, 76 photos,
-scenes and sheets):
+Measured with the committed `same_picture.py` on the 150 collected images of a real run (Are.na pulls and stock
+photos; 74 flat marks, 76 photos, scenes and sheets) and the test fixtures' 8 photos (a box, a ball and a printed
+word on a lit wall, staged alike):
 
 | Pairs | n | Score |
 |-|-|-|
-| Each image against its copies: saved again as PNG, JPEG q75 or WebP; 2 to 10% cut off every side, one side or at random; 50% and 200% size; 10% darker or lighter; cut, halved and saved as JPEG at once; a plain ground made clear, its colour kept or zeroed; a JPEG stored turned or mirrored with the EXIF orientation (2 to 8) that shows it, and the shown pixels of such a JPEG against it | 4,500 | lowest 0.8590 (a photo keyed to 6% of itself, colour zeroed) |
+| Each image against its copies: saved again as PNG, JPEG q75 or WebP; 2 to 10% cut off every side, one side or at random; 50% and 200% size; 10% darker or lighter; cut, halved and saved as JPEG at once; a plain ground made clear, its colour kept or zeroed; a JPEG stored turned or mirrored with the EXIF orientation (2 to 8) that shows it, and the shown pixels of such a JPEG against it | 4,740 | lowest 0.8590 (a photo keyed to 6% of itself, colour zeroed) |
+| Each image against its partly clear copies that hold a quarter of its detail: 65, 40 or 20% shown, with the centre, the edges or patches of 1/80 of the long side made clear and the colour under them zeroed or noise, then saved as WebP, cut 4% each side or 10% on one, or halved | 7,210 | lowest 0.8576, but 17 copies (34 with both colours) under 0.85: below |
+| Each image saved again, cut, resized, made lighter or darker, or turned with EXIF, before any part is made clear | 1,422 | lowest 0.9429 |
 | Every pair of different images | 11,175 | highest 0.7197 (two white-on-black wordmarks from one studio, checked by eye: different marks); 99.9th percentile 0.5889 |
-| Each clear-ground copy against every other image | 22,350 | highest 0.7246 |
-| The test fixtures' own marks (also on a clear ground), photos and their cut-outs against each image | 3,750 | highest 0.6290 |
-| Two test photos staged the same way, in other colours; one's cut-out against the other | 2 | 0.8375, 0.8392 |
+| A clear copy of each image (the centre or the edges made clear, 12 to 65% shown; a plain ground made clear) against other images, sampled (below) | 22,282 | highest 0.8490, but 2 at 0.88 and 0.90: below |
+| The test fixtures' own marks (also on a clear ground), photos and their cut-outs against each image | 3,750 | highest 0.6393 |
+| The fixture photos against each other | 28 | highest 0.8375 |
+| A fixture photo's cut-out, or a copy of it with part made clear, against the other photos | 952 | highest 0.9288; 14 at 0.85 or over |
 
-0.85 sits in that gap, so a person's own photo staged like a collected one still passes. Comparing only what shows is
-what refuses a keyed copy whose hidden colour was zeroed: without it the copy of a photo keyed to 14% of itself scored
-0.8111 and passed; with it, 0.9580. `MIN_SHOWN` keeps it from raising different pairs: at a tenth the clear-ground
-copies score at most 0.7246 against other images, as they do without alpha; at a twentieth, 0.7636. A window is
-refined only when it scores 0.5 at 32 px; every copy reached that. The gate reads each image once more and adds about
-3 to 5 seconds to a trace against 152 images, which takes about 30 seconds; for a source with clear pixels the gate
-itself took 3 to 10 seconds, where an opaque one took under 3.
+0.85 sits between every edited copy and every pair of different images. Among clear copies it does not, and these
+are measured:
+
+- A one-colour mark on a clear ground, partly made clear, can pass (13 copies of one black wordmark: 0.67 to 0.84).
+  Where it shows it is one colour, so the view with alpha finds no detail; the flattened views compare it, and in
+  them the clear part reads as ground.
+- A copy whose clear part takes most of the detail and that is also cut can pass (40% shown with the centre clear,
+  cut 4% each side: 0.40 and 0.82): what shows holds 0.18 and 0.24 of the image's detail at the window that undoes
+  the cut, under `MIN_HELD`.
+- An image shown only as a thin band can pass (a wordmark 20% shown with the centre clear, saved as WebP or halved:
+  0.58 and 0.59, where its band holds a third of its detail).
+- A copy that shows only a thin band can be refused against an image whose border looks alike (2 of 22,282 sampled
+  pairs, both 20% shown with the centre clear: 0.88 and 0.90).
+- A cut-out, or a copy showing 12 to 20%, of a photo staged like a collected one can be refused (the fixture photos:
+  14 of 952, up to 0.93); the whole photo passes (0.84 at most).
+
+Raising `MIN_SHOWN` to a quarter keeps all 16 of those different pairs under 0.85 (0.83 at most), but passes a keyed
+copy that shows 14% of a collected logo (0.81) and 404 of the 504 copies above that show 20%. Comparing only what
+shows is what refuses that keyed copy: it scores 0.98, and 0.81 with the flattened views alone. Measuring what a
+refined window holds at 32 px is what refuses a fixture photo with its centre clear (65% shown, holding 0.26 to 0.28
+of its detail) once it is also cut 2 to 5% each side: 0.97 to 0.98, where at 64 px it held 0.23 to 0.25 and scored
+0.40 to 0.82; letting the refinement leave `MIN_HELD` behind instead raised a copy of one fixture photo against
+another to 0.95.
+
+The partly clear copies and the clear copies against other images were cut so the run takes under an hour (41
+minutes on 18 processes). A pilot on 10 of the collected images and the fixture photos scored every cell (90, 65,
+40, 20 and 12% shown; five shapes, single pixels and patches of 1/20 included; colour kept, zeroed or noise; nine
+edits) and every clear copy against every other image. The run keeps the values whose lowest copy in a first pilot
+scored under 0.95, leaves out the kept colour (never more than 0.016 under zeroed for the same copy) and, among the
+clear copies against other images, the patch copies (0.47 at most, against 0.79); it compares each clear copy with
+the images in the 100 highest pairs with it, its own 2 highest partners, the 8 images the pilot's clear copies scored
+highest against, and 6 more drawn with a fixed seed. On the pilot the reduced grid's lowest copy was the full grid's
+for every image (0.9191 at the lowest), and the sample's highest pair was the full set's (0.7941), also with the 8
+images taken from the other half of the pilot. None of the images behind the 17 copies and 2 pairs above was in the
+pilot. Against 150 images the gate reads each one once more (2.4 seconds), then takes 0.2 to 0.4 seconds for an
+opaque source or a cut copy (the first source about a second more) and 9 to 11 for a source with clear pixels.
 
 It does not see a copy turned (other than by its EXIF orientation) or mirrored, cut by more than an eighth on a side,
 shown as a small part of a larger picture, keyed until under a tenth of it shows (the views without alpha still
-compare it: the copy keyed to 6% scored 0.8590), or with its tones inverted; the mask and path gates still compare its
-mark. A copy of a `--refs` image that no collection lists is left to the mask and path gates, which can miss a photo.
-Those gates, and the check's distance check, see a reference with an EXIF orientation both as stored and as shown,
-so a mark drawn again from what such a file shows is compared too. They read a source as stored, as potrace traces
-it: one that its EXIF orientation turns is compared as the turned mark it holds, and they can miss a mark turned a
-quarter.
+compare it: the copy keyed to 6% scored 0.8590), with its tones inverted, or the partly clear copies above; the mask
+and path gates still compare its mark. A copy of a `--refs` image that no collection lists is left to the mask and
+path gates, which can miss a photo. Those gates, and the check's distance check, see a reference with an EXIF
+orientation both as stored and as shown, so a mark drawn again from what such a file shows is compared too. They read
+a source as stored, as potrace traces it: one that its EXIF orientation turns is compared as the turned mark it holds,
+and they can miss a mark turned a quarter.
 
 ## Type
 
