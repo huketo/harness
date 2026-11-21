@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "fonttools", "uharfbuzz"]
+# dependencies = ["numpy", "scipy", "scikit-image", "pillow", "fonttools", "uharfbuzz", "resvg-py"]
 # ///
 """Write the logo book: every direction presented the way a studio presents logo directions (references/logo-book.md).
 

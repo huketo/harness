@@ -10,12 +10,13 @@ import io
 import json
 import os
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
 from unittest import mock
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import ExifTags, Image, ImageDraw, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import potrace_bin as P  # noqa: E402
@@ -125,6 +126,135 @@ def dark_mark_and_small_light_mark() -> Image.Image:
     x0, y0, x1, _ = SMALL_MARK_BOX
     out.alpha_composite(light_on_clear(mark_image(badge, x1 - x0)), (x0, y0))
     return out
+
+
+def photo(seed: int = 0, size: tuple[int, int] = (640, 480), cut_out: bool = False) -> Image.Image:
+    """A 3D mockup photographed against a wall, the kind of picture collections hold that has no one mark to split: a
+    lit gradient ground, a soft shadow, a box with three shaded faces and a printed word, a shaded ball, and sensor
+    noise. Each seed places, sizes and colours them differently. With `cut_out`, what a background remover leaves:
+    the box and the ball on a clear ground whose colour is zeroed."""
+    import numpy as np
+    from PIL import ImageFilter
+
+    rng = np.random.default_rng(seed)
+    W, H = size
+    y, x = np.mgrid[0:H, 0:W].astype(np.float32)
+    top, bottom = rng.uniform(0.78, 0.9), rng.uniform(0.5, 0.62)
+    light = top + (bottom - top) * y / H - 0.08 * ((x - W * rng.uniform(0.3, 0.7)) / W) ** 2
+    wall = np.stack([light * c for c in rng.uniform(0.92, 1.0, 3)], -1)
+    im = Image.fromarray((np.clip(wall, 0, 1) * 255).astype(np.uint8))
+    bx, by = rng.uniform(0.15, 0.35) * W, rng.uniform(0.25, 0.4) * H
+    bw, bh, depth = rng.uniform(0.3, 0.45) * W, rng.uniform(0.18, 0.28) * H, rng.uniform(0.08, 0.14) * W
+    shadow = Image.new("L", size, 0)
+    ImageDraw.Draw(shadow).ellipse([bx - 20, by + bh - 10, bx + bw + 60, by + bh + 50], fill=110)
+    im = Image.composite(Image.new("RGB", size, (40, 40, 45)), im, shadow.filter(ImageFilter.GaussianBlur(18)))
+    d = ImageDraw.Draw(im)
+    subject = Image.new("L", size, 0)
+    ImageDraw.Draw(subject).polygon([(bx, by), (bx + depth, by - depth / 2), (bx + bw + depth, by - depth / 2),
+                                     (bx + bw + depth, by + bh - depth / 2), (bx + bw, by + bh), (bx, by + bh)], fill=255)
+    front = tuple(int(v) for v in rng.uniform(215, 245, 3))
+    d.polygon([(bx, by), (bx + depth, by - depth / 2), (bx + bw + depth, by - depth / 2), (bx + bw, by)],
+              fill=tuple(min(255, int(v * 1.04)) for v in front))
+    d.polygon([(bx + bw, by), (bx + bw + depth, by - depth / 2), (bx + bw + depth, by + bh - depth / 2), (bx + bw, by + bh)],
+              fill=tuple(int(v * 0.72) for v in front))
+    d.rectangle([bx, by, bx + bw, by + bh], fill=front)
+    ink = tuple(int(v) for v in rng.uniform(10, 60, 3))
+    for i in range(int(rng.integers(4, 7))):  # a printed word: letters as blocks of varied widths
+        lx = bx + bw * (0.1 + i * 0.12)
+        d.rectangle([lx, by + bh * 0.38, lx + bw * rng.uniform(0.05, 0.1), by + bh * 0.62], fill=ink)
+    cx, cy, r = rng.uniform(0.65, 0.85) * W, rng.uniform(0.55, 0.75) * H, rng.uniform(0.07, 0.11) * W
+    lit = np.clip(1.15 - np.hypot(x - cx + r * 0.4, y - cy + r * 0.4) / (1.6 * r), 0.25, 1)
+    a = np.asarray(im, dtype=np.float32) / 255
+    a = np.where((np.hypot(x - cx, y - cy) < r)[..., None], lit[..., None] * rng.uniform(0.5, 0.95, 3), a)
+    a = a + rng.normal(0, 0.012, a.shape)
+    out = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
+    if not cut_out:
+        return out
+    ImageDraw.Draw(subject).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    out = Image.composite(out, Image.new("RGB", size, (0, 0, 0)), subject).convert("RGBA")
+    out.putalpha(subject)
+    return out
+
+
+def threaded(seed: int = 0, size: tuple[int, int] = (640, 480), lines: int = 2400,
+             ink: tuple[int, int] = (0, 90)) -> Image.Image:
+    """photo(seed) with thin dark threads across it both ways, the way fabric, fine print or a wire fence photographs:
+    detail a pixel wide, finer than a pixel of the 128 px squares the same-picture gate first squeezes images into.
+    The first `lines` threads, each channel of each drawn in `ink` (low, high) at random: fewer and lighter threads lie
+    where more and darker ones would."""
+    import numpy as np
+
+    im = photo(seed, size)
+    d = ImageDraw.Draw(im)
+    rng = np.random.default_rng(seed + 31)
+    W, H = size
+    for k in range(lines):
+        x, y = rng.uniform(0, W), rng.uniform(0, H)
+        ink_ = tuple(int(v) for v in rng.uniform(*ink, 3))
+        if k % 2:
+            half = rng.uniform(0.1, 0.3) * W
+            d.line([(x - half, y), (x + half, y)], fill=ink_, width=1)
+        else:
+            half = rng.uniform(0.1, 0.3) * H
+            d.line([(x, y - half), (x, y + half)], fill=ink_, width=1)
+    return im
+
+
+def cleared(im: Image.Image, shown: float, shape: str, hidden: str = "zeroed", cell: int = 8,
+            seed: int = 0) -> Image.Image:
+    """`im` as RGBA with all but `shown` of it made clear and the rest left as it was: around the edges (a centred box
+    of its aspect shows), in the centre (a centred box of its aspect is clear), in patches (squares of `cell` px,
+    picked at random), or in stripes ("columns" or "rows": the first round(shown * cell) of every `cell` show). The
+    colour under the clear pixels is `hidden`: "kept", "zeroed" or "noise"."""
+    import numpy as np
+
+    rgb = np.asarray(im.convert("RGB")).copy()
+    H, W = rgb.shape[:2]
+    y, x = np.mgrid[0:H, 0:W]
+    rng = np.random.default_rng(seed)
+    if shape in ("edges", "centre"):
+        f = np.sqrt(shown if shape == "edges" else 1 - shown) / 2
+        box = (abs(x + 0.5 - W / 2) < f * W) & (abs(y + 0.5 - H / 2) < f * H)
+        show = box if shape == "edges" else ~box
+    elif shape == "patches":
+        rows, cols = -(-H // cell), -(-W // cell)
+        cells = np.zeros(rows * cols, bool)
+        cells[rng.permutation(rows * cols)[:round(shown * rows * cols)]] = True
+        show = np.kron(cells.reshape(rows, cols), np.ones((cell, cell), bool))[:H, :W]
+    elif shape in ("columns", "rows"):
+        show = ((x if shape == "columns" else y) % cell) < round(shown * cell)
+    else:
+        raise ValueError(shape)
+    if hidden == "zeroed":
+        rgb[~show] = 0
+    elif hidden == "noise":
+        rgb[~show] = rng.integers(0, 256, (int((~show).sum()), 3))
+    elif hidden != "kept":
+        raise ValueError(hidden)
+    return Image.fromarray(np.dstack([rgb, np.where(show, 255, 0).astype(np.uint8)]), "RGBA")
+
+
+def exif_turned(im: Image.Image, quality: int = 95) -> bytes:
+    """`im` as a camera writes it: JPEG pixels stored on their side, with an EXIF orientation (6) that shows them
+    upright."""
+    exif = Image.Exif()
+    exif[ExifTags.Base.Orientation] = 6
+    buf = io.BytesIO()
+    im.transpose(Image.Transpose.ROTATE_90).save(buf, "JPEG", quality=quality, exif=exif.tobytes())
+    return buf.getvalue()
+
+
+def broken_exif(orientation: int | None = None) -> bytes:
+    """An EXIF block Pillow can't parse, as an editor or a damaged file may leave one. With no `orientation`, not a TIFF
+    block at all: Image.getexif() raises. With one, a block whose orientation reads but whose ImageLength holds text,
+    so writing the block again, as ImageOps.exif_transpose() does, raises."""
+    if orientation is None:
+        return b"not an EXIF block"
+    text = b"Synthetic\x00"
+    entries = [(0x0101, 2, len(text), 38),  # ImageLength as ASCII, after the header (8 bytes) and the IFD (30)
+               (0x0112, 3, 1, orientation << 16)]  # Orientation, a SHORT held in the first half of its 4 bytes
+    ifd = struct.pack(">H", len(entries)) + b"".join(struct.pack(">HHII", *e) for e in entries) + struct.pack(">I", 0)
+    return b"Exif\x00\x00MM\x00\x2a" + struct.pack(">I", 8) + ifd + text
 
 
 def font_bytes(family: str) -> bytes:

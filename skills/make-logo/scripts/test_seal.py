@@ -13,6 +13,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import unittest
 from contextlib import redirect_stdout
@@ -30,6 +31,7 @@ import logo_book as LB  # noqa: E402
 import logolib as L  # noqa: E402
 import package_logo as PK  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 import trace_ref as T  # noqa: E402
 
 LIMIT = D.load_calibration(None)["limit"]
@@ -378,6 +380,21 @@ class CheckReferences(Project):
         self.assertTrue(chk["nearest"][0]["ref"].endswith("sheet.png"), chk["nearest"])
         self.assertEqual(chk["refs_compared"], 2, "a sheet compared on both grounds is still one reference image")
 
+    def test_check_compares_a_reference_as_its_exif_orientation_shows_it(self):
+        # An L with a flag: turned a quarter, mirrored or not, it is not itself.
+        b = self.build(self.recipe(mark=[{"shape": "rect", "x": 8, "y": 4, "w": 10, "h": 40},
+                                         {"shape": "rect", "x": 8, "y": 34, "w": 34, "h": 10},
+                                         {"shape": "polygon", "points": [[24, 6], [42, 6], [42, 24]]}]))
+        self.assertEqual(self.check(b), 0)
+        svg = R.read_bytes(os.path.join(b, "mark.svg")).decode()
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg, width=400, background="#ffffff"))
+        R.write_bytes(self.ws.path("refs", "mine", "turned.jpg"),
+                      G.exif_turned(G.padded(Image.open(io.BytesIO(png)).convert("RGB"))))
+        self.assertEqual(self.check(b), 1)
+        chk = R.read_json(os.path.join(b, "check.json"))
+        self.assertTrue(chk["nearest"][0]["ref"].endswith("turned.jpg"), chk["nearest"])
+        self.assertEqual(chk["refs_compared"], 2, "a reference seen both ways is still one reference image")
+
     def test_check_refuses_while_a_reference_cannot_be_compared(self):
         b = self.build(self.recipe())
         self.assertEqual(self.check(b), 0)
@@ -463,12 +480,89 @@ class TracedDocuments(Project):
         self.assertEqual(self.check(cut), 0)
         self.assertIn("`cut rect`", self.sheet(cut, "package-cut"))
 
-    def test_package_and_book_refuse_once_a_collection_holds_the_source(self):
+    def test_package_and_book_refuse_once_the_collections_changed(self):
         chk = R.read_json(os.path.join(self.b, "check.json"))
-        self.assertEqual(chk.get("collected_sha256"), R.collected_sha256())
-        self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
+        self.assertEqual(chk.get("collected_sha256"), R.digest(sha for _, sha in R.collected()))
+        self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})  # outside --refs
         self.refused("collections-changed", self.package, self.b)
         self.refused("collections-changed", self.book, self.b)
+
+    def test_package_and_book_refuse_a_collection_or_a_folder_in_it_that_is_a_link(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
+        elsewhere = os.path.dirname(self.ws.image("elsewhere/channel/1.png", G.mark_image(G.badge)))
+        for link, target in ((os.path.join(world, "channel"), elsewhere),
+                             (os.path.join(R.cache_root(), "linked"), os.path.dirname(elsewhere))):
+            os.symlink(target, link)
+            for step in (self.package, self.book):
+                with self.assertRaises(R.Refused) as cm:
+                    step(self.b)
+                self.assertEqual(cm.exception.reason, "collection-linked", str(cm.exception))
+                self.assertIn(link, str(cm.exception))
+            os.remove(link)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
+
+    def test_package_and_book_refuse_once_a_collection_holds_the_source_or_a_copy(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
+        self.refused("collected", self.package, self.b)
+        self.refused("collected", self.book, self.b)
+        shutil.rmtree(world)
+        buf = io.BytesIO()
+        G.mark_image(G.own).resize((450, 450), Image.LANCZOS).save(buf, "JPEG", quality=80)
+        self.ws.collection("world", {"cafe/60000002.jpg": buf.getvalue()})
+        self.refused("collected-copy", self.package, self.b)
+        self.refused("collected-copy", self.book, self.b)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
+
+    def test_package_and_book_refuse_a_copy_of_the_source_collected_into_a_refs_folder(self):
+        """A collection that is also a --refs folder: what a pull adds there changes the --refs images too, and the
+        refusal names the source as collected rather than the references as changed."""
+        arena = self.ws.collection("arena", {"logos/50000001.png": G.mark_image(G.external)})
+        self.refs = [self.mine, arena]
+        T.trace(self.sketch, brief=self.brief, refs=self.refs, out=self.ws.path("trace", "own-arena.svg"))
+        b = self.build(self.recipe("arena", mark=[{"shape": "trace", "file": "trace/own-arena.svg", "x": 2, "y": 2,
+                                                   "size": 44}]), "build/arena")
+        self.assertEqual(self.check(b), 0)
+        buf = io.BytesIO()
+        G.mark_image(G.own).resize((450, 450), Image.LANCZOS).save(buf, "JPEG", quality=80)
+        for reason, added in (("collected", R.read_bytes(self.sketch)), ("collected-copy", buf.getvalue())):
+            self.ws.collection("arena", {"logos/50000001.png": G.mark_image(G.external), "logos/50000002.png": added})
+            self.refused(reason, self.package, b)
+            self.refused(reason, self.book, b)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
+
+    def every_step(self) -> dict[str, str | None]:
+        """trace's, check's, package's and book's refusal of the traced direction as the collections are now."""
+        def refusal(step) -> str | None:
+            try:
+                with redirect_stdout(io.StringIO()):
+                    step()
+            except R.Refused as e:
+                return e.reason
+            except SystemExit as e:  # check_logo.py's exit status
+                self.assertEqual(e.code, 0)
+            return None
+
+        return {"trace": refusal(lambda: T.trace(self.sketch, brief=self.brief, refs=self.refs,
+                                                 out=self.ws.path("trace", "again.svg"))),
+                "package": refusal(lambda: self.package(self.b)), "book": refusal(lambda: self.book(self.b)),
+                "check": refusal(lambda: C.main([self.b, "--refs", *self.refs]))}  # last: a refusal removes check.json
+
+    def test_every_step_names_the_source_collected_before_another_collected_file_gone(self):
+        """A collection lists the source's own bytes and another file it lists is gone. Fetching the collection again
+        mends the one, never the other, so every step names the source."""
+        world = self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch),
+                                             "cafe/60000002.png": G.mark_image(G.tee)})
+        os.remove(os.path.join(world, "cafe", "60000002.png"))
+        self.assertEqual(self.every_step(), dict.fromkeys(("trace", "package", "book", "check"), "collected"))
+
+    def test_every_step_refuses_a_collected_file_it_cannot_read(self):
+        """The distance gates can't say a trace is far from a file they can't read, and the same-picture gate can't say
+        it is not a copy of one: every step refuses it rather than leaving it out."""
+        self.ws.collection("world", {"cafe/60000001.png": b"not an image"})
+        self.assertEqual(self.every_step(), dict.fromkeys(("trace", "package", "book", "check"), "not-comparable"))
 
     def test_package_and_book_refuse_a_pull_that_stopped_before_its_manifest(self):
         # The first pull of a collection wrote the source's bytes, then stopped before it wrote manifest.json: the
@@ -496,6 +590,70 @@ class TracedDocuments(Project):
         self.assertIn(self.entry["answer"], sheet)
         self.assertIn(self.entry["sha256"], sheet)
         self.assertIn(f"{self.score:.3f}", sheet)
+
+
+@G.needs_potrace
+class SamePictureAtEveryStep(Project):
+    """trace, check, package and book judge one traced source alike: each compares it as a picture with every
+    collected image, whatever the brief claims, and with no --refs image."""
+
+    def setUp(self):
+        super().setUp()
+        mood = self.ws.image("refs/mine/mood.png", G.photo(2))  # the person's own photo, on the moodboard
+        self.ws.image("refs/mine/found.png", G.photo(3))  # a photo they found
+        world = self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        # They claim the collected photo too: a collected image is compared all the same.
+        self.claims = [self.ws.entry(mood), self.ws.entry(os.path.join(world, "mockups", "90000001.png"))]
+        cwd = os.getcwd()
+        os.chdir(self.ws.root)
+        self.addCleanup(os.chdir, cwd)
+
+    def verdicts(self, name: str, picture: Image.Image) -> dict[str, str | None]:
+        """Each step's refusal of a copy of `picture` (a JPEG, or a PNG when it has alpha) traced into a direction, or
+        None. The direction is traced, built and checked as a version without the same-picture gate would, so each
+        step has one to judge."""
+        if picture.mode == "RGBA":
+            copy = self.ws.image(f"sketches/{name}.png", picture)
+        else:
+            copy = self.ws.image(f"sketches/{name}.jpg", picture, "JPEG", quality=75)
+        self.brief = self.ws.brief([*self.claims, self.ws.entry(copy)])
+        with mock.patch.object(SP, "LIMIT", 2.0):
+            T.trace(copy, brief=self.brief, refs=self.refs, out=self.ws.path("trace", f"{name}.svg"))
+            b = self.build(self.recipe(name, mark=[{"shape": "trace", "file": f"trace/{name}.svg", "x": 2, "y": 2,
+                                                    "size": 44}]), f"build/{name}")
+            self.assertEqual(self.check(b), 0)
+
+        def refusal(step) -> str | None:
+            try:
+                with redirect_stdout(io.StringIO()):
+                    step()
+            except R.Refused as e:
+                return e.reason
+            except SystemExit as e:  # check_logo.py's exit status
+                self.assertEqual(e.code, 0)
+            return None
+
+        return {"trace": refusal(lambda: T.trace(copy, brief=self.brief, refs=self.refs,
+                                                 out=self.ws.path("trace", f"{name}-again.svg"))),
+                "package": refusal(lambda: self.package(b, f"package-{name}")),
+                "book": refusal(lambda: LB.main([b, "--out", self.ws.path(f"book-{name}"), "--name", "Tessera",
+                                                 "--line", "Synthetic test product", "--refs", *self.refs, "--brief",
+                                                 self.brief, "--fonts", self.ws.fonts])),
+                "check": refusal(lambda: C.main([b, "--refs", *self.refs]))}  # last: a refusal removes check.json
+
+    def test_every_step_refuses_a_copy_of_a_collected_photo(self):
+        self.assertEqual(self.verdicts("collected", G.photo(0)), dict.fromkeys(("trace", "package", "book", "check"),
+                                                                                "collected-copy"))
+
+    def test_every_step_refuses_a_partly_clear_copy_of_a_collected_photo(self):
+        copy = G.cleared(G.photo(0), 0.65, "patches", "zeroed")  # 65% shows as it was; the rest clear, colour zeroed
+        self.assertEqual(self.verdicts("partly-clear", copy), dict.fromkeys(("trace", "package", "book", "check"),
+                                                                            "collected-copy"))
+
+    def test_every_step_passes_a_copy_of_a_refs_photo(self):
+        for name, seed in (("mood", 2), ("found", 3)):  # in trace_sources, and not
+            with self.subTest(name):
+                self.assertEqual(self.verdicts(name, G.photo(seed)), dict.fromkeys(("trace", "package", "book", "check")))
 
 
 if __name__ == "__main__":

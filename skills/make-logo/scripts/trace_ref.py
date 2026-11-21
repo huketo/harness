@@ -14,14 +14,20 @@ usual add, cut and xor shapes.
 
 trace() is the only way to trace, and build_logo.py runs it again for every trace shape. It refuses:
 1. a file that is not in brief.json `trace_sources` (by sha256);
-2. a file whose sha256 is in any collection manifest under the cache (fetch_arena.mjs, fetch_photos.mjs);
+2. a file whose sha256 is in any collection manifest under the cache (fetch_arena.mjs, fetch_photos.mjs), whatever
+   else in the collections is gone or changed (rights.collected_files(), which every check after it reads them with);
 3. a mask, the exact pixels passed to potrace after the crop, threshold and invert, that scores at or over the
    calibrated limit against any collected image or --refs logo;
-4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3).
+4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3);
+5. a file, or the part --crop takes, that is the same picture as any collected image ("collected-copy"): saved
+   again, resized, cut a little at the edges, made lighter or darker, or partly made clear (same_picture.py). A
+   photo has no one mark to split, so 3 and 4 can miss a copy of one. 5 compares no --refs image, and every
+   collected image whatever trace_sources lists.
 In 3 and 4 a --refs image whose sha256 is a trace_sources entry (the person's own sketch on the moodboard) is left
 out, unless a collection manifest lists that sha256: a collected file is always compared. Every image is compared,
-fit to measure or not: an SVG rasterised, a raster too small to split enlarged, and one with transparency split on
-white and on black, its highest score counting (a sheet may hold a dark logo and a light one). It also refuses while
+fit to measure or not: an SVG rasterised, a raster too small to split enlarged, one with transparency split on white
+and on black (a sheet may hold a dark logo and a light one), and one with an EXIF orientation split as stored and as
+shown, its highest score counting. The source is read as stored, as potrace traces it. It also refuses while
 any of them still can't be read as a mark, or its mask leaves out a tenth of the ink seen (a sheet of several marks)
 ("not-comparable": take it out, or replace it with one mark cropped out of it), while a --refs folder or file named
 is not there, a folder in them can't be listed, or an image is a broken link ("refs-missing"), while a collection is
@@ -50,13 +56,14 @@ import resvg_py
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.svgLib.path import parse_path
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import distance as D  # noqa: E402
 import logolib as L  # noqa: E402
 import potrace_bin as P  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 
 SCHEMA = "make-logo/trace@1"
 LONG_SIDE = 1200  # potrace gets about this many pixels on the long side, so it has edges to fit
@@ -138,31 +145,34 @@ KEEP = 0.9
 
 
 def gate_masks(data: bytes) -> tuple[list[np.ndarray], str]:
-    """A reference's ink for the distance gates, one mask for each ground it is seen on, or ([], why) with why the
-    words for the refusal (rights.UNCOMPARABLE). An opaque image is split as logolib.load() gives it, as measuring
+    """A reference's ink for the distance gates, one mask for each way and ground it is seen on, or ([], why) with why
+    the words for the refusal (rights.UNCOMPARABLE). An opaque image is split as logolib.load() gives it, as measuring
     sees it. One with transparency is split on white and on black, and both masks are kept: a sheet with a dark logo
-    and a light one shows one on each. On each ground, while no ink is found, or the mask keeps under KEEP of the ink
-    seen, the image is enlarged to logolib.WORK when it is smaller (a favicon). A ground on which every size tried
-    keeps under KEEP ("partial") means more than one mark, or a mark too small to keep beside a larger one: the gates
-    would compare with part of the image only, so it is not comparable until it is cropped to one mark. The best size
-    counts, as enlarging blurs a mark that is not there on that ground into specks."""
+    and a light one shows one on each. One with an EXIF orientation is split as stored and as shown
+    (logolib.orientations), and the masks of both are kept: a copy may be drawn from what the file shows or from its
+    pixels. On each ground, while no ink is found, or the mask keeps under KEEP of the ink seen, the image is enlarged
+    to logolib.WORK when it is smaller (a favicon). A ground on which every size tried keeps under KEEP ("partial")
+    means more than one mark, or a mark too small to keep beside a larger one: the gates would compare with part of
+    the image only, so it is not comparable until it is cropped to one mark. The best size counts, as enlarging blurs
+    a mark that is not there on that ground into specks."""
     try:
         im = L.open_image(data)
     except Exception:  # neither Pillow nor resvg can read it
         return [], R.UNCOMPARABLE["unreadable"]
     masks, why, short = [], "", []
-    for name, ground in [("white", (255, 255, 255))] + ([("black", (0, 0, 0))] if L.transparent(im) else []):
-        best = 0.0
-        for side in (None, L.WORK) if max(im.size) < L.WORK else (None,):
-            seg = L.segment(L.flatten(im, ground, side))
-            if seg["ok"] and seg["kept"] >= KEEP:
-                masks.append(seg["mask"])
-                break
-            best = max(best, seg.get("kept", 1.0))
-            why = why or seg.get("why", "")
-        else:
-            if best < KEEP:
-                short.append(f"{math.floor(best * 1000) / 10:g}% of the ink on {name}")
+    for view, seen in zip(L.orientations(im), ("", " as its EXIF orientation shows it")):
+        for name, ground in [("white", (255, 255, 255))] + ([("black", (0, 0, 0))] if L.transparent(view) else []):
+            best = 0.0
+            for side in (None, L.WORK) if max(view.size) < L.WORK else (None,):
+                seg = L.segment(L.flatten(view, ground, side))
+                if seg["ok"] and seg["kept"] >= KEEP:
+                    masks.append(seg["mask"])
+                    break
+                best = max(best, seg.get("kept", 1.0))
+                why = why or seg.get("why", "")
+            else:
+                if best < KEEP:
+                    short.append(f"{math.floor(best * 1000) / 10:g}% of the ink on {name}{seen}")
     if short:
         return [], R.UNCOMPARABLE["partial"].format(kept=" and ".join(short), need=f"{KEEP:.0%}")
     return masks, "" if masks else R.UNCOMPARABLE.get(_SEGMENT_WHY.get(why, why), why)
@@ -182,29 +192,30 @@ def _read(path: str) -> bytes | None:
         return None
 
 
-def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
-    """What the distance checks compare with: every image in the --refs folders and files and every collected file,
-    each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, [features of each
-    mask])], once per sha256, "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+def reference_set(refs: list[str], collected: list[tuple[str, str, bytes]] = ()) -> dict:
+    """What the distance and same-picture checks compare with: every image in the --refs folders and files and every
+    collected file (rights.collected_files(): its bytes, read once and of the sha256 its manifest lists), each read
+    once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, [features of each mask])] of
+    them all, "pictures": [(file, sha256, same_picture.Picture)] of the collected files, each once per sha256,
+    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
 
-    Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing,
-    ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest lists,
-    and ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say
-    nothing about a picture they could not compare."""
-    marks, uncomparable, changed, missing, seen, ref_shas, read = [], [], [], [], set(), [], {}
-    for f, listed in [(f, None) for f in R.ref_images(refs)] + list(collected):
+    Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing, and
+    ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say nothing
+    about a picture they could not compare."""
+    marks, pictures, uncomparable, missing, seen, ref_shas = [], {}, [], [], set(), []
+    read = {f: (data, sha) for f, sha, data in collected}  # a --refs folder may be a collection
+    for f, is_ref in [(f, True) for f in R.ref_images(refs)] + [(f, False) for f, _, _ in collected]:
         if f not in read:
             data = _read(f)
             read[f] = (data, R.sha256_bytes(data) if data is not None else None)
         data, sha = read[f]
-        if listed is None:
+        if is_ref:
             if data is None:  # gone between the listing and the read
                 missing.append(f)
                 continue
             ref_shas.append(sha)
-        elif sha != listed:
-            changed.append(f"{f} ({'gone' if data is None else 'changed'})")
-            continue
+        else:
+            pictures.setdefault(sha, (f, sha, SP.cached(sha, data)))
         if sha in seen:
             continue
         seen.add(sha)
@@ -216,18 +227,13 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
     if missing:
         raise R.Refused("refs-missing", f"these --refs images could not be read: {'; '.join(missing)}. Put them back "
                                         "or take them out of the --refs folders, then run this again.")
-    if changed:
-        raise R.Refused("collection-changed", "these collected files are gone or changed since their manifest listed "
-                                              f"them: {'; '.join(changed)}. Fetch the collection again, or list what "
-                                              "is in it now with `node scripts/collection.mjs <name>`, then run this "
-                                              "again.")
     if uncomparable:
         raise R.Refused("not-comparable", "the distance gates can't read a mark in "
                                           f"{'; '.join(uncomparable)}, so they can't say the result is far from it. "
                                           "Take each one out of the --refs folder (or out of its collection, then "
                                           "`node scripts/collection.mjs <name>`), or replace it with a copy that "
                                           "shows one mark on a plain ground, then run this again.")
-    return {"marks": marks, "refs_sha256": R.digest(ref_shas)}
+    return {"marks": marks, "pictures": list(pictures.values()), "refs_sha256": R.digest(ref_shas)}
 
 
 def calibration_snapshot(path: str | None) -> tuple[dict, str]:
@@ -279,14 +285,14 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
     if reproduce and reproduce["raster"].get("potrace_args") != POTRACE_ARGS:
         raise R.Refused("record-changed", f"the record says potrace ran with {reproduce['raster'].get('potrace_args')}, "
                                           f"and trace_ref.py runs it with {POTRACE_ARGS}. Trace again with trace_ref.py.")
-    collected = R.collected()
-    hit = next((f for f, sha in collected if sha == src_sha), None)
-    if hit:
-        raise R.Refused("collected", f"{source} has the same sha256 as {hit}, collected for measuring. Collected and "
-                                     "reference logos set proportions; they are never traced.")
+    collected = R.collected_files([(source, src_sha)])
     cal, cal_sha = calibration_snapshot(calibration)
     crop = [float(v) for v in crop]
-    mask = raster_mask(data, crop, threshold, invert, long_side)
+    try:
+        mask = raster_mask(data, crop, threshold, invert, long_side)
+    except UnidentifiedImageError:
+        raise R.Refused("not-comparable", f"{source} can't be read as a raster image, so it can't be traced or "
+                                          "compared. Export it as PNG or JPEG.") from None
     mask_pbm = pbm(mask)
     mask_sha = R.sha256_bytes(mask_pbm)
     if reproduce and mask_sha != reproduce.get("mask_sha256"):
@@ -298,7 +304,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
         raise SystemExit(f"no ink in {source} at --crop {crop} and --threshold {threshold}{' with --invert' if invert else ''}")
     refset = reference_set(refs, collected)
     # The person's own sketches on the moodboard are left out; a collected file never is, whatever the brief says.
-    own = {e["sha256"] for e in b["trace_sources"]} - {sha for _, sha in collected}
+    own = {e["sha256"] for e in b["trace_sources"]} - {sha for _, sha, _ in collected}
     marks = [m for m in refset["marks"] if m[1] not in own]
     mask_near = nearest(tight, marks, cal)
     if mask_near["score"] >= cal["limit"]:
@@ -315,6 +321,8 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                                             f"{vector_near['ref']} (limit {cal['limit']:.3f}; the mask scored "
                                             f"{mask_near['score']:.3f}, the specks potrace dropped hid it).",
                         mask_nearest=mask_near, vector_nearest=vector_near)
+    copy_near = SP.gate(source, SP.source(data, crop), refset["pictures"], mask_nearest=mask_near,
+                        vector_nearest=vector_near)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     svg_bytes = svg.encode()
@@ -328,8 +336,9 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                    "potrace_args": list(POTRACE_ARGS)},
         "mask_sha256": mask_sha,
         "gate": {"calibration_sha256": cal_sha, "limit": cal["limit"], "refs_sha256": refset["refs_sha256"],
-                 "collected_sha256": R.digest(sha for _, sha in collected), "compared": len(marks),
-                 "mask_nearest": mask_near, "vector_nearest": vector_near},
+                 "collected_sha256": R.digest(sha for _, sha, _ in collected), "compared": len(marks),
+                 "mask_nearest": mask_near, "vector_nearest": vector_near, "copy_nearest": copy_near,
+                 "copy_limit": SP.LIMIT},
         "potrace": potrace,
         "svg_sha256": R.sha256_bytes(svg_bytes),
     }
@@ -354,7 +363,8 @@ def main(argv: list[str] | None = None) -> None:
     g = r["provenance"]["gate"]
     print(f"traced {os.path.basename(a.image)} into {a.out} ({r['provenance']['trace_source']['rights']}): nearest of "
           f"{g['compared']} images compared {g['mask_nearest']['score']:.3f} as a mask, {g['vector_nearest']['score']:.3f} "
-          f"as a path, limit {g['limit']:.3f}; provenance in {r['record']}")
+          f"as a path, limit {g['limit']:.3f}; {g['copy_nearest']['score']:.3f} as a picture, limit {g['copy_limit']}; "
+          f"provenance in {r['record']}")
 
 
 if __name__ == "__main__":

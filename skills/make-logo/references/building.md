@@ -71,8 +71,9 @@ traced, and the scripts refuse them by hash and by likeness.
    light mark on dark). It refuses a file not in `trace_sources`, a file whose sha256 is in any collection manifest,
    and a crop whose mask, or whose traced path, scores at or over the limit against a collected image or a `--refs`
    logo. Every image counts, even one `measure_logo.py` skips (a logo cut close out of a screenshot): an SVG is
-   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, and an image with transparency
-   is seen on white and on black, its higher score counting (a sheet may hold a dark logo and a light one). While an
+   rasterised with resvg, a raster too small to split (a 16 px favicon) is enlarged, an image with transparency is
+   seen on white and on black (a sheet may hold a dark logo and a light one), and one with an EXIF orientation (a
+   camera's JPEG stored on its side) as stored and as shown, its highest score counting. While an
    image still can't be read as one mark, the trace is refused (`not-comparable`, naming it): take it out of the
    folder, or out of its collection, or replace it with one mark cropped out of it on a plain ground. That includes a
    sheet whose mask, on white or on black, keeps under 90% of the ink seen there: a second mark, or a favicon beside a
@@ -81,9 +82,15 @@ traced, and the scripts refuse them by hash and by likeness.
    collection that is or holds a symbolic link (`collection-linked`), one that holds a file its manifest does not
    list (`collection-unlisted`: a pull that stopped, or a file put there by hand), or a
    collected file that is gone or no longer has the sha256 its manifest lists (`collection-changed`), is refused too;
-   `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. The
-   person's own sketch in `--refs` (its sha256 is in `trace_sources`) is left out of that comparison; a collected file
-   never is, whatever `trace_sources` lists.
+   `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. A
+   file whose sha256 a manifest lists is named as collected before a collected file that is gone or changed, as check,
+   package and book name it: a new pull mends the one, never the other (check reads its `--refs` first, so a gone
+   collected file passed there by name is `refs-missing` at check). A source that is not a raster image Pillow can
+   read is refused (`not-comparable`). Last,
+   the file and the part `--crop` takes are compared as pictures with every collected image, whatever
+   `trace_sources` lists, and one that is the same picture saved again, resized, cut a little, made lighter or darker,
+   or partly made clear is refused (`collected-copy`; see Same picture). The person's own sketch in `--refs` (its
+   sha256 is in `trace_sources`) is left out of the mask and path comparisons; a collected file never is.
    potrace draws the curves and drops specks; check for stray type in the crop and cut it.
 3. Place it: `{"shape": "trace", "file": "trace/<n>.svg", "x": 2, "y": 2, "size": 44}`, with `rotate` and `mirror` as
    usual. The path is found from the working folder first, then from the recipe's folder. Then change one thing with
@@ -99,6 +106,121 @@ traced, and the scripts refuse them by hash and by likeness.
 
 The book shows where a traced mark came from, the kind of right, the person's answer and the score against the
 source; the trademark sheet says the same in words.
+
+### Same picture
+
+The mask and path gates compare marks: the source cut at `--threshold`, each reference split from its ground. A
+photo (a 3D mockup, a sign on a wall) has no one mark to split, so the two masks can cover different parts of the
+same picture: in a real run a re-saved or slightly cut copy of a collected photo scored 0.37 to 0.45 against a limit
+of 0.795. `same_picture.py` compares the pictures themselves, at every step (trace, check, package, book), with
+every collected image whatever `trace_sources` lists, and with no `--refs` image. Each image is seen in grey,
+squeezed into a square (a crop changes the aspect), on white and, with transparency, on black and as its colour
+channels alone (what potrace gets of a source). One with clear pixels is also seen on black with its alpha, and one
+with an EXIF orientation both as stored and as shown: an EXIF block Pillow can't parse turns nothing, and an
+orientation read from a block broken elsewhere still turns the pixels. A file neither Pillow nor resvg can read, the
+source or a collected image, is refused at every step (`not-comparable`) rather than scored 0. One is compared with
+every window of the other that leaves out up to an eighth of each side, at 32 px, both ways round, and the best
+window is refined to 1/128 of a side at 64 px. Each view is compared less its blur (sigma an eighth of its side), so
+light falling across a wall counts for nothing, and the score is the correlation of the pixels, 1 for the same
+picture at any brightness and contrast. Where either picture has clear pixels, only what both show counts: each pixel
+counts as much as both show of it, and each view is less a plane fitted around each pixel to what both show, so the
+colour under a clear pixel, which a copy can set to anything, reaches no pixel that shows. A window where both show
+under a tenth of it (`MIN_SHOWN`) scores 0, and so does one where what both show holds under a quarter of either
+picture's own detail (`MIN_HELD`), measured at 32 px for the refined windows too: one edge of a mark, or one side of
+a ball, matches a window of other pictures as well. A pixel of the square averages what a copy shows with what it
+hides, so where its clear pixels are finer than that (stripes a pixel or two wide), each pixel of the other picture's
+square holds what the copy hides: copies of a test photo crossed by threads a pixel wide, with stripes of 1 to 6 px
+made clear, scored 0.65 to 0.89. So two views, one or both with clear pixels, whose search reaches `FLOOR` (0.5) are
+compared again at their own size: the one with clear pixels is laid on the other where the 64 px search put it, each
+way round, and moved to within an eighth of its own pixel by its fine detail where it shows (each pixel less the mean
+of the 5 px square around it), no further than 1/128 of a side; then each 64 px cell averages only its own pixels
+that show and the other's resampled onto them. In that move each pixel that shows weighs its alpha squared: its
+colour is its value on black over its alpha, so what rounding and resampling put in it grows as the alpha falls.
+Moving only pixels that show half or more left a test photo under thin threads, 5 of every 8 columns shown at 127 of
+255 and cut about a tenth each side, where the search put it (0.846; 1.00 at 128); weighing each pixel by its alpha
+alone, copies of the threaded test photo shown in 2 of every 4 columns or rows and then halved fell from 0.87 and
+0.91 to 0.82 and 0.79. The searches at 32 and 64 px only find where: on a photo of pixel-wide lines, a mask laid 1 px
+off scored 0.20 to 0.87 where laid true it scored 1.00. Moved by all of what shows rather than its fine detail, a
+copy of one test photo with its centre clear rose from 0.81 to 0.94 against another photo staged alike, and to 0.90
+within the bound; moved by its fine detail, 0.83. Two views without clear pixels score as before, bit for bit. The
+gate refuses at `LIMIT` = 0.85 and over.
+
+Measured with the committed `same_picture.py` on the 150 collected images of a real run (Are.na pulls and stock
+photos; 74 flat marks, 76 photos, scenes and sheets) and the test fixtures' 8 photos (a box, a ball and a printed
+word on a lit wall, staged alike):
+
+| Pairs | n | Score |
+|-|-|-|
+| Each image against its copies: saved again as PNG, JPEG q75 or WebP; 2 to 10% cut off every side, one side or at random; 50% and 200% size; 10% darker or lighter; cut, halved and saved as JPEG at once; a plain ground made clear, its colour kept or zeroed; a JPEG stored turned or mirrored with the EXIF orientation (2 to 8) that shows it, and the shown pixels of such a JPEG against it | 4,740 | lowest 0.8590 (a photo keyed to 6% of itself, colour zeroed) |
+| Each image against its partly clear copies that hold a quarter of its detail: 65, 40 or 20% shown with the centre, the edges or patches of 1/80 of the long side made clear, or 50 or 62.5% shown in stripes (1 of every 2, 2 of 4, 5 of 8 or 20 of 32 columns or rows of the image at 1,024 px at most, the first three mostly finer than a pixel of the square); then saved as WebP, cut 4% each side or 10% on one, or halved, and the stripes also as they are. Each copy twice, the colour under its clear pixels zeroed and noise | 9,845 copies (19,690 scores) | lowest 0.8525, but 21 of the 9,845 copies (42 of the 19,690 scores) under 0.85: below |
+| Each image saved again, cut, resized, made lighter or darker, or turned with EXIF, before any part is made clear | 1,422 | lowest 0.9429 |
+| Every pair of different images | 11,175 | highest 0.7197 (two white-on-black wordmarks from one studio, checked by eye: different marks); 99.9th percentile 0.5889 |
+| A clear copy of each image (the centre or the edges made clear, 12 to 65% shown; 1 of every 2 or 5 of 8 columns, 2 of 4 or 20 of 32 rows; a plain ground made clear) against other images, sampled (below) | 32,146 | highest 0.8087, but 1 at 0.89: below |
+| The test fixtures' own marks (also on a clear ground), photos and their cut-outs against each image | 3,750 | highest 0.6302 |
+| The fixture photos against each other | 28 | highest 0.8375 |
+| A fixture photo's cut-out, or a copy of it with part made clear (stripes too), against the other photos | 1,176 | highest 0.9412; 12 at 0.85 or over |
+
+0.85 sits between every edited copy and every pair of different images. Among clear copies it does not, and these
+are measured:
+
+- A one-colour mark on a clear ground, partly made clear, can pass (17 copies of one black wordmark, 4 of them in
+  stripes of 20 of 32 and cut: 0.67 to 0.84). Where it shows it is one colour, so the view with alpha finds no
+  detail; the flattened views compare it, and in them the clear part reads as ground.
+- A copy whose clear part takes most of the detail and that is also cut can pass (40% shown with the centre clear,
+  cut 4% each side: 0.40 and 0.83): what shows holds 0.18 and 0.24 of the image's detail at the window that undoes
+  the cut, under `MIN_HELD`.
+- An image shown only as a thin band can pass (a wordmark 20% shown with the centre clear, saved as WebP or halved:
+  0.59 and 0.59, where its band holds a third of its detail).
+- A copy that shows only a thin band can be refused against an image whose border looks alike (1 of 32,146 sampled
+  pairs, 20% shown with the centre clear: 0.89).
+- A cut-out, or a copy showing 12 to 40%, of a photo staged like a collected one can be refused (the fixture photos:
+  12 of 1,176, up to 0.94); the whole photo passes (0.84 at most).
+- A copy made clear in stripes finer than its pixels and then resized keeps no record of which pixels it hid:
+  halved, a copy with every other column clear shows each pixel half (alpha 0.50, give or take 0.01), so it is
+  compared whole. Of the threaded test photo it scores 0.82 (every other row: 0.75), and 1.00 against the photo's
+  own shown columns halved alike: what it lacks is the threads it hid. Every collected image so copied and halved
+  scored 0.86 or more.
+- A pixel counts as much as it shows in what a window holds too, so a copy shown faintly holds less: the copy of the
+  test photo under thin threads above, shown at 100 of 255, holds 0.245 of the photo's detail and passes (0.846); at
+  102 it scores 1.00. Of copies of 10 collected images and 4 test photos shown at 96 to 160 of 255 (5 of every 8
+  columns, patches of 1/80 or the edges, 62.5 or 65% shown; whole, cut 4% or about a tenth each side), one passes: a
+  photo in patches at 96, cut, holding a quarter of its detail (0.72).
+- Only a pairing whose 32 px search reaches `FLOOR` is compared at its own size, and that search averages what a
+  copy hides: striped copies of a photo dense with lines a pixel wide, cut 2 to 7% a side, scored 0.57 there at the
+  lowest.
+
+Raising `MIN_SHOWN` to a quarter keeps 12 of those 13 different pairs under 0.85 (a copy showing 40% is untouched:
+0.85), but passes a keyed copy that shows 14% of a collected logo (0.81) and 430 of the 504 copies above that show
+20%. Comparing only what shows is what refuses that keyed copy: it scores 1.00, and 0.81 with the flattened views
+alone. Measuring what a refined window holds at 32 px is what refuses a fixture photo with its centre clear (65%
+shown, holding 0.26 to 0.28 of its detail) once it is also cut 2 to 5% each side: 0.97 to 0.98, where at 64 px it
+held 0.23 to 0.25 and scored 0.40 to 0.82; letting the refinement leave `MIN_HELD` behind instead raised a copy of
+one fixture photo against another to 0.95.
+
+The partly clear copies and the clear copies against other images were cut as below; with the stripes added, each in
+every cell of its own (eight stripes, both colours, the four edits and none), the run took 137 minutes on 18
+processes. A pilot on 10 of the collected images and the fixture photos scored every cell (90, 65, 40, 20 and 12%
+shown; five shapes, single pixels and patches of 1/20 included; colour kept, zeroed or noise; nine edits) and every
+clear copy against every other image. The run keeps the values whose lowest copy in a first pilot scored under 0.95,
+leaves out the kept colour (never more than 0.016 under zeroed for the same copy) and, among the clear copies
+against other images, the patch copies (0.47 at most, against 0.79); it compares each clear copy with the images in
+the 100 highest pairs with it, its own 2 highest partners, the 8 images the pilot's clear copies scored highest
+against, and 6 more drawn with a fixed seed. On the pilot the reduced grid's lowest copy was the full grid's for
+every image (0.9191 at the lowest), and the sample's highest pair was the full set's (0.7941), also with the 8
+images taken from the other half of the pilot. None of the images behind the 21 copies and the pair above was in the
+pilot. Against 150 images the gate reads each one once more (2.6 seconds), then takes 0.2 to 0.4 seconds for an
+opaque source or a cut copy (the first source about a second more) and 10 to 14 for a source with clear pixels;
+about 20 for one that reaches `FLOOR` against many of them (a keyed mark: 15 of 150), as each of those pairings is
+compared again at its own size, each way round.
+
+It does not see a copy turned (other than by its EXIF orientation) or mirrored, cut by more than an eighth on a
+side, shown as a small part of a larger picture, keyed until under a tenth of it shows (the views without alpha
+still compare it: the copy keyed to 6% scored 0.8590), with its tones inverted, or the partly clear copies above, a
+resized one made clear finer than its pixels among them; the mask and path gates still compare its mark. A copy of a
+`--refs` image that no collection lists is left to the mask and path gates, which can miss a photo. Those gates, and
+the check's distance check, see a reference with an EXIF orientation both as stored and as shown, so a mark drawn
+again from what such a file shows is compared too. They read a source as stored, as potrace traces it: one that its
+EXIF orientation turns is compared as the turned mark it holds, and they can miss a mark turned a quarter.
 
 ## Type
 
@@ -135,9 +257,13 @@ every `--refs` image, SVGs included, read the same way, and the check refuses to
 mark (`not-comparable`), removing the builds' old `check.json`. `check.json` records `refs_compared` and the `limit`.
 Before checking, `check_logo.py` confirms every file `build.json` lists still has its sha256 and that the list holds
 the mark, its grid and, with a wordmark, the wordmark and both lockups; it renders the mark from those verified
-bytes. It refuses a traced direction whose trace was gated against other `--refs` images, another calibration or
-other collections than the check's (`trace-gate-stale`), or while a collected file is gone or changed
-(`collection-changed`), and removes its old `check.json`: build it again. `check.json` then records the sha256 of
+bytes. For a traced direction it first runs the same-picture gate again on the source, against the collections as they
+are now: a source a collection now lists (`collected`), or a copy of a collected image (`collected-copy`), is
+refused, so a copy collected after the trace, or a trace made before this gate, goes no further; so is a collected
+file it can't read as a picture (`not-comparable`). It refuses a traced direction whose trace was gated
+against other `--refs` images, another calibration or other collections than the check's (`trace-gate-stale`), or
+while a collected file is gone or changed (`collection-changed`), and removes its old `check.json`: build it again,
+or, for a copy, drop the direction. `check.json` then records the sha256 of
 `build.json`, of the `--refs` images, of the calibration and, for a traced direction, of the collections
 (`collected_sha256`; `null` for one with no trace).
 
@@ -155,7 +281,10 @@ other collections than the check's (`trace-gate-stale`), or while a collected fi
   none (never that the trace kept its shape: `rotate` and `mirror` change it too); in the brief's language;
 - `brand.json`: the palette, the fonts and any trace's source and statement.
 
-It reads only the verified bytes of the files `build.json` lists, so a part an earlier build left in the folder never
-ships, and it refuses a build whose `check.json` is missing, failed, or no longer matches `build.json`, its files, the
-`--refs` images or the calibration, or, for a traced direction, its source or the collections (`collections-changed`).
-It verifies all of that before it creates the output folder.
+It reads only the verified bytes of the files `build.json` lists, so a part an earlier build left in the folder
+never ships, and it refuses a build whose `check.json` is missing, failed, or no longer matches `build.json`, its
+files, the `--refs` images or the calibration, or, for a traced direction, its source or the collections
+(`collections-changed`); a traced source must also pass the same-picture gate again (`collected`, `collected-copy`,
+and `not-comparable` for a collected file it can't read as a picture),
+judged before the `--refs` images, so a copy that a pull brings into a collection that is also a `--refs` folder is
+named as one. It verifies all of that before it creates the output folder.

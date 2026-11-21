@@ -14,7 +14,7 @@ import io
 import os
 
 import numpy as np
-from PIL import Image, ImageSequence, UnidentifiedImageError
+from PIL import ExifTags, Image, ImageSequence, UnidentifiedImageError
 from scipy import ndimage as ndi
 from skimage import color, filters, measure, morphology, transform
 
@@ -53,6 +53,25 @@ def open_image(src) -> Image.Image:
     out = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
     out.paste(im.convert("RGBA"), (pad, pad))
     return out
+
+
+# What shows a stored image upright for each EXIF orientation that turns or mirrors it, as ImageOps.exif_transpose()
+# does it.
+SHOWN = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180, 4: Image.Transpose.FLIP_TOP_BOTTOM,
+         5: Image.Transpose.TRANSPOSE, 6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
+         8: Image.Transpose.ROTATE_90}
+
+
+def orientations(im: Image.Image) -> list[Image.Image]:
+    """`im` as stored and, when its EXIF orientation (2 to 8) turns or mirrors it, as shown: a camera often stores a
+    JPEG on its side with the tag that shows it upright. open_image() and load() give it as stored. The EXIF block is
+    optional and only turns the pixels: one Pillow can't parse leaves `im` as stored, and an orientation read from a
+    block broken elsewhere still turns them (exif_transpose() writes the block again, which fails on such a block)."""
+    try:
+        turn = SHOWN.get(im.getexif().get(ExifTags.Base.Orientation, 1))
+    except Exception:  # SyntaxError, struct.error and others, by what is broken
+        return [im]
+    return [im] if turn is None else [im, im.transpose(turn)]
 
 
 def transparent(im: Image.Image) -> bool:

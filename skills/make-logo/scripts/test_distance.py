@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import calibrate as C  # noqa: E402
 import distance as D  # noqa: E402
+import gate_fixtures as G  # noqa: E402
 
 SIDE = 600
 
@@ -174,6 +175,15 @@ class Cli(unittest.TestCase):
         os.remove(os.path.join(refs, "same.png"))
         png(os.path.join(refs, "bar.png"), np.ones((40, 400), bool))
         self.assertEqual(self.run_main(cand, refs)[0], 0)
+
+    def test_a_reference_is_compared_as_its_exif_orientation_shows_it(self):
+        cand = os.path.join(self.dir, "cand.png")
+        G.mark_image(G.own).save(cand)
+        refs = os.path.join(self.dir, "refs")
+        os.mkdir(refs)
+        with open(os.path.join(refs, "turned.jpg"), "wb") as f:  # stored on its side, shown upright
+            f.write(G.exif_turned(G.mark_image(G.own)))
+        self.assertEqual(self.run_main(cand, refs)[0], 1)
 
 
 def shapes() -> list[np.ndarray]:

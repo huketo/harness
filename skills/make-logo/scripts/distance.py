@@ -9,7 +9,8 @@
 Exits 0 when the nearest reference is clear, 1 when it is too close, and 2 when no reference showed a mark.
 
 Measures on the marks' silhouettes, each normalised so that size, position and the ground's colour don't count, all
-taken at the candidate's closest pose (as is, mirrored, or turned a few degrees either way, picked by `similarity`):
+taken at the candidate's closest pose (as is, mirrored, or turned a few degrees either way, picked by `similarity`),
+against a reference with an EXIF orientation both as stored and as shown, the higher score counting:
 - `overlap`: intersection over union of the silhouettes. 1 is the same silhouette.
 - `edges`: how far the outlines sit from each other, as the mean nearest distance both ways, in thousandths of the
   box. 0 is the same outline.
@@ -152,9 +153,12 @@ def fused(d: dict, cal: dict) -> float:
     return round(float(1 / (1 + np.exp(-z))), 4)
 
 
-def from_file(path: str, candidate: bool = False) -> dict | None:
-    seg = L.segment(L.load(path))
-    return prepare(seg["mask"], poses=candidate) if seg["ok"] else None
+def from_file(path: str, candidate: bool = False) -> list[dict]:
+    """The mark in a file, prepared once for each way it is seen, or [] when none is found: a candidate as stored,
+    with its poses; a reference as stored and, with an EXIF orientation, as shown (logolib.orientations)."""
+    im = L.open_image(path)
+    segs = [L.segment(L.flatten(v)) for v in ([im] if candidate else L.orientations(im))]
+    return [prepare(s["mask"], poses=candidate) for s in segs if s["ok"]]
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -166,16 +170,15 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--json")
     a = ap.parse_args(argv)
     cand = from_file(a.candidate, candidate=True)
-    if cand is None:
+    if not cand:
         sys.exit("No mark found in the candidate")
+    cal = load_calibration(a.calibration)
     rows = []
     for f in L.images(a.refs):
-        ref = from_file(f)
-        if ref is not None:
-            rows.append({"ref": f, **compare(cand, ref)})
-    cal = load_calibration(a.calibration)
-    for r in rows:
-        r["score"] = fused(r, cal)
+        seen = [compare(cand[0], ref) for ref in from_file(f)]
+        if seen:
+            d = max(seen, key=lambda m: fused(m, cal))
+            rows.append({"ref": f, **d, "score": fused(d, cal)})
     rows.sort(key=lambda r: -r["score"])
     limit = a.limit if a.limit is not None else cal["limit"]
     for r in rows[:5]:

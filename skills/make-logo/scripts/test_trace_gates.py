@@ -2,9 +2,10 @@
 # requires-python = ">=3.10"
 # dependencies = ["numpy", "scipy", "scikit-image", "pillow", "skia-pathops", "fonttools", "uharfbuzz", "resvg-py"]
 # ///
-"""The tracing gates: trace_ref.trace() refuses a source the person holds no stated rights in, a collected file, and a
-mask or vector close to a collected or reference logo; build_logo.py re-runs it for every trace shape, and
-check_logo.py leaves out only the verified source. Synthetic marks, a temporary cache, potrace from potrace_bin."""
+"""The tracing gates: trace_ref.trace() refuses a source the person holds no stated rights in, a collected file, a
+mask or vector close to a collected or reference logo, and the same picture as a collected image (a photo the masks
+can't read); build_logo.py re-runs it for every trace shape, and check_logo.py leaves out only the verified source and
+runs the same-picture gate again. Synthetic marks and photos, a temporary cache, potrace from potrace_bin."""
 from __future__ import annotations
 
 import io
@@ -13,12 +14,14 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import unittest
 from contextlib import redirect_stdout
 from unittest import mock
 
+import numpy as np
 import resvg_py
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_logo as B  # noqa: E402
@@ -27,9 +30,16 @@ import distance as D  # noqa: E402
 import gate_fixtures as G  # noqa: E402
 import logolib as L  # noqa: E402
 import rights as R  # noqa: E402
+import same_picture as SP  # noqa: E402
 import trace_ref as T  # noqa: E402
 
 LIMIT = D.load_calibration(None)["limit"]
+
+
+def png(im: Image.Image, **save) -> bytes:
+    buf = io.BytesIO()
+    im.save(buf, "PNG", **save)
+    return buf.getvalue()
 
 
 def reencoded(im: Image.Image) -> Image.Image:
@@ -37,6 +47,16 @@ def reencoded(im: Image.Image) -> Image.Image:
     buf = io.BytesIO()
     im.resize((450, 450), Image.LANCZOS).save(buf, "JPEG", quality=80)
     return Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
+
+
+def edited(im: Image.Image) -> dict[str, tuple[Image.Image, str, dict]]:
+    """Copies of a picture made to get it past the gates, by file name: saved again, cut, resized, brightened."""
+    W, H = im.size
+    return {"jpeg-q75.jpg": (im, "JPEG", {"quality": 75}), "webp.webp": (im, "WEBP", {}),
+            "cut-4pc.png": (im.crop((round(W * .04), round(H * .04), round(W * .96), round(H * .96))), "PNG", {}),
+            "cut-10pc-left.png": (im.crop((round(W * .1), 0, W, H)), "PNG", {}),
+            "half-size.png": (im.resize((W // 2, H // 2), Image.LANCZOS), "PNG", {}),
+            "brighter.png": (ImageEnhance.Brightness(im).enhance(1.1), "PNG", {})}
 
 
 @G.needs_potrace
@@ -60,6 +80,12 @@ class TraceGates(unittest.TestCase):
         self.assertEqual(cm.exception.reason, reason, str(cm.exception))
         self.assertFalse(os.path.exists(self.out), "a refused trace wrote its SVG")
         return cm.exception
+
+    def test_refuses_a_source_it_cannot_read_as_an_image(self):
+        source = self.ws.path("sketches", "own.png")
+        R.write_bytes(source, b"not an image")
+        e = self.refused("not-comparable", source, [self.ws.entry(source)])
+        self.assertIn(source, str(e))
 
     def test_refuses_a_file_not_in_trace_sources(self):
         other = self.ws.image("sketches/other.png", G.mark_image(G.own).rotate(90))
@@ -178,9 +204,6 @@ class TraceGates(unittest.TestCase):
             os.symlink(target, link)
             e = self.refused("collection-linked", self.sketch, [entry])
             self.assertIn(link, str(e))
-            with self.assertRaises(R.Refused) as cm:  # and so do package_logo.py and logo_book.py (rights.sealed)
-                R.collected_sha256()
-            self.assertEqual(cm.exception.reason, "collection-linked", str(cm.exception))
             os.remove(link)
         self.assertEqual(self.trace(self.sketch, [entry])["svg"], self.out)
 
@@ -235,6 +258,123 @@ class TraceGates(unittest.TestCase):
         resaved = self.ws.image("sketches/resaved.jpg", reencoded(self.ext), "JPEG", quality=90)
         e = self.refused("mask-too-close", resaved, [self.ws.entry(collected), self.ws.entry(resaved)])
         self.assertTrue(e.detail["mask_nearest"]["ref"].endswith("50000001.png"), e.detail)
+
+    def test_refuses_edited_copies_of_a_collected_photo_that_the_masks_miss(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        for name, (im, fmt, save) in edited(G.photo(0)).items():
+            with self.subTest(name):
+                copy = self.ws.image(f"sketches/{name}", im, fmt, **save)
+                self.out = self.ws.path("trace", f"{name}.svg")
+                e = self.refused("collected-copy", copy, [self.ws.entry(copy)])
+                near = e.detail["copy_nearest"]
+                print(f"\n  {name}: same picture {near['score']:.4f} (limit {SP.LIMIT}), mask "
+                      f"{e.detail['mask_nearest']['score']:.4f}, path {e.detail['vector_nearest']['score']:.4f}")
+                self.assertTrue(near["ref"].endswith("90000001.png"), near)
+                self.assertGreaterEqual(near["score"], SP.LIMIT)
+                self.assertIn("90000001.png", str(e))
+                # What the mask and path gates missed: the photo split by Otsu is not the source cut at 0.5.
+                self.assertLess(e.detail["mask_nearest"]["score"], LIMIT)
+                self.assertLess(e.detail["vector_nearest"]["score"], LIMIT)
+
+    def test_traces_another_photo_and_records_its_nearest_picture(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        own = self.ws.image("sketches/own-photo.png", G.photo(1))
+        gate = self.trace(own, [self.ws.entry(own)])["provenance"]["gate"]
+        self.assertIn("copy_nearest", gate)
+        print(f"\n  another photo: same picture {gate['copy_nearest']['score']:.4f} against {gate['copy_nearest']['ref']}")
+        self.assertLess(gate["copy_nearest"]["score"], SP.LIMIT)
+        self.assertEqual(gate["copy_limit"], SP.LIMIT)
+
+    def test_refuses_the_crop_of_a_page_that_holds_a_collected_photo(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        page, d = G.canvas(1400, 600)
+        page.paste(G.photo(0), (60, 60))
+        G.own(d, 860, 100, 400)
+        board = self.ws.image("sketches/board.png", page)
+        e = self.refused("collected-copy", board, [self.ws.entry(board)], crop=(60 / 1400, 60 / 600, 640 / 1400, 480 / 600))
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+        whole = self.trace(board, [self.ws.entry(board)])["provenance"]["gate"]
+        self.assertLess(whole["copy_nearest"]["score"], SP.LIMIT, "the whole page is not the photo")
+
+    def test_refuses_a_cut_out_of_a_collected_photo_whose_clear_ground_hides_no_colour(self):
+        # A background remover's cut-out keeps a fifth of the photo and zeroes the colour under the rest, so flattened
+        # on any ground it is mostly not the photo; the pixels it shows are the photo's own.
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        copy = self.ws.image("sketches/cut-out.png", G.photo(0, cut_out=True))
+        e = self.refused("collected-copy", copy, [self.ws.entry(copy)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+
+    def test_traces_a_cut_out_of_another_photo(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        own = self.ws.image("sketches/own-cut-out.png", G.photo(1, cut_out=True))
+        gate = self.trace(own, [self.ws.entry(own)])["provenance"]["gate"]
+        print(f"\n  another photo's cut-out: same picture {gate['copy_nearest']['score']:.4f}")
+        self.assertLess(gate["copy_nearest"]["score"], SP.LIMIT)
+
+    def test_refuses_the_picture_a_collected_jpeg_shows_once_its_exif_orientation_turns_it(self):
+        self.ws.collection("world", {"mockups/90000001.jpg": G.exif_turned(G.photo(0))})
+        shown = self.ws.image("sketches/shown.png", G.photo(0))
+        e = self.refused("collected-copy", shown, [self.ws.entry(shown)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.jpg"), e.detail)
+
+    def test_refuses_a_jpeg_whose_exif_orientation_shows_a_collected_photo(self):
+        self.ws.collection("world", {"mockups/90000001.png": G.photo(0)})
+        turned = self.ws.path("sketches", "turned.jpg")
+        R.write_bytes(turned, G.exif_turned(G.photo(0)))
+        e = self.refused("collected-copy", turned, [self.ws.entry(turned)])
+        self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+
+    def test_refuses_a_copy_of_a_collected_photo_whose_exif_block_is_broken(self):
+        """A block Pillow can't parse once cost an image every view, so a copy showing the photo pixel for pixel scored
+        0 as a picture. The stored pixels are seen whatever of the block can't be read, and an orientation that reads is
+        shown."""
+        upright = G.photo(0)
+        turned = upright.transpose(Image.Transpose.ROTATE_90)  # stored on its side; orientation 6 shows it upright
+        cases = {"the copy's block unreadable": (png(upright), png(upright, exif=G.broken_exif())),
+                 "the copy's block broken past its orientation": (png(upright), png(turned, exif=G.broken_exif(6))),
+                 "the collected block unreadable": (png(upright, exif=G.broken_exif()), png(upright)),
+                 "the collected block broken past its orientation": (png(turned, exif=G.broken_exif(6)), png(upright))}
+        for n, (name, (collected, copy)) in enumerate(cases.items()):
+            with self.subTest(name):
+                world = self.ws.collection("world", {"mockups/90000001.png": collected})
+                source = self.ws.path("sketches", f"copy-{n}.png")
+                R.write_bytes(source, copy)
+                self.out = self.ws.path("trace", f"copy-{n}.svg")
+                e = self.refused("collected-copy", source, [self.ws.entry(source)])
+                self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+                shutil.rmtree(world)
+
+    def test_refuses_a_redrawing_of_the_mark_a_reference_shows_by_its_exif_orientation(self):
+        # A JPEG of a mark stored on its side with the EXIF orientation that shows it upright, collected or in --refs.
+        # The mark drawn again on a wide page is another picture, which the same-picture gate passes, so only the mask
+        # gate can see the copy: it must compare the reference as shown and as stored.
+        for name, draw in (("L", G.own), ("triangle", G.badge)):
+            turned = G.exif_turned(G.mark_image(draw))
+            for where in ("collected", "refs"):
+                if where == "collected":
+                    ref = os.path.join(self.ws.collection("world", {"logos/90000001.jpg": turned}), "logos",
+                                       "90000001.jpg")
+                else:
+                    ref = self.ws.path("refs", "mine", "turned.jpg")
+                    R.write_bytes(ref, turned)
+                for seen in ("shown", "stored"):
+                    with self.subTest(name, where=where, seen=seen):
+                        page, d = G.canvas(900, 500)
+                        draw(d, 60, 50, 400)
+                        if seen == "stored":
+                            page = page.transpose(Image.Transpose.ROTATE_90)
+                        redrawn = self.ws.image(f"sketches/{name}-{where}-{seen}.png", page)
+                        self.out = self.ws.path("trace", f"{name}-{where}-{seen}.svg")
+                        self.assertLess(SP.score(SP.source(R.read_bytes(redrawn)), SP.picture(turned)), SP.LIMIT,
+                                        "the redrawing must be another picture")
+                        e = self.refused("mask-too-close", redrawn, [self.ws.entry(redrawn)])
+                        print(f"\n  {name} redrawn as a {where} EXIF 6 JPEG is {seen}: mask "
+                              f"{e.detail['mask_nearest']['score']:.4f}")
+                        self.assertEqual(e.detail["mask_nearest"]["ref"], ref)
+                if where == "collected":
+                    shutil.rmtree(os.path.dirname(os.path.dirname(ref)))
+                else:
+                    os.remove(ref)
 
     def test_refuses_a_collected_file_that_no_longer_has_its_manifest_hash(self):
         world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
@@ -297,13 +437,198 @@ class TraceGates(unittest.TestCase):
         self.assertRegex(rec["mask_sha256"], "^[0-9a-f]{64}$")
         self.assertEqual(rec["gate"]["calibration_sha256"], R.sha256_file(R.calibration_file(None)))
         self.assertEqual(rec["gate"]["refs_sha256"], R.refs_sha256([self.mine, self.arena]))
-        self.assertEqual(rec["gate"]["collected_sha256"], R.collected_sha256())
+        self.assertEqual(rec["gate"]["collected_sha256"], R.digest(sha for _, sha in R.collected()))
         self.assertEqual(rec["gate"]["limit"], LIMIT)
         self.assertNotIn("not_checked", rec["gate"])
         self.assertEqual(rec["potrace"]["sha256"], R.sha256_file(rec["potrace"]["path"]))
         said = subprocess.run([rec["potrace"]["path"], "--version"], capture_output=True, text=True, check=True).stdout
         self.assertEqual(rec["potrace"]["version"], said.strip().splitlines()[0])
         self.assertEqual(rec["svg_sha256"], R.sha256_file(self.out))
+
+
+class PartlyClear(unittest.TestCase):
+    """same_picture.gate(), which trace, check, package and book all call, on a collected photo copied with part of it
+    made clear: every copy that shows MIN_SHOWN or more of the photo and MIN_HELD or more of its subject (the box and
+    the ball) is that photo, whatever shape is cleared and whatever colour is left under the clear pixels; the same
+    copies of another photo are not. A copy that shows less of the subject is not asked for (references/building.md,
+    "Same picture")."""
+
+    SHOWN = (0.9, 0.65, 0.4, 0.2)  # each over MIN_SHOWN
+    SHAPES = (("edges", 0), ("centre", 0), ("patches", 8), ("patches", 32))
+    HIDDEN = ("kept", "zeroed", "noise")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.collected = [("world/mockups/90000001.png", "", SP.picture(png(G.photo(0))))]
+
+    def verdicts(self, seed: int, collected=None) -> list[tuple[str, float, str | None, float]]:
+        """(copy, share of the subject it shows, refusal or None, score) of each cleared copy of photo `seed` against
+        photo 0, or against `collected`."""
+        subject = np.asarray(G.photo(seed, cut_out=True).getchannel("A")) > 0
+        out = []
+        for shown in self.SHOWN:
+            for shape, cell in self.SHAPES:
+                for hidden in self.HIDDEN:
+                    name = f"{shown:.0%} shown, {shape}{f' {cell} px' if cell else ''}, colour {hidden}"
+                    copy = G.cleared(G.photo(seed), shown, shape, hidden, cell)
+                    held = float((np.asarray(copy.getchannel("A"))[subject] > 0).mean())
+                    try:
+                        out.append((name, held, None, SP.gate(name, SP.source(png(copy)),
+                                                             collected or self.collected)["score"]))
+                    except R.Refused as e:
+                        out.append((name, held, e.reason, e.detail["copy_nearest"]["score"]))
+        return out
+
+    def test_refuses_every_partly_clear_copy_of_a_collected_photo(self):
+        verdicts = self.verdicts(0)
+        print("\n" + "\n".join(f"  {name}, {held:.0%} of the subject: {score:.4f}" for name, held, _, score in verdicts))
+        self.assertGreater(min(self.SHOWN), SP.MIN_SHOWN)
+        self.assertEqual([(name, held, score) for name, held, why, score in verdicts
+                          if held >= SP.MIN_HELD and why != "collected-copy"], [])
+
+    def test_passes_the_same_copies_of_another_photo(self):
+        verdicts = self.verdicts(1)
+        print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
+        self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
+
+    def test_passes_copies_of_a_photo_against_another_staged_alike(self):
+        """Photo 0 with its centre clear holds under a fifth of its detail: what shows is the lit wall around the box and
+        the ball, as in photo 1. A refinement free to leave MIN_HELD behind found a window there scoring 0.9469."""
+        verdicts = self.verdicts(0, [("world/mockups/90000002.png", "", SP.picture(png(G.photo(1))))])
+        print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
+        self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
+
+    def test_refuses_a_partly_clear_copy_cut_at_the_edges_too(self):
+        """Photo 1 with its centre clear shows 65% of it, and what shows holds about a quarter of its detail at 32 px
+        (0.26 to 0.28 once cut 2 to 5% each side) but less at 64 px (0.23 to 0.25), where the sharp edges of the box
+        and the ball, in the clear centre, weigh more. Held to MIN_HELD at 64 px too, these copies scored 0.40 to
+        0.82."""
+        photo = G.photo(1)
+        collected = [("world/mockups/90000002.png", "", SP.picture(png(photo)))]
+        copy = G.cleared(photo, 0.65, "centre", "zeroed")
+        W, H = copy.size
+        verdicts = {}
+        for cut in (0.02, 0.04, 0.05):
+            part = copy.crop((round(cut * W), round(cut * H), round((1 - cut) * W), round((1 - cut) * H)))
+            try:
+                verdicts[cut] = SP.gate(f"cut {cut:.0%}", SP.source(png(part)), collected)["score"]
+            except R.Refused as e:
+                verdicts[cut] = e.reason
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
+    STRIPES = ((8, 5), (4, 2), (2, 1), (16, 10))  # (every, shown): 1 to 3 px clear, and a band of 6 px
+
+    def striped(self, seed: int, collected) -> dict[str, str | float]:
+        """Each striped copy of G.threaded(seed), whole and cut 4% each side, against `collected`: its refusal, or its
+        score."""
+        photo = G.threaded(seed)
+        W, H = photo.size
+        verdicts = {}
+        for axis in ("columns", "rows"):
+            for every, shown in self.STRIPES:
+                for cut in (0, 0.04):
+                    name = f"{shown} of every {every} {axis}{f', cut {cut:.0%}' if cut else ''}"
+                    copy = G.cleared(photo, shown / every, axis, "zeroed", every)
+                    copy = copy.crop((round(cut * W), round(cut * H), round((1 - cut) * W), round((1 - cut) * H)))
+                    try:
+                        verdicts[name] = SP.gate(name, SP.source(png(copy)), collected)["score"]
+                    except R.Refused as e:
+                        verdicts[name] = e.reason
+        return verdicts
+
+    def test_refuses_striped_copies_of_a_collected_photo_whose_detail_is_finer_than_its_square(self):
+        """Stripes thinner than a pixel of the photo's 128 px square: averaged there, each pixel of the collected
+        photo also holds the threads the stripes hide, which the copy does not show. Compared so, these copies scored
+        0.65 to 0.89."""
+        collected = [("world/mockups/90000003.png", "", SP.picture(png(G.threaded(0))))]
+        verdicts = self.striped(0, collected)
+        print("\n" + "\n".join(f"  {name}: {v}" for name, v in verdicts.items()))
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
+    def test_passes_the_same_striped_copies_of_another_photo(self):
+        verdicts = self.striped(1, [("world/mockups/90000003.png", "", SP.picture(png(G.threaded(0))))])
+        print(f"\n  highest: {max(v for v in verdicts.values() if isinstance(v, float)):.4f}")
+        self.assertEqual({k: v for k, v in verdicts.items() if not isinstance(v, float)}, {})
+
+    FAINT = (110, 127, 128, 192)  # the alpha of the columns that show; under 102 they hold under MIN_HELD
+
+    def faint(self, seed: int, collected) -> dict[int, str | float]:
+        """Each copy of photo `seed` under 1,200 lighter threads showing 5 of every 8 columns at an alpha of FAINT (the
+        rest clear, colour zeroed), cut to (63, 48, 577, 432) at its own size, against `collected`: its refusal, or its
+        score."""
+        verdicts = {}
+        for alpha in self.FAINT:
+            photo = G.threaded(seed, lines=1200, ink=(30, 160))
+            copy = np.asarray(G.cleared(photo, 5 / 8, "columns", "zeroed", 8)).copy()
+            copy[..., 3] = np.where(copy[..., 3] > 0, alpha, 0)
+            copy = Image.fromarray(copy, "RGBA").crop((63, 48, 577, 432))
+            try:
+                verdicts[alpha] = SP.gate(f"alpha {alpha}", SP.source(png(copy)), collected)["score"]
+            except R.Refused as e:
+                verdicts[alpha] = e.reason
+        return verdicts
+
+    def test_refuses_a_striped_copy_whose_shown_columns_are_half_clear(self):
+        """The cut lays the copy's columns off the photo's own, so only its fine detail where it shows puts it back.
+        That once counted only pixels showing half or more: at alpha 127 nothing was moved, and the copy scored 0.8461
+        (0.9999 at 128), what shows holding 0.31 of the photo's detail. A pixel counts as much as it shows, so at alpha
+        100 what shows holds 0.245, under MIN_HELD: not asked for."""
+        collected = [("world/mockups/90000004.png", "", SP.picture(png(G.threaded(0, lines=1200, ink=(30, 160)))))]
+        verdicts = self.faint(0, collected)
+        print("\n" + "\n".join(f"  alpha {alpha}: {v}" for alpha, v in verdicts.items()))
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
+    def test_passes_the_same_half_clear_copies_of_another_photo(self):
+        verdicts = self.faint(1, [("world/mockups/90000004.png", "", SP.picture(png(G.threaded(0, lines=1200,
+                                                                                                 ink=(30, 160)))))])
+        print(f"\n  highest: {max(v for v in verdicts.values() if isinstance(v, float)):.4f}")
+        self.assertEqual({k: v for k, v in verdicts.items() if not isinstance(v, float)}, {})
+
+
+class Unusual(unittest.TestCase):
+    """same_picture on what it can't see in full: a file it can't read as an image, either side of the gate, and a view
+    a pixel across."""
+
+    def test_refuses_a_source_or_a_collected_file_it_cannot_read(self):
+        photo = ("world/mockups/90000001.png", "", SP.picture(png(G.photo(0))))
+        unreadable = ("world/mockups/90000002.png", "", SP.picture(b"not an image"))
+        for name, src, collected, named in (("the source", SP.source(b"not an image"), [photo], "sketches/own.png"),
+                                            ("a collected file", SP.source(png(G.photo(1))), [photo, unreadable],
+                                             unreadable[0])):
+            with self.subTest(name):
+                with self.assertRaises(R.Refused) as cm:
+                    SP.gate("sketches/own.png", src, collected)
+                self.assertEqual(cm.exception.reason, "not-comparable", str(cm.exception))
+                self.assertIn(named, str(cm.exception))
+
+    def test_scores_a_view_a_pixel_across_in_time(self):
+        """A side of one pixel has one end: _register() once moved it by steps that halved towards 0 and never ended."""
+        rng = np.random.default_rng(0)
+        grey = np.clip(np.linspace(40, 220, 256)[:, None] + rng.normal(0, 30, (256, 1)), 0, 255).astype(np.uint8)
+
+        def column(width: int, alpha: bool) -> Image.Image:
+            rgb = np.repeat(np.repeat(grey[:, :, None], 3, 2), width, 1)
+            if not alpha:
+                return Image.fromarray(rgb, "RGB")
+            a = np.full((256, width, 1), 255, np.uint8)
+            a[::7] = 200
+            return Image.fromarray(np.concatenate([rgb, a], 2), "RGBA")
+
+        across = Image.Transpose.TRANSPOSE
+        dot = (0, 0, 1, 1)
+        cases = {"1 x 256 with alpha against 8 x 256": (column(1, True), column(8, False)),
+                 "256 x 1 with alpha against 256 x 8": (column(1, True).transpose(across),
+                                                        column(8, False).transpose(across)),
+                 "1 x 256 with alpha against 1 x 256": (column(1, True), column(1, False)),
+                 "1 x 1 with alpha against 1 x 1": (column(1, True).crop(dot), column(1, False).crop(dot))}
+        for name, (copy, image) in cases.items():
+            with self.subTest(name):
+                done = []
+                t = threading.Thread(target=lambda: done.append(SP.score(SP.source(png(copy)), SP.picture(png(image)))),
+                                     daemon=True)
+                t.start()
+                t.join(30)
+                self.assertTrue(done, f"{name}: still scoring after 30 s")
 
 
 @G.needs_potrace
@@ -431,7 +756,10 @@ class BuildGates(unittest.TestCase):
     def test_check_refuses_a_trace_gated_before_a_reference_was_added(self):
         out = self.assembled()
         self.assertEqual(self.check_exit(out).code, 0)
-        self.ws.image("refs/mine/sketch-copy.jpg", reencoded(G.mark_image(G.own)), "JPEG", quality=90)
+        # The person's L drawn again on a wide page: the same mark, another picture.
+        page, d = G.canvas(900, 500)
+        G.own(d, 60, 50, 400)
+        self.ws.image("refs/mine/sketch-on-a-wide-page.png", page)
         with self.assertRaises(R.Refused) as cm:  # the trace gate, run now, refuses the source
             T.trace(self.sketch, brief=self.brief, refs=[self.mine, self.arena], out=self.ws.path("trace", "again.svg"))
         self.assertEqual(cm.exception.reason, "mask-too-close")
@@ -463,6 +791,16 @@ class BuildGates(unittest.TestCase):
         e = self.check_exit(out)
         self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
         self.assertEqual(e.reason, "collection-unlisted", str(e))
+        self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
+
+    def test_check_refuses_once_a_copy_of_the_source_is_collected(self):
+        out = self.assembled()
+        self.assertEqual(self.check_exit(out).code, 0)
+        world = self.ws.collection("world", {"cafe/60000001.png": reencoded(G.mark_image(G.own))})
+        e = self.check_exit(out)
+        self.assertIsInstance(e, R.Refused, f"check_logo.py exited {e.code} instead of refusing")
+        self.assertEqual(e.reason, "collected-copy", str(e))
+        self.assertIn(os.path.join(world, "cafe", "60000001.png"), str(e))
         self.assertFalse(os.path.exists(os.path.join(out, "check.json")), "a refused check left its old check.json")
 
     def test_check_refuses_a_trace_gated_before_a_collection_was_added(self):
