@@ -29,11 +29,18 @@ cropped copy of a collected photo passes them. This compares the pictures themse
    own detail where it shows: one edge of a mark, or one side of a ball, matches some window of other pictures too.
    What a window holds is measured at COARSE px in the refinement too: at FINE px a picture's sharpest edges weigh
    more, so a copy whose clear part takes them would hold less of its detail at the window that undoes its cut.
+6. Two views, one or both with alpha, that reach FLOOR are then compared at their own size (_native): a pixel of a
+   square averages what a copy shows with what it hides, so where the clear pixels are finer than that (stripes a
+   pixel or two wide), each pixel of the other image's square holds what the copy hides. The view with alpha is laid
+   on the other where the refinement put it, the way round it scored higher, and moved to within an eighth of its
+   own pixel by the fine detail of what it shows (_register); then each FINE px averages only its pixels that show
+   and the other's resampled onto them, each weighted by how much both show (_cells), and scores as in step 5. The
+   searches only find where: a mask laid a pixel off picks what it hides as surely as no mask.
 
-A pairing's score is its refined score, or its coarse score under FLOOR; two images score the highest of their
-pairings. The gate refuses at LIMIT and over. It does not see a picture turned (but by its EXIF orientation),
-mirrored, cut by more than CUT on a side, reduced to a small part of a larger one, or a copy that shows under
-MIN_SHOWN of it or holds under MIN_HELD of its detail at COARSE px.
+A pairing's score is its refined score (with alpha, its score at their own size), or its coarse score under FLOOR;
+two images score the highest of their pairings. The gate refuses at LIMIT and over. It does not see a picture turned
+(but by its EXIF orientation), mirrored, cut by more than CUT on a side, reduced to a small part of a larger one, or a
+copy that shows under MIN_SHOWN of it or holds under MIN_HELD of its detail at COARSE px.
 """
 from __future__ import annotations
 
@@ -69,25 +76,24 @@ def _square(grey: Image.Image) -> np.ndarray:
     return np.asarray(grey.resize((SQUARE, SQUARE), Image.BOX), dtype=np.float32) / 255
 
 
-def _grounds(im: Image.Image) -> list[tuple[np.ndarray, np.ndarray | None]]:
-    """(grey, alpha or None) squares of `im`: on white and, with transparency, on black and as its colour channels
-    alone; with clear pixels, on black again with the alpha that says how much of each pixel shows (on black, a pixel
-    is its colour times that alpha)."""
+def _grounds(im: Image.Image) -> list[tuple[Image.Image, Image.Image | None]]:
+    """(grey, alpha or None) of `im` at its own size, as "L" images: on white and, with transparency, on black and as
+    its colour channels alone; with clear pixels, on black again with the alpha that says how much of each pixel shows
+    (on black, a pixel is its colour times that alpha)."""
     if not L.transparent(im):
-        return [(_square(im.convert("L")), None)]
+        return [(im.convert("L"), None)]
     rgba = im.convert("RGBA")
-    on = {g: _square(Image.alpha_composite(Image.new("RGBA", im.size, (*g, 255)), rgba).convert("L"))
-          for g in (WHITE, BLACK)}
-    out = [(on[WHITE], None), (on[BLACK], None), (_square(rgba.convert("L")), None)]  # last: as raster_mask() reads it
-    alpha = _square(rgba.getchannel("A"))
-    if alpha.min() < 1:
+    on = {g: Image.alpha_composite(Image.new("RGBA", im.size, (*g, 255)), rgba).convert("L") for g in (WHITE, BLACK)}
+    out = [(on[WHITE], None), (on[BLACK], None), (rgba.convert("L"), None)]  # last: as raster_mask() reads it
+    alpha = rgba.getchannel("A")
+    if _square(alpha).min() < 1:
         out.append((on[BLACK], alpha))
     return out
 
 
-def views(im: Image.Image, crop=WHOLE) -> list[tuple[np.ndarray, np.ndarray | None]]:
-    """The (grey, alpha or None) squares `im` is compared as, of the part `crop` (x, y, w, h in fractions) takes:
-    _grounds() of it as stored and, with an EXIF orientation, as shown (logolib.orientations). Floats 0-1."""
+def views(im: Image.Image, crop=WHOLE) -> list[tuple[Image.Image, Image.Image | None]]:
+    """The (grey, alpha or None) "L" images `im` is compared as, of the part `crop` (x, y, w, h in fractions) takes:
+    _grounds() of it as stored and, with an EXIF orientation, as shown (logolib.orientations)."""
     x, y, w, h = (float(v) for v in crop)
     W, H = im.size
     part = im.crop((round(x * W), round(y * H), round((x + w) * W), round((y + h) * H)))
@@ -251,19 +257,35 @@ def _whole(spans: _Spans, square: np.ndarray, alpha: np.ndarray | None, details:
 
 
 class Picture:
-    """An image's views, ready to compare: each whole at both sizes, as detail and as _shown() gives it, and its coarse
-    windows when first asked for."""
+    """An image's views, ready to compare: each whole at both sizes, as detail and as _shown() gives it, its coarse
+    windows when first asked for, and each view at its own size (native()) when a pairing with alpha needs it."""
 
-    def __init__(self, views: list[tuple[np.ndarray, np.ndarray | None]]):
-        self.squares = [s for s, _ in views]
-        self.alphas = [a for _, a in views]
+    def __init__(self, views: list[tuple[Image.Image, Image.Image | None]], remake=None):
+        """`views` as views() gives them; `remake()` gives them again for native(), so a collected image, of which a
+        trace compares every one, keeps only its squares. Without `remake` the views are kept."""
+        self.squares = [_square(g) for g, _ in views]
+        self.alphas = [None if a is None else _square(a) for _, a in views]
         self.halves = [_halve(s) for s in self.squares]
         self.coarse = [_details(_COARSE_WHOLE, _COARSE_WHOLE, h)[0, 0] for h in self.halves]
         self.fine = [_details(_FINE_WHOLE, _FINE_WHOLE, s)[0, 0] for s in self.squares]
         self.coarse_shown = [_whole(_COARSE_WHOLE, h, None if a is None else _halve(a), d)
                              for h, a, d in zip(self.halves, self.alphas, self.coarse)]
         self.fine_shown = [_whole(_FINE_WHOLE, s, a, d) for s, a, d in zip(self.squares, self.alphas, self.fine)]
-        self._details = self._shown = None
+        self._details = self._shown = self._native = None
+        self._remake = remake or (lambda: views)
+        self._samples: dict[int, _Samples] = {}
+
+    def native(self, i: int) -> tuple[np.ndarray, np.ndarray | None]:
+        """View i at its own size: (grey, alpha or None), each 0-255 in uint8."""
+        if self._native is None:
+            self._native = [(np.asarray(g), None if a is None else np.asarray(a)) for g, a in self._remake()]
+        return self._native[i]
+
+    def samples(self, i: int) -> "_Samples":
+        """View i's _Samples, for _register() where it is the frame."""
+        if i not in self._samples:
+            self._samples[i] = _samples(*self.native(i))
+        return self._samples[i]
 
     def details(self) -> list[np.ndarray]:
         """Each view's coarse windows less their blur, as _details() gives them, (len(SPANS) ** 2, COARSE ** 2): row i
@@ -289,11 +311,14 @@ class Picture:
 def picture(data: bytes, crops=(WHOLE,)) -> Picture:
     """The image in `data` seen whole, or as each part `crops` takes. One neither Pillow nor resvg can read has no
     views and scores 0: the distance gates refuse it ("not-comparable") where they compare it."""
-    try:
+    def remake():
         im = L.open_image(data)
+        return [v for c in crops for v in views(im, c)]
+
+    try:
+        return Picture(remake(), remake)
     except Exception:
         return Picture([])
-    return Picture([v for c in crops for v in views(im, c)])
 
 
 def source(data: bytes, crop=WHOLE) -> Picture:
@@ -331,9 +356,10 @@ def _coarse_held(big: Picture, i: int, small: Picture, j: int, down: _Spans, acr
     return _held(x, small.coarse_shown[j])
 
 
-def _refine(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, float, float, float]) -> float:
-    """The best score of `small`'s view j whole, at FINE, against windows of `big`'s view i near `cut` (left, top,
-    right, bottom left out), moving each side a step of 1/64, then of 1/128."""
+def _refine(big: Picture, i: int, small: Picture, j: int,
+            cut: tuple[float, float, float, float]) -> tuple[float, tuple[float, float, float, float]]:
+    """(the best score, its window) of `small`'s view j whole, at FINE, against windows of `big`'s view i near `cut`
+    (left, top, right, bottom left out), moving each side a step of 1/64, then of 1/128."""
     square, alpha = big.squares[i], big.alphas[i]
     best = -1.0
     for step in (1 / 64, 1 / 128):
@@ -356,23 +382,241 @@ def _refine(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, floa
             best = float(s[y, x])
             (t, b), (l, r) = down.spans[y], across.spans[x]
             cut = (l, t, r, b)
-    return best
+    return best, cut
+
+
+SAMPLES = 1 << 15  # the most pixels that show _register() compares, drawn once with a fixed seed
+REACH = 1 / 128  # how far _register() moves an end, of the other's side: _refine()'s last step
+DETAIL = 2  # _register() takes each px less the mean of a square of 2 * DETAIL + 1 frame px around it
+
+
+def _along(v: np.ndarray, axis: int, n: int, a: float, c: float, area: bool) -> np.ndarray:
+    """`v` resampled along `axis` to n px, px i taking what lies at a * i + c in v (its px centred on whole numbers):
+    with `area`, the mean of v over [a * i + c - a / 2, a * i + c + a / 2], each px weighted by how much of it lies
+    there; else v linearly interpolated at that point. Clamped at the ends."""
+    v = np.moveaxis(np.asarray(v, dtype=np.float32), axis, 0)
+    m, shape = v.shape[0], (-1,) + (1,) * (v.ndim - 1)
+    at = a * np.arange(n) + c
+    if area:
+        s = np.concatenate([np.zeros((1, *v.shape[1:])), np.cumsum(v, 0, dtype=np.float64)])
+
+        def upto(x):  # the sum of v over [0, x), x on its px edges (px k spans [k, k + 1))
+            x = np.clip(x, 0, m)
+            k = np.minimum(np.floor(x).astype(int), m - 1)
+            return s[k] + (x - k).reshape(shape) * v[k]
+
+        lo, hi = at - a / 2 + 0.5, at + a / 2 + 0.5
+        out = (upto(hi) - upto(lo)) / np.maximum(np.clip(hi, 0, m) - np.clip(lo, 0, m), 1e-12).reshape(shape)
+    else:
+        p = np.clip(at, 0, m - 1)
+        k = np.minimum(np.floor(p).astype(int), max(m - 2, 0))
+        f = (p - k).reshape(shape)
+        out = v[k] * (1 - f) + v[np.minimum(k + 1, m - 1)] * f
+    return np.moveaxis(out, 0, axis)
+
+
+def _ends(big: tuple[int, int], small: tuple[int, int], cut, small_is_frame: bool) -> list[list[float]]:
+    """Down and across, where the window `cut` (left, top, right, bottom left out of `big`, shapes (rows, columns))
+    puts the first and the last px of the frame, the view with alpha (`small`, or `big`), in the other's px (each
+    centred on a whole number)."""
+    l, t, r, b = cut
+    out = []
+    for nb, ns, lo, hi in ((big[0], small[0], t, b), (big[1], small[1], l, r)):
+        kept = 1 - lo - hi
+        if small_is_frame:  # small px x is big px nb * (lo + kept * (x + 0.5) / ns) - 0.5
+            px, n = (lambda x: nb * (lo + kept * (x + 0.5) / ns) - 0.5), ns
+        else:  # big px x is small px ((x + 0.5) / nb - lo) * ns / kept - 0.5
+            px, n = (lambda x: ((x + 0.5) / nb - lo) * ns / kept - 0.5), nb
+        out.append([px(0), px(n - 1)])
+    return out
+
+
+def _line(ends: list[float], n: int) -> tuple[float, float]:
+    """(a, c): px x of a side of n px lies at a * x + c in the other's px, from where its first and last px lie."""
+    return (ends[1] - ends[0]) / max(n - 1, 1), ends[0]
+
+
+class _Samples(NamedTuple):
+    """Up to SAMPLES px of a view with alpha that show at least half: where they are, how much each shows, and its
+    colour less the mean of what shows around it (in a square of 2 * DETAIL + 1 px)."""
+    ys: np.ndarray
+    xs: np.ndarray
+    weight: np.ndarray
+    detail: np.ndarray
+
+
+def _samples(grey: np.ndarray, alpha: np.ndarray) -> _Samples:
+    from scipy.ndimage import uniform_filter
+
+    shows = alpha.astype(np.float32) / 255
+    lit = grey.astype(np.float32) / 255  # on black: colour times alpha
+    ys, xs = np.nonzero(alpha >= 128)
+    pick = np.random.default_rng(0).permutation(len(ys))[:SAMPLES]
+    ys, xs = ys[pick], xs[pick]
+    side = 2 * DETAIL + 1
+    near = uniform_filter(lit, side)[ys, xs] / np.maximum(uniform_filter(shows, side)[ys, xs], 1e-6)
+    return _Samples(ys, xs, shows[ys, xs].astype(np.float64), (lit[ys, xs] / shows[ys, xs] - near).astype(np.float64))
+
+
+def _register(frame: _Samples, shape: tuple[int, int], other: tuple[np.ndarray, np.ndarray | None],
+              ends: list[list[float]]) -> list[list[float]]:
+    """`ends` (_ends()) moved to where the fine detail of the frame's px that show (`frame`, of a view of `shape`)
+    agrees best with the other view's, linearly interpolated there: Pearson's r of the two, each px less the mean of
+    what shows around it (in a square of 2 * DETAIL + 1 frame px; where a frame px covers more than one of the
+    other's, theirs averaged first), and weighted by how much both show of it. Each end moves alone, up to 2 steps
+    either way and no further than REACH of the other's side from where it was, the step starting at 1/512 of that
+    side and halving down to an eighth of a frame px. A mask finer than the alignment the search finds at 128 px
+    picks the other's px it is laid on: a px off, these two compare what the copy shows with what it hides. Only the
+    fine detail counts, as only a copy shares it: the lit walls of two photos staged alike, in all, agree better
+    once moved a few px."""
+    from scipy.ndimage import uniform_filter, uniform_filter1d
+
+    og, oa = other
+    scale = [abs(_line(e, n)[0]) for e, n in zip(ends, shape)]
+    planes = [og.astype(np.float32) / 255] + ([] if oa is None else [oa.astype(np.float32) / 255])
+    for axis, a in enumerate(scale):
+        if a > 1.5:
+            planes = [uniform_filter1d(p, max(1, round(a)), axis=axis, mode="nearest") for p in planes]
+    side = [2 * max(1, round(DETAIL * a)) + 1 for a in scale]
+    if oa is None:
+        planes = [planes[0] - uniform_filter(planes[0], side, mode="nearest")]
+    else:  # on black over alpha, less what shows around it
+        planes = [np.divide(planes[0], planes[1], out=np.zeros_like(planes[0]), where=planes[1] > 1e-3)
+                  - uniform_filter(planes[0], side, mode="nearest")
+                  / np.maximum(uniform_filter(planes[1], side, mode="nearest"), 1e-6), planes[1]]
+    H, W = og.shape
+    flat = [p.ravel() for p in planes]
+
+    def at(p: np.ndarray, y: np.ndarray, x: np.ndarray) -> np.ndarray:
+        y, x = np.clip(y, 0, H - 1), np.clip(x, 0, W - 1)
+        y0, x0 = np.minimum(y.astype(np.int64), max(H - 2, 0)), np.minimum(x.astype(np.int64), max(W - 2, 0))
+        fy, fx = y - y0, x - x0
+        k = y0 * W + x0
+        dy, dx = (H > 1) * W, int(W > 1)
+        top = p[k] * (1 - fx) + p[k + dx] * fx
+        return top * (1 - fy) + (p[k + dy] * (1 - fx) + p[k + dy + dx] * fx) * fy
+
+    def agree(e: list[list[float]]) -> float:
+        (ay, cy), (ax, cx) = (_line(v, n) for v, n in zip(e, shape))
+        y, x = ay * frame.ys + cy, ax * frame.xs + cx
+        w = frame.weight * ((y >= -0.5) & (y <= H - 0.5) & (x >= -0.5) & (x <= W - 0.5))
+        v = at(flat[0], y, x)
+        if oa is not None:
+            w = w * at(flat[1], y, x)
+        total = w.sum()
+        if total < 100:
+            return -1.0
+        dc, dv = frame.detail - (w * frame.detail).sum() / total, v - (w * v).sum() / total
+        vc, vv = (w * dc * dc).sum(), (w * dv * dv).sum()
+        return float((w * dc * dv).sum() / np.sqrt(vc * vv)) if vc > 1e-12 and vv > 1e-12 else -1.0
+
+    start, ends = ends, [list(e) for e in ends]
+    best = agree(ends)
+    steps = [max(og.shape[k] / 512, a / 8) for k, a in enumerate(scale)]
+    floors = [a / 8 for a in scale]
+    while any(st >= f for st, f in zip(steps, floors)):
+        for _ in range(2):
+            moved = False
+            for axis in (k for k in range(2) if steps[k] >= floors[k]):
+                for end in range(2):
+                    here, keep = ends[axis][end], ends[axis][end]
+                    for k in (-2, -1, 1, 2):
+                        ends[axis][end] = here + k * steps[axis]
+                        if abs(ends[axis][end] - start[axis][end]) > REACH * og.shape[axis]:
+                            continue
+                        v = agree(ends)
+                        if v > best:
+                            best, keep, moved = v, ends[axis][end], True
+                    ends[axis][end] = keep
+            if not moved:
+                break
+        steps = [st / 2 for st in steps]
+    return ends
+
+
+def _cells(frame: tuple[np.ndarray, np.ndarray], other: tuple[np.ndarray, np.ndarray | None],
+           ends: list[list[float]], held: float) -> float:
+    """The score of the frame against the other view where `ends` lay it, at FINE px over the frame's px that land on
+    the other: each FINE px averages the frame's px, and the other resampled onto them (averaged where a frame px
+    covers more than one of its px, else linearly interpolated), each weighted by how much both show of it, so no px
+    either hides counts. Then as _shown_scores(), with `held` (at COARSE px, as the search measured it)."""
+    (fg, fa), (og, oa) = frame, other
+    lines = [_line(e, n) for e, n in zip(ends, fg.shape)]
+    span = []
+    for (a, c), n, m in zip(lines, fg.shape, og.shape):
+        x = np.arange(n)
+        on = np.nonzero((a * x + c >= -0.5) & (a * x + c <= m - 0.5))[0]
+        span.append((int(on[0]), int(on[-1]) + 1) if len(on) >= 4 else None)
+    if None in span:
+        return 0.0
+    (y0, y1), (x0, x1) = span
+    (ay, cy), (ax, cx) = lines
+
+    def onto(p: np.ndarray) -> np.ndarray:  # the axis that shrinks it most first
+        steps = [(0, y1 - y0, ay, cy + ay * y0), (1, x1 - x0, ax, cx + ax * x0)]
+        for axis, n, a, c in sorted(steps, key=lambda st: st[1] / p.shape[st[0]]):
+            p = _along(p, axis, n, a, c, abs(a) > 1)
+        return p
+
+    shows = fa[y0:y1, x0:x1] / 255.0
+    lit = fg[y0:y1, x0:x1] / 255.0  # on black: the frame's colour times its alpha
+    seen = onto(og) / 255  # the other's grey, or on black its colour times its alpha
+    if oa is None:
+        w, mine, theirs = shows, lit, shows * seen
+    else:
+        both = onto(oa) / 255
+        w, mine, theirs = shows * both, lit * both, shows * seen
+
+    def fine(p: np.ndarray) -> np.ndarray:
+        p = _along(p, 0, FINE, p.shape[0] / FINE, p.shape[0] / FINE / 2 - 0.5, True)
+        return _along(p, 1, FINE, p.shape[1] / FINE, p.shape[1] / FINE / 2 - 0.5, True).reshape(1, -1)
+
+    w, mine, theirs = fine(w), fine(mine), fine(theirs)
+    x = _shown(mine, w)
+    y = _Shown(np.divide(theirs, w, out=np.zeros_like(theirs), where=w > 0), None, None, None, None)
+    return float(_shown_scores(x, y, np.asarray([held]))[0])
+
+
+def _native(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, float, float, float]) -> float:
+    """The score of `small`'s view j against `big`'s view i, one or both with alpha, at their own size: the view with
+    alpha (the frame; small's when both have) laid on the other where _refine() put it (`cut`), _register()ed, and
+    compared by _cells(). The searches at 32 and 64 px only find where: a px of theirs holds what the frame hides
+    wherever its clear px are finer than a px of the 128 px squares."""
+    frame_is_small = small.alphas[j] is not None
+    (f, fi), (o, oi) = ((small, j), (big, i)) if frame_is_small else ((big, i), (small, j))
+    frame, other = f.native(fi), o.native(oi)
+    ends = _register(f.samples(fi), frame[0].shape, other,
+                     _ends(big.native(i)[0].shape, small.native(j)[0].shape, cut, frame_is_small))
+    l, t, r, b = cut
+    held = _coarse_held(big, i, small, j, _Spans(2 * COARSE, COARSE, [(t, b)]), _Spans(2 * COARSE, COARSE, [(l, r)]))
+    return _cells(frame, other, ends, float(held[0]))
 
 
 def score(a: Picture, b: Picture) -> float:
-    """How much `a` and `b` are the same picture, 0 to 1: the highest over their views, each way round."""
+    """How much `a` and `b` are the same picture, 0 to 1: the highest over their views, each way round. Two views one
+    or both with alpha whose coarse search reaches FLOOR either way round score as _native() gives it, laid the way
+    round _refine() scored higher."""
     best = 0.0
     k = len(SPANS)
+    laid = {}  # (a's view, b's view) with alpha -> (refined score, big, i, small, j, window)
     for big, small in ((b, a), (a, b)):
         for i in range(len(big.squares) if small.squares else 0):
             for j in range(len(small.squares)):
                 s = _coarse_scores(big, i, small, j)
                 w = int(s.argmax())
-                if s[w] >= FLOOR:
-                    (t, bt), (l, r) = SPANS[w // k], SPANS[w % k]
-                    best = max(best, _refine(big, i, small, j, (l, t, r, bt)))
-                else:
+                if s[w] < FLOOR:
                     best = max(best, float(s[w]))
+                    continue
+                (t, bt), (l, r) = SPANS[w // k], SPANS[w % k]
+                fine, cut = _refine(big, i, small, j, (l, t, r, bt))
+                if big.alphas[i] is None and small.alphas[j] is None:
+                    best = max(best, fine)
+                    continue
+                pair = (i, j) if big is a else (j, i)
+                if pair not in laid or fine > laid[pair][0]:
+                    laid[pair] = (fine, big, i, small, j, cut)
+    for _, big, i, small, j, cut in laid.values():
+        best = max(best, _native(big, i, small, j, cut))
     return best
 
 

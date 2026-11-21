@@ -489,6 +489,40 @@ class PartlyClear(unittest.TestCase):
                 verdicts[cut] = e.reason
         self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
 
+    STRIPES = ((8, 5), (4, 2), (2, 1), (16, 10))  # (every, shown): 1 to 3 px clear, and a band of 6 px
+
+    def striped(self, seed: int, collected) -> dict[str, str | float]:
+        """Each striped copy of G.threaded(seed), whole and cut 4% each side, against `collected`: its refusal, or its
+        score."""
+        photo = G.threaded(seed)
+        W, H = photo.size
+        verdicts = {}
+        for axis in ("columns", "rows"):
+            for every, shown in self.STRIPES:
+                for cut in (0, 0.04):
+                    name = f"{shown} of every {every} {axis}{f', cut {cut:.0%}' if cut else ''}"
+                    copy = G.cleared(photo, shown / every, axis, "zeroed", every)
+                    copy = copy.crop((round(cut * W), round(cut * H), round((1 - cut) * W), round((1 - cut) * H)))
+                    try:
+                        verdicts[name] = SP.gate(name, SP.source(png(copy)), collected)["score"]
+                    except R.Refused as e:
+                        verdicts[name] = e.reason
+        return verdicts
+
+    def test_refuses_striped_copies_of_a_collected_photo_whose_detail_is_finer_than_its_square(self):
+        """Stripes thinner than a pixel of the photo's 128 px square: averaged there, each pixel of the collected
+        photo also holds the threads the stripes hide, which the copy does not show. Compared so, these copies scored
+        0.65 to 0.89."""
+        collected = [("world/mockups/90000003.png", "", SP.picture(png(G.threaded(0))))]
+        verdicts = self.striped(0, collected)
+        print("\n" + "\n".join(f"  {name}: {v}" for name, v in verdicts.items()))
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
+    def test_passes_the_same_striped_copies_of_another_photo(self):
+        verdicts = self.striped(1, [("world/mockups/90000003.png", "", SP.picture(png(G.threaded(0))))])
+        print(f"\n  highest: {max(v for v in verdicts.values() if isinstance(v, float)):.4f}")
+        self.assertEqual({k: v for k, v in verdicts.items() if not isinstance(v, float)}, {})
+
 
 @G.needs_potrace
 class BuildGates(unittest.TestCase):

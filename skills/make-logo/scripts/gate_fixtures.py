@@ -175,11 +175,33 @@ def photo(seed: int = 0, size: tuple[int, int] = (640, 480), cut_out: bool = Fal
     return out
 
 
+def threaded(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
+    """photo(seed) with thin dark threads across it both ways, the way fabric, fine print or a wire fence photographs:
+    detail a pixel wide, finer than a pixel of the 128 px squares the same-picture gate first squeezes images into."""
+    import numpy as np
+
+    im = photo(seed, size)
+    d = ImageDraw.Draw(im)
+    rng = np.random.default_rng(seed + 31)
+    W, H = size
+    for k in range(2400):
+        x, y = rng.uniform(0, W), rng.uniform(0, H)
+        ink = tuple(int(v) for v in rng.uniform(0, 90, 3))
+        if k % 2:
+            half = rng.uniform(0.1, 0.3) * W
+            d.line([(x - half, y), (x + half, y)], fill=ink, width=1)
+        else:
+            half = rng.uniform(0.1, 0.3) * H
+            d.line([(x, y - half), (x, y + half)], fill=ink, width=1)
+    return im
+
+
 def cleared(im: Image.Image, shown: float, shape: str, hidden: str = "zeroed", cell: int = 8,
             seed: int = 0) -> Image.Image:
     """`im` as RGBA with all but `shown` of it made clear and the rest left as it was: around the edges (a centred box
-    of its aspect shows), in the centre (a centred box of its aspect is clear), or in patches (squares of `cell` px,
-    picked at random). The colour under the clear pixels is `hidden`: "kept", "zeroed" or "noise"."""
+    of its aspect shows), in the centre (a centred box of its aspect is clear), in patches (squares of `cell` px,
+    picked at random), or in stripes ("columns" or "rows": the first round(shown * cell) of every `cell` show). The
+    colour under the clear pixels is `hidden`: "kept", "zeroed" or "noise"."""
     import numpy as np
 
     rgb = np.asarray(im.convert("RGB")).copy()
@@ -195,6 +217,8 @@ def cleared(im: Image.Image, shown: float, shape: str, hidden: str = "zeroed", c
         cells = np.zeros(rows * cols, bool)
         cells[rng.permutation(rows * cols)[:round(shown * rows * cols)]] = True
         show = np.kron(cells.reshape(rows, cols), np.ones((cell, cell), bool))[:H, :W]
+    elif shape in ("columns", "rows"):
+        show = ((x if shape == "columns" else y) % cell) < round(shown * cell)
     else:
         raise ValueError(shape)
     if hidden == "zeroed":
