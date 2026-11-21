@@ -84,7 +84,9 @@ traced, and the scripts refuse them by hash and by likeness.
    collected file that is gone or no longer has the sha256 its manifest lists (`collection-changed`), is refused too;
    `node scripts/collection.mjs <name>` clears what a stopped pull left and lists what the collection holds now. A
    file whose sha256 a manifest lists is named as collected before a collected file that is gone or changed, as check,
-   package and book name it: a new pull mends the one, never the other. Last,
+   package and book name it: a new pull mends the one, never the other (check reads its `--refs` first, so a gone
+   collected file passed there by name is `refs-missing` at check). A source that is not a raster image Pillow can
+   read is refused (`not-comparable`). Last,
    the file and the part `--crop` takes are compared as pictures with every collected image, whatever
    `trace_sources` lists, and one that is the same picture saved again, resized, cut a little, made lighter or darker,
    or partly made clear is refused (`collected-copy`; see Same picture). The person's own sketch in `--refs` (its

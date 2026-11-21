@@ -81,6 +81,12 @@ class TraceGates(unittest.TestCase):
         self.assertFalse(os.path.exists(self.out), "a refused trace wrote its SVG")
         return cm.exception
 
+    def test_refuses_a_source_it_cannot_read_as_an_image(self):
+        source = self.ws.path("sketches", "own.png")
+        R.write_bytes(source, b"not an image")
+        e = self.refused("not-comparable", source, [self.ws.entry(source)])
+        self.assertIn(source, str(e))
+
     def test_refuses_a_file_not_in_trace_sources(self):
         other = self.ws.image("sketches/other.png", G.mark_image(G.own).rotate(90))
         self.refused("not-in-brief", self.sketch, [self.ws.entry(other)])

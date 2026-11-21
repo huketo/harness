@@ -56,7 +56,7 @@ import resvg_py
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.svgLib.path import parse_path
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import distance as D  # noqa: E402
@@ -288,7 +288,11 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
     collected = R.collected_files([(source, src_sha)])
     cal, cal_sha = calibration_snapshot(calibration)
     crop = [float(v) for v in crop]
-    mask = raster_mask(data, crop, threshold, invert, long_side)
+    try:
+        mask = raster_mask(data, crop, threshold, invert, long_side)
+    except UnidentifiedImageError:
+        raise R.Refused("not-comparable", f"{source} can't be read as a raster image, so it can't be traced or "
+                                          "compared. Export it as PNG or JPEG.") from None
     mask_pbm = pbm(mask)
     mask_sha = R.sha256_bytes(mask_pbm)
     if reproduce and mask_sha != reproduce.get("mask_sha256"):
