@@ -18,6 +18,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest import mock
 
+import numpy as np
 import resvg_py
 from PIL import Image, ImageEnhance
 
@@ -32,6 +33,12 @@ import same_picture as SP  # noqa: E402
 import trace_ref as T  # noqa: E402
 
 LIMIT = D.load_calibration(None)["limit"]
+
+
+def png(im: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return buf.getvalue()
 
 
 def reencoded(im: Image.Image) -> Image.Image:
@@ -413,6 +420,51 @@ class TraceGates(unittest.TestCase):
         said = subprocess.run([rec["potrace"]["path"], "--version"], capture_output=True, text=True, check=True).stdout
         self.assertEqual(rec["potrace"]["version"], said.strip().splitlines()[0])
         self.assertEqual(rec["svg_sha256"], R.sha256_file(self.out))
+
+
+class PartlyClear(unittest.TestCase):
+    """same_picture.gate(), which trace, check, package and book all call, on a collected photo copied with part of it
+    made clear: every copy that shows MIN_SHOWN or more of the photo and MIN_HELD or more of its subject (the box and
+    the ball) is that photo, whatever shape is cleared and whatever colour is left under the clear pixels; the same
+    copies of another photo are not. A copy that shows less of the subject is not asked for (references/building.md,
+    "Same picture")."""
+
+    SHOWN = (0.9, 0.65, 0.4, 0.2)  # each over MIN_SHOWN
+    SHAPES = (("edges", 0), ("centre", 0), ("patches", 8), ("patches", 32))
+    HIDDEN = ("kept", "zeroed", "noise")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.collected = [("world/mockups/90000001.png", "", SP.picture(png(G.photo(0))))]
+
+    def verdicts(self, seed: int) -> list[tuple[str, float, str | None, float]]:
+        """(copy, share of the subject it shows, refusal or None, score) of each cleared copy of photo `seed` against
+        photo 0."""
+        subject = np.asarray(G.photo(seed, cut_out=True).getchannel("A")) > 0
+        out = []
+        for shown in self.SHOWN:
+            for shape, cell in self.SHAPES:
+                for hidden in self.HIDDEN:
+                    name = f"{shown:.0%} shown, {shape}{f' {cell} px' if cell else ''}, colour {hidden}"
+                    copy = G.cleared(G.photo(seed), shown, shape, hidden, cell)
+                    held = float((np.asarray(copy.getchannel("A"))[subject] > 0).mean())
+                    try:
+                        out.append((name, held, None, SP.gate(name, SP.source(png(copy)), self.collected)["score"]))
+                    except R.Refused as e:
+                        out.append((name, held, e.reason, e.detail["copy_nearest"]["score"]))
+        return out
+
+    def test_refuses_every_partly_clear_copy_of_a_collected_photo(self):
+        verdicts = self.verdicts(0)
+        print("\n" + "\n".join(f"  {name}, {held:.0%} of the subject: {score:.4f}" for name, held, _, score in verdicts))
+        self.assertGreater(min(self.SHOWN), SP.MIN_SHOWN)
+        self.assertEqual([(name, held, score) for name, held, why, score in verdicts
+                          if held >= SP.MIN_HELD and why != "collected-copy"], [])
+
+    def test_passes_the_same_copies_of_another_photo(self):
+        verdicts = self.verdicts(1)
+        print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
+        self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
 
 
 @G.needs_potrace

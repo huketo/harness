@@ -545,9 +545,13 @@ class SamePictureAtEveryStep(Project):
         self.addCleanup(os.chdir, cwd)
 
     def verdicts(self, name: str, picture: Image.Image) -> dict[str, str | None]:
-        """Each step's refusal of a JPEG copy of `picture` traced into a direction, or None. The direction is traced,
-        built and checked as a version without the same-picture gate would, so each step has one to judge."""
-        copy = self.ws.image(f"sketches/{name}.jpg", picture, "JPEG", quality=75)
+        """Each step's refusal of a copy of `picture` (a JPEG, or a PNG when it has alpha) traced into a direction, or
+        None. The direction is traced, built and checked as a version without the same-picture gate would, so each
+        step has one to judge."""
+        if picture.mode == "RGBA":
+            copy = self.ws.image(f"sketches/{name}.png", picture)
+        else:
+            copy = self.ws.image(f"sketches/{name}.jpg", picture, "JPEG", quality=75)
         self.brief = self.ws.brief([*self.claims, self.ws.entry(copy)])
         with mock.patch.object(SP, "LIMIT", 2.0):
             T.trace(copy, brief=self.brief, refs=self.refs, out=self.ws.path("trace", f"{name}.svg"))
@@ -576,6 +580,11 @@ class SamePictureAtEveryStep(Project):
     def test_every_step_refuses_a_copy_of_a_collected_photo(self):
         self.assertEqual(self.verdicts("collected", G.photo(0)), dict.fromkeys(("trace", "package", "book", "check"),
                                                                                 "collected-copy"))
+
+    def test_every_step_refuses_a_partly_clear_copy_of_a_collected_photo(self):
+        copy = G.cleared(G.photo(0), 0.65, "patches", "zeroed")  # 65% shows as it was; the rest clear, colour zeroed
+        self.assertEqual(self.verdicts("partly-clear", copy), dict.fromkeys(("trace", "package", "book", "check"),
+                                                                            "collected-copy"))
 
     def test_every_step_passes_a_copy_of_a_refs_photo(self):
         for name, seed in (("mood", 2), ("found", 3)):  # in trace_sources, and not

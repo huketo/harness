@@ -175,6 +175,37 @@ def photo(seed: int = 0, size: tuple[int, int] = (640, 480), cut_out: bool = Fal
     return out
 
 
+def cleared(im: Image.Image, shown: float, shape: str, hidden: str = "zeroed", cell: int = 8,
+            seed: int = 0) -> Image.Image:
+    """`im` as RGBA with all but `shown` of it made clear and the rest left as it was: around the edges (a centred box
+    of its aspect shows), in the centre (a centred box of its aspect is clear), or in patches (squares of `cell` px,
+    picked at random). The colour under the clear pixels is `hidden`: "kept", "zeroed" or "noise"."""
+    import numpy as np
+
+    rgb = np.asarray(im.convert("RGB")).copy()
+    H, W = rgb.shape[:2]
+    y, x = np.mgrid[0:H, 0:W]
+    rng = np.random.default_rng(seed)
+    if shape in ("edges", "centre"):
+        f = np.sqrt(shown if shape == "edges" else 1 - shown) / 2
+        box = (abs(x + 0.5 - W / 2) < f * W) & (abs(y + 0.5 - H / 2) < f * H)
+        show = box if shape == "edges" else ~box
+    elif shape == "patches":
+        rows, cols = -(-H // cell), -(-W // cell)
+        cells = np.zeros(rows * cols, bool)
+        cells[rng.permutation(rows * cols)[:round(shown * rows * cols)]] = True
+        show = np.kron(cells.reshape(rows, cols), np.ones((cell, cell), bool))[:H, :W]
+    else:
+        raise ValueError(shape)
+    if hidden == "zeroed":
+        rgb[~show] = 0
+    elif hidden == "noise":
+        rgb[~show] = rng.integers(0, 256, (int((~show).sum()), 3))
+    elif hidden != "kept":
+        raise ValueError(hidden)
+    return Image.fromarray(np.dstack([rgb, np.where(show, 255, 0).astype(np.uint8)]), "RGBA")
+
+
 def exif_turned(im: Image.Image, quality: int = 95) -> bytes:
     """`im` as a camera writes it: JPEG pixels stored on their side, with an EXIF orientation (6) that shows them
     upright."""

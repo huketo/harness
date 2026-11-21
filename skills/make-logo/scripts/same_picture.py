@@ -12,26 +12,33 @@ cropped copy of a collected photo passes them. This compares the pictures themse
 
 1. Each image is seen in grey, squeezed into a SQUARE x SQUARE square (a crop changes the aspect, so it is dropped):
    flattened on white and, when it has transparency, on black and as its colour channels alone, which is what
-   trace_ref.raster_mask() gives potrace. One with clear pixels is also seen on white and on black with its alpha,
-   so that only what it shows counts (step 4). One with an EXIF orientation is seen both as stored and as shown. A
-   source is also seen as the part --crop takes.
+   trace_ref.raster_mask() gives potrace. One with clear pixels is also seen on black with its alpha, so that only
+   what it shows counts (step 5). One with an EXIF orientation is seen both as stored and as shown. A source is also
+   seen as the part --crop takes.
 2. One square is compared with every window of the other that leaves out up to CUT of each side, on a STEP grid, at
    COARSE x COARSE px, both ways round: the one a crop of the other, or the other with a border.
 3. The best window of each pairing whose score reaches FLOOR there is refined to 1/128 of a side, at FINE x FINE px.
 4. Each view is compared less its blur (a Gaussian, sigma an eighth of its side), so light falling across a wall
    counts for nothing, and the score is the correlation of the pixels (Pearson's r): 1 for the same picture whatever
-   its brightness and contrast. With alpha, each pixel counts as much as both pictures show of it, and a window
-   where they show under MIN_SHOWN of it scores 0: the colour under a clear pixel, which a copy may set to anything,
-   counts for nothing.
+   its brightness and contrast.
+5. Where either view has alpha, only what both show counts, so the colour under a clear pixel, which a copy may set
+   to anything, counts for nothing: each pixel's colour is its value on black over its alpha, it counts as much as
+   both show of it, and each view is less a plane fitted around each pixel to what both show (_Plane) rather than
+   its blur, which would carry the hidden colour, or the ground a copy is flattened on, into the pixels that show. A
+   window scores 0 where both show under MIN_SHOWN of it, or where that part holds under MIN_HELD of either view's
+   own detail where it shows: one edge of a mark, or one side of a ball, matches some window of other pictures too.
 
 A pairing's score is its refined score, or its coarse score under FLOOR; two images score the highest of their
 pairings. The gate refuses at LIMIT and over. It does not see a picture turned (but by its EXIF orientation),
-mirrored, cut by more than CUT on a side, reduced to a small part of a larger one, or showing under MIN_SHOWN of it.
+mirrored, cut by more than CUT on a side, reduced to a small part of a larger one, or a copy that shows under
+MIN_SHOWN of it or holds under MIN_HELD of its detail.
 """
 from __future__ import annotations
 
 import os
 import sys
+from functools import cache
+from typing import NamedTuple
 
 import numpy as np
 from PIL import Image
@@ -46,6 +53,7 @@ import rights as R  # noqa: E402
 LIMIT = 0.85
 FLOOR = 0.5
 MIN_SHOWN = 0.1
+MIN_HELD = 0.25
 SQUARE, COARSE, FINE = 128, 32, 64
 CUT, STEP = 1 / 8, 1 / 32
 WHOLE = (0.0, 0.0, 1.0, 1.0)
@@ -58,7 +66,8 @@ def _square(grey: Image.Image) -> np.ndarray:
 
 def _grounds(im: Image.Image) -> list[tuple[np.ndarray, np.ndarray | None]]:
     """(grey, alpha or None) squares of `im`: on white and, with transparency, on black and as its colour channels
-    alone; with clear pixels, on white and on black again with the alpha that says how much of each pixel shows."""
+    alone; with clear pixels, on black again with the alpha that says how much of each pixel shows (on black, a pixel
+    is its colour times that alpha)."""
     if not L.transparent(im):
         return [(_square(im.convert("L")), None)]
     rgba = im.convert("RGBA")
@@ -67,7 +76,7 @@ def _grounds(im: Image.Image) -> list[tuple[np.ndarray, np.ndarray | None]]:
     out = [(on[WHITE], None), (on[BLACK], None), (_square(rgba.convert("L")), None)]  # last: as raster_mask() reads it
     alpha = _square(rgba.getchannel("A"))
     if alpha.min() < 1:
-        out += [(on[WHITE], alpha), (on[BLACK], alpha)]
+        out.append((on[BLACK], alpha))
     return out
 
 
@@ -124,9 +133,91 @@ def _details(down: _Spans, across: _Spans, square: np.ndarray) -> np.ndarray:
     return np.where(norm > 1e-3, v / np.maximum(norm, 1e-12), 0).astype(np.float32)
 
 
-def _shown(down: _Spans, across: _Spans, alpha: np.ndarray | None) -> np.ndarray | None:
-    """The alpha of each window _details() takes, the same shape, or None for none."""
-    return None if alpha is None else _by_window(down, across, down.take @ alpha @ across.take.T)
+def _windows(down: _Spans, across: _Spans, square: np.ndarray) -> np.ndarray:
+    """(windows down, windows across, n * n): the window of `square` (grey or alpha) each pair of spans takes."""
+    return _by_window(down, across, down.take @ square @ across.take.T)
+
+
+@cache
+def _plane_blurs(n: int) -> list[np.ndarray]:
+    """n x n: _blur(n)'s Gaussian times the offset from each pixel (in sigmas) to the power 0, 1 and 2."""
+    i = np.arange(n)
+    d = (i[None, :] - i[:, None]) / (n / 8)
+    g = np.exp(-0.5 * d ** 2)
+    return [g * d ** k for k in range(3)]
+
+
+class _Plane:
+    """A plane fitted around each pixel of each row of `w`'s n x n squares: least squares weighted by the Gaussian of
+    _blur(n) and by `w`, how much of each pixel counts. A local mean would leave the slope of light falling across a
+    wall at every edge of what shows, and two lit walls would agree there; a plane takes it away. A small ridge on the
+    slope makes a pixel whose neighbours lie on one line less their mean."""
+
+    def __init__(self, w: np.ndarray):
+        self.w, self.n = w, round(np.sqrt(w.shape[1]))
+        s00, s10, s01, s20, s11, s02 = (self._moment(w, p, q) for p, q in ((0, 0), (1, 0), (0, 1), (2, 0), (1, 1),
+                                                                          (0, 2)))
+        s20, s02 = s20 + 1e-3 * s00, s02 + 1e-3 * s00
+        det = s00 * (s20 * s02 - s11 * s11) - s10 * (s10 * s02 - s11 * s01) + s01 * (s10 * s11 - s20 * s01)
+        det = np.where(det > 1e-12, det, np.inf)
+        self.of = [(s20 * s02 - s11 * s11) / det, (s11 * s01 - s10 * s02) / det, (s10 * s11 - s20 * s01) / det]
+
+    def _moment(self, v: np.ndarray, p: int, q: int) -> np.ndarray:
+        blurs, n = _plane_blurs(self.n), self.n
+        return (blurs[p] @ v.reshape(-1, n, n) @ blurs[q].T).reshape(len(v), n * n)
+
+    def less(self, v: np.ndarray) -> np.ndarray:
+        """Each row of `v` (or its one row against each of w's) less the plane fitted to it."""
+        vw = v * self.w
+        return v - sum(self._moment(vw, p, q) * c for (p, q), c in zip(((0, 0), (1, 0), (0, 1)), self.of))
+
+
+class _Shown(NamedTuple):
+    """A view's rows (n x n squares) ready for _shown_scores()."""
+    colour: np.ndarray  # a view with alpha is on black: each pixel's value over its alpha, whatever the rows averaged
+    alpha: np.ndarray | None
+    held: np.ndarray  # where its detail lies: its detail squared where it shows, each row summing to 1 (0: no detail)
+    plane: _Plane | None  # fitted over its alpha
+    detail: np.ndarray | None  # its colour less that plane
+
+
+def _shown(v: np.ndarray, alpha: np.ndarray | None, details: np.ndarray | None = None) -> _Shown:
+    """`v`'s rows as _Shown, with `alpha`'s; a view without alpha passes its details() for where its detail lies."""
+    v = v.astype(np.float64)
+    if alpha is None:
+        return _Shown(v, None, details.astype(np.float64) ** 2, None, None)
+    alpha = alpha.astype(np.float64)
+    v = np.divide(v, alpha, out=np.zeros_like(v), where=alpha > 0)
+    plane = _Plane(alpha)
+    detail = plane.less(v)
+    held = alpha * (detail - (alpha * detail).sum(1, keepdims=True) / np.maximum(alpha.sum(1, keepdims=True),
+                                                                                1e-12)) ** 2
+    total = held.sum(1, keepdims=True)
+    return _Shown(v, alpha, np.where(total > 1e-6, held / np.maximum(total, 1e-12), 0), plane, detail)
+
+
+def _shown_scores(x: _Shown, y: _Shown) -> np.ndarray:
+    """The score of each row of `x` against `y` (one row), one or both with alpha, where both show: Pearson's r of
+    their colours less a plane, each pixel weighted by how much both show of it, the plane fitted to that weight too
+    (_Plane), so what a clear pixel hides, or the ground a copy is flattened on, reaches no pixel that shows. 0 for a
+    window where they show under MIN_SHOWN of it, where that holds under MIN_HELD of either's detail (one edge of a
+    mark, one side of a ball: some window of other pictures matches it as well), or where either has no detail left
+    (under a thousandth, in 0-1 grey)."""
+    if x.alpha is not None and y.alpha is not None:
+        plane = _Plane(x.alpha * y.alpha)
+        w, dx, dy = plane.w, plane.less(x.colour), plane.less(y.colour)
+    elif x.alpha is not None:  # what both show is what x shows: x's own plane
+        w, dx, dy = x.alpha, x.detail, x.plane.less(y.colour)
+    else:
+        w, dx, dy = y.alpha, y.plane.less(x.colour), y.detail
+    n = w.shape[1]
+    s = w.sum(1)
+    dx = dx - (w * dx).sum(1, keepdims=True) / np.maximum(s, 1e-12)[:, None]
+    dy = dy - (w * dy).sum(1, keepdims=True) / np.maximum(s, 1e-12)[:, None]
+    vx, vy = (w * dx * dx).sum(1), (w * dy * dy).sum(1)
+    held = np.minimum((w * x.held).sum(1), (w * y.held).sum(1))
+    ok = (s >= MIN_SHOWN * n) & (held >= MIN_HELD) & (vx > 1e-6) & (vy > 1e-6)
+    return np.where(ok, (w * dx * dy).sum(1) / np.sqrt(np.where(ok, vx * vy, 1)), 0.0)
 
 
 SPANS = [(a, b) for a in np.arange(0, CUT + 1e-9, STEP) for b in np.arange(0, CUT + 1e-9, STEP)]  # off the two ends
@@ -139,9 +230,15 @@ def _halve(square: np.ndarray) -> np.ndarray:
     return square.reshape(2 * COARSE, SQUARE // (2 * COARSE), 2 * COARSE, -1).mean((1, 3))
 
 
+def _whole(spans: _Spans, square: np.ndarray, alpha: np.ndarray | None, details: np.ndarray) -> _Shown:
+    """A view whole, as _shown() gives it, at the size `spans` (one window, none left out) resamples to."""
+    return _shown(_windows(spans, spans, square)[0], None if alpha is None else _windows(spans, spans, alpha)[0],
+                  details[None])
+
+
 class Picture:
-    """An image's views, ready to compare: each whole at both sizes with its alpha, and its coarse windows when first
-    asked for."""
+    """An image's views, ready to compare: each whole at both sizes, as detail and as _shown() gives it, and its coarse
+    windows when first asked for."""
 
     def __init__(self, views: list[tuple[np.ndarray, np.ndarray | None]]):
         self.squares = [s for s, _ in views]
@@ -149,20 +246,30 @@ class Picture:
         self.halves = [_halve(s) for s in self.squares]
         self.coarse = [_details(_COARSE_WHOLE, _COARSE_WHOLE, h)[0, 0] for h in self.halves]
         self.fine = [_details(_FINE_WHOLE, _FINE_WHOLE, s)[0, 0] for s in self.squares]
-        self.coarse_alpha = [None if a is None else _shown(_COARSE_WHOLE, _COARSE_WHOLE, _halve(a))[0, 0]
-                             for a in self.alphas]
-        self.fine_alpha = [None if a is None else _shown(_FINE_WHOLE, _FINE_WHOLE, a)[0, 0] for a in self.alphas]
-        self._windows = None
+        self.coarse_shown = [_whole(_COARSE_WHOLE, h, None if a is None else _halve(a), d)
+                             for h, a, d in zip(self.halves, self.alphas, self.coarse)]
+        self.fine_shown = [_whole(_FINE_WHOLE, s, a, d) for s, a, d in zip(self.squares, self.alphas, self.fine)]
+        self._details = self._shown = None
 
-    def windows(self) -> list[tuple[np.ndarray, np.ndarray | None]]:
-        """Each view's coarse windows and their alpha, (len(SPANS) ** 2, COARSE ** 2): row i leaves out
-        SPANS[i // len(SPANS)] down and SPANS[i % len(SPANS)] across."""
-        if self._windows is None:
-            k = len(SPANS) ** 2
-            self._windows = [(_details(_COARSE, _COARSE, h).reshape(k, -1),
-                              None if a is None else _shown(_COARSE, _COARSE, _halve(a)).reshape(k, -1))
-                             for h, a in zip(self.halves, self.alphas)]
-        return self._windows
+    def details(self) -> list[np.ndarray]:
+        """Each view's coarse windows less their blur, as _details() gives them, (len(SPANS) ** 2, COARSE ** 2): row i
+        leaves out SPANS[i // len(SPANS)] down and SPANS[i % len(SPANS)] across."""
+        if self._details is None:
+            self._details = [_details(_COARSE, _COARSE, h).reshape(len(SPANS) ** 2, -1) for h in self.halves]
+        return self._details
+
+    def shown(self, i: int) -> _Shown:
+        """View i's coarse windows as _shown() gives them, rows as in details(). Kept only for a view with alpha, whose
+        detail takes a while to find: one without is cheap to take again, and a trace compares every collected image."""
+        k, a = len(SPANS) ** 2, self.alphas[i]
+        if a is None:
+            return _shown(_windows(_COARSE, _COARSE, self.halves[i]).reshape(k, -1), None, self.details()[i])
+        if self._shown is None:
+            self._shown = [None] * len(self.squares)
+        if self._shown[i] is None:
+            self._shown[i] = _shown(_windows(_COARSE, _COARSE, self.halves[i]).reshape(k, -1),
+                                    _windows(_COARSE, _COARSE, _halve(a)).reshape(k, -1))
+        return self._shown[i]
 
 
 def picture(data: bytes, crops=(WHOLE,)) -> Picture:
@@ -190,49 +297,38 @@ def cached(sha: str, data: bytes) -> Picture:
     return _CACHE[sha]
 
 
-def _scores(x: np.ndarray, x_alpha: np.ndarray | None, y: np.ndarray, y_alpha: np.ndarray | None) -> np.ndarray:
-    """The score of each row of `x` (windows, as _details() gives them) against `y`: their dot product, which is
-    Pearson's r. With alpha on either side, r with each pixel weighted by how much both show of it, and 0 for a
-    window where they show under MIN_SHOWN of it or it has no detail there."""
-    if x_alpha is None and y_alpha is None:
-        return x @ y
-    x, y = x.astype(np.float64), y.astype(np.float64)  # sums of squares less squared sums: float32 loses them
-    a = np.ones_like(y) if y_alpha is None else y_alpha.astype(np.float64)
-    u = np.stack([a, a * y, a * y * y], 1)
-    if x_alpha is None:  # each window shown in full: sums over y alone
-        s, sy, syy = u.sum(0)
-        sx, sxy = (x @ u[:, :2]).T
-        sxx = (x * x) @ a
-    else:
-        ax = x_alpha.astype(np.float64)
-        s, sy, syy = (ax @ u).T
-        ax = ax * x
-        sx, sxy = (ax @ u[:, :2]).T
-        sxx = (ax * x) @ a
-    var = (s * sxx - sx * sx) * (s * syy - sy * sy)
-    ok = (s >= MIN_SHOWN * len(y)) & (var > 1e-12)
-    return np.where(ok, (s * sxy - sx * sy) / np.sqrt(np.where(ok, var, 1)), 0.0)
+def _coarse_scores(big: Picture, i: int, small: Picture, j: int) -> np.ndarray:
+    """The score of each coarse window of `big`'s view i against `small`'s view j whole: where neither has alpha, the
+    dot product of their details, which is Pearson's r; else _shown_scores()."""
+    if big.alphas[i] is None and small.alphas[j] is None:
+        return big.details()[i] @ small.coarse[j]
+    return _shown_scores(big.shown(i), small.coarse_shown[j])
 
 
-def _refine(square: np.ndarray, alpha: np.ndarray | None, small: np.ndarray, small_alpha: np.ndarray | None,
-            cut: tuple[float, float, float, float]) -> float:
-    """The best score of `small` (a FINE view) against windows of `square` near `cut` (left, top, right, bottom left
-    out), moving each side a step of 1/64, then of 1/128."""
+def _refine(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, float, float, float]) -> float:
+    """The best score of `small`'s view j whole, at FINE, against windows of `big`'s view i near `cut` (left, top,
+    right, bottom left out), moving each side a step of 1/64, then of 1/128."""
+    square, alpha = big.squares[i], big.alphas[i]
     best = -1.0
     for step in (1 / 64, 1 / 128):
         l, t, r, b = cut
-        across = _Spans(SQUARE, FINE, [(l + i * step, r + j * step) for i in (-1, 0, 1) for j in (-1, 0, 1)
-                                       if l + i * step >= 0 and r + j * step >= 0])
-        down = _Spans(SQUARE, FINE, [(t + i * step, b + j * step) for i in (-1, 0, 1) for j in (-1, 0, 1)
-                                     if t + i * step >= 0 and b + j * step >= 0])
+        across = _Spans(SQUARE, FINE, [(l + p * step, r + q * step) for p in (-1, 0, 1) for q in (-1, 0, 1)
+                                       if l + p * step >= 0 and r + q * step >= 0])
+        down = _Spans(SQUARE, FINE, [(t + p * step, b + q * step) for p in (-1, 0, 1) for q in (-1, 0, 1)
+                                     if t + p * step >= 0 and b + q * step >= 0])
         shape = (len(down.spans), len(across.spans))
-        shown = _shown(down, across, alpha)
-        s = _scores(_details(down, across, square).reshape(-1, FINE * FINE),
-                    None if shown is None else shown.reshape(-1, FINE * FINE), small, small_alpha).reshape(shape)
-        i, j = np.unravel_index(int(s.argmax()), shape)
-        if s[i, j] > best:
-            best = float(s[i, j])
-            (t, b), (l, r) = down.spans[i], across.spans[j]
+        details = None if alpha is not None else _details(down, across, square).reshape(-1, FINE * FINE)
+        if alpha is None and small.alphas[j] is None:
+            s = details @ small.fine[j]
+        else:
+            s = _shown_scores(_shown(_windows(down, across, square).reshape(-1, FINE * FINE),
+                                     None if alpha is None else _windows(down, across, alpha).reshape(-1, FINE * FINE),
+                                     details), small.fine_shown[j])
+        s = s.reshape(shape)
+        y, x = np.unravel_index(int(s.argmax()), shape)
+        if s[y, x] > best:
+            best = float(s[y, x])
+            (t, b), (l, r) = down.spans[y], across.spans[x]
             cut = (l, t, r, b)
     return best
 
@@ -242,16 +338,15 @@ def score(a: Picture, b: Picture) -> float:
     best = 0.0
     k = len(SPANS)
     for big, small in ((b, a), (a, b)):
-        for (windows, shown), square, alpha in zip(big.windows() if small.coarse else [], big.squares, big.alphas):
-            for whole, whole_alpha, fine, fine_alpha in zip(small.coarse, small.coarse_alpha, small.fine,
-                                                            small.fine_alpha):
-                s = _scores(windows, shown, whole, whole_alpha)
-                i = int(s.argmax())
-                if s[i] >= FLOOR:
-                    (t, bt), (l, r) = SPANS[i // k], SPANS[i % k]
-                    best = max(best, _refine(square, alpha, fine, fine_alpha, (l, t, r, bt)))
+        for i in range(len(big.squares) if small.squares else 0):
+            for j in range(len(small.squares)):
+                s = _coarse_scores(big, i, small, j)
+                w = int(s.argmax())
+                if s[w] >= FLOOR:
+                    (t, bt), (l, r) = SPANS[w // k], SPANS[w % k]
+                    best = max(best, _refine(big, i, small, j, (l, t, r, bt)))
                 else:
-                    best = max(best, float(s[i]))
+                    best = max(best, float(s[w]))
     return best
 
 
