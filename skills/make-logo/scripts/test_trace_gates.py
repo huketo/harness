@@ -466,6 +466,24 @@ class PartlyClear(unittest.TestCase):
         print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
         self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
 
+    def test_refuses_a_partly_clear_copy_cut_at_the_edges_too(self):
+        """Photo 1 with its centre clear shows 65% of it, and what shows holds about a quarter of its detail at 32 px
+        (0.26 to 0.28 once cut 2 to 5% each side) but less at 64 px (0.23 to 0.25), where the sharp edges of the box
+        and the ball, in the clear centre, weigh more. Held to MIN_HELD at 64 px too, these copies scored 0.40 to
+        0.82."""
+        photo = G.photo(1)
+        collected = [("world/mockups/90000002.png", "", SP.picture(png(photo)))]
+        copy = G.cleared(photo, 0.65, "centre", "zeroed")
+        W, H = copy.size
+        verdicts = {}
+        for cut in (0.02, 0.04, 0.05):
+            part = copy.crop((round(cut * W), round(cut * H), round((1 - cut) * W), round((1 - cut) * H)))
+            try:
+                verdicts[cut] = SP.gate(f"cut {cut:.0%}", SP.source(png(part)), collected)["score"]
+            except R.Refused as e:
+                verdicts[cut] = e.reason
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
 
 @G.needs_potrace
 class BuildGates(unittest.TestCase):
