@@ -197,9 +197,6 @@ class TraceGates(unittest.TestCase):
             os.symlink(target, link)
             e = self.refused("collection-linked", self.sketch, [entry])
             self.assertIn(link, str(e))
-            with self.assertRaises(R.Refused) as cm:  # and so do package_logo.py and logo_book.py (rights.sealed)
-                R.collected_sha256()
-            self.assertEqual(cm.exception.reason, "collection-linked", str(cm.exception))
             os.remove(link)
         self.assertEqual(self.trace(self.sketch, [entry])["svg"], self.out)
 
@@ -413,7 +410,7 @@ class TraceGates(unittest.TestCase):
         self.assertRegex(rec["mask_sha256"], "^[0-9a-f]{64}$")
         self.assertEqual(rec["gate"]["calibration_sha256"], R.sha256_file(R.calibration_file(None)))
         self.assertEqual(rec["gate"]["refs_sha256"], R.refs_sha256([self.mine, self.arena]))
-        self.assertEqual(rec["gate"]["collected_sha256"], R.collected_sha256())
+        self.assertEqual(rec["gate"]["collected_sha256"], R.digest(sha for _, sha in R.collected()))
         self.assertEqual(rec["gate"]["limit"], LIMIT)
         self.assertNotIn("not_checked", rec["gate"])
         self.assertEqual(rec["potrace"]["sha256"], R.sha256_file(rec["potrace"]["path"]))

@@ -192,11 +192,6 @@ def collected_files(root: str | None = None) -> list[tuple[str, str, bytes]]:
     return out
 
 
-def collected_sha256(root: str | None = None) -> str:
-    """The digest of every sha256 the collection manifests list, once each listed file is confirmed to have it."""
-    return digest(sha for _, sha, _ in collected_files(root))
-
-
 # The brief --------------------------------------------------------------------------------------------------------
 
 def load_brief(path: str) -> dict:
@@ -320,8 +315,9 @@ def sealed(build: str, refs: list[str], calibration: str | None,
     """(build.json, check.json, verified_files(), traces()) of a build whose check still holds, or a refusal naming
     what changed. Everything is verified before it returns, so a step that writes calls this first and writes only
     after: a traced build's sources must pass the same-picture gate again against the collections as they are now
-    (same_picture.recheck), and the collections its traces were gated against (check.json `collected_sha256`) must
-    be as they were."""
+    (same_picture.recheck), and the --refs images, the calibration and the collections its traces were gated against
+    (check.json `collected_sha256`) must be as they were. The sources are judged first: a pull into a collection
+    that is also a --refs folder changes the --refs images too, and a copy of a source it brought is named as one."""
     bpath, cpath = os.path.join(build, "build.json"), os.path.join(build, "check.json")
     if not os.path.isfile(bpath):
         raise Refused("not-built", f"{build} has no build.json")
@@ -332,12 +328,6 @@ def sealed(build: str, refs: list[str], calibration: str | None,
     if chk.get("build_sha256") != sha256_bytes(raw):
         raise Refused("stale-check", f"{build}/build.json changed since check_logo.py ran (a new build?). Check it again.")
     files = verified_files(build, info)
-    if chk.get("refs_sha256") != refs_sha256(refs):
-        raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
-                                      "same folders, or check again against these.")
-    if chk.get("calibration_sha256") != sha256_file(calibration_file(calibration)):
-        raise Refused("calibration-changed", f"{build} was checked with another calibration. Pass the same --calibration, "
-                                             "or check again.")
     found = traces(build, info, files)
     if found:
         sys.path.insert(0, HERE)
@@ -345,10 +335,16 @@ def sealed(build: str, refs: list[str], calibration: str | None,
 
         now = collected_files()
         SP.recheck(found, now)
-        if chk.get("collected_sha256") != digest(sha for _, sha, _ in now):
-            raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a "
-                                                 "file added or removed), and its trace was gated against the old ones. "
-                                                 "Build it again, so the trace is gated against them, and check it.")
+    if chk.get("refs_sha256") != refs_sha256(refs):
+        raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
+                                      "same folders, or check again against these.")
+    if chk.get("calibration_sha256") != sha256_file(calibration_file(calibration)):
+        raise Refused("calibration-changed", f"{build} was checked with another calibration. Pass the same --calibration, "
+                                             "or check again.")
+    if found and chk.get("collected_sha256") != digest(sha for _, sha, _ in now):
+        raise Refused("collections-changed", f"the collections changed since {build} was checked (a new pull, or a "
+                                             "file added or removed), and its trace was gated against the old ones. "
+                                             "Build it again, so the trace is gated against them, and check it.")
     if require_ok and not chk.get("ok"):
         raise Refused("check-failed", f"{build} failed check_logo.py. Change the recipe, build and check again.")
     return info, chk, files, found

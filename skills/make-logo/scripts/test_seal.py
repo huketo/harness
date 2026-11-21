@@ -482,10 +482,25 @@ class TracedDocuments(Project):
 
     def test_package_and_book_refuse_once_the_collections_changed(self):
         chk = R.read_json(os.path.join(self.b, "check.json"))
-        self.assertEqual(chk.get("collected_sha256"), R.collected_sha256())
+        self.assertEqual(chk.get("collected_sha256"), R.digest(sha for _, sha in R.collected()))
         self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})  # outside --refs
         self.refused("collections-changed", self.package, self.b)
         self.refused("collections-changed", self.book, self.b)
+
+    def test_package_and_book_refuse_a_collection_or_a_folder_in_it_that_is_a_link(self):
+        world = self.ws.collection("world", {"cafe/60000001.png": G.mark_image(G.tee)})
+        elsewhere = os.path.dirname(self.ws.image("elsewhere/channel/1.png", G.mark_image(G.badge)))
+        for link, target in ((os.path.join(world, "channel"), elsewhere),
+                             (os.path.join(R.cache_root(), "linked"), os.path.dirname(elsewhere))):
+            os.symlink(target, link)
+            for step in (self.package, self.book):
+                with self.assertRaises(R.Refused) as cm:
+                    step(self.b)
+                self.assertEqual(cm.exception.reason, "collection-linked", str(cm.exception))
+                self.assertIn(link, str(cm.exception))
+            os.remove(link)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
 
     def test_package_and_book_refuse_once_a_collection_holds_the_source_or_a_copy(self):
         world = self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch)})  # outside --refs
@@ -497,6 +512,24 @@ class TracedDocuments(Project):
         self.ws.collection("world", {"cafe/60000002.jpg": buf.getvalue()})
         self.refused("collected-copy", self.package, self.b)
         self.refused("collected-copy", self.book, self.b)
+        for wrote in ("package", "book"):
+            self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
+
+    def test_package_and_book_refuse_a_copy_of_the_source_collected_into_a_refs_folder(self):
+        """A collection that is also a --refs folder: what a pull adds there changes the --refs images too, and the
+        refusal names the source as collected rather than the references as changed."""
+        arena = self.ws.collection("arena", {"logos/50000001.png": G.mark_image(G.external)})
+        self.refs = [self.mine, arena]
+        T.trace(self.sketch, brief=self.brief, refs=self.refs, out=self.ws.path("trace", "own-arena.svg"))
+        b = self.build(self.recipe("arena", mark=[{"shape": "trace", "file": "trace/own-arena.svg", "x": 2, "y": 2,
+                                                   "size": 44}]), "build/arena")
+        self.assertEqual(self.check(b), 0)
+        buf = io.BytesIO()
+        G.mark_image(G.own).resize((450, 450), Image.LANCZOS).save(buf, "JPEG", quality=80)
+        for reason, added in (("collected", R.read_bytes(self.sketch)), ("collected-copy", buf.getvalue())):
+            self.ws.collection("arena", {"logos/50000001.png": G.mark_image(G.external), "logos/50000002.png": added})
+            self.refused(reason, self.package, b)
+            self.refused(reason, self.book, b)
         for wrote in ("package", "book"):
             self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
 
