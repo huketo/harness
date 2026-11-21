@@ -14,7 +14,8 @@ usual add, cut and xor shapes.
 
 trace() is the only way to trace, and build_logo.py runs it again for every trace shape. It refuses:
 1. a file that is not in brief.json `trace_sources` (by sha256);
-2. a file whose sha256 is in any collection manifest under the cache (fetch_arena.mjs, fetch_photos.mjs);
+2. a file whose sha256 is in any collection manifest under the cache (fetch_arena.mjs, fetch_photos.mjs), whatever
+   else in the collections is gone or changed (rights.collected_files(), which every check after it reads them with);
 3. a mask, the exact pixels passed to potrace after the crop, threshold and invert, that scores at or over the
    calibrated limit against any collected image or --refs logo;
 4. potrace's path, rendered, that does the same (potrace drops specks, so a small mark beside dust can pass 3);
@@ -191,30 +192,28 @@ def _read(path: str) -> bytes | None:
         return None
 
 
-def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dict:
+def reference_set(refs: list[str], collected: list[tuple[str, str, bytes]] = ()) -> dict:
     """What the distance and same-picture checks compare with: every image in the --refs folders and files and every
-    collected file, each read once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256,
-    [features of each mask])] of them all, "pictures": [(file, sha256, same_picture.Picture)] of the collected files,
-    each once per sha256, "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
+    collected file (rights.collected_files(): its bytes, read once and of the sha256 its manifest lists), each read
+    once, so a sha256 recorded is of the bytes judged. Returns {"marks": [(file, sha256, [features of each mask])] of
+    them all, "pictures": [(file, sha256, same_picture.Picture)] of the collected files, each once per sha256,
+    "refs_sha256": the --refs images' digest, as rights.refs_sha256() computes it}.
 
-    Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing,
-    ("collection-changed") while a collected file is gone or its bytes no longer have the sha256 its manifest lists,
-    and ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say
-    nothing about a picture they could not compare."""
-    marks, pictures, uncomparable, changed, missing, seen, ref_shas, read = [], {}, [], [], [], set(), [], {}
-    for f, listed in [(f, None) for f in R.ref_images(refs)] + list(collected):
+    Refuses ("refs-missing") while a --refs path named is not there or an image is a link to nothing, and
+    ("not-comparable") while any image can't be read as a mark even by gate_masks()'s fallbacks: the gates say nothing
+    about a picture they could not compare."""
+    marks, pictures, uncomparable, missing, seen, ref_shas = [], {}, [], [], set(), []
+    read = {f: (data, sha) for f, sha, data in collected}  # a --refs folder may be a collection
+    for f, is_ref in [(f, True) for f in R.ref_images(refs)] + [(f, False) for f, _, _ in collected]:
         if f not in read:
             data = _read(f)
             read[f] = (data, R.sha256_bytes(data) if data is not None else None)
         data, sha = read[f]
-        if listed is None:
+        if is_ref:
             if data is None:  # gone between the listing and the read
                 missing.append(f)
                 continue
             ref_shas.append(sha)
-        elif sha != listed:
-            changed.append(f"{f} ({'gone' if data is None else 'changed'})")
-            continue
         else:
             pictures.setdefault(sha, (f, sha, SP.cached(sha, data)))
         if sha in seen:
@@ -228,11 +227,6 @@ def reference_set(refs: list[str], collected: list[tuple[str, str]] = ()) -> dic
     if missing:
         raise R.Refused("refs-missing", f"these --refs images could not be read: {'; '.join(missing)}. Put them back "
                                         "or take them out of the --refs folders, then run this again.")
-    if changed:
-        raise R.Refused("collection-changed", "these collected files are gone or changed since their manifest listed "
-                                              f"them: {'; '.join(changed)}. Fetch the collection again, or list what "
-                                              "is in it now with `node scripts/collection.mjs <name>`, then run this "
-                                              "again.")
     if uncomparable:
         raise R.Refused("not-comparable", "the distance gates can't read a mark in "
                                           f"{'; '.join(uncomparable)}, so they can't say the result is far from it. "
@@ -291,11 +285,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
     if reproduce and reproduce["raster"].get("potrace_args") != POTRACE_ARGS:
         raise R.Refused("record-changed", f"the record says potrace ran with {reproduce['raster'].get('potrace_args')}, "
                                           f"and trace_ref.py runs it with {POTRACE_ARGS}. Trace again with trace_ref.py.")
-    collected = R.collected()
-    hit = next((f for f, sha in collected if sha == src_sha), None)
-    if hit:
-        raise R.Refused("collected", f"{source} has the same sha256 as {hit}, collected for measuring. Collected and "
-                                     "reference logos set proportions; they are never traced.")
+    collected = R.collected_files([(source, src_sha)])
     cal, cal_sha = calibration_snapshot(calibration)
     crop = [float(v) for v in crop]
     mask = raster_mask(data, crop, threshold, invert, long_side)
@@ -310,7 +300,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
         raise SystemExit(f"no ink in {source} at --crop {crop} and --threshold {threshold}{' with --invert' if invert else ''}")
     refset = reference_set(refs, collected)
     # The person's own sketches on the moodboard are left out; a collected file never is, whatever the brief says.
-    own = {e["sha256"] for e in b["trace_sources"]} - {sha for _, sha in collected}
+    own = {e["sha256"] for e in b["trace_sources"]} - {sha for _, sha, _ in collected}
     marks = [m for m in refset["marks"] if m[1] not in own]
     mask_near = nearest(tight, marks, cal)
     if mask_near["score"] >= cal["limit"]:
@@ -342,7 +332,7 @@ def trace(source: str, *, brief: str, refs: list[str], out: str, calibration: st
                    "potrace_args": list(POTRACE_ARGS)},
         "mask_sha256": mask_sha,
         "gate": {"calibration_sha256": cal_sha, "limit": cal["limit"], "refs_sha256": refset["refs_sha256"],
-                 "collected_sha256": R.digest(sha for _, sha in collected), "compared": len(marks),
+                 "collected_sha256": R.digest(sha for _, sha, _ in collected), "compared": len(marks),
                  "mask_nearest": mask_near, "vector_nearest": vector_near, "copy_nearest": copy_near,
                  "copy_limit": SP.LIMIT},
         "potrace": potrace,

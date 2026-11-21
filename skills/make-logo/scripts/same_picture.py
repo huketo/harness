@@ -654,17 +654,13 @@ def gate(source_file: str, src: Picture, collected: list[tuple[str, str, Picture
                                       "proportions; they are never traced.", copy_nearest=found, **detail)
 
 
-def recheck(traces: list[dict], collected: list[tuple[str, str, bytes]]) -> None:
+def recheck(traces: list[dict]) -> list[tuple[str, str, bytes]]:
     """The trace gate's own check of each verified trace (rights.traces()) against the collections as they are now, so
-    a copy collected after the trace, or a trace made before this gate, goes no further: refuses ("collected") a
-    source whose sha256 a collection lists, then ("collected-copy") one that is the same picture as any collected
-    image. `collected` is rights.collected_files()."""
-    for t in traces:
-        hit = next((f for f, sha, _ in collected if sha == t["trace"]["source_sha256"]), None)
-        if hit:
-            raise R.Refused("collected", f"the traced source {t['provenance']['source']['file']} has the same sha256 as "
-                                         f"{hit}, collected since it was traced. Collected and reference logos set "
-                                         "proportions; they are never traced. Drop that direction or trace another file.")
-    images = list({sha: (f, sha, cached(sha, data)) for f, sha, data in collected}.values())
+    a copy collected after the trace, or a trace made before this gate, goes no further: reads the collections as
+    trace_ref.trace() does (rights.collected_files(), refusing "collected" before "collection-changed"), then refuses
+    as gate() does ("not-comparable", "collected-copy"). Returns the collected files, as rights.collected_files()."""
+    now = R.collected_files([(t["provenance"]["source"]["file"], t["trace"]["source_sha256"]) for t in traces])
+    images = list({sha: (f, sha, cached(sha, data)) for f, sha, data in now}.values())
     for t in traces:
         gate(t["provenance"]["source"]["file"], source(t["source"], t["provenance"]["raster"]["crop"]), images)
+    return now

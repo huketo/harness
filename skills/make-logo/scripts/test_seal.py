@@ -533,6 +533,37 @@ class TracedDocuments(Project):
         for wrote in ("package", "book"):
             self.assertFalse(os.path.exists(os.path.join(self.ws.root, wrote)), f"{wrote} wrote files before refusing")
 
+    def every_step(self) -> dict[str, str | None]:
+        """trace's, check's, package's and book's refusal of the traced direction as the collections are now."""
+        def refusal(step) -> str | None:
+            try:
+                with redirect_stdout(io.StringIO()):
+                    step()
+            except R.Refused as e:
+                return e.reason
+            except SystemExit as e:  # check_logo.py's exit status
+                self.assertEqual(e.code, 0)
+            return None
+
+        return {"trace": refusal(lambda: T.trace(self.sketch, brief=self.brief, refs=self.refs,
+                                                 out=self.ws.path("trace", "again.svg"))),
+                "package": refusal(lambda: self.package(self.b)), "book": refusal(lambda: self.book(self.b)),
+                "check": refusal(lambda: C.main([self.b, "--refs", *self.refs]))}  # last: a refusal removes check.json
+
+    def test_every_step_names_the_source_collected_before_another_collected_file_gone(self):
+        """A collection lists the source's own bytes and another file it lists is gone. Fetching the collection again
+        mends the one, never the other, so every step names the source."""
+        world = self.ws.collection("world", {"cafe/60000001.png": R.read_bytes(self.sketch),
+                                             "cafe/60000002.png": G.mark_image(G.tee)})
+        os.remove(os.path.join(world, "cafe", "60000002.png"))
+        self.assertEqual(self.every_step(), dict.fromkeys(("trace", "package", "book", "check"), "collected"))
+
+    def test_every_step_refuses_a_collected_file_it_cannot_read(self):
+        """The distance gates can't say a trace is far from a file they can't read, and the same-picture gate can't say
+        it is not a copy of one: every step refuses it rather than leaving it out."""
+        self.ws.collection("world", {"cafe/60000001.png": b"not an image"})
+        self.assertEqual(self.every_step(), dict.fromkeys(("trace", "package", "book", "check"), "not-comparable"))
+
     def test_package_and_book_refuse_a_pull_that_stopped_before_its_manifest(self):
         # The first pull of a collection wrote the source's bytes, then stopped before it wrote manifest.json: the
         # collections' digest is unchanged, and nothing lists the file.

@@ -175,11 +175,21 @@ def collected(root: str | None = None) -> list[tuple[str, str]]:
     return out
 
 
-def collected_files(root: str | None = None) -> list[tuple[str, str, bytes]]:
-    """collected(), each listed file read once: (file, sha256, bytes). Refuses ("collection-changed") while a listed
-    file is gone or its bytes no longer have that sha256."""
+def collected_files(sources: list[tuple[str, str]] = ()) -> list[tuple[str, str, bytes]]:
+    """collected(), each listed file read once: (file, sha256, bytes). Refuses ("collected") one of `sources` (file,
+    sha256: a file to trace, or a traced source) whose sha256 a collection lists, then ("collection-changed") while a
+    listed file is gone or its bytes no longer have that sha256. trace_ref.trace() and every check of a trace after it
+    read the collections here, so they judge in this order: fetching a collection again mends a file gone from it,
+    never a source that is a collected file."""
+    listed = collected()
+    for f, sha in sources:
+        hit = next((c for c, s in listed if s == sha), None)
+        if hit:
+            raise Refused("collected", f"{f} has the same sha256 as {hit}, which a collection lists: it was collected "
+                                       "for measuring. Collected and reference logos set proportions; they are never "
+                                       "traced. Trace another file, and drop any direction traced from this one.")
     out, changed = [], []
-    for f, sha in collected(root):
+    for f, sha in listed:
         data = read_bytes(f) if os.path.isfile(f) else None
         if data is None or sha256_bytes(data) != sha:
             changed.append(f)
@@ -333,8 +343,7 @@ def sealed(build: str, refs: list[str], calibration: str | None,
         sys.path.insert(0, HERE)
         import same_picture as SP
 
-        now = collected_files()
-        SP.recheck(found, now)
+        now = SP.recheck(found)
     if chk.get("refs_sha256") != refs_sha256(refs):
         raise Refused("refs-changed", f"the --refs folders now hold other files than when {build} was checked. Pass the "
                                       "same folders, or check again against these.")

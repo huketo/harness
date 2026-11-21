@@ -19,13 +19,14 @@ that file out, replace it, or mend the path. A traced
 direction (build.json `traces`, verified against its provenance) leaves out only its own source, by sha256, and never
 a collected file: every other reference keeps the usual limit. Its score against that source is recorded in
 `source_scores` for the book to show and fails nothing; a source the person holds rights in may be used unchanged.
-A traced source is held to the same-picture gate again (same_picture.recheck), against the collections as they are
-now: one whose sha256 a collection lists ("collected"), or the same picture as a collected image ("collected-copy"),
-is refused, and the build's old check.json removed: drop that direction. A trace whose gates saw other --refs images,
-another calibration or other collections than this check is refused too ("trace-gate-stale"): build it again so the
-trace is gated against what the check sees. For a traced build, a collected file gone or changed since its manifest
-listed it ("collection-changed") and a file in a collection that its manifest does not list ("collection-unlisted")
-are refused as well.
+A traced source is held to the same-picture gate again (same_picture.recheck), against the collections as they are now:
+one whose sha256 a collection lists ("collected", whatever else in the collections is gone or changed), or the same
+picture as a collected image ("collected-copy"), is refused, and so is a collected file it can't read as a picture
+("not-comparable"); the build's old check.json is removed: drop that direction. A trace whose gates saw other --refs
+images, another calibration or other collections than this check is refused too ("trace-gate-stale"): build it again so
+the trace is gated against what the check sees. For a traced build, a collected file gone or changed since its manifest
+listed it ("collection-changed") and a file in a collection that its manifest does not list ("collection-unlisted") are
+refused as well.
 check.json also records the sha256 of build.json, of the --refs images, of the calibration and, for a traced build,
 of the collections, which package_logo.py and logo_book.py recompute before they go on.
 """
@@ -100,11 +101,10 @@ def _check(build: str, refset: dict, cal: dict, calibration_sha256: str) -> dict
     info = json.loads(raw)
     files = R.verified_files(build, info)
     traces = R.traces(build, info, files)
-    # The collections matter only to a trace's gates: an untraced build records none.
-    collected = R.collected_files() if traces else []
+    # The collections matter only to a trace's gates: an untraced build records none. Judged before the stale-gate
+    # check, so a copy collected since the trace is named.
+    collected = SP.recheck(traces) if traces else []
     collected_sha = R.digest(sha for _, sha, _ in collected) if traces else None
-    if traces:  # before the stale-gate check, so a copy collected since the trace is named
-        SP.recheck(traces, collected)
     now = {"refs_sha256": refset["refs_sha256"], "calibration_sha256": calibration_sha256, "collected_sha256": collected_sha}
     for t in traces:
         stale = [GATE_INPUTS[k] for k, v in now.items() if t["provenance"]["gate"].get(k) != v]
