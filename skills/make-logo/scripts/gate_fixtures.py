@@ -10,6 +10,7 @@ import io
 import json
 import os
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
@@ -175,24 +176,27 @@ def photo(seed: int = 0, size: tuple[int, int] = (640, 480), cut_out: bool = Fal
     return out
 
 
-def threaded(seed: int = 0, size: tuple[int, int] = (640, 480)) -> Image.Image:
+def threaded(seed: int = 0, size: tuple[int, int] = (640, 480), lines: int = 2400,
+             ink: tuple[int, int] = (0, 90)) -> Image.Image:
     """photo(seed) with thin dark threads across it both ways, the way fabric, fine print or a wire fence photographs:
-    detail a pixel wide, finer than a pixel of the 128 px squares the same-picture gate first squeezes images into."""
+    detail a pixel wide, finer than a pixel of the 128 px squares the same-picture gate first squeezes images into.
+    The first `lines` threads, each channel of each drawn in `ink` (low, high) at random: fewer and lighter threads lie
+    where more and darker ones would."""
     import numpy as np
 
     im = photo(seed, size)
     d = ImageDraw.Draw(im)
     rng = np.random.default_rng(seed + 31)
     W, H = size
-    for k in range(2400):
+    for k in range(lines):
         x, y = rng.uniform(0, W), rng.uniform(0, H)
-        ink = tuple(int(v) for v in rng.uniform(0, 90, 3))
+        ink_ = tuple(int(v) for v in rng.uniform(*ink, 3))
         if k % 2:
             half = rng.uniform(0.1, 0.3) * W
-            d.line([(x - half, y), (x + half, y)], fill=ink, width=1)
+            d.line([(x - half, y), (x + half, y)], fill=ink_, width=1)
         else:
             half = rng.uniform(0.1, 0.3) * H
-            d.line([(x, y - half), (x, y + half)], fill=ink, width=1)
+            d.line([(x, y - half), (x, y + half)], fill=ink_, width=1)
     return im
 
 
@@ -238,6 +242,19 @@ def exif_turned(im: Image.Image, quality: int = 95) -> bytes:
     buf = io.BytesIO()
     im.transpose(Image.Transpose.ROTATE_90).save(buf, "JPEG", quality=quality, exif=exif.tobytes())
     return buf.getvalue()
+
+
+def broken_exif(orientation: int | None = None) -> bytes:
+    """An EXIF block Pillow can't parse, as an editor or a damaged file may leave one. With no `orientation`, not a TIFF
+    block at all: Image.getexif() raises. With one, a block whose orientation reads but whose ImageLength holds text,
+    so writing the block again, as ImageOps.exif_transpose() does, raises."""
+    if orientation is None:
+        return b"not an EXIF block"
+    text = b"Synthetic\x00"
+    entries = [(0x0101, 2, len(text), 38),  # ImageLength as ASCII, after the header (8 bytes) and the IFD (30)
+               (0x0112, 3, 1, orientation << 16)]  # Orientation, a SHORT held in the first half of its 4 bytes
+    ifd = struct.pack(">H", len(entries)) + b"".join(struct.pack(">HHII", *e) for e in entries) + struct.pack(">I", 0)
+    return b"Exif\x00\x00MM\x00\x2a" + struct.pack(">I", 8) + ifd + text
 
 
 def font_bytes(family: str) -> bytes:

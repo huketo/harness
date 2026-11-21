@@ -13,8 +13,10 @@ cropped copy of a collected photo passes them. This compares the pictures themse
 1. Each image is seen in grey, squeezed into a SQUARE x SQUARE square (a crop changes the aspect, so it is dropped):
    flattened on white and, when it has transparency, on black and as its colour channels alone, which is what
    trace_ref.raster_mask() gives potrace. One with clear pixels is also seen on black with its alpha, so that only
-   what it shows counts (step 5). One with an EXIF orientation is seen both as stored and as shown. A source is also
-   seen as the part --crop takes.
+   what it shows counts (step 5). One with an EXIF orientation is seen both as stored and as shown
+   (logolib.orientations: a block it can't parse turns nothing). A source is also seen as the part --crop takes. A
+   file neither Pillow nor resvg can read has no views, and the gate refuses it ("not-comparable") rather than score
+   it 0.
 2. One square is compared with every window of the other that leaves out up to CUT of each side, on a STEP grid, at
    COARSE x COARSE px, both ways round: the one a crop of the other, or the other with a border.
 3. The best window of each pairing whose score reaches FLOOR there is refined to 1/128 of a side, at FINE x FINE px.
@@ -33,9 +35,9 @@ cropped copy of a collected photo passes them. This compares the pictures themse
    square averages what a copy shows with what it hides, so where the clear pixels are finer than that (stripes a pixel
    or two wide), each pixel of the other image's square holds what the copy hides. The view with alpha is laid on the
    other where the refinement put it, each way round, and moved to within an eighth of its own pixel by the fine detail
-   of what it shows (_register); then each FINE px averages only its pixels that show and the other's resampled onto
-   them, each weighted by how much both show (_cells), and scores as in step 5. The searches only find where: a mask
-   laid a pixel off picks what it hides as surely as no mask.
+   of what it shows, each pixel weighing its alpha squared (_register, _Samples); then each FINE px averages only its
+   pixels that show and the other's resampled onto them, each weighted by how much both show (_cells), and scores as
+   in step 5. The searches only find where: a mask laid a pixel off picks what it hides as surely as no mask.
 
 A pairing's score is its refined score (with alpha, its score at their own size), or its coarse score under FLOOR;
 two images score the highest of their pairings. The gate refuses at LIMIT and over. It does not see a picture turned
@@ -310,15 +312,16 @@ class Picture:
 
 def picture(data: bytes, crops=(WHOLE,)) -> Picture:
     """The image in `data` seen whole, or as each part `crops` takes. One neither Pillow nor resvg can read has no
-    views and scores 0: the distance gates refuse it ("not-comparable") where they compare it."""
-    def remake():
-        im = L.open_image(data)
-        return [v for c in crops for v in views(im, c)]
-
+    views: gate() refuses it ("not-comparable") rather than score it 0."""
     try:
-        return Picture(remake(), remake)
-    except Exception:
+        im = L.open_image(data)
+    except Exception:  # neither Pillow nor resvg can read it
         return Picture([])
+
+    def remake():
+        return [v for c in crops for v in views(L.open_image(data), c)]
+
+    return Picture([v for c in crops for v in views(im, c)], remake)
 
 
 def source(data: bytes, crop=WHOLE) -> Picture:
@@ -437,8 +440,12 @@ def _line(ends: list[float], n: int) -> tuple[float, float]:
 
 
 class _Samples(NamedTuple):
-    """Up to SAMPLES px of a view with alpha that show at least half: where they are, how much each shows, and its
-    colour less the mean of what shows around it (in a square of 2 * DETAIL + 1 px)."""
+    """Up to SAMPLES px of a view with alpha that show at all: where they are, what each weighs, and its colour less
+    the mean of what shows around it (in a square of 2 * DETAIL + 1 px). A px's colour is its value on black over its
+    alpha, so what rounding and resampling put in it grows as its alpha falls: each weighs its alpha squared, which
+    gives every px the same share of that and leaves out none that shows. Left out under half, a copy showing every px
+    it shows at 127 of 255 was never moved; weighed by its alpha alone, a copy shown in stripes and then halved, its
+    alpha about a half everywhere, was moved by what its faintest px got wrong."""
     ys: np.ndarray
     xs: np.ndarray
     weight: np.ndarray
@@ -450,12 +457,13 @@ def _samples(grey: np.ndarray, alpha: np.ndarray) -> _Samples:
 
     shows = alpha.astype(np.float32) / 255
     lit = grey.astype(np.float32) / 255  # on black: colour times alpha
-    ys, xs = np.nonzero(alpha >= 128)
+    ys, xs = np.nonzero(alpha)
     pick = np.random.default_rng(0).permutation(len(ys))[:SAMPLES]
     ys, xs = ys[pick], xs[pick]
     side = 2 * DETAIL + 1
     near = uniform_filter(lit, side)[ys, xs] / np.maximum(uniform_filter(shows, side)[ys, xs], 1e-6)
-    return _Samples(ys, xs, shows[ys, xs].astype(np.float64), (lit[ys, xs] / shows[ys, xs] - near).astype(np.float64))
+    return _Samples(ys, xs, shows[ys, xs].astype(np.float64) ** 2,
+                    (lit[ys, xs] / shows[ys, xs] - near).astype(np.float64))
 
 
 def _register(frame: _Samples, shape: tuple[int, int], other: tuple[np.ndarray, np.ndarray | None],
@@ -463,9 +471,10 @@ def _register(frame: _Samples, shape: tuple[int, int], other: tuple[np.ndarray, 
     """`ends` (_ends()) moved to where the fine detail of the frame's px that show (`frame`, of a view of `shape`)
     agrees best with the other view's, linearly interpolated there: Pearson's r of the two, each px less the mean of
     what shows around it (in a square of 2 * DETAIL + 1 frame px; where a frame px covers more than one of the
-    other's, theirs averaged first), and weighted by how much both show of it. Each end moves alone, up to 2 steps
-    either way and no further than REACH of the other's side from where it was, the step starting at 1/512 of that
-    side and halving down to an eighth of a frame px. A mask finer than the alignment the search finds at 128 px
+    other's, theirs averaged first), each weighed as _Samples says and by how much the other shows of it. Each end
+    moves alone, up to 2 steps either way and no further than REACH of the other's side from where it was, the step
+    starting at 1/512 of that side and halving down to an eighth of a frame px; an axis of one frame px, whose two
+    ends are one, stays where it is. A mask finer than the alignment the search finds at 128 px
     picks the other's px it is laid on: a px off, these two compare what the copy shows with what it hides. Only the
     fine detail counts, as only a copy shares it: the lit walls of two photos staged alike, in all, agree better
     once moved a few px."""
@@ -512,12 +521,13 @@ def _register(frame: _Samples, shape: tuple[int, int], other: tuple[np.ndarray, 
 
     start, ends = ends, [list(e) for e in ends]
     best = agree(ends)
+    axes = [k for k in range(2) if shape[k] > 1]  # one px: its scale is 0, and steps would halve towards it forever
     steps = [max(og.shape[k] / 512, a / 8) for k, a in enumerate(scale)]
     floors = [a / 8 for a in scale]
-    while any(st >= f for st, f in zip(steps, floors)):
+    while any(steps[k] >= floors[k] for k in axes):
         for _ in range(2):
             moved = False
-            for axis in (k for k in range(2) if steps[k] >= floors[k]):
+            for axis in (k for k in axes if steps[k] >= floors[k]):
                 for end in range(2):
                     here, keep = ends[axis][end], ends[axis][end]
                     for k in (-2, -1, 1, 2):
@@ -623,8 +633,16 @@ def nearest(src: Picture, images: list[tuple[str, str, Picture]]) -> dict:
 
 
 def gate(source_file: str, src: Picture, collected: list[tuple[str, str, Picture]], **detail) -> dict:
-    """{"score", "ref"} of the collected image `src` is nearest to as a picture, or a refusal ("collected-copy") at
-    LIMIT and over. `detail` goes into the refusal."""
+    """{"score", "ref"} of the collected image `src` is nearest to as a picture, or a refusal: ("not-comparable")
+    while `src` or a collected image has no views (picture()), as nothing can be said of a picture that was not
+    compared, then ("collected-copy") at LIMIT and over. `detail` goes into the refusal."""
+    unread = ([source_file] if not src.squares else []) + [f for f, _, pic in collected if not pic.squares]
+    if unread:
+        raise R.Refused("not-comparable", f"the same-picture gate can't read {'; '.join(unread)} "
+                                          f"({R.UNCOMPARABLE['unreadable']}), so it can't say {source_file} is not a "
+                                          "collected image saved again or cut. Take each collected file named out of "
+                                          "its collection, then `node scripts/collection.mjs <name>`, and trace only a "
+                                          "file that opens as an image; then run this again.", **detail)
     near = nearest(src, collected)
     found = {"score": round(near["score"], 4), "ref": near["ref"]}
     if near["score"] < LIMIT:

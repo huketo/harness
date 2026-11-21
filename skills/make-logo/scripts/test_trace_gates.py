@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import unittest
 from contextlib import redirect_stdout
 from unittest import mock
@@ -35,9 +36,9 @@ import trace_ref as T  # noqa: E402
 LIMIT = D.load_calibration(None)["limit"]
 
 
-def png(im: Image.Image) -> bytes:
+def png(im: Image.Image, **save) -> bytes:
     buf = io.BytesIO()
-    im.save(buf, "PNG")
+    im.save(buf, "PNG", **save)
     return buf.getvalue()
 
 
@@ -317,6 +318,26 @@ class TraceGates(unittest.TestCase):
         e = self.refused("collected-copy", turned, [self.ws.entry(turned)])
         self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
 
+    def test_refuses_a_copy_of_a_collected_photo_whose_exif_block_is_broken(self):
+        """A block Pillow can't parse once cost an image every view, so a copy showing the photo pixel for pixel scored
+        0 as a picture. The stored pixels are seen whatever of the block can't be read, and an orientation that reads is
+        shown."""
+        upright = G.photo(0)
+        turned = upright.transpose(Image.Transpose.ROTATE_90)  # stored on its side; orientation 6 shows it upright
+        cases = {"the copy's block unreadable": (png(upright), png(upright, exif=G.broken_exif())),
+                 "the copy's block broken past its orientation": (png(upright), png(turned, exif=G.broken_exif(6))),
+                 "the collected block unreadable": (png(upright, exif=G.broken_exif()), png(upright)),
+                 "the collected block broken past its orientation": (png(turned, exif=G.broken_exif(6)), png(upright))}
+        for n, (name, (collected, copy)) in enumerate(cases.items()):
+            with self.subTest(name):
+                world = self.ws.collection("world", {"mockups/90000001.png": collected})
+                source = self.ws.path("sketches", f"copy-{n}.png")
+                R.write_bytes(source, copy)
+                self.out = self.ws.path("trace", f"copy-{n}.svg")
+                e = self.refused("collected-copy", source, [self.ws.entry(source)])
+                self.assertTrue(e.detail["copy_nearest"]["ref"].endswith("90000001.png"), e.detail)
+                shutil.rmtree(world)
+
     def test_refuses_a_redrawing_of_the_mark_a_reference_shows_by_its_exif_orientation(self):
         # A JPEG of a mark stored on its side with the EXIF orientation that shows it upright, collected or in --refs.
         # The mark drawn again on a wide page is another picture, which the same-picture gate passes, so only the mask
@@ -522,6 +543,86 @@ class PartlyClear(unittest.TestCase):
         verdicts = self.striped(1, [("world/mockups/90000003.png", "", SP.picture(png(G.threaded(0))))])
         print(f"\n  highest: {max(v for v in verdicts.values() if isinstance(v, float)):.4f}")
         self.assertEqual({k: v for k, v in verdicts.items() if not isinstance(v, float)}, {})
+
+    FAINT = (110, 127, 128, 192)  # the alpha of the columns that show; under 102 they hold under MIN_HELD
+
+    def faint(self, seed: int, collected) -> dict[int, str | float]:
+        """Each copy of photo `seed` under 1,200 lighter threads showing 5 of every 8 columns at an alpha of FAINT (the
+        rest clear, colour zeroed), cut to (63, 48, 577, 432) at its own size, against `collected`: its refusal, or its
+        score."""
+        verdicts = {}
+        for alpha in self.FAINT:
+            photo = G.threaded(seed, lines=1200, ink=(30, 160))
+            copy = np.asarray(G.cleared(photo, 5 / 8, "columns", "zeroed", 8)).copy()
+            copy[..., 3] = np.where(copy[..., 3] > 0, alpha, 0)
+            copy = Image.fromarray(copy, "RGBA").crop((63, 48, 577, 432))
+            try:
+                verdicts[alpha] = SP.gate(f"alpha {alpha}", SP.source(png(copy)), collected)["score"]
+            except R.Refused as e:
+                verdicts[alpha] = e.reason
+        return verdicts
+
+    def test_refuses_a_striped_copy_whose_shown_columns_are_half_clear(self):
+        """The cut lays the copy's columns off the photo's own, so only its fine detail where it shows puts it back.
+        That once counted only pixels showing half or more: at alpha 127 nothing was moved, and the copy scored 0.8461
+        (0.9999 at 128), what shows holding 0.31 of the photo's detail. A pixel counts as much as it shows, so at alpha
+        100 what shows holds 0.245, under MIN_HELD: not asked for."""
+        collected = [("world/mockups/90000004.png", "", SP.picture(png(G.threaded(0, lines=1200, ink=(30, 160)))))]
+        verdicts = self.faint(0, collected)
+        print("\n" + "\n".join(f"  alpha {alpha}: {v}" for alpha, v in verdicts.items()))
+        self.assertEqual(verdicts, dict.fromkeys(verdicts, "collected-copy"))
+
+    def test_passes_the_same_half_clear_copies_of_another_photo(self):
+        verdicts = self.faint(1, [("world/mockups/90000004.png", "", SP.picture(png(G.threaded(0, lines=1200,
+                                                                                                 ink=(30, 160)))))])
+        print(f"\n  highest: {max(v for v in verdicts.values() if isinstance(v, float)):.4f}")
+        self.assertEqual({k: v for k, v in verdicts.items() if not isinstance(v, float)}, {})
+
+
+class Unusual(unittest.TestCase):
+    """same_picture on what it can't see in full: a file it can't read as an image, either side of the gate, and a view
+    a pixel across."""
+
+    def test_refuses_a_source_or_a_collected_file_it_cannot_read(self):
+        photo = ("world/mockups/90000001.png", "", SP.picture(png(G.photo(0))))
+        unreadable = ("world/mockups/90000002.png", "", SP.picture(b"not an image"))
+        for name, src, collected, named in (("the source", SP.source(b"not an image"), [photo], "sketches/own.png"),
+                                            ("a collected file", SP.source(png(G.photo(1))), [photo, unreadable],
+                                             unreadable[0])):
+            with self.subTest(name):
+                with self.assertRaises(R.Refused) as cm:
+                    SP.gate("sketches/own.png", src, collected)
+                self.assertEqual(cm.exception.reason, "not-comparable", str(cm.exception))
+                self.assertIn(named, str(cm.exception))
+
+    def test_scores_a_view_a_pixel_across_in_time(self):
+        """A side of one pixel has one end: _register() once moved it by steps that halved towards 0 and never ended."""
+        rng = np.random.default_rng(0)
+        grey = np.clip(np.linspace(40, 220, 256)[:, None] + rng.normal(0, 30, (256, 1)), 0, 255).astype(np.uint8)
+
+        def column(width: int, alpha: bool) -> Image.Image:
+            rgb = np.repeat(np.repeat(grey[:, :, None], 3, 2), width, 1)
+            if not alpha:
+                return Image.fromarray(rgb, "RGB")
+            a = np.full((256, width, 1), 255, np.uint8)
+            a[::7] = 200
+            return Image.fromarray(np.concatenate([rgb, a], 2), "RGBA")
+
+        across = Image.Transpose.TRANSPOSE
+        dot = (0, 0, 1, 1)
+        cases = {"1 x 256 with alpha against 8 x 256": (column(1, True), column(8, False)),
+                 "256 x 1 with alpha against 256 x 8": (column(1, True).transpose(across),
+                                                        column(8, False).transpose(across)),
+                 "1 x 256 with alpha against 1 x 256": (column(1, True), column(1, False)),
+                 "1 x 1 with alpha against 1 x 1": (column(1, True).crop(dot), column(1, False).crop(dot))}
+        for name, (copy, image) in cases.items():
+            with self.subTest(name):
+                done = []
+                t = threading.Thread(target=lambda: done.append(SP.score(SP.source(png(copy)), SP.picture(png(image)))),
+                                     daemon=True)
+                t.start()
+                t.join(30)
+                self.assertTrue(done, f"{name}: still scoring after 30 s")
 
 
 @G.needs_potrace
