@@ -102,8 +102,8 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 | --- | --- |
 | [`awesome-interface`](../../skills/awesome-interface/SKILL.md) | 일반 UI 제작·개선·검토. 새 화면의 시각 방향과 기존 제품을 보존하는 리디자인 절차를 포함하며, 접근성·배치·문구·타이포그래피·색상·시각적 완성도·웹 모션과 제스처·모바일 웹 대응의 공통 규칙을 소유합니다. 작은 수정은 관련 영역만 읽습니다. “declutter”, “reveal hero”처럼 증상이나 패턴 이름으로 요청하면 플레이북이 소유 규칙으로 안내합니다. |
 | [`image-to-code`](../../skills/image-to-code/SKILL.md) | 제공·선택·생성된 이미지에서 웹 UI를 구현합니다. 사용 가능한 참조는 재생성하지 않고, 필요한 이미지가 없을 때만 `imagegen`을 사용합니다. 네이티브 앱 구현은 범위 밖입니다. |
-| [`imagegen`](../../skills/imagegen/SKILL.md) | 웹 섹션·모바일 앱 화면·독립 로고·브랜드 콘셉트 보드의 실제 이미지 생성과 시각 확인. 내부 참조는 `frontend/common`, `frontend/web`, `frontend/mobile`, `logo`, `brandkit`이며 별도 등록 스킬이 아닙니다. |
-| [`design-md`](../../skills/design-md/SKILL.md) | 명시적으로 요청한 설계 문서의 추출·작성·갱신. 기존 문서 소유 경로를 우선하며 현재 구현·승인된 의도·제안·미확인을 구분합니다. Stitch는 선택적 어댑터입니다. 요청하면 세션의 디자인 교정을 규칙으로 제안하고, 승인받은 항목만 기록합니다. |
+| [`imagegen`](../../skills/imagegen/SKILL.md) | 웹 섹션·모바일 앱 화면·로고 콘셉트·브랜드 콘셉트 보드의 실제 이미지 생성과 시각 확인. 완성된 로고 파일(SVG·PNG 묶음)은 `make-logo`가 만듭니다. 내부 참조는 `frontend/common`, `frontend/web`, `frontend/mobile`, `logo`, `brandkit`이며 별도 등록 스킬이 아닙니다. |
+| [`design-md`](../../skills/design-md/SKILL.md) | 명시적으로 요청한 설계 문서의 추출·작성·갱신. 기존 문서 소유 경로를 우선하며 현재 구현·승인된 의도·제안·미확인을 구분합니다. Stitch는 선택적 어댑터입니다. 요청하면 세션의 디자인 교정을 규칙으로 제안하고, 승인받은 항목만 기록합니다. 컴포넌트 하나의 문서 항목과, 구현 값이 프로젝트의 기존 토큰에 어떻게 대응하는지 보여 주는 읽기 전용 보고도 만듭니다. |
 
 - “awesome-interface로 이 오류 문구만 고쳐 주세요.”
 - “이 화면을 전체 검토하되 수정하지 마세요.”
@@ -132,6 +132,20 @@ UI 작업은 산출물에 따라 네 진입점 중 필요한 것만 사용합니
 검증용 합성 입력과 기대 동작은 각 스킬의 `evals/evals.json`에 있습니다: [UI](../../skills/awesome-interface/evals/evals.json), [이미지 기반 구현](../../skills/image-to-code/evals/evals.json), [이미지 생성](../../skills/imagegen/evals/evals.json), [설계 문서](../../skills/design-md/evals/evals.json). `files`가 있는 사례는 fixture를 같은 상대 경로로 배치한 격리 작업공간에서 실행합니다. 계획 전용 사례는 지시·단계·보존 경계를 검증하며 실제 생성이나 구현의 성공을 증명하지 않습니다. 실제 모델 응답과 캡처는 버전 관리하지 않습니다.
 
 `awesome-interface`를 스킬 없음과 `emilkowalski/skills`의 스킬 16개에 견주어 같은 과제로 비교하는 스위트는 [`evals/compare/`](../../skills/awesome-interface/evals/compare/)에 있습니다. 실행·채점·반복 비교 방법은 [`scripts/skill-eval/README.md`](../../scripts/skill-eval/README.md)를 따릅니다. 실행기는 평가받는 에이전트와 판정자로 유료 모델을 호출합니다.
+
+### 폰트와 로고
+
+폰트와 로고는 이미지가 아니라 실제 파일로 넘겨야 할 때 다음 두 스킬을 사용합니다. 로고 콘셉트 이미지만 필요하면 `imagegen`을 사용합니다.
+
+| 진입점 | 소유 범위 |
+| --- | --- |
+| [`make-font`](../../skills/make-font/SKILL.md) | 사람이 좋아하는 폰트를 측정하고, 사람이 승인한 OFL-1.1 가변 폰트 하나를 그 측정값에 맞춰 변형합니다. 결과는 새 이름의 OFL 폰트, 웹 폰트, 폰트 북입니다. 참고 폰트의 윤곽은 복사하지 않습니다. 한글도 구조별로 측정하고 변형하며, 한글 기반은 `scripts/bases.json`에 고정한 폰트(현재 Noto Sans KR)만 받습니다. |
+| [`make-logo`](../../skills/make-logo/SKILL.md) | 참고 로고와 Are.na 수집 이미지에서 비례를 측정하고, 도형·OFL 폰트·허용된 아이콘 세트로 독창적인 마크를 만들어 여섯 방향의 로고 북으로 보여 줍니다. 참고 로고는 비례 측정과 거리 검사에 쓰며, 트레이싱은 사람이 권리를 진술한 원본 파일에만 합니다. |
+
+- “make-font로 이 스크린숏 세 장과 비슷한 비례의 본문용 폰트를 만들어 주세요. 한글도 필요합니다.”
+- “make-logo로 이 로고들과 비슷한 느낌이되 우리 제품만의 마크를 만들어 주세요. 이 스케치는 제가 직접 그렸습니다.”
+
+두 스킬의 Python 스크립트는 `uv run`으로 실행합니다. make-font는 Python 3.12를, make-logo는 3.10 이상을 선언하며, 관문 테스트는 3.12에서 실행합니다. 기반 폰트의 승인, 트레이싱 원본에 대한 권리 진술, 최종 방향 선택은 사람이 답합니다. 스크립트는 기반 폰트 승인과 트레이싱 권리 진술을 해당 파일의 sha256에 묶어 기록합니다. 최종 방향 선택은 에이전트가 질문과 답을 `brief.json`의 `choice`에 원문 그대로 적으며, 패키지 단계는 이 기록을 검사하지 않습니다. 무인 실행에서는 그 질문 앞에서 멈춥니다. 거리 검사를 통과했다는 것은 주어진 참고 자료와 가깝지 않다는 뜻일 뿐입니다. 참고 이미지 가운데 파일은 읽었지만 비교할 수 있는 마크로 해석할 수 없는 것이 있으면, 검사는 `not-comparable`로 멈추고 `check.json`을 남기지 않습니다. 모든 참고 이미지를 읽었지만 비교할 대상이 하나도 없으면(예: 빈 참고 폴더) 거리 행은 `not checked`로 표시되고 빌드는 통과할 수 있으므로, 그 통과는 거리에 대한 증거가 되지 않습니다. 산출물의 상표 검토와 법적 판단은 사람이 맡으며, `make-logo`는 그 검토에 쓸 상표 검색 시트를 함께 만듭니다. 관문 테스트는 [`docs/agents/testing.md`](../agents/testing.md#make-font-and-make-logo-gates)의 명령으로 실행합니다.
 
 ## 마케팅
 

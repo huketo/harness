@@ -9,6 +9,8 @@ description: T3 Code에서 독립 구현을 여러 워크트리의 자식 에이
 
 시작 전에 `orchestrator_capabilities`를 호출한다. 도구가 없으면 T3 스레드 밖이라고 말하고 멈춘다. 대상 선택과 도구 조합은 [references/targets.md](references/targets.md)를 따른다.
 
+브리프를 쓰기 전, 그리고 자식이 시간 한도에 걸렸거나 도구 호출이 거부되었거나 호스트 부하가 높을 때는 [references/operations.md](references/operations.md)를 읽는다.
+
 ## 역할
 
 | 역할 | 실행 | 하는 일 |

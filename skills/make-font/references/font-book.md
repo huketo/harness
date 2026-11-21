@@ -1,0 +1,63 @@
+# The font book
+
+A printed specimen in the font itself, 1600 x 1000 px pages, as HTML, page PNGs and one PDF. Every number on a
+page is read from the font files or the logs when the book is written, never typed in.
+
+## Pages
+
+1. **Cover.** The family name at 300 px with the ascender, cap height, x-height, baseline and descender drawn
+   as guide lines at the font's own values. Version, weights, glyph count, scripts, licence, date.
+2. **How it was made** (with `--targets`). Four steps in plain words, then the targets against each weight's
+   measured value, and the width classes with their letters.
+3. **Vertical metrics.** Hxdop drawn from the outlines with every line labelled, advances under each glyph,
+   and the hhea, typo and win values.
+4. **Weights.** One column per weight: Rag at 330 px, the alphabet and a sentence.
+5. **Waterfall.** 120 px down to 11 px, each line cut to fit.
+6. **Text settings.** 20/30, 16/24 and 13/19 columns, headings in the second weight.
+7. **Hangul** (a font with Hangul syllables). The measuring syllables of the six classes drawn from the outlines,
+   each in its advance with the class's mean face box dashed over it; a table of each class's syllables and
+   held-out syllables, mean face, centre height and advance, and, from the fit log, its target and its own x and y
+   scale; and the coverage as counts: KS X 1001, the modern syllables, the compatibility jamo.
+8. **Korean text.** Korean paragraphs at 20/32, 16/26 and 13/21 px and three lines mixing Korean and Latin at 26 px.
+   The specimen is this fixed amount whatever the font covers; the counts go into `pages.json` under `coverage`
+   (`{"korean": {"KS X 1001": [have, 2350], "modern syllables": [have, 11172], "compatibility jamo": [have, 94]}}`).
+9. **Character set.** Every other code point in the TTF's character map, grouped (basic, extended, other scripts,
+   figures, punctuation, currency, maths, symbols, marks), as many pages as it needs. The Hangul syllables and
+   compatibility jamo are counted on the Hangul page instead of listed.
+10. **Figures and punctuation.** Every figure style the features allow, fractions, punctuation and currency.
+11. **Kerning and spacing.** Eighteen common pairs with their values, the spacing strings, kerning off and on,
+    and the guard's largest pair drawn without and with the guard.
+12. **OpenType features.** Every GSUB and GPOS feature, off in grey and on in black, 21 to a page (seven columns,
+    three rows). Stylistic sets show the characters their lookups change, with the set's own name from the name
+    table.
+13. **Languages.** Latin, Cyrillic and Greek languages whose letters are all in the character map.
+14. **Licence and install.** The name table's copyright lines and OFL notice, files with sizes, the check
+    summary (gates passed, the names of those failed and of those not run), a CSS snippet and desktop install.
+15. **Provenance.** From `check-report.json` (`--check-report` is required): the approved base's file name and
+    full sha256, its source, the licence's file name and sha256, the Reserved Font Names, and the approval
+    question, answer and decision verbatim. Every TTF given and every WOFF2 taken from `--webfonts` must have a
+    sha256 the report lists under `package.outputs`; a font from another build, or a report with no such list,
+    is refused, so the provenance always belongs to the fonts the book shows and copies.
+
+## Rules for the book's text
+
+- No reference name, no base family name in prose. The base is named only where the book quotes: the copyright
+  lines on the licence page, which the OFL requires, and the approval record on the provenance page.
+- Plain sentences, sentence case, no puffery. The sample text describes the font's own mechanics.
+- Typographic minus for negative numbers, real quotes and dashes in samples.
+
+## Printing
+
+`node scripts/render_book.mjs book/` loads the page in Chromium through Playwright, waits for the fonts, then:
+
+- **Fallback check.** For every element set in the book face, the DevTools protocol lists which platform fonts
+  drew its glyphs. Any system font means a glyph is missing from ours and a stand-in drew it. That fails.
+- **Overflow check.** Any element past a page's margins fails.
+- Writes `pages/NN-slug.png` at 2x and `fontbook.pdf`.
+
+Playwright and a browser come from `awesome-interface/scripts/find-chromium.mjs` when that skill is installed
+beside this one. Without it, the script looks in `--root <dir>`, the current folder and the global install, and
+`PW_CHROMIUM` may name any Chrome or Chromium executable.
+
+Then open the cover, the kerning page and one character-set page and look. The standard is a sheet a type
+designer would send: aligned columns, one accent colour for guides only, nothing clipped, nothing overlapping.

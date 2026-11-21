@@ -25,6 +25,10 @@ mise exec -- node --test t3/scheduled/guard.test.mjs
 mise exec -- node --test 'scripts/skill-eval/**/*.test.ts'
 mise exec -- node --test scripts/install.test.ts scripts/safe-generate.test.ts scripts/check-repo.test.ts
 mise exec -- node --test skills/harness-flow/scripts/flow-status.test.mjs
+mise exec -- node --test skills/design-md/scripts/oklch.test.mjs
+mise exec -- node --test skills/make-logo/scripts/collection.test.mjs skills/make-logo/scripts/book_pages.test.mjs
+mise exec -- node --test 'skills/awesome-interface/scripts/*.test.mjs'
+mise exec -- node --test scripts/skill-eval/route.test.ts
 ```
 
 `plugin/hooks/allowlist.property.test.mjs` is a property test (fast-check, fixed seed, 200 generated cases): it asserts that `harness-mode allowlist` and the merge guard's `allowedRepo` give the same answer for generated remote URLs and allowlist lines. It covers that agreement only, not whether either reading is the intended one.
@@ -33,7 +37,11 @@ To observe a change to the merge guard, `harness-mode`, or the installer end to 
 
 `skills/harness-flow/scripts/flow-status.test.mjs` runs the read-only status script against synthetic repositories and checks which skill it names next. `mise run test` collects every `skills/*/scripts/*.test.mjs`.
 
-The host-sync test uses temporary local Git repositories and is the focused boundary for `t3/scheduled/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist; its repositories carry a CI definition and a `verify-*` skill unless a case removes them to exercise the readiness degrade. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test skips its five installed-binary cases when `codex` is not on `PATH`, as on CI; with `codex` installed, a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`; it covers timeouts, daily run limits, failure stop, and `daysOfMonth` admission. The skill-eval tests run the runner and grader against temporary repositories with a fake agent and synthetic captures; they call no model and do not prove a real comparison run.
+The host-sync test uses temporary local Git repositories and is the focused boundary for `t3/scheduled/host-sync.mjs`. The merge-guard test covers both `plugin/hooks/merge-guard.mjs` and `skills/full-send/scripts/harness-mode` with temporary repositories, a temporary `HOME`, and a synthetic full-send allowlist; its repositories carry a CI definition and a `verify-*` skill unless a case removes them to exercise the readiness degrade. The plugin installer test puts fake `claude` and `agy` executables first on `PATH`; it does not prove the real CLIs accept the artifacts. The Codex reviewer test skips its five installed-binary cases when `codex` is not on `PATH`, as on CI; with `codex` installed, a PATH shim answers `exec` and `debug models` with synthetic output, and the sandbox, feature, and MCP probes run the installed binary under a temporary `HOME` and `CODEX_HOME`; no model is called. The T3 guard test uses temporary job files and `XDG_STATE_HOME`; it covers timeouts, daily run limits, failure stop, and `daysOfMonth` admission. The skill-eval tests run the runner and grader against temporary repositories with a fake agent and synthetic captures; they call no model and do not prove a real comparison run. `scripts/skill-eval/route.test.ts` runs the description routing runner the same way, with a fake agent against a temporary repository; it calls no model.
+
+`skills/design-md/scripts/oklch.test.mjs` checks the color forms `oklch.mjs` reads and refuses, and its CLI output, offline. `skills/make-logo/scripts/collection.test.mjs` and `book_pages.test.mjs` check collection manifests and pulls against a stubbed `fetch` in a temporary cache, and the logo book's page-image cleanup; they reach no network. The awesome-interface capture tests (`capture.test.mjs`, `capture-guard.test.mjs`, `pixdiff.test.mjs`, `find-chromium.test.mjs`) serve a synthetic page that sends POST, PUT, PATCH, DELETE, and GET to a local server and check which requests arrived. Their browser cases skip when `find-chromium.mjs` finds no Playwright package or no Chromium that launches. Playwright is not a repository dependency, so exercising those cases needs both: run them from a folder whose `node_modules` has Playwright, and a browser it can launch; `PW_CHROMIUM` only selects which Chromium executable Playwright launches. All of these run in `mise run test` and `mise run check`.
+
+`mise run skill-route` is the paid live routing run: one model call per distinct prompt in `scripts/skill-eval/routing/design.json`, classifying from the design skills' descriptions alone. It is not part of `check` or CI, it observes description-based selection rather than actual skill activation, and it assumes a login without server-managed policy. Run it only after a person approves the paid run; `mise run skill-route -- --dry-run` prints the requests without calling a model.
 
 `scripts/install.test.ts` covers the skill, agy, and Codex links and `scripts/update.ts` against a temporary `HOME` and temporary local Git remotes: skills-only ownership, `CLAUDE_CONFIG_DIR`, conflicts that are preserved, fast-forward reinstallation, and refusal of dirty, topic-branch, or divergent checkouts. `scripts/safe-generate.test.ts` runs the pinned rulesync against synthetic Claude Code and agy settings in a temporary `HOME`; it proves that existing entries survive, that `CLAUDE_CONFIG_DIR` is honored, and that a second run changes nothing. It skips the rulesync cases when rulesync is not installed, and it does not prove the agents enforce the generated rules.
 
@@ -66,6 +74,18 @@ uv run --with playwright python3 -m unittest discover -s skills/diagram-design/s
 ```
 
 These prove the safety verdicts, inlining, and the render checks against fixtures; they do not fetch live logos. A live fetch (`scripts/logos.py fetch`) is network evidence and is reported separately.
+
+### make-font and make-logo gates
+
+The make-font and make-logo gate tests are Python `unittest` suites on synthetic inputs: FontBuilder fonts built in the test, never a downloaded font, and synthetic images. They are not part of `mise run check` or CI. Run them after changing either skill and before integrating that change:
+
+```bash
+mise run test-font-gates
+mise run test-logo-gates
+mise run test-skill-gates   # both
+```
+
+The tasks run under `uv` with Python 3.12 (`uv run --no-project --python 3.12`), so the first run downloads Python and the packages and later runs reuse the cache. `test-logo-gates` needs `potrace` on `PATH` (or in the make-logo cache): without it the trace and seal cases are skipped, and a run with skips does not prove the trace gates. The tasks and the child interpreters the tests start pass `-B`, so a run leaves no `__pycache__` in the script folders. They prove the gates' accept and refuse decisions against those fixtures; they do not call GitHub or Google Fonts, run fontbakery, or render a font or logo book in a browser, and those remain unverified until run separately.
 
 ## Shell
 

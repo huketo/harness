@@ -1,6 +1,6 @@
 ---
 name: awesome-interface
-description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures, mobile-web behavior. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system document authoring, native-platform animation APIs, API interface design, or backend-only code review."
+description: "Design, improve, and review product interfaces: accessibility, layout, UI copy, typography, color systems, visual polish, web motion and gestures, mobile-web behavior. Use for new UI art direction, authorized redesigns, focused UI fixes, palettes, complete screen or flow reviews, and explicitly requested UI change reviews, stress tests, design alternatives, or interface explanations. Not for image generation, screenshot-to-code implementation, design-system documentation or token mapping reports, native-platform animation APIs, API interface design, or backend-only code review."
 license: MIT
 ---
 
@@ -59,7 +59,7 @@ For creation, apply the relevant domain guidance during implementation rather th
 
 Exercise the relevant existing preview or runtime. Inspect rendered states when layout, motion, contrast, focus, or interaction determines the result. For changed interactive web UI, check keyboard operation and the supported narrow-width state; include empty/loading/error and reduced-motion states where the change reaches them. Separate 320px reflow from 200% zoom rather than claiming one proves both.
 
-Use available browser/runtime tools rather than prescribing a specific automation package. When the runtime is unavailable, do the reachable source checks and identify the unverified states. Source inspection cannot prove visual correctness; a screenshot cannot prove keyboard behavior. Do not invent passing measurements or runtime output.
+Use available browser/runtime tools rather than prescribing a specific automation package. For before-and-after screenshots of a locally served web surface with its writes blocked, use the bundled scripts as [capture and compare](references/review.md#capture-and-compare) describes. When the runtime is unavailable, do the reachable source checks and identify the unverified states. Source inspection cannot prove visual correctness; a screenshot cannot prove keyboard behavior. Do not invent passing measurements or runtime output.
 
 Size the answer to the question. A naming, choice or short explanation question gets a direct answer at the length the user asked for, without unrequested implementation, requirements or tool lists. State versions, release dates, download counts or maintenance status only when checked in this session against a source you name, such as the lockfile, registry or release page; otherwise omit them or mark them unverified.
 

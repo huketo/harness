@@ -19,6 +19,22 @@ description = "Run every maintained test suite with node --test"
 depends = ["setup"]
 run = "node --test 'plugin/**/*.test.mjs' 't3/**/*.test.mjs' 'codex/**/*.test.ts' 'scripts/**/*.test.ts' 'skills/*/scripts/*.test.mjs'"
 
+[tasks.test-font-gates]
+description = "Run the make-font Python gate tests (synthetic FontBuilder fonts, offline); not part of check or CI"
+run = "uv run --no-project --python 3.12 --with fonttools --with brotli --with uharfbuzz --with numpy --with pillow --with skia-pathops python -I -B -m unittest discover -s skills/make-font/scripts -p 'test_*.py' -v"
+
+[tasks.test-logo-gates]
+description = "Run the make-logo Python gate tests (synthetic images, offline); not part of check or CI"
+run = "uv run --no-project --python 3.12 --with numpy --with scipy --with scikit-image --with pillow --with skia-pathops --with fonttools --with uharfbuzz --with resvg-py python -I -B -m unittest discover -s skills/make-logo/scripts -p 'test_*.py' -v"
+
+[tasks.test-skill-gates]
+description = "Run every Python gate test for make-font and make-logo; run before integrating a slice that touches either skill"
+depends = ["test-font-gates", "test-logo-gates"]
+
+[tasks.skill-route]
+description = "Description-based routing check for the design skills: one paid model call per prompt asks which skill the descriptions alone select; it does not observe actual activation. Pass -- --dry-run to print the requests without calling a model; not part of check or CI"
+run = "node scripts/skill-eval/route.ts --cases scripts/skill-eval/routing/design.json"
+
 [tasks.rules]
 description = "Enforce the repository rules AGENTS.md pairs with scripts/check-repo.ts"
 run = "node scripts/check-repo.ts"

@@ -52,6 +52,12 @@ Examine deleted lines as carefully as additions. Check for equivalent replacemen
 
 An `aria-label` replaced by a valid visible-label association, custom role replaced by a native element, focus outline replaced by a visible equivalent, or string moved to a translation catalog is not by itself a regression.
 
+## Swapped controls and changed writes
+
+When the change replaces or edits a number, amount, upload, date, or select-on-open control, run the matching [equivalence classes](worst-case-data.md#input-equivalence-classes) on base and head with the same inputs. Compare what each side shows, commits and sends, not only what it renders. A differing row is a change defect unless the change states it as intended. A defect both sides share, such as a date a day early west of UTC, is `Pre-existing`; when fixing it is in scope, fix it as its own change and name it in the report.
+
+When a hunk adds, moves or rewraps a submit handler, a mutation call or a non-GET request, capture the state that sends it on base and head, each with its own `--bodies` file, and diff the two (see [capture and compare](review.md#capture-and-compare)). Each row records an absolute URL, so when base and head are served on different local ports every row differs; before the diff, rewrite only a row `url` whose origin is that side's own local build origin to a shared placeholder, and leave every other URL and field, the body included, as recorded, for example `node -e 'const [f,o]=process.argv.slice(1);const j=JSON.parse(require("fs").readFileSync(f,"utf8"));for(const r of j.rows){const u=new URL(r.url);if(u.origin===o)r.url="ORIGIN"+u.pathname+u.search}console.log(JSON.stringify(j,null,1))' base-bodies.json http://localhost:3001 > base.norm.json`, and the same with the head file and its origin. A request that went to any other origin keeps it, so a call moved to another API still shows. A text substitution over the whole file would also rewrite URLs inside bodies and hide a changed callback. A body that differs with no stated intent is a finding.
+
 ## Classify by cause, not proximity
 
 - `Introduced`: evidence shows the change created the defect.
@@ -66,3 +72,5 @@ Finish using [review.md](review.md) and the [report format](../assets/review-for
 ## Runtime without checkout mutation
 
 Use an existing safe preview matching the reviewed revision. If isolated rendering is needed and authorized, create a disposable local checkout/fixture through the project’s existing mechanism, isolate external services and remove only resources created for the review afterward. Never exercise destructive production paths. A preview of another revision does not verify this change. Record unavailable rendering or mismatched revisions as `Not verified`.
+
+When base and head can both be served locally, capture the base with `--kind before` and the head with `--kind after`, with the same surfaces, states, widths and themes, and compare them as [capture and compare](review.md#capture-and-compare) describes. Each changed region pixdiff reports must map to a hunk in the resolved change. A region no hunk explains is a finding, classified `Introduced` or `Regression` by the usual base/head evidence. While two captures of the same revision already differ, the comparison is `Not verified`, not a finding.

@@ -1,0 +1,24 @@
+{
+  "_comment": "Pinned bases for Hangul: OFL-1.1 TrueType variable fonts with Latin and every modern Hangul syllable, the only fonts find_foundation.py ranks when the targets' scripts have korean. It refuses a download whose sha256 differs from the one pinned here, and checks each file again (find_foundation.qualify). Read references/foundation.md before adding an entry.",
+  "families": {
+    "noto-sans-kr": {
+      "family": "Noto Sans KR",
+      "category": "sans",
+      "version": "2.004, google/fonts@24ddc1f324ca",
+      "rfn": [
+        "Source"
+      ],
+      "license": {
+        "url": "https://raw.githubusercontent.com/google/fonts/24ddc1f324cac5d9f5aedca126d298f56e3f1640/ofl/notosanskr/OFL.txt",
+        "sha256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9"
+      },
+      "files": [
+        {
+          "weight": "100 900",
+          "url": "https://raw.githubusercontent.com/google/fonts/24ddc1f324cac5d9f5aedca126d298f56e3f1640/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf",
+          "sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252"
+        }
+      ]
+    }
+  }
+}
