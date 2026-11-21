@@ -437,9 +437,9 @@ class PartlyClear(unittest.TestCase):
     def setUpClass(cls):
         cls.collected = [("world/mockups/90000001.png", "", SP.picture(png(G.photo(0))))]
 
-    def verdicts(self, seed: int) -> list[tuple[str, float, str | None, float]]:
+    def verdicts(self, seed: int, collected=None) -> list[tuple[str, float, str | None, float]]:
         """(copy, share of the subject it shows, refusal or None, score) of each cleared copy of photo `seed` against
-        photo 0."""
+        photo 0, or against `collected`."""
         subject = np.asarray(G.photo(seed, cut_out=True).getchannel("A")) > 0
         out = []
         for shown in self.SHOWN:
@@ -449,7 +449,8 @@ class PartlyClear(unittest.TestCase):
                     copy = G.cleared(G.photo(seed), shown, shape, hidden, cell)
                     held = float((np.asarray(copy.getchannel("A"))[subject] > 0).mean())
                     try:
-                        out.append((name, held, None, SP.gate(name, SP.source(png(copy)), self.collected)["score"]))
+                        out.append((name, held, None, SP.gate(name, SP.source(png(copy)),
+                                                             collected or self.collected)["score"]))
                     except R.Refused as e:
                         out.append((name, held, e.reason, e.detail["copy_nearest"]["score"]))
         return out
@@ -463,6 +464,13 @@ class PartlyClear(unittest.TestCase):
 
     def test_passes_the_same_copies_of_another_photo(self):
         verdicts = self.verdicts(1)
+        print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
+        self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
+
+    def test_passes_copies_of_a_photo_against_another_staged_alike(self):
+        """Photo 0 with its centre clear holds under a fifth of its detail: what shows is the lit wall around the box and
+        the ball, as in photo 1. A refinement free to leave MIN_HELD behind found a window there scoring 0.9469."""
+        verdicts = self.verdicts(0, [("world/mockups/90000002.png", "", SP.picture(png(G.photo(1))))])
         print(f"\n  highest: {max(score for *_, score in verdicts):.4f}")
         self.assertEqual([(name, score) for name, _, why, score in verdicts if why is not None], [])
 

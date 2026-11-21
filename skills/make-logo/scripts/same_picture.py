@@ -25,10 +25,10 @@ cropped copy of a collected photo passes them. This compares the pictures themse
    to anything, counts for nothing: each pixel's colour is its value on black over its alpha, it counts as much as
    both show of it, and each view is less a plane fitted around each pixel to what both show (_Plane) rather than
    its blur, which would carry the hidden colour, or the ground a copy is flattened on, into the pixels that show. A
-   window scores 0 where both show under MIN_SHOWN of it, or, in the coarse search, where that part holds under
-   MIN_HELD of either view's own detail where it shows: one edge of a mark, or one side of a ball, matches some
-   window of other pictures too. The refinement then aligns by r alone: at FINE px a picture's sharpest edges weigh
-   more, so a copy whose clear part takes them holds less of its detail there than at COARSE px.
+   window scores 0 where both show under MIN_SHOWN of it, or where that part holds under MIN_HELD of either view's
+   own detail where it shows: one edge of a mark, or one side of a ball, matches some window of other pictures too.
+   What a window holds is measured at COARSE px in the refinement too: at FINE px a picture's sharpest edges weigh
+   more, so a copy whose clear part takes them would hold less of its detail at the window that undoes its cut.
 
 A pairing's score is its refined score, or its coarse score under FLOOR; two images score the highest of their
 pairings. The gate refuses at LIMIT and over. It does not see a picture turned (but by its EXIF orientation),
@@ -198,13 +198,23 @@ def _shown(v: np.ndarray, alpha: np.ndarray | None, details: np.ndarray | None =
     return _Shown(v, alpha, np.where(total > 1e-6, held / np.maximum(total, 1e-12), 0), plane, detail)
 
 
-def _shown_scores(x: _Shown, y: _Shown, min_held: float) -> np.ndarray:
+def _held(x: _Shown, y: _Shown) -> np.ndarray:
+    """For each row of `x` against `y` (one row): the lower of the two views' shares of their own detail where both
+    show."""
+    if x.alpha is not None and y.alpha is not None:
+        w = x.alpha * y.alpha
+    else:
+        w = x.alpha if x.alpha is not None else y.alpha
+    return np.minimum((w * x.held).sum(1), (w * y.held).sum(1))
+
+
+def _shown_scores(x: _Shown, y: _Shown, held: np.ndarray) -> np.ndarray:
     """The score of each row of `x` against `y` (one row), one or both with alpha, where both show: Pearson's r of
     their colours less a plane, each pixel weighted by how much both show of it, the plane fitted to that weight too
     (_Plane), so what a clear pixel hides, or the ground a copy is flattened on, reaches no pixel that shows. 0 for a
-    window where they show under MIN_SHOWN of it, where that holds under `min_held` of either's detail (one edge of a
-    mark, one side of a ball: some window of other pictures matches it as well), or where either has no detail left
-    (under a thousandth, in 0-1 grey)."""
+    window where they show under MIN_SHOWN of it, where `held` (each row's _held(), at COARSE px) is under MIN_HELD
+    (one edge of a mark, one side of a ball: some window of other pictures matches it as well), or where either has no
+    detail left (under a thousandth, in 0-1 grey)."""
     if x.alpha is not None and y.alpha is not None:
         plane = _Plane(x.alpha * y.alpha)
         w, dx, dy = plane.w, plane.less(x.colour), plane.less(y.colour)
@@ -217,8 +227,7 @@ def _shown_scores(x: _Shown, y: _Shown, min_held: float) -> np.ndarray:
     dx = dx - (w * dx).sum(1, keepdims=True) / np.maximum(s, 1e-12)[:, None]
     dy = dy - (w * dy).sum(1, keepdims=True) / np.maximum(s, 1e-12)[:, None]
     vx, vy = (w * dx * dx).sum(1), (w * dy * dy).sum(1)
-    held = np.minimum((w * x.held).sum(1), (w * y.held).sum(1))
-    ok = (s >= MIN_SHOWN * n) & (held >= min_held) & (vx > 1e-6) & (vy > 1e-6)
+    ok = (s >= MIN_SHOWN * n) & (held >= MIN_HELD) & (vx > 1e-6) & (vy > 1e-6)
     return np.where(ok, (w * dx * dy).sum(1) / np.sqrt(np.where(ok, vx * vy, 1)), 0.0)
 
 
@@ -301,16 +310,27 @@ def cached(sha: str, data: bytes) -> Picture:
 
 def _coarse_scores(big: Picture, i: int, small: Picture, j: int) -> np.ndarray:
     """The score of each coarse window of `big`'s view i against `small`'s view j whole: where neither has alpha, the
-    dot product of their details, which is Pearson's r; else _shown_scores() with MIN_HELD."""
+    dot product of their details, which is Pearson's r; else _shown_scores()."""
     if big.alphas[i] is None and small.alphas[j] is None:
         return big.details()[i] @ small.coarse[j]
-    return _shown_scores(big.shown(i), small.coarse_shown[j], MIN_HELD)
+    x, y = big.shown(i), small.coarse_shown[j]
+    return _shown_scores(x, y, _held(x, y))
+
+
+def _coarse_held(big: Picture, i: int, small: Picture, j: int, down: _Spans, across: _Spans) -> np.ndarray:
+    """_held() of each window `down` and `across` take of `big`'s view i against `small`'s view j whole, both at
+    COARSE px, as the coarse search measures it."""
+    d, a = _Spans(2 * COARSE, COARSE, down.spans), _Spans(2 * COARSE, COARSE, across.spans)
+    half, alpha, k = big.halves[i], big.alphas[i], len(down.spans) * len(across.spans)
+    shown = None if alpha is None else _windows(d, a, _halve(alpha)).reshape(k, -1)
+    details = None if alpha is not None else _details(d, a, half).reshape(k, -1)
+    x = _shown(_windows(d, a, half).reshape(k, -1), shown, details)
+    return _held(x, small.coarse_shown[j])
 
 
 def _refine(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, float, float, float]) -> float:
     """The best score of `small`'s view j whole, at FINE, against windows of `big`'s view i near `cut` (left, top,
-    right, bottom left out), moving each side a step of 1/64, then of 1/128. The coarse search held the window to
-    MIN_HELD; this aligns it by r alone."""
+    right, bottom left out), moving each side a step of 1/64, then of 1/128."""
     square, alpha = big.squares[i], big.alphas[i]
     best = -1.0
     for step in (1 / 64, 1 / 128):
@@ -326,7 +346,7 @@ def _refine(big: Picture, i: int, small: Picture, j: int, cut: tuple[float, floa
         else:
             s = _shown_scores(_shown(_windows(down, across, square).reshape(-1, FINE * FINE),
                                      None if alpha is None else _windows(down, across, alpha).reshape(-1, FINE * FINE),
-                                     details), small.fine_shown[j], 0.0)
+                                     details), small.fine_shown[j], _coarse_held(big, i, small, j, down, across))
         s = s.reshape(shape)
         y, x = np.unravel_index(int(s.argmax()), shape)
         if s[y, x] > best:
