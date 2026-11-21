@@ -57,7 +57,8 @@ trademark sheet. It doesn't know whether the statement is true.
   usual limit. It refuses a traced direction whose trace was gated against other `--refs` images, another
   calibration or other collections than it is given, and removes that `check.json`. Before that, it runs the
   same-picture gate again on each traced source against the collections as they are now: a source a collection now
-  lists (`collected`) or a copy of a collected image (`collected-copy`) stops the direction. With
+  lists (`collected`) or a copy of a collected image (`collected-copy`) stops the direction, and so does a collected
+  file it can't read as a picture (`not-comparable`). With
   no reference that shows a mark, its nearest-reference row reads `not checked`.
 - `package_logo.py` and `logo_book.py` go on only while `check.json` passed and the sha256 of `build.json`, of every
   file it lists, of the `--refs` images and of the calibration all match what `check_logo.py` saw; for a traced
@@ -171,7 +172,8 @@ shipped. Below, `<refs>` stands for every reference folder, always the same list
    "$C/photos"`, then `node scripts/render_book.mjs book` (`references/logo-book.md`). A direction that failed the
    check is left out; `--include-failed` shows it, marked. This step and step 10 refuse a traced direction whose
    collections changed after its check (`collections-changed`): build and check it again. They refuse one whose
-   source a collection now holds, or holds a copy of (`collected`, `collected-copy`): drop it.
+   source a collection now holds, or holds a copy of (`collected`, `collected-copy`): drop it. A collected file they
+   can't read as a picture (`not-comparable`) is the same as in step 7.
    Open every page. Send `book/logobook.pdf` and ask the person to choose; record the question and their answer
    verbatim in `brief.json` as `"choice"`.
    Done when render_book.mjs exits 0 and the person's pick is recorded in their words.
