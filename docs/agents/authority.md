@@ -50,7 +50,7 @@ A person may select a work mode for one task or thread with the `full-send` or `
 - `full-send` adds merging that one PR/MR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. The worktree must also hold a CI definition and a `verify-*` skill, so that a change can be proven without a person. Without the allowlist entry or either of those it runs as `full-stop` and says so.
 - Neither mode authorizes deleting data, production changes, writes outside the repository, closing a PR/MR, admin bypass, force-pushing another branch, or editing the allowlist.
 
-`skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks merges the mode does not allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
+`skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks a merge that neither the mode nor the conditions under [Actions that need no question](#actions-that-need-no-question) allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
 
 ## Settled policy
 

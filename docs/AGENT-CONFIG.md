@@ -24,11 +24,11 @@ Claude Code는 `plugin.json`의 버전이 바뀔 때만 마켓플레이스에서
 
 ## 2. 머지 가드와 작업 모드
 
-작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 사람이 그 머지를 명시적으로 결정해야 합니다.
+작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 [`authority.md`](agents/authority.md)가 정한 조건(허용 목록의 저장소, 통과한 CI, 다른 모델 계열의 리뷰 승인)을 충족할 때에만 묻지 않고 진행합니다.
 
 | 모드 | 머지 가드의 판정 |
 | --- | --- |
-| 없음 | 막습니다. 사람이 특정 MR의 머지를 요청한 뒤 `harness-mode allow-merge <번호>`를 기록하면, 30분 안에 그 번호를 명시한 머지 명령 하나만 통과합니다. |
+| 없음 | 머지 대상이 허용 목록에 있는 이 워크트리의 저장소이고, 그 PR/MR의 CI가 모두 통과했으며, 본문에 `review-loop`이 승인 뒤에 적는 `Reviewed with review-loop: ... Verdict: approved` 줄이 있으면 통과합니다. 가드가 머지 직전에 `gh pr view`나 `glab mr view`로 이 상태를 읽으며, 읽지 못하면 막습니다. CI가 없거나 진행 중이거나 실패했으면 막습니다. 그 밖에는 사람이 특정 PR/MR의 머지를 요청한 뒤 `harness-mode allow-merge <번호>`를 기록하면, 30분 안에 그 번호를 명시한 머지 명령 하나만 통과합니다. |
 | `full-stop` | 항상 막습니다. |
 | `full-send` | 머지 대상 저장소가 허용 목록에 있을 때만 통과합니다. 허용 목록에 없는 저장소와, CI 설정이나 `verify-*` 검증 스킬이 없는 워크트리에서는 `harness-mode`가 모드를 `full-stop`으로 낮춥니다. 이 준비도 검사는 `harness-mode`만 하며 파일이 있는지만 봅니다. 대상 저장소를 명령에서 읽을 수 없는 GraphQL 머지는 막습니다. |
 | 모든 모드 | `--admin`, 명령 연결·치환·`eval`, `GH_REPO`·`GH_HOST`·`GITLAB_HOST`·`GITLAB_URL`·`--hostname` 같은 대상 변경, 서로 다른 저장소를 가리키는 인자, 머지할 저장소와 다른 호스트를 적은 URL이나 API 주소는 항상 막습니다. |

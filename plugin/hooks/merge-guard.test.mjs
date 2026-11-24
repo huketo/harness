@@ -11,6 +11,8 @@ import {
 	allowedRepo,
 	allowlistFile,
 	decide,
+	ghChecks,
+	glabChecks,
 	mergeCommand,
 	mergeRepo,
 	parseAllowlist,
@@ -18,6 +20,7 @@ import {
 	readPayload,
 	render,
 	repoKey,
+	reviewApproved,
 	sameRepo,
 	targetRepo,
 } from "./merge-guard.mjs";
@@ -344,4 +347,41 @@ test("every host a merge command names must be the host of the repository it mer
 	assert.equal(d('gh pr merge 7 --body "see https://other.example/x"', send, personal), "allow");
 	// gh's -m is --merge and takes no value, so the word after it is still a target.
 	assert.equal(d("gh pr merge -m https://ghe.example/example-owner/x/pull/7", send, personal), "deny");
+});
+
+test("without a mode, an allowlisted repository merges only on passing CI and a review-loop approval", () => {
+	const personal = "git@github.com:example-owner/harness.git";
+	const ok = { ci: "pass", review: true };
+	const d = (command, gate, origin = personal, state = {}) => decide({ command, state, origin, now: NOW, allow: ALLOW, gate });
+	assert.equal(d("gh pr merge 1", ok).action, "allow");
+	assert.equal(d("gh pr merge 1", null).action, "deny");
+	assert.equal(d("gh pr merge 1", null).needsGate, true);
+	assert.equal(d("gh pr merge 1", { ci: "pending", review: true }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ci: "fail", review: true }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ci: "missing", review: true }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ci: "pass", review: false }).action, "deny");
+	assert.equal(d("gh pr merge 1 --admin", ok).action, "deny");
+	assert.equal(d("gh pr merge 1", ok, personal, { mode: "full-stop" }).action, "deny");
+	assert.equal(d("gh pr merge 1", ok, "git@github.com:someone-else/repo.git").action, "deny");
+	assert.equal(d("gh pr merge 1", null, "git@github.com:someone-else/repo.git").needsGate, undefined);
+	assert.equal(d("gh pr merge 1 -R example-owner/other", ok).action, "deny");
+	assert.equal(d("gh pr merge 1 && gh pr merge 2", ok).action, "deny");
+	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "allow");
+});
+
+test("CI and review state are read from the PR/MR, and anything short of success is not a pass", () => {
+	assert.equal(ghChecks([]), "missing");
+	assert.equal(ghChecks(undefined), "missing");
+	assert.equal(ghChecks([{ status: "COMPLETED", conclusion: "SUCCESS" }, { state: "SUCCESS" }, { conclusion: "SKIPPED" }]), "pass");
+	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { status: "IN_PROGRESS", conclusion: "" }]), "pending");
+	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "fail");
+	assert.equal(ghChecks([{ state: "PENDING" }]), "pending");
+	assert.equal(glabChecks({}), "missing");
+	assert.equal(glabChecks({ head_pipeline: { status: "success" } }), "pass");
+	assert.equal(glabChecks({ head_pipeline: { status: "running" } }), "pending");
+	assert.equal(glabChecks({ head_pipeline: { status: "failed" } }), "fail");
+	assert.equal(reviewApproved("Summary\n\nReviewed with review-loop: 2 rounds with gpt-sol on high. Verdict: approved\nmodel line"), true);
+	assert.equal(reviewApproved("Reviewed with review-loop: 5 rounds with gpt-sol. Verdict: deadlock"), false);
+	assert.equal(reviewApproved("quote: > Reviewed with review-loop: 1 rounds with x. Verdict: approved"), false);
+	assert.equal(reviewApproved(null), false);
 });
