@@ -39,7 +39,7 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 - rotating or revoking credentials or editing secret stores;
 - deleting preserved sessions, reports, audit evidence, benchmark data, or blocked host-sync candidates;
 - starting, changing, enabling, or disabling scheduled jobs and live automations;
-- submitting content, sending a notification, or performing another live external write that the list above does not name;
+- submitting content, sending a notification, or performing another live external write, except the actions listed under [Actions that need no question](#actions-that-need-no-question);
 - changing external project settings, access control, billing, or provider configuration.
 
 ## Work modes

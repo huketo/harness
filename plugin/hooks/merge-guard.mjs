@@ -102,6 +102,16 @@ export function mergeTarget(command) {
 	const paths = new Set([...text.matchAll(/(?:merge_requests|pulls?)\/(\d+)/g)].map((m) => m[1]));
 	const api = MERGE_PATTERNS.slice(2).some(({ re }) => re.test(text));
 	if (api) return paths.size === 1 ? [...paths][0] : null;
+	const positional = mergePositional(command);
+	if (positional === null) return null;
+	const match = /^[!#]?(\d+)$/.exec(positional) ?? /\/(?:-\/merge_requests|pull)\/(\d+)(?:[/?#].*)?$/.exec(positional);
+	if (!match) return null;
+	return [...paths].every((n) => n === match[1]) ? match[1] : null;
+}
+
+/** The single positional argument of a `pr merge` / `mr merge` invocation, or null (none, several, an unknown flag, an API call). */
+export function mergePositional(command) {
+	const text = command.replace(/\\\n/g, " ");
 	const invocation = [MERGE_PATTERNS[0], MERGE_PATTERNS[1]].map(({ cli, re }) => ({ cli, m: re.exec(text) })).find(({ m }) => m);
 	if (!invocation) return null;
 	const words = shellWords(text.slice(invocation.m.index + invocation.m[0].length));
@@ -123,10 +133,7 @@ export function mergeTarget(command) {
 		}
 		positional.push(word);
 	}
-	if (positional.length !== 1) return null;
-	const match = /^[!#]?(\d+)$/.exec(positional[0]) ?? /\/(?:-\/merge_requests|pull)\/(\d+)(?:[/?#].*)?$/.exec(positional[0]);
-	if (!match) return null;
-	return [...paths].every((n) => n === match[1]) ? match[1] : null;
+	return positional.length === 1 ? positional[0] : null;
 }
 
 export function parseState(text) {
@@ -330,9 +337,11 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 	if (mode !== "none") return deny("no work mode allows merging");
 	const { key, denied } = allowlisted();
 	if (denied) return denied;
-	if (repo && !sameRepo(repo, origin)) return deny("without a mode, a merge covers only this worktree's repository");
-	const target = mergeTarget(command);
-	if (!target) return deny("without a mode, name the PR/MR number in the merge command");
+	// A bare number and no repository reference: both CLIs read that one way, so the lookup below and the merge
+	// resolve the same PR/MR. Any other selector (a branch, `!N`, `#N`, a URL, -R, a REST path) is denied.
+	const target = mergePositional(command);
+	if (repo || !/^\d+$/.test(target ?? ""))
+		return deny(`without a mode, merge with \`${cli === "gh" ? "gh pr" : "glab mr"} merge <number>\` and no repository flag or URL`);
 	if (!gate) return { ...deny("the PR/MR's CI and review state could not be read"), needsGate: true };
 	if (gate.repo !== key) return deny(`the PR/MR number resolves in ${gate.repo ?? "an unknown repository"}, not in ${key}`);
 	if (gate.ci !== "pass") return deny(`CI on the PR/MR is ${gate.ci}, not passing`);
@@ -341,28 +350,24 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 }
 
 /**
- * CI and review state of the PR/MR a merge command targets, read from the platform; null when unreadable. The
- * lookup resolves its repository the way the merge will (the command's own -R, else the CLI's default), and `repo`
- * is the repository the platform answered for, so a fork whose CLI default is its upstream cannot borrow origin.
+ * CI and review state of PR/MR `target` (a bare number), read from the platform; null when unreadable. The lookup
+ * names no repository, as the merge does, so both resolve through the CLI's default; `repo` is the repository
+ * the platform answered for, so a fork whose CLI default is its upstream cannot borrow origin's allowlist entry.
  */
-function readGate(cli, command, dir) {
-	const target = mergeTarget(command);
-	const named = /(?:^|\s)(?:-R|--repo)(?:\s+|=)?["']?([^\s"']+)/.exec(command)?.[1];
-	const where = named ? ["-R", named] : [];
+function readGate(cli, target, dir) {
 	// Two lookups at most, inside the 10 s the hook is given.
 	const run = (file, args) => JSON.parse(execFileSync(file, args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 4_000 }));
 	const home = (url, marker) => (typeof url === "string" && url.includes(marker) ? repoKey(url.slice(0, url.indexOf(marker))) : null);
 	try {
-		if (!target) return null;
 		if (cli === "gh") {
-			const pr = run("gh", ["pr", "view", target, ...where, "--json", "statusCheckRollup,body,url"]);
+			const pr = run("gh", ["pr", "view", target, "--json", "statusCheckRollup,body,url"]);
 			return { ci: ghChecks(pr.statusCheckRollup), review: reviewApproved(pr.body), repo: home(pr.url, "/pull/") };
 		}
-		const mr = run("glab", ["mr", "view", target, ...where, "--output", "json"]);
+		const mr = run("glab", ["mr", "view", target, "--output", "json"]);
 		const pipeline = mr.head_pipeline ?? mr.pipeline;
 		let parents = [];
 		if (pipeline?.sha && pipeline.sha !== mr.sha && /^[0-9a-f]{7,64}$/.test(pipeline.sha) && Number.isInteger(mr.project_id))
-			parents = run("glab", ["api", ...where, `projects/${mr.project_id}/repository/commits/${pipeline.sha}`]).parent_ids ?? [];
+			parents = run("glab", ["api", `projects/${mr.project_id}/repository/commits/${pipeline.sha}`]).parent_ids ?? [];
 		return { ci: glabChecks(mr, parents), review: reviewApproved(mr.description), repo: home(mr.web_url, "/-/merge_requests/") };
 	} catch {
 		return null;
@@ -455,7 +460,7 @@ function main() {
 	let decision = decide(facts);
 	// Only a merge that every other rule allows reads the platform, so every other denial stays offline.
 	if (decision.needsGate) {
-		const gate = readGate(mergeCommand(command), command, dir);
+		const gate = readGate(mergeCommand(command), mergePositional(command), dir);
 		if (gate) decision = decide({ ...facts, gate });
 	}
 	let final = decision;

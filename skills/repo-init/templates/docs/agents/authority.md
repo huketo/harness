@@ -34,7 +34,7 @@ Approval for one plan ends with that plan and does not authorize a later batch o
 These actions are hard to undo, publish material, or cross a durable boundary. Each requires an explicit decision naming the exact action:
 
 - Deploying to production, or publishing a release or package.
-- Posting or sending anything else from the person's external accounts.
+- Posting or sending anything from the person's external accounts, except the actions listed under [Actions that need no question](#actions-that-need-no-question).
 - Counting a failed check as passed by re-running it until it passes, skipping it, or bypassing it.
 - Force-pushing a shared branch, rebasing published history, or deleting tags or a branch the task does not own.
 - Selecting or changing license or copyright terms.

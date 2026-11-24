@@ -374,6 +374,20 @@ test("without a mode, an allowlisted repository merges only on passing CI and a 
 	assert.equal(d("gh pr merge 1", ok, "git@github.com:someone-else/repo.git").action, "deny");
 	assert.equal(d("gh pr merge 1", null, "git@github.com:someone-else/repo.git").needsGate, undefined);
 	assert.equal(d("gh pr merge 1 -R example-owner/other", ok).action, "deny");
+	// Only a bare number with no repository reference: gh reads `!1` as a branch, and a flag or URL can point the
+	// merge somewhere the lookup does not follow.
+	for (const command of [
+		"gh pr merge '!1'",
+		"gh pr merge '#1'",
+		"gh pr merge 1 -R example-owner/harness",
+		'gh pr merge 1 --repo "example-owner/harness"',
+		"gh pr merge https://github.com/example-owner/harness/pull/1",
+		"gh api -X PUT repos/example-owner/harness/pulls/1/merge",
+	]) {
+		assert.equal(d(command, ok).action, "deny", command);
+		assert.equal(d(command, null).needsGate, undefined, command);
+	}
+	assert.equal(d("gh pr merge 1 --squash --delete-branch", ok).action, "allow");
 	assert.equal(d("gh pr merge 1 && gh pr merge 2", ok).action, "deny");
 	assert.equal(d("glab mr merge 1", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
 	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "deny");
