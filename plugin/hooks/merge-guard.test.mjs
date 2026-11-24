@@ -351,22 +351,32 @@ test("every host a merge command names must be the host of the repository it mer
 
 test("without a mode, an allowlisted repository merges only on passing CI and a review-loop approval", () => {
 	const personal = "git@github.com:example-owner/harness.git";
-	const ok = { ci: "pass", review: true };
+	const ok = { ci: "pass", review: true, repo: "github.com/example-owner/harness" };
+	const gitlabOk = { ci: "pass", review: true, repo: "gitlab.example/team/allowed" };
 	const d = (command, gate, origin = personal, state = {}) => decide({ command, state, origin, now: NOW, allow: ALLOW, gate });
 	assert.equal(d("gh pr merge 1", ok).action, "allow");
 	assert.equal(d("gh pr merge 1", null).action, "deny");
 	assert.equal(d("gh pr merge 1", null).needsGate, true);
-	assert.equal(d("gh pr merge 1", { ci: "pending", review: true }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ci: "fail", review: true }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ci: "missing", review: true }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ci: "pass", review: false }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ...ok, ci: "pending" }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ...ok, ci: "fail" }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ...ok, ci: "missing" }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ...ok, review: false }).action, "deny");
+	// A branch name or no target would let the lookup read another PR, so neither reaches the platform.
+	assert.equal(d("gh pr merge", ok).action, "deny");
+	assert.equal(d("gh pr merge", null).needsGate, undefined);
+	assert.equal(d("gh pr merge other-branch", ok).action, "deny");
+	assert.equal(d("gh pr merge other-branch", null).needsGate, undefined);
+	// A fork whose CLI default is its upstream answers for another repository.
+	assert.equal(d("gh pr merge 1", { ...ok, repo: "github.com/upstream-owner/harness" }).action, "deny");
+	assert.equal(d("gh pr merge 1", { ...ok, repo: null }).action, "deny");
 	assert.equal(d("gh pr merge 1 --admin", ok).action, "deny");
 	assert.equal(d("gh pr merge 1", ok, personal, { mode: "full-stop" }).action, "deny");
 	assert.equal(d("gh pr merge 1", ok, "git@github.com:someone-else/repo.git").action, "deny");
 	assert.equal(d("gh pr merge 1", null, "git@github.com:someone-else/repo.git").needsGate, undefined);
 	assert.equal(d("gh pr merge 1 -R example-owner/other", ok).action, "deny");
 	assert.equal(d("gh pr merge 1 && gh pr merge 2", ok).action, "deny");
-	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "allow");
+	assert.equal(d("glab mr merge 1", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
+	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "deny");
 });
 
 test("CI and review state are read from the PR/MR, and anything short of success is not a pass", () => {
@@ -376,10 +386,15 @@ test("CI and review state are read from the PR/MR, and anything short of success
 	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { status: "IN_PROGRESS", conclusion: "" }]), "pending");
 	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "fail");
 	assert.equal(ghChecks([{ state: "PENDING" }]), "pending");
+	assert.equal(ghChecks([{ conclusion: "SKIPPED" }, { conclusion: "NEUTRAL" }]), "missing");
 	assert.equal(glabChecks({}), "missing");
-	assert.equal(glabChecks({ head_pipeline: { status: "success" } }), "pass");
-	assert.equal(glabChecks({ head_pipeline: { status: "running" } }), "pending");
-	assert.equal(glabChecks({ head_pipeline: { status: "failed" } }), "fail");
+	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "success", sha: "aaa" } }), "pass");
+	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "running", sha: "aaa" } }), "pending");
+	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "failed", sha: "aaa" } }), "fail");
+	// A pipeline for an older head is not this head's CI; a merged-results pipeline counts through its parent.
+	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "aaa" } }), "missing");
+	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "mmm" } }, ["ttt", "bbb"]), "pass");
+	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "mmm" } }, ["ttt", "aaa"]), "missing");
 	assert.equal(reviewApproved("Summary\n\nReviewed with review-loop: 2 rounds with gpt-sol on high. Verdict: approved\nmodel line"), true);
 	assert.equal(reviewApproved("Reviewed with review-loop: 5 rounds with gpt-sol. Verdict: deadlock"), false);
 	assert.equal(reviewApproved("quote: > Reviewed with review-loop: 1 rounds with x. Verdict: approved"), false);

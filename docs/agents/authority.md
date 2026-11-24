@@ -34,12 +34,12 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 
 - changing license or copyright terms;
 - publishing or unpublishing a repository, release, or package;
-- getting past a failed check by retrying, skipping, or bypassing it;
+- counting a failed check as passed by re-running it until it passes, skipping it, or bypassing it;
 - force-pushing a shared branch, rebasing published history, deleting tags or a branch the task does not own, or otherwise rewriting shared history;
 - rotating or revoking credentials or editing secret stores;
 - deleting preserved sessions, reports, audit evidence, benchmark data, or blocked host-sync candidates;
 - starting, changing, enabling, or disabling scheduled jobs and live automations;
-- submitting content, sending a notification, or performing another live external write;
+- submitting content, sending a notification, or performing another live external write that the list above does not name;
 - changing external project settings, access control, billing, or provider configuration.
 
 ## Work modes

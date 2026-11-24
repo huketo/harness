@@ -265,13 +265,20 @@ export function ghChecks(rollup) {
 	if (!Array.isArray(rollup) || rollup.length === 0) return "missing";
 	const states = rollup.map((check) => String(check.conclusion || check.state || check.status || "").toUpperCase());
 	if (states.some((state) => ["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(state))) return "fail";
-	return states.every((state) => ["SUCCESS", "SKIPPED", "NEUTRAL"].includes(state)) ? "pass" : "pending";
+	if (!states.every((state) => ["SUCCESS", "SKIPPED", "NEUTRAL"].includes(state))) return "pending";
+	return states.includes("SUCCESS") ? "pass" : "missing";
 }
 
-/** CI state of an MR from its JSON view: the head pipeline's status. */
-export function glabChecks(mr) {
-	const status = (mr?.head_pipeline ?? mr?.pipeline)?.status;
-	if (!status) return "missing";
+/**
+ * CI state of an MR from its JSON view: the head pipeline's status, counted only when that pipeline ran on the
+ * MR's current head. `parents` are the parent commits of the pipeline's commit, for a merged-results pipeline
+ * whose temporary merge commit has the head as a parent.
+ */
+export function glabChecks(mr, parents = []) {
+	const pipeline = mr?.head_pipeline ?? mr?.pipeline;
+	const status = pipeline?.status;
+	if (!status || !mr.sha) return "missing";
+	if (pipeline.sha !== mr.sha && !parents.includes(mr.sha)) return "missing";
 	if (status === "success") return "pass";
 	return ["failed", "canceled"].includes(status) ? "fail" : "pending";
 }
@@ -324,23 +331,39 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 	const { key, denied } = allowlisted();
 	if (denied) return denied;
 	if (repo && !sameRepo(repo, origin)) return deny("without a mode, a merge covers only this worktree's repository");
+	const target = mergeTarget(command);
+	if (!target) return deny("without a mode, name the PR/MR number in the merge command");
 	if (!gate) return { ...deny("the PR/MR's CI and review state could not be read"), needsGate: true };
+	if (gate.repo !== key) return deny(`the PR/MR number resolves in ${gate.repo ?? "an unknown repository"}, not in ${key}`);
 	if (gate.ci !== "pass") return deny(`CI on the PR/MR is ${gate.ci}, not passing`);
 	if (!gate.review) return deny("the PR/MR description has no `Reviewed with review-loop: ... Verdict: approved` line");
 	return { action: "allow", reason: `passing CI and an approved review in allowlisted ${key}` };
 }
 
-/** CI and review state of the PR/MR a merge command targets, read from the platform; null when unreadable. */
+/**
+ * CI and review state of the PR/MR a merge command targets, read from the platform; null when unreadable. The
+ * lookup resolves its repository the way the merge will (the command's own -R, else the CLI's default), and `repo`
+ * is the repository the platform answered for, so a fork whose CLI default is its upstream cannot borrow origin.
+ */
 function readGate(cli, command, dir) {
 	const target = mergeTarget(command);
-	const run = (file, args) => JSON.parse(execFileSync(file, args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 20_000 }));
+	const named = /(?:^|\s)(?:-R|--repo)(?:\s+|=)?["']?([^\s"']+)/.exec(command)?.[1];
+	const where = named ? ["-R", named] : [];
+	// Two lookups at most, inside the 10 s the hook is given.
+	const run = (file, args) => JSON.parse(execFileSync(file, args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 4_000 }));
+	const home = (url, marker) => (typeof url === "string" && url.includes(marker) ? repoKey(url.slice(0, url.indexOf(marker))) : null);
 	try {
+		if (!target) return null;
 		if (cli === "gh") {
-			const pr = run("gh", ["pr", "view", ...(target ? [target] : []), "--json", "statusCheckRollup,body"]);
-			return { ci: ghChecks(pr.statusCheckRollup), review: reviewApproved(pr.body) };
+			const pr = run("gh", ["pr", "view", target, ...where, "--json", "statusCheckRollup,body,url"]);
+			return { ci: ghChecks(pr.statusCheckRollup), review: reviewApproved(pr.body), repo: home(pr.url, "/pull/") };
 		}
-		const mr = run("glab", ["mr", "view", ...(target ? [target] : []), "--output", "json"]);
-		return { ci: glabChecks(mr), review: reviewApproved(mr.description) };
+		const mr = run("glab", ["mr", "view", target, ...where, "--output", "json"]);
+		const pipeline = mr.head_pipeline ?? mr.pipeline;
+		let parents = [];
+		if (pipeline?.sha && pipeline.sha !== mr.sha && /^[0-9a-f]{7,64}$/.test(pipeline.sha) && Number.isInteger(mr.project_id))
+			parents = run("glab", ["api", ...where, `projects/${mr.project_id}/repository/commits/${pipeline.sha}`]).parent_ids ?? [];
+		return { ci: glabChecks(mr, parents), review: reviewApproved(mr.description), repo: home(mr.web_url, "/-/merge_requests/") };
 	} catch {
 		return null;
 	}
