@@ -8,7 +8,9 @@
 // was checked, so nothing a shell command could reinterpret sits between the check and the merge.
 // GitLab is refused: its server-side rebase, merged-results pipelines, and squash settings need checks this
 // script does not make yet, so a GitLab merge stays a separate decision.
-// Usage: gated-merge.mjs <number> [--squash | --merge | --rebase] [--delete-branch] [--dry-run]
+// Usage: gated-merge.mjs <number> [--squash | --merge | --rebase] [--dry-run]
+// It never deletes the head branch: a deletion cannot be pinned to the checked repository and commit the way the
+// merge is, so the branch is left to the repository's own setting or to an ordinary `git push --delete`.
 // Like the merge guard, this guards against accidental merges; it is not an authorization system.
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
@@ -32,17 +34,16 @@ export function reviewApproved(body) {
 	return /^Reviewed with review-loop: .*Verdict: approved\s*$/m.test(body ?? "");
 }
 
-/** `<number> [method] [--delete-branch] [--dry-run]`, or null when anything else is given. */
+/** `<number> [method] [--dry-run]`, or null when anything else is given. */
 export function parseArgs(argv) {
-	const out = { number: null, method: "squash", deleteBranch: false, dryRun: false };
+	const out = { number: null, method: "squash", dryRun: false };
 	let methods = 0;
 	for (const arg of argv) {
 		if (/^[1-9]\d{0,8}$/.test(arg) && out.number === null) out.number = arg;
 		else if (["--squash", "--merge", "--rebase"].includes(arg)) {
 			out.method = arg.slice(2);
 			methods++;
-		} else if (arg === "--delete-branch") out.deleteBranch = true;
-		else if (arg === "--dry-run") out.dryRun = true;
+		} else if (arg === "--dry-run") out.dryRun = true;
 		else return null;
 	}
 	return out.number && methods <= 1 ? out : null;
@@ -92,14 +93,13 @@ function run(file, args, cwd) {
 
 function readView(key, number, cwd) {
 	try {
-		const fields = "number,url,state,headRefOid,headRefName,isCrossRepository,body,statusCheckRollup";
+		const fields = "number,url,state,headRefOid,body,statusCheckRollup";
 		const pr = JSON.parse(run("gh", ["pr", "view", number, "-R", key, "--json", fields], cwd));
 		return {
 			number: pr.number,
 			repo: prRepo(pr.url, pr.number),
 			state: String(pr.state ?? "").toLowerCase(),
 			head: pr.headRefOid,
-			branch: pr.isCrossRepository === false ? pr.headRefName : null,
 			ci: ghChecks(pr.statusCheckRollup),
 			review: reviewApproved(pr.body),
 		};
@@ -111,7 +111,7 @@ function readView(key, number, cwd) {
 function main() {
 	const args = parseArgs(process.argv.slice(2));
 	if (!args) {
-		process.stderr.write("usage: gated-merge.mjs <number> [--squash | --merge | --rebase] [--delete-branch] [--dry-run]\n");
+		process.stderr.write("usage: gated-merge.mjs <number> [--squash | --merge | --rebase] [--dry-run]\n");
 		process.exit(2);
 	}
 	const cwd = process.cwd();
@@ -154,20 +154,6 @@ function main() {
 	}
 	if (merged?.merged !== true) refuse("GitHub did not confirm the merge");
 	process.stdout.write(`gated-merge: merged ${key} #${args.number} at ${view.head} as ${merged.sha} (CI passed, review approved)\n`);
-	if (!args.deleteBranch) return;
-	if (!view.branch) {
-		process.stdout.write("gated-merge: the head branch lives in another repository and was not deleted\n");
-		return;
-	}
-	try {
-		// The exact ref on the verified origin, deleted only while it still points at the head that was merged.
-		const ref = `refs/heads/${view.branch}`;
-		// Pushed to the origin URL that was checked, not to the remote's name, so a separate push URL cannot redirect it.
-		run("git", ["push", `--force-with-lease=${ref}:${view.head}`, origin, `:${ref}`], cwd);
-		process.stdout.write(`gated-merge: deleted branch ${view.branch}\n`);
-	} catch (error) {
-		process.stdout.write(`gated-merge: merged, but branch ${view.branch} was not deleted (${String(error.stderr || error.message).trim().split("\n")[0]})\n`);
-	}
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();
