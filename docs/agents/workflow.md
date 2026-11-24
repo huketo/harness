@@ -44,7 +44,17 @@ The root MIT license and owner-only maintenance policy are settled. Do not reint
 
 The step is complete when every affected public claim, link, license notice, and privacy boundary is consistent.
 
-## 7. Deliver evidence
+## 7. Land the change
+
+A change is finished when it is merged, not when its PR/MR is open. After the checks above pass:
+
+1. Commit, push the task's branch, and open the PR/MR with the `file-mr` skill.
+2. Get an independent review with the `review-loop` skill and answer its findings until it approves.
+3. When CI passes on the reviewed head, merge as [`authority.md`](authority.md) allows, with the `full-send` skill's `scripts/gated-merge.mjs <number>`, then delete the task's branch and worktree.
+
+Stop before the merge only for a reason: a review deadlock, a failing check, a refusal from the merge script, or an action `authority.md` puts behind a decision. Report that reason and the exact action that remains.
+
+## 8. Deliver evidence
 
 Report behavior changed, files changed, exact commands and observed results, checks not run, and remaining risks or owner decisions. Redact sensitive values and avoid quoting private report or session content. Documentation-only work reports link and command inspections actually performed; if no runtime check was run, state that explicitly.
 
