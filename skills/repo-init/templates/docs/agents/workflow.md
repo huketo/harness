@@ -48,7 +48,17 @@ Update the guide that owns each changed contract, following [`writing.md`](writi
 
 The step is complete when every affected claim in maintained documentation matches the new behavior.
 
-## 7. Deliver evidence
+## 7. Land the change
+
+A change is finished when it is merged, not when its PR/MR is open. After the checks above pass:
+
+1. Commit, push the task's branch, and open the PR/MR with the `file-mr` skill.
+2. Get an independent review with the `review-loop` skill and answer its findings until it approves.
+3. When CI passes on the reviewed head, merge as [`authority.md`](authority.md) allows, with the `full-send` skill's `scripts/gated-merge.mjs <number>`, then delete the task's branch and worktree.
+
+Stop before the merge only for a reason: a review deadlock, a failing check, a refusal from the merge script, or an action `authority.md` puts behind a decision. Report that reason and the exact action that remains.
+
+## 8. Deliver evidence
 
 Report the behavior or documentation changed, the owning files, the exact commands or scenarios run with their observed results, the relevant checks not run and why, generated artifacts, and every commit or remote write made. Redact sensitive values.
 
