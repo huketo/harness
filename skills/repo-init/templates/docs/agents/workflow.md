@@ -64,6 +64,8 @@ Report the behavior or documentation changed, the owning files, the exact comman
 
 Label each claim by its basis: measured (observed in this session), inferred (derived from that evidence), or assumed (not yet checked).
 
+When the change has something a person can look at (a screen, a terminal view, a rendered page, a command's output), put that artifact itself at the top of the report: the screenshot, the captured terminal text, or the output lines. Follow it with two or three sentences on what it shows. A sentence saying it was observed does not replace the artifact.
+
 ## Review findings
 
 Treat each finding as a hypothesis. Confirm its premise at a source location, with a focused reproduction, or from a primary reference before editing. Judge the remedy separately: a correct observation can still suggest an oversized fix. A finding is evidence, not authority to widen scope.
