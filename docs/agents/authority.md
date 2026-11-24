@@ -10,11 +10,18 @@ Within the requested scope, an agent may inspect tracked source, edit repository
 
 Local investigation follows data minimization. Access to the checkout is not blanket authority to inspect ignored `var/` output, home-directory sessions, credentials, reports, calendars, databases, or logs; read them only when the task explicitly requires that evidence.
 
+## Actions that need no question
+
+Within the requested scope these proceed without asking, and the final report names each one done:
+
+- creating local commits, pushing the task's branch, and opening or updating its PR/MR;
+- merging the task's PR/MR once CI passes and a reviewer from another model family has approved it, in a repository on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); elsewhere a merge is a separate decision;
+- deleting the task's own branch and worktree after its PR/MR is merged.
+
 ## Approval that may cover one plan
 
 When the complete set is known, request one explicit approval covering named reversible actions such as:
 
-- creating local commits or pushing a named owner branch;
 - running named paid-model or authenticated external-service checks;
 - inspecting named sensitive host, session, report, or calendar sources needed for the task;
 - applying a documented installation or configuration change to the owner's host.
@@ -27,7 +34,8 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 
 - changing license or copyright terms;
 - publishing or unpublishing a repository, release, or package;
-- merging, force-pushing, rebasing published history, deleting branches or tags, or otherwise rewriting shared history;
+- getting past a failed check by retrying, skipping, or bypassing it;
+- force-pushing a shared branch, rebasing published history, deleting tags or a branch the task does not own, or otherwise rewriting shared history;
 - rotating or revoking credentials or editing secret stores;
 - deleting preserved sessions, reports, audit evidence, benchmark data, or blocked host-sync candidates;
 - starting, changing, enabling, or disabling scheduled jobs and live automations;
@@ -39,8 +47,8 @@ These actions are hard to undo or cross a durable authority boundary. They requi
 A person may select a work mode for one task or thread with the `full-send` or `full-stop` skill; the mode is never a default. Without a selected mode, every rule in this guide applies unchanged.
 
 - `full-stop` authorizes the task's own commits, pushes, rebases, and `--force-with-lease` on the task branch, and the test methods its proof needs. It never merges.
-- `full-send` adds merging that one MR or PR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. The worktree must also hold a CI definition and a `verify-*` skill, so that a change can be proven without a person. Without the allowlist entry or either of those it runs as `full-stop` and says so.
-- Neither mode authorizes deleting data, production changes, writes outside the repository, closing an MR, admin bypass, force-pushing another branch, or editing the allowlist.
+- `full-send` adds merging that one PR/MR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. The worktree must also hold a CI definition and a `verify-*` skill, so that a change can be proven without a person. Without the allowlist entry or either of those it runs as `full-stop` and says so.
+- Neither mode authorizes deleting data, production changes, writes outside the repository, closing a PR/MR, admin bypass, force-pushing another branch, or editing the allowlist.
 
 `skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks merges the mode does not allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
 
