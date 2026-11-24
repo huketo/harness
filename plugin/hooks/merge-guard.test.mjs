@@ -385,6 +385,18 @@ test("without a mode, an allowlisted repository merges only on passing CI and a 
 		"gh pr merge 1 '-R' other-owner/other",
 		'gh pr merge 1 "--repo=other-owner/other"',
 		"gh pr merge 1 -Rother-owner/other",
+		// A wrapper or prefix can move the merge to another directory or binary than the lookup uses.
+		"env -C /tmp/elsewhere gh pr merge 1",
+		"env gh pr merge 1",
+		"sudo gh pr merge 1",
+		"/usr/bin/gh pr merge 1",
+		"FOO=1 gh pr merge 1",
+		// Flags the earlier raw-text checks can miss once quotes are removed.
+		'gh pr merge 1 --ad"min"',
+		"gh pr merge 1 '--admin'",
+		"gh pr merge 1 --auto",
+		"gh pr merge 1 --unknown-flag",
+		"gh pr merge 1 2",
 		"gh pr merge https://github.com/example-owner/harness/pull/1",
 		"gh api -X PUT repos/example-owner/harness/pulls/1/merge",
 	]) {
@@ -392,6 +404,11 @@ test("without a mode, an allowlisted repository merges only on passing CI and a 
 		assert.equal(d(command, null).needsGate, undefined, command);
 	}
 	assert.equal(d("gh pr merge 1 --squash --delete-branch", ok).action, "allow");
+	assert.equal(d('gh pr merge 1 --squash --subject "feat: a title" --match-head-commit abc123', ok).action, "allow");
+	assert.equal(d("  gh pr merge 1 -s -d  ", ok).action, "allow");
+	assert.equal(d("glab mr merge 1 --squash --remove-source-branch --yes", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
+	assert.equal(d("glab mr merge '!1'", gitlabOk, "https://gitlab.example/team/allowed.git").action, "deny");
+	assert.equal(d("glab mr merge 1 --auto-merge", gitlabOk, "https://gitlab.example/team/allowed.git").action, "deny");
 	assert.equal(d("gh pr merge 1 && gh pr merge 2", ok).action, "deny");
 	assert.equal(d("glab mr merge 1", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
 	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "deny");

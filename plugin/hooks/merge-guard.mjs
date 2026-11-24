@@ -102,32 +102,10 @@ export function mergeTarget(command) {
 	const paths = new Set([...text.matchAll(/(?:merge_requests|pulls?)\/(\d+)/g)].map((m) => m[1]));
 	const api = MERGE_PATTERNS.slice(2).some(({ re }) => re.test(text));
 	if (api) return paths.size === 1 ? [...paths][0] : null;
-	const positional = mergePositional(command);
-	if (positional === null) return null;
-	const match = /^[!#]?(\d+)$/.exec(positional) ?? /\/(?:-\/merge_requests|pull)\/(\d+)(?:[/?#].*)?$/.exec(positional);
-	if (!match) return null;
-	return [...paths].every((n) => n === match[1]) ? match[1] : null;
-}
-
-/** The unquoted argument words of a `pr merge` / `mr merge` invocation with their CLI, or null (an API call, a redirection). */
-function mergeWords(command) {
-	const text = command.replace(/\\\n/g, " ");
 	const invocation = [MERGE_PATTERNS[0], MERGE_PATTERNS[1]].map(({ cli, re }) => ({ cli, m: re.exec(text) })).find(({ m }) => m);
 	if (!invocation) return null;
 	const words = shellWords(text.slice(invocation.m.index + invocation.m[0].length));
-	return words && { cli: invocation.cli, words };
-}
-
-/** Whether a merge invocation carries a repository flag, read from the same unquoted words as its positional. */
-export function namesRepoFlag(command) {
-	return (mergeWords(command)?.words ?? []).some((word) => /^(?:-R|--repo)(?:=|$)/.test(word) || /^-R./.test(word));
-}
-
-/** The single positional argument of a `pr merge` / `mr merge` invocation, or null (none, several, an unknown flag, an API call). */
-export function mergePositional(command) {
-	const invocation = mergeWords(command);
-	if (!invocation) return null;
-	const { words } = invocation;
+	if (!words) return null;
 	const flags = FLAGS[invocation.cli];
 	const positional = [];
 	for (let i = 0; i < words.length; i++) {
@@ -145,7 +123,36 @@ export function mergePositional(command) {
 		}
 		positional.push(word);
 	}
-	return positional.length === 1 ? positional[0] : null;
+	if (positional.length !== 1) return null;
+	const match = /^[!#]?(\d+)$/.exec(positional[0]) ?? /\/(?:-\/merge_requests|pull)\/(\d+)(?:[/?#].*)?$/.exec(positional[0]);
+	if (!match) return null;
+	return [...paths].every((n) => n === match[1]) ? match[1] : null;
+}
+
+/**
+ * The PR/MR number of a merge the no-mode route may check: the whole command is one direct `gh pr merge <number>`
+ * or `glab mr merge <number>` with known flags, read after shell quote removal. A wrapper or prefix (`env -C`,
+ * `sudo`, a path, an assignment), a repository flag, the admin flag, auto-merge, any other selector, or an unknown
+ * flag returns null, so the lookup and the merge cannot resolve different PR/MRs.
+ */
+export function directMerge(command, cli) {
+	const words = shellWords(command.replace(/\\\n/g, " ").trim());
+	const noun = cli === "gh" ? "pr" : "mr";
+	if (!words || words[0] !== cli || words[1] !== noun || words[2] !== "merge") return null;
+	const refused = new Set(["-R", "--repo", "--admin", "--auto", "--disable-auto", "--auto-merge"]);
+	let number = null;
+	for (let i = 3; i < words.length; i++) {
+		const word = words[i];
+		const name = word.split("=")[0];
+		if (refused.has(name)) return null;
+		if (FLAGS[cli].value.has(name)) {
+			if (!word.includes("=")) i++;
+		} else if (!FLAGS[cli].bool.has(word)) {
+			if (number !== null || !/^\d+$/.test(word)) return null;
+			number = word;
+		}
+	}
+	return number;
 }
 
 export function parseState(text) {
@@ -349,11 +356,9 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 	if (mode !== "none") return deny("no work mode allows merging");
 	const { key, denied } = allowlisted();
 	if (denied) return denied;
-	// A bare number and no repository reference: both CLIs read that one way, so the lookup below and the merge
-	// resolve the same PR/MR. Any other selector (a branch, `!N`, `#N`, a URL, -R, a REST path) is denied.
-	const target = mergePositional(command);
-	if (repo || namesRepoFlag(command) || !/^\d+$/.test(target ?? ""))
-		return deny(`without a mode, merge with \`${cli === "gh" ? "gh pr" : "glab mr"} merge <number>\` and no repository flag or URL`);
+	// One direct, fully parsed command with a bare number: the lookup below and the merge then resolve the same PR/MR.
+	if (repo || !directMerge(command, cli))
+		return deny(`without a mode, merge with exactly \`${cli === "gh" ? "gh pr" : "glab mr"} merge <number>\` and merge-method flags, with no wrapper, repository flag, URL, or auto-merge`);
 	if (!gate) return { ...deny("the PR/MR's CI and review state could not be read"), needsGate: true };
 	if (gate.repo !== key) return deny(`the PR/MR number resolves in ${gate.repo ?? "an unknown repository"}, not in ${key}`);
 	if (gate.ci !== "pass") return deny(`CI on the PR/MR is ${gate.ci}, not passing`);
@@ -472,7 +477,8 @@ function main() {
 	let decision = decide(facts);
 	// Only a merge that every other rule allows reads the platform, so every other denial stays offline.
 	if (decision.needsGate) {
-		const gate = readGate(mergeCommand(command), mergePositional(command), dir);
+		const cli = mergeCommand(command);
+		const gate = readGate(cli, directMerge(command, cli), dir);
 		if (gate) decision = decide({ ...facts, gate });
 	}
 	let final = decision;
