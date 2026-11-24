@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { parseAllowlist } from "../../../plugin/hooks/merge-guard.mjs";
-import { ghChecks, localRefusal, mergeArgs, parseArgs, reviewApproved, viewRefusal } from "./gated-merge.mjs";
+import { ghChecks, localRefusal, mergeArgs, parseArgs, prRepo, reviewApproved, viewRefusal } from "./gated-merge.mjs";
 
 const SCRIPT = join(import.meta.dirname, "gated-merge.mjs");
 const KEY = "github.com/example-owner/harness";
@@ -75,6 +75,15 @@ test("CI and review state: anything short of a concluded success is not a pass",
 	assert.equal(reviewApproved(null), false);
 });
 
+test("a PR URL names its repository only through the full owner/repo/pull/number route", () => {
+	assert.equal(prRepo(`https://${KEY}/pull/12`, 12), KEY);
+	assert.equal(prRepo("https://github.com/pull/pull/pull/12", 12), "github.com/pull/pull");
+	assert.equal(prRepo(`https://${KEY}/pull/13`, 12), null);
+	assert.equal(prRepo(`https://${KEY}/pull/12/files`, 12), null);
+	assert.equal(prRepo("https://github.com/a/b/c/pull/12", 12), null);
+	assert.equal(prRepo(undefined, 12), null);
+});
+
 // End to end with a stand-in `gh` that answers the view and the merge from files and records every call.
 let root, env, repo, calls;
 const answer = (name, value) => writeFileSync(join(root, name), JSON.stringify(value));
@@ -94,6 +103,7 @@ const merge = (...argv) => spawnSync("node", [SCRIPT, ...argv], { cwd: repo, env
 const recorded = () => readFileSync(calls, "utf8").trim().split("\n").filter(Boolean);
 const VIEW_CALL = `pr view 12 -R ${KEY} --json number,url,state,headRefOid,headRefName,isCrossRepository,body,statusCheckRollup`;
 const MERGE_CALL = `api --hostname github.com -X PUT repos/example-owner/harness/pulls/12/merge -f sha=${HEAD} -f merge_method=squash`;
+let remote, HEAD_REAL, OTHER_REAL;
 
 before(() => {
 	root = mkdtempSync(join(tmpdir(), "gated-merge-test-"));
@@ -112,17 +122,36 @@ before(() => {
 	chmodSync(join(bin, "gh"), 0o755);
 	env = { ...process.env, HOME: join(root, "home"), XDG_CONFIG_HOME: config, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", PATH: `${bin}:${process.env.PATH}` };
 	execFileSync("git", ["init", "-q", repo], { env });
-	execFileSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:example-owner/harness.git"], { env });
+	// A local bare repository stands in for github.com through a URL rewrite, with two branches on one commit.
+	remote = join(root, "remote.git");
+	const git = (...argv) => execFileSync("git", argv, { env, encoding: "utf8" }).trim();
+	git("init", "-q", "--bare", remote);
+	git("-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "one");
+	HEAD_REAL = git("-C", repo, "rev-parse", "HEAD");
+	git("-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "two");
+	OTHER_REAL = git("-C", repo, "rev-parse", "HEAD");
+	git("-C", repo, "push", "-q", remote, `${HEAD_REAL}:refs/heads/feature`, `${HEAD_REAL}:refs/heads/feature#draft`);
+	git("-C", repo, "config", `url.${remote}.pushInsteadOf`, "git@github.com:example-owner/harness.git");
+	git("-C", repo, "remote", "add", "origin", "git@github.com:example-owner/harness.git");
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
 test("end to end: a passing, approved PR merges through the pinned call and nothing else does", () => {
 	writeFileSync(calls, "");
-	view();
+	view({ headRefOid: HEAD_REAL, headRefName: "feature#draft" });
 	answer("merge.json", { merged: true, sha: "b".repeat(40) });
 	const ok = merge("12", "--delete-branch");
 	assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL, "api --hostname github.com -X DELETE repos/example-owner/harness/git/refs/heads/feature"]);
+	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL.replace(HEAD, HEAD_REAL)]);
+	// The branch goes through git with a lease on the merged head, so a later push or a look-alike name survives.
+	assert.match(ok.stdout, /deleted branch feature#draft/);
+	assert.equal(execFileSync("git", ["-C", remote, "branch", "--list"], { env, encoding: "utf8" }).trim(), "feature");
+	execFileSync("git", ["-C", repo, "push", "-q", remote, `${OTHER_REAL}:refs/heads/feature#draft`], { env });
+	view({ headRefOid: HEAD_REAL, headRefName: "feature#draft" });
+	const moved = merge("12", "--delete-branch");
+	assert.match(moved.stdout, /was not deleted/);
+	assert.match(execFileSync("git", ["-C", remote, "branch", "--list"], { env, encoding: "utf8" }), /feature#draft/);
+	view();
 
 	// A merge queue or auto-merge would leave the PR open; anything but a confirmed merge is a failure.
 	writeFileSync(calls, "");

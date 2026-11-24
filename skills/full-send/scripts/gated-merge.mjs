@@ -74,6 +74,18 @@ export function mergeArgs({ key, number, method, head }) {
 	return ["api", "--hostname", HOST, "-X", "PUT", `repos/${path}/pulls/${number}/merge`, "-f", `sha=${head}`, "-f", `merge_method=${method}`];
 }
 
+/** `host/owner/repo` of a PR URL whose whole path is `/<owner>/<repo>/pull/<number>`, or null. */
+export function prRepo(url, number) {
+	let parsed;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return null;
+	}
+	const route = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)$/.exec(parsed.pathname);
+	return route && route[3] === String(number) ? `${parsed.host}/${route[1]}/${route[2]}`.toLowerCase() : null;
+}
+
 function run(file, args, cwd) {
 	return execFileSync(file, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 });
 }
@@ -82,10 +94,9 @@ function readView(key, number, cwd) {
 	try {
 		const fields = "number,url,state,headRefOid,headRefName,isCrossRepository,body,statusCheckRollup";
 		const pr = JSON.parse(run("gh", ["pr", "view", number, "-R", key, "--json", fields], cwd));
-		const at = typeof pr.url === "string" ? pr.url.indexOf("/pull/") : -1;
 		return {
 			number: pr.number,
-			repo: at > 0 ? repoKey(pr.url.slice(0, at)) : null,
+			repo: prRepo(pr.url, pr.number),
 			state: String(pr.state ?? "").toLowerCase(),
 			head: pr.headRefOid,
 			branch: pr.isCrossRepository === false ? pr.headRefName : null,
@@ -149,7 +160,10 @@ function main() {
 		return;
 	}
 	try {
-		run("gh", ["api", "--hostname", HOST, "-X", "DELETE", `repos/${key.slice(HOST.length + 1)}/git/refs/heads/${view.branch}`], cwd);
+		// The exact ref on the verified origin, deleted only while it still points at the head that was merged.
+		const ref = `refs/heads/${view.branch}`;
+		// Pushed to the origin URL that was checked, not to the remote's name, so a separate push URL cannot redirect it.
+		run("git", ["push", `--force-with-lease=${ref}:${view.head}`, origin, `:${ref}`], cwd);
 		process.stdout.write(`gated-merge: deleted branch ${view.branch}\n`);
 	} catch (error) {
 		process.stdout.write(`gated-merge: merged, but branch ${view.branch} was not deleted (${String(error.stderr || error.message).trim().split("\n")[0]})\n`);
