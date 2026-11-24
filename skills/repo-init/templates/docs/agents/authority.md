@@ -16,7 +16,7 @@ Within the requested scope these proceed without asking, and the final report na
 
 - Creating local commits, pushing the task's branch, and opening or updating its PR/MR.
 - Commenting on, labelling, or closing the issues the task works on, in the tracker described in [`issue-tracker.md`](issue-tracker.md).
-- Merging the task's PR/MR once CI passes and a reviewer from another model family has approved it, in a repository on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); elsewhere a merge is a separate decision.
+- Merging the task's PR/MR with the `full-send` skill's `scripts/gated-merge.mjs <number>`, which merges only when CI passed on the current head, the description carries the `review-loop` approval line from a reviewer of another model family, and the repository is on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); when it refuses, the merge is a separate decision.
 - Deleting the task's own branch and worktree after its PR/MR is merged.
 - Deploying to staging.
 

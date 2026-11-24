@@ -11,8 +11,6 @@ import {
 	allowedRepo,
 	allowlistFile,
 	decide,
-	ghChecks,
-	glabChecks,
 	mergeCommand,
 	mergeRepo,
 	parseAllowlist,
@@ -20,7 +18,6 @@ import {
 	readPayload,
 	render,
 	repoKey,
-	reviewApproved,
 	sameRepo,
 	targetRepo,
 } from "./merge-guard.mjs";
@@ -347,91 +344,4 @@ test("every host a merge command names must be the host of the repository it mer
 	assert.equal(d('gh pr merge 7 --body "see https://other.example/x"', send, personal), "allow");
 	// gh's -m is --merge and takes no value, so the word after it is still a target.
 	assert.equal(d("gh pr merge -m https://ghe.example/example-owner/x/pull/7", send, personal), "deny");
-});
-
-test("without a mode, an allowlisted repository merges only on passing CI and a review-loop approval", () => {
-	const personal = "git@github.com:example-owner/harness.git";
-	const ok = { ci: "pass", review: true, repo: "github.com/example-owner/harness" };
-	const gitlabOk = { ci: "pass", review: true, repo: "gitlab.example/team/allowed" };
-	const d = (command, gate, origin = personal, state = {}) => decide({ command, state, origin, now: NOW, allow: ALLOW, gate });
-	assert.equal(d("gh pr merge 1", ok).action, "allow");
-	assert.equal(d("gh pr merge 1", null).action, "deny");
-	assert.equal(d("gh pr merge 1", null).needsGate, true);
-	assert.equal(d("gh pr merge 1", { ...ok, ci: "pending" }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ...ok, ci: "fail" }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ...ok, ci: "missing" }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ...ok, review: false }).action, "deny");
-	// A branch name or no target would let the lookup read another PR, so neither reaches the platform.
-	assert.equal(d("gh pr merge", ok).action, "deny");
-	assert.equal(d("gh pr merge", null).needsGate, undefined);
-	assert.equal(d("gh pr merge other-branch", ok).action, "deny");
-	assert.equal(d("gh pr merge other-branch", null).needsGate, undefined);
-	// A fork whose CLI default is its upstream answers for another repository.
-	assert.equal(d("gh pr merge 1", { ...ok, repo: "github.com/upstream-owner/harness" }).action, "deny");
-	assert.equal(d("gh pr merge 1", { ...ok, repo: null }).action, "deny");
-	assert.equal(d("gh pr merge 1 --admin", ok).action, "deny");
-	assert.equal(d("gh pr merge 1", ok, personal, { mode: "full-stop" }).action, "deny");
-	assert.equal(d("gh pr merge 1", ok, "git@github.com:someone-else/repo.git").action, "deny");
-	assert.equal(d("gh pr merge 1", null, "git@github.com:someone-else/repo.git").needsGate, undefined);
-	assert.equal(d("gh pr merge 1 -R example-owner/other", ok).action, "deny");
-	// Only a bare number with no repository reference: gh reads `!1` as a branch, and a flag or URL can point the
-	// merge somewhere the lookup does not follow.
-	for (const command of [
-		"gh pr merge '!1'",
-		"gh pr merge '#1'",
-		"gh pr merge 1 -R example-owner/harness",
-		'gh pr merge 1 --repo "example-owner/harness"',
-		'gh pr merge 1 "--repo" other-owner/other',
-		"gh pr merge 1 '-R' other-owner/other",
-		'gh pr merge 1 "--repo=other-owner/other"',
-		"gh pr merge 1 -Rother-owner/other",
-		// A wrapper or prefix can move the merge to another directory or binary than the lookup uses.
-		"env -C /tmp/elsewhere gh pr merge 1",
-		"env gh pr merge 1",
-		"sudo gh pr merge 1",
-		"/usr/bin/gh pr merge 1",
-		"FOO=1 gh pr merge 1",
-		// Flags the earlier raw-text checks can miss once quotes are removed.
-		'gh pr merge 1 --ad"min"',
-		"gh pr merge 1 '--admin'",
-		"gh pr merge 1 --auto",
-		"gh pr merge 1 --unknown-flag",
-		"gh pr merge 1 2",
-		"gh pr merge https://github.com/example-owner/harness/pull/1",
-		"gh api -X PUT repos/example-owner/harness/pulls/1/merge",
-	]) {
-		assert.equal(d(command, ok).action, "deny", command);
-		assert.equal(d(command, null).needsGate, undefined, command);
-	}
-	assert.equal(d("gh pr merge 1 --squash --delete-branch", ok).action, "allow");
-	assert.equal(d('gh pr merge 1 --squash --subject "feat: a title" --match-head-commit abc123', ok).action, "allow");
-	assert.equal(d("  gh pr merge 1 -s -d  ", ok).action, "allow");
-	assert.equal(d("glab mr merge 1 --squash --remove-source-branch --yes", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
-	assert.equal(d("glab mr merge '!1'", gitlabOk, "https://gitlab.example/team/allowed.git").action, "deny");
-	assert.equal(d("glab mr merge 1 --auto-merge", gitlabOk, "https://gitlab.example/team/allowed.git").action, "deny");
-	assert.equal(d("gh pr merge 1 && gh pr merge 2", ok).action, "deny");
-	assert.equal(d("glab mr merge 1", gitlabOk, "https://gitlab.example/team/allowed.git").action, "allow");
-	assert.equal(d("glab mr merge 1", ok, "https://gitlab.example/team/allowed.git").action, "deny");
-});
-
-test("CI and review state are read from the PR/MR, and anything short of success is not a pass", () => {
-	assert.equal(ghChecks([]), "missing");
-	assert.equal(ghChecks(undefined), "missing");
-	assert.equal(ghChecks([{ status: "COMPLETED", conclusion: "SUCCESS" }, { state: "SUCCESS" }, { conclusion: "SKIPPED" }]), "pass");
-	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { status: "IN_PROGRESS", conclusion: "" }]), "pending");
-	assert.equal(ghChecks([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "fail");
-	assert.equal(ghChecks([{ state: "PENDING" }]), "pending");
-	assert.equal(ghChecks([{ conclusion: "SKIPPED" }, { conclusion: "NEUTRAL" }]), "missing");
-	assert.equal(glabChecks({}), "missing");
-	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "success", sha: "aaa" } }), "pass");
-	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "running", sha: "aaa" } }), "pending");
-	assert.equal(glabChecks({ sha: "aaa", head_pipeline: { status: "failed", sha: "aaa" } }), "fail");
-	// A pipeline for an older head is not this head's CI; a merged-results pipeline counts through its parent.
-	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "aaa" } }), "missing");
-	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "mmm" } }, ["ttt", "bbb"]), "pass");
-	assert.equal(glabChecks({ sha: "bbb", head_pipeline: { status: "success", sha: "mmm" } }, ["ttt", "aaa"]), "missing");
-	assert.equal(reviewApproved("Summary\n\nReviewed with review-loop: 2 rounds with gpt-sol on high. Verdict: approved\nmodel line"), true);
-	assert.equal(reviewApproved("Reviewed with review-loop: 5 rounds with gpt-sol. Verdict: deadlock"), false);
-	assert.equal(reviewApproved("quote: > Reviewed with review-loop: 1 rounds with x. Verdict: approved"), false);
-	assert.equal(reviewApproved(null), false);
 });

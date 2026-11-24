@@ -5,7 +5,6 @@
 //   full-send  + a repository on the full-send allowlist → allow (never with --admin)
 //   full-stop                                            → deny
 //   no mode    + an unexpired one-shot grant             → allow once, then the grant is consumed
-//   no mode    + an allowlisted repository whose PR/MR has passing CI and a review-loop approval line → allow
 //   otherwise                                            → deny
 // The allowlist is ${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos, the file harness-mode reads: one
 // `host/path` or `host/owner/*` entry per line. A missing or empty allowlist means full-send never merges.
@@ -127,32 +126,6 @@ export function mergeTarget(command) {
 	const match = /^[!#]?(\d+)$/.exec(positional[0]) ?? /\/(?:-\/merge_requests|pull)\/(\d+)(?:[/?#].*)?$/.exec(positional[0]);
 	if (!match) return null;
 	return [...paths].every((n) => n === match[1]) ? match[1] : null;
-}
-
-/**
- * The PR/MR number of a merge the no-mode route may check: the whole command is one direct `gh pr merge <number>`
- * or `glab mr merge <number>` with known flags, read after shell quote removal. A wrapper or prefix (`env -C`,
- * `sudo`, a path, an assignment), a repository flag, the admin flag, auto-merge, any other selector, or an unknown
- * flag returns null, so the lookup and the merge cannot resolve different PR/MRs.
- */
-export function directMerge(command, cli) {
-	const words = shellWords(command.replace(/\\\n/g, " ").trim());
-	const noun = cli === "gh" ? "pr" : "mr";
-	if (!words || words[0] !== cli || words[1] !== noun || words[2] !== "merge") return null;
-	const refused = new Set(["-R", "--repo", "--admin", "--auto", "--disable-auto", "--auto-merge"]);
-	let number = null;
-	for (let i = 3; i < words.length; i++) {
-		const word = words[i];
-		const name = word.split("=")[0];
-		if (refused.has(name)) return null;
-		if (FLAGS[cli].value.has(name)) {
-			if (!word.includes("=")) i++;
-		} else if (!FLAGS[cli].bool.has(word)) {
-			if (number !== null || !/^\d+$/.test(word)) return null;
-			number = word;
-		}
-	}
-	return number;
 }
 
 export function parseState(text) {
@@ -286,41 +259,13 @@ function onlyHost(command, cli, host) {
  * worktree's origin URL, `now` seconds since the epoch.
  * Returns { action: "pass" | "allow" | "deny", reason, consumeGrant }.
  */
-/** CI state of a PR from the `statusCheckRollup` field of a PR view: pass, fail, pending, or missing. */
-export function ghChecks(rollup) {
-	if (!Array.isArray(rollup) || rollup.length === 0) return "missing";
-	const states = rollup.map((check) => String(check.conclusion || check.state || check.status || "").toUpperCase());
-	if (states.some((state) => ["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(state))) return "fail";
-	if (!states.every((state) => ["SUCCESS", "SKIPPED", "NEUTRAL"].includes(state))) return "pending";
-	return states.includes("SUCCESS") ? "pass" : "missing";
-}
-
-/**
- * CI state of an MR from its JSON view: the head pipeline's status, counted only when that pipeline ran on the
- * MR's current head. `parents` are the parent commits of the pipeline's commit, for a merged-results pipeline
- * whose temporary merge commit has the head as a parent.
- */
-export function glabChecks(mr, parents = []) {
-	const pipeline = mr?.head_pipeline ?? mr?.pipeline;
-	const status = pipeline?.status;
-	if (!status || !mr.sha) return "missing";
-	if (pipeline.sha !== mr.sha && !parents.includes(mr.sha)) return "missing";
-	if (status === "success") return "pass";
-	return ["failed", "canceled"].includes(status) ? "fail" : "pending";
-}
-
-/** Whether a PR/MR description carries the line review-loop writes after an approval. */
-export function reviewApproved(body) {
-	return /^Reviewed with review-loop: .*Verdict: approved\s*$/m.test(body ?? "");
-}
-
-export function decide({ command, state, origin, now, allow = [], gate = null }) {
+export function decide({ command, state, origin, now, allow = [] }) {
 	const cli = mergeCommand(command);
 	if (!cli) return { action: "pass" };
 	const mode = state.mode ?? "none";
 	const deny = (reason) => ({
 		action: "deny",
-		reason: `harness merge guard: ${reason} (mode=${mode}). Merging needs passing CI and a review-loop approval line on the PR/MR in a repository on the full-send allowlist, or the person's explicit request for this merge followed by \`harness-mode allow-merge <ref>\`. Report the PR/MR as ready instead.`,
+		reason: `harness merge guard: ${reason} (mode=${mode}). Merging needs /full-send in a repository on the full-send allowlist, or the person's explicit request for this merge followed by \`harness-mode allow-merge <ref>\`. Report the MR as ready instead.`,
 	});
 	if (/--admin\b/.test(command)) return deny("--admin bypasses branch protection and is never allowed");
 	if (mode === "full-stop") return deny("full-stop never merges");
@@ -328,20 +273,15 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 	if (compound(command)) return deny("run the merge as a single command, without chaining, substitution, or eval");
 	const repo = targetRepo(command);
 	if (repo === "conflict") return deny("the command names more than one repository");
-	// The allowlisted repository a merge acts on, or a denial.
-	const allowlisted = () => {
+	if (mode === "full-send") {
 		// A GraphQL merge names an opaque node id, so its repository cannot be read from the command.
 		if (MERGE_PATTERNS.slice(4).some(({ re }) => re.test(command)))
-			return { denied: deny("a GraphQL merge does not name its repository; use the CLI or REST merge") };
+			return deny("a GraphQL merge does not name its repository; use the CLI or REST merge");
 		const key = mergeRepo(repo, origin, cli);
 		// A path-only ref resolves against the origin, so an endpoint URL on another host must not inherit it.
-		if (key && !onlyHost(command, cli, key.split("/")[0])) return { denied: deny(`the command names a host other than ${key.split("/")[0]}`) };
-		if (allowedRepo(key, allow)) return { key };
-		return { denied: deny(`${mode === "full-send" ? "full-send merges" : "merging without a question covers"} only repositories on the allowlist, and ${key ?? "this target"} is not on it`) };
-	};
-	if (mode === "full-send") {
-		const { key, denied } = allowlisted();
-		return denied ?? { action: "allow", reason: `full-send in allowlisted ${key}` };
+		if (key && !onlyHost(command, cli, key.split("/")[0])) return deny(`the command names a host other than ${key.split("/")[0]}`);
+		if (allowedRepo(key, allow)) return { action: "allow", reason: `full-send in allowlisted ${key}` };
+		return deny(`full-send merges only repositories on the allowlist, and ${key ?? "this target"} is not on it`);
 	}
 	const expires = Number(state.grant_expires);
 	if (state.grant && Number.isFinite(expires) && expires > now) {
@@ -353,42 +293,7 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 			return deny(`the one-shot grant names ${state.grant}; name that MR or PR number in the merge command`);
 		return { action: "allow", reason: `one-shot grant for ${state.grant}`, consumeGrant: true };
 	}
-	if (mode !== "none") return deny("no work mode allows merging");
-	const { key, denied } = allowlisted();
-	if (denied) return denied;
-	// One direct, fully parsed command with a bare number: the lookup below and the merge then resolve the same PR/MR.
-	if (repo || !directMerge(command, cli))
-		return deny(`without a mode, merge with exactly \`${cli === "gh" ? "gh pr" : "glab mr"} merge <number>\` and merge-method flags, with no wrapper, repository flag, URL, or auto-merge`);
-	if (!gate) return { ...deny("the PR/MR's CI and review state could not be read"), needsGate: true };
-	if (gate.repo !== key) return deny(`the PR/MR number resolves in ${gate.repo ?? "an unknown repository"}, not in ${key}`);
-	if (gate.ci !== "pass") return deny(`CI on the PR/MR is ${gate.ci}, not passing`);
-	if (!gate.review) return deny("the PR/MR description has no `Reviewed with review-loop: ... Verdict: approved` line");
-	return { action: "allow", reason: `passing CI and an approved review in allowlisted ${key}` };
-}
-
-/**
- * CI and review state of PR/MR `target` (a bare number), read from the platform; null when unreadable. The lookup
- * names no repository, as the merge does, so both resolve through the CLI's default; `repo` is the repository
- * the platform answered for, so a fork whose CLI default is its upstream cannot borrow origin's allowlist entry.
- */
-function readGate(cli, target, dir) {
-	// Two lookups at most, inside the 10 s the hook is given.
-	const run = (file, args) => JSON.parse(execFileSync(file, args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 4_000 }));
-	const home = (url, marker) => (typeof url === "string" && url.includes(marker) ? repoKey(url.slice(0, url.indexOf(marker))) : null);
-	try {
-		if (cli === "gh") {
-			const pr = run("gh", ["pr", "view", target, "--json", "statusCheckRollup,body,url"]);
-			return { ci: ghChecks(pr.statusCheckRollup), review: reviewApproved(pr.body), repo: home(pr.url, "/pull/") };
-		}
-		const mr = run("glab", ["mr", "view", target, "--output", "json"]);
-		const pipeline = mr.head_pipeline ?? mr.pipeline;
-		let parents = [];
-		if (pipeline?.sha && pipeline.sha !== mr.sha && /^[0-9a-f]{7,64}$/.test(pipeline.sha) && Number.isInteger(mr.project_id))
-			parents = run("glab", ["api", `projects/${mr.project_id}/repository/commits/${pipeline.sha}`]).parent_ids ?? [];
-		return { ci: glabChecks(mr, parents), review: reviewApproved(mr.description), repo: home(mr.web_url, "/-/merge_requests/") };
-	} catch {
-		return null;
-	}
+	return deny("no work mode allows merging");
 }
 
 /** The shell command and working directory from each CLI's PreToolUse payload. */
@@ -462,25 +367,18 @@ function main() {
 	}
 	const state = parseState(stateText);
 	let allowText = "";
-	if (state.mode !== "full-stop") {
+	if (state.mode === "full-send") {
 		try {
 			allowText = readFileSync(allowlistFile(), "utf8");
 		} catch {}
 	}
-	const facts = {
+	const decision = decide({
 		command,
 		state,
 		origin: gitDir ? git(dir, ["remote", "get-url", "origin"]) : null,
 		now: Math.floor(Date.now() / 1000),
 		allow: parseAllowlist(allowText),
-	};
-	let decision = decide(facts);
-	// Only a merge that every other rule allows reads the platform, so every other denial stays offline.
-	if (decision.needsGate) {
-		const cli = mergeCommand(command);
-		const gate = readGate(cli, directMerge(command, cli), dir);
-		if (gate) decision = decide({ ...facts, gate });
-	}
+	});
 	let final = decision;
 	if (decision.consumeGrant && file) {
 		// Claim the grant by renaming the mode file; a concurrent hook that loses the rename denies.

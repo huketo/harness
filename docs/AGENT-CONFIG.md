@@ -24,11 +24,11 @@ Claude Code는 `plugin.json`의 버전이 바뀔 때만 마켓플레이스에서
 
 ## 2. 머지 가드와 작업 모드
 
-작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 [`authority.md`](agents/authority.md)가 정한 조건(허용 목록의 저장소, 통과한 CI, 다른 모델 계열의 리뷰 승인)을 충족할 때에만 묻지 않고 진행합니다.
+작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 사람이 그 머지를 명시적으로 결정하거나, [`authority.md`](agents/authority.md)가 정한 조건을 `skills/full-send/scripts/gated-merge.mjs <번호>`가 확인했을 때에만 진행합니다. 이 스크립트는 origin이 허용 목록에 있고, 워크트리가 `full-stop`이 아니며, 그 PR/MR의 현재 head에서 CI가 통과했고, 본문에 `review-loop`의 승인 줄이 있을 때에만 머지합니다. 저장소는 origin으로, 대상은 확인한 번호와 head 커밋으로 고정해 머지하므로, 확인한 대상과 머지되는 대상이 달라지지 않습니다. 머지 가드는 에이전트가 직접 실행하는 머지 명령을 아래 표대로 판정하며, 이 스크립트의 내부 호출은 보지 않습니다.
 
 | 모드 | 머지 가드의 판정 |
 | --- | --- |
-| 없음 | 머지 대상이 허용 목록에 있는 이 워크트리의 저장소이고, 그 PR/MR의 CI가 모두 통과했으며, 본문에 `review-loop`이 승인 뒤에 적는 `Reviewed with review-loop: ... Verdict: approved` 줄이 있으면 통과합니다. 가드가 머지 직전에 `gh pr view`나 `glab mr view`로 이 상태를 읽으며, 읽지 못하면 막습니다. 머지 명령은 `gh pr merge <번호>`나 `glab mr merge <번호>`처럼 번호만 적은 형태여야 하고(명령 앞의 래퍼나 경로, 저장소 플래그, URL, 브랜치 이름, REST 경로, 자동 머지 플래그, 알 수 없는 플래그는 막습니다), 그 번호가 이 워크트리의 origin 저장소에서 조회되어야 합니다. CI가 없거나 진행 중이거나 실패했으면 막고, 성공한 검사가 하나도 없거나 파이프라인이 현재 head의 것이 아니어도 막습니다. 그 밖에는 사람이 특정 PR/MR의 머지를 요청한 뒤 `harness-mode allow-merge <번호>`를 기록하면, 30분 안에 그 번호를 명시한 머지 명령 하나만 통과합니다. |
+| 없음 | 막습니다. 사람이 특정 MR의 머지를 요청한 뒤 `harness-mode allow-merge <번호>`를 기록하면, 30분 안에 그 번호를 명시한 머지 명령 하나만 통과합니다. |
 | `full-stop` | 항상 막습니다. |
 | `full-send` | 머지 대상 저장소가 허용 목록에 있을 때만 통과합니다. 허용 목록에 없는 저장소와, CI 설정이나 `verify-*` 검증 스킬이 없는 워크트리에서는 `harness-mode`가 모드를 `full-stop`으로 낮춥니다. 이 준비도 검사는 `harness-mode`만 하며 파일이 있는지만 봅니다. 대상 저장소를 명령에서 읽을 수 없는 GraphQL 머지는 막습니다. |
 | 모든 모드 | `--admin`, 명령 연결·치환·`eval`, `GH_REPO`·`GH_HOST`·`GITLAB_HOST`·`GITLAB_URL`·`--hostname` 같은 대상 변경, 서로 다른 저장소를 가리키는 인자, 머지할 저장소와 다른 호스트를 적은 URL이나 API 주소는 항상 막습니다. |

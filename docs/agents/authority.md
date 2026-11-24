@@ -15,7 +15,7 @@ Local investigation follows data minimization. Access to the checkout is not bla
 Within the requested scope these proceed without asking, and the final report names each one done:
 
 - creating local commits, pushing the task's branch, and opening or updating its PR/MR;
-- merging the task's PR/MR once CI passes and a reviewer from another model family has approved it, in a repository on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); elsewhere a merge is a separate decision;
+- merging the task's PR/MR with the `full-send` skill's `scripts/gated-merge.mjs <number>`, which merges only when CI passed on the current head, the description carries the `review-loop` approval line from a reviewer of another model family, and the repository is on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); when it refuses, the merge is a separate decision;
 - deleting the task's own branch and worktree after its PR/MR is merged.
 
 ## Approval that may cover one plan
@@ -50,7 +50,7 @@ A person may select a work mode for one task or thread with the `full-send` or `
 - `full-send` adds merging that one PR/MR once the skill's merge gate passes, only in a repository the person listed in `${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`. The worktree must also hold a CI definition and a `verify-*` skill, so that a change can be proven without a person. Without the allowlist entry or either of those it runs as `full-stop` and says so.
 - Neither mode authorizes deleting data, production changes, writes outside the repository, closing a PR/MR, admin bypass, force-pushing another branch, or editing the allowlist.
 
-`skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks a merge that neither the mode nor the conditions under [Actions that need no question](#actions-that-need-no-question) allow. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
+`skills/full-send/scripts/harness-mode` records the mode for the merge-guard hook, which blocks merge commands the mode does not allow; `gated-merge.mjs` is the route that needs no mode. The hook is a guardrail against accidental merges, not an authorization source: an explicit request for one merge is recorded with `harness-mode allow-merge <ref>` only after the person made it.
 
 ## Settled policy
 
