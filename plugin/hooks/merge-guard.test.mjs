@@ -381,6 +381,10 @@ test("without a mode, an allowlisted repository merges only on passing CI and a 
 		"gh pr merge '#1'",
 		"gh pr merge 1 -R example-owner/harness",
 		'gh pr merge 1 --repo "example-owner/harness"',
+		'gh pr merge 1 "--repo" other-owner/other',
+		"gh pr merge 1 '-R' other-owner/other",
+		'gh pr merge 1 "--repo=other-owner/other"',
+		"gh pr merge 1 -Rother-owner/other",
 		"gh pr merge https://github.com/example-owner/harness/pull/1",
 		"gh api -X PUT repos/example-owner/harness/pulls/1/merge",
 	]) {

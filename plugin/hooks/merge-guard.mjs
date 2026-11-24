@@ -109,13 +109,25 @@ export function mergeTarget(command) {
 	return [...paths].every((n) => n === match[1]) ? match[1] : null;
 }
 
-/** The single positional argument of a `pr merge` / `mr merge` invocation, or null (none, several, an unknown flag, an API call). */
-export function mergePositional(command) {
+/** The unquoted argument words of a `pr merge` / `mr merge` invocation with their CLI, or null (an API call, a redirection). */
+function mergeWords(command) {
 	const text = command.replace(/\\\n/g, " ");
 	const invocation = [MERGE_PATTERNS[0], MERGE_PATTERNS[1]].map(({ cli, re }) => ({ cli, m: re.exec(text) })).find(({ m }) => m);
 	if (!invocation) return null;
 	const words = shellWords(text.slice(invocation.m.index + invocation.m[0].length));
-	if (!words) return null;
+	return words && { cli: invocation.cli, words };
+}
+
+/** Whether a merge invocation carries a repository flag, read from the same unquoted words as its positional. */
+export function namesRepoFlag(command) {
+	return (mergeWords(command)?.words ?? []).some((word) => /^(?:-R|--repo)(?:=|$)/.test(word) || /^-R./.test(word));
+}
+
+/** The single positional argument of a `pr merge` / `mr merge` invocation, or null (none, several, an unknown flag, an API call). */
+export function mergePositional(command) {
+	const invocation = mergeWords(command);
+	if (!invocation) return null;
+	const { words } = invocation;
 	const flags = FLAGS[invocation.cli];
 	const positional = [];
 	for (let i = 0; i < words.length; i++) {
@@ -340,7 +352,7 @@ export function decide({ command, state, origin, now, allow = [], gate = null })
 	// A bare number and no repository reference: both CLIs read that one way, so the lookup below and the merge
 	// resolve the same PR/MR. Any other selector (a branch, `!N`, `#N`, a URL, -R, a REST path) is denied.
 	const target = mergePositional(command);
-	if (repo || !/^\d+$/.test(target ?? ""))
+	if (repo || namesRepoFlag(command) || !/^\d+$/.test(target ?? ""))
 		return deny(`without a mode, merge with \`${cli === "gh" ? "gh pr" : "glab mr"} merge <number>\` and no repository flag or URL`);
 	if (!gate) return { ...deny("the PR/MR's CI and review state could not be read"), needsGate: true };
 	if (gate.repo !== key) return deny(`the PR/MR number resolves in ${gate.repo ?? "an unknown repository"}, not in ${key}`);
