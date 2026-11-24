@@ -12,7 +12,14 @@ The T3 thread is the only channel to the person. T3 Connect can push a thread's 
 
 ## When a human decision is required
 
-Ask only after repository context, tools, tests, and available evidence cannot resolve it. Human-only decisions are destructive or irreversible actions, real design tradeoffs with no context-visible answer, credentials or values only the person has, contradictory requirements, and scope outside the assignment. Never ask for reassurance, for facts the environment answers, for style details, or for cheap reversible choices. Combine related questions into one request. Batch reversible external-write approvals once per plan when their full scope is known; keep destructive, irreversible, or direction-changing decisions separate.
+Before asking, sort the decision into one of four kinds. Kinds 2 and 4 are the human-only decisions.
+
+1. **A choice that running it can settle** (a library, a structure, an approach) is the agent's. Build or measure the candidates, pick one, proceed, and report what was observed that decided it.
+2. **Product direction, taste, and what only the person knows or holds** (a fact, a credential, which of two contradictory requirements wins, scope beyond the assignment) go to the person. Ask in the person's words, not in implementation terms. When the choice is about how something looks or behaves, show running prototypes or real examples and ask which is closer.
+3. **A reversible action you already have a recommendation for**, and that [`authority.md`](authority.md) puts behind no approval, is not a question. Proceed with the recommendation and report it with its evidence.
+4. **An action that is hard to reverse** is confirmed first when it falls outside what [`authority.md`](authority.md) already allows.
+
+Reassurance, facts the environment answers, and style details are never questions. Combine related questions into one request. Batch reversible external-write approvals once per plan when their full scope is known; keep destructive, irreversible, or direction-changing decisions separate.
 
 For a material technical alternative with costly reversal and unresolved evidence, review it first with the `council` skill, then send its recommendation and dissent with the question so the person does not decide empty-handed.
 

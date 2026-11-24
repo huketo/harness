@@ -10,25 +10,36 @@ Within the requested scope, an agent may read tracked source, edit repository fi
 
 Access to the checkout is not blanket authority to read credentials, ignored runtime output, logs, databases, or personal data. Read them only when the task explicitly requires that evidence.
 
+## Actions that need no question
+
+Within the requested scope these proceed without asking, and the final report names each one done:
+
+- Creating local commits, pushing the task's branch, and opening or updating its PR/MR.
+- Commenting on, labelling, or closing the issues the task works on, in the tracker described in [`issue-tracker.md`](issue-tracker.md).
+- Merging the task's PR/MR with the `full-send` skill's `scripts/gated-merge.mjs <number>`, which merges a GitHub PR only when CI passed on the current head, the description carries the `review-loop` approval line from a reviewer of another model family, and the repository is on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); when it refuses, as it does for every GitLab MR, the merge is a separate decision.
+- Re-running a failed CI job of the task's PR/MR to diagnose the failure.
+- Deleting the task's own branch and worktree after its PR/MR is merged.
+- Deploying to staging.
+
 ## Approval that may cover one plan
 
 When the complete set is known, one explicit approval may cover named reversible actions such as:
 
-- Creating local commits or pushing named branches.
-- Opening or updating a named merge request or pull request.
-- Creating, commenting on, labelling, or closing named issues in the tracker described in [`issue-tracker.md`](issue-tracker.md).
 - Running named authenticated or paid external checks.
 - Applying a documented installation or configuration change to the machine.
 
-Approval for one plan ends with that plan. A push does not authorize a merge, a release, or a later batch.
+Approval for one plan ends with that plan and does not authorize a later batch or a wider target.
 
 ## Separate decision every time
 
 These actions are hard to undo, publish material, or cross a durable boundary. Each requires an explicit decision naming the exact action:
 
-- Merging, force-pushing a shared branch, rebasing published history, or deleting branches or tags.
+- Deploying to production, or publishing a release or package.
+- Posting or sending anything from the person's external accounts, except the actions listed under [Actions that need no question](#actions-that-need-no-question).
+- Counting a failed check as passed by re-running it until it passes, skipping it, or bypassing it.
+- Force-pushing a shared branch, rebasing published history, or deleting tags or a branch the task does not own.
 - Selecting or changing license or copyright terms.
-- Changing repository visibility, or publishing a release, package, or deployment.
+- Changing repository visibility.
 - Rotating or revoking credentials, or editing secret stores.
 - Deleting data, preserved evidence, or another person's work.
 - Creating, changing, or disabling CI pipelines, scheduled jobs, or live automations.
