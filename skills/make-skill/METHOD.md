@@ -34,6 +34,8 @@ No text was copied; these are ideas, restated.
 
 ## Known limits
 
+- The first skill changed with this procedure (`full-send`) could not follow steps 3 to 5: the fix was a script, and its steps run against a remote, a PR, and CI that the runner cannot prepare. Step 3 now names both cases and makes the script's failing-then-passing test the evidence. That paragraph rests on one use and was not run against cases.
+
 - The runner resolves local skills in this repository only; elsewhere the comparison is done by hand.
 - One run per arm is a small sample; a narrow gap needs `--runs`.
 - The run workspace path contains `skill-eval`, which an evaluated agent could notice.

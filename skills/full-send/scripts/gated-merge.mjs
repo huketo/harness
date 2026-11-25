@@ -9,6 +9,8 @@
 // GitLab is refused: its server-side rebase, merged-results pipelines, and squash settings need checks this
 // script does not make yet, so a GitLab merge stays a separate decision.
 // Usage: gated-merge.mjs <number> [--squash | --merge | --rebase] [--dry-run]
+// An error answer from the merge call does not say whether GitHub merged: the PR is read once more, and it counts
+// as merged only when GitHub reports it merged at the head that was checked.
 // It never deletes the head branch: a deletion cannot be pinned to the checked repository and commit the way the
 // merge is, so the branch is left to the repository's own setting or to an ordinary `git push --delete`.
 // After GitHub confirms the merge it runs sweep-landed.mjs --apply in this worktree, so the local branches and
@@ -72,6 +74,12 @@ export function viewRefusal({ key, number, view }) {
 	return null;
 }
 
+/** The merge commit when a second read shows this PR merged at the head that was checked, or null. */
+export function landedAnyway({ key, number, head, view }) {
+	const same = view && String(view.number) === number && view.repo === key && view.state === "merged" && view.head === head;
+	return same && /^[0-9a-f]{40,64}$/.test(view.merge ?? "") ? view.merge : null;
+}
+
 /** The immediate merge call: GitHub merges the checked head now or fails; it never queues or schedules. */
 export function mergeArgs({ key, number, method, head }) {
 	const path = key.slice(HOST.length + 1);
@@ -96,7 +104,7 @@ function run(file, args, cwd) {
 
 function readView(key, number, cwd) {
 	try {
-		const fields = "number,url,state,headRefOid,body,statusCheckRollup";
+		const fields = "number,url,state,headRefOid,body,statusCheckRollup,mergeCommit";
 		const pr = JSON.parse(run("gh", ["pr", "view", number, "-R", key, "--json", fields], cwd));
 		return {
 			number: pr.number,
@@ -105,6 +113,7 @@ function readView(key, number, cwd) {
 			head: pr.headRefOid,
 			ci: ghChecks(pr.statusCheckRollup),
 			review: reviewApproved(pr.body),
+			merge: pr.mergeCommit?.oid,
 		};
 	} catch {
 		return null;
@@ -153,7 +162,9 @@ function main() {
 	try {
 		merged = JSON.parse(run("gh", command, cwd));
 	} catch (error) {
-		refuse(`GitHub did not merge it now (${String(error.stderr || error.message).trim().split("\n")[0]})`);
+		const sha = landedAnyway({ key, number: args.number, head: view.head, view: readView(key, args.number, cwd) });
+		if (!sha) refuse(`GitHub did not merge it now (${String(error.stderr || error.message).trim().split("\n")[0]})`);
+		merged = { merged: true, sha };
 	}
 	if (merged?.merged !== true) refuse("GitHub did not confirm the merge");
 	process.stdout.write(`gated-merge: merged ${key} #${args.number} at ${view.head} as ${merged.sha} (CI passed, review approved)\n`);

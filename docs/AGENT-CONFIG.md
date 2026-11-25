@@ -24,7 +24,7 @@ Claude Code는 `plugin.json`의 버전이 바뀔 때만 마켓플레이스에서
 
 ## 2. 머지 가드와 작업 모드
 
-작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 사람이 그 머지를 명시적으로 결정하거나, [`authority.md`](agents/authority.md)가 정한 조건을 `skills/full-send/scripts/gated-merge.mjs <번호>`가 확인했을 때에만 진행합니다. 이 스크립트는 origin이 허용 목록에 있는 github.com 저장소이고, 워크트리가 `full-stop`이 아니며, 그 PR의 현재 head에서 CI가 통과했고, 본문에 `review-loop`의 승인 줄이 있을 때에만 머지합니다. 저장소는 origin으로, 대상은 확인한 번호와 head 커밋으로 고정해 GitHub의 즉시 머지 API를 부르고, 머지되었다는 응답을 받지 못하면 실패로 끝냅니다. 머지가 확인되면 같은 워크트리에서 `sweep-landed.mjs --apply`를 실행해 머지된 작업의 로컬 브랜치와 워크트리를 지우며, 이 정리가 실패해도 머지는 성공으로 보고합니다. GitLab MR은 서버 쪽 rebase와 merged-results 파이프라인을 아직 확인하지 못하므로 거절하며, 그 머지는 사람이 결정합니다. 머지 가드는 에이전트가 직접 실행하는 머지 명령을 아래 표대로 판정하며, 이 스크립트의 내부 호출은 보지 않습니다.
+작업 모드는 사람이 작업이나 스레드마다 고르는 층입니다. 모드를 고르지 않으면 [`hitl.md`](agents/hitl.md)와 [`authority.md`](agents/authority.md)가 그대로 적용되며, 머지는 사람이 그 머지를 명시적으로 결정하거나, [`authority.md`](agents/authority.md)가 정한 조건을 `skills/full-send/scripts/gated-merge.mjs <번호>`가 확인했을 때에만 진행합니다. 이 스크립트는 origin이 허용 목록에 있는 github.com 저장소이고, 워크트리가 `full-stop`이 아니며, 그 PR의 현재 head에서 CI가 통과했고, 본문에 `review-loop`의 승인 줄이 있을 때에만 머지합니다. 저장소는 origin으로, 대상은 확인한 번호와 head 커밋으로 고정해 GitHub의 즉시 머지 API를 부르고, 머지되었다는 응답을 받지 못하면 실패로 끝냅니다. 다만 머지 호출이 오류로 끝나면 PR을 한 번 더 읽어서, 확인했던 head 커밋에서 머지되었다고 GitHub가 보고할 때에만 머지된 것으로 처리합니다. 머지가 확인되면 같은 워크트리에서 `sweep-landed.mjs --apply`를 실행해 머지된 작업의 로컬 브랜치와 워크트리를 지우며, 이 정리가 실패해도 머지는 성공으로 보고합니다. GitLab MR은 서버 쪽 rebase와 merged-results 파이프라인을 아직 확인하지 못하므로 거절하며, 그 머지는 사람이 결정합니다. 머지 가드는 에이전트가 직접 실행하는 머지 명령을 아래 표대로 판정하며, 이 스크립트의 내부 호출은 보지 않습니다.
 
 | 모드 | 머지 가드의 판정 |
 | --- | --- |
