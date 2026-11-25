@@ -8,8 +8,8 @@
 //   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
 //   how a task that just started looks. That last one is kept for a day only: after 24 hours in which its branch
 //   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes. That needs proof from
-//   the reflog files: neither the branch's log nor the worktree's HEAD log names a commit, moved from or moved to,
-//   that is not on the default branch. Without that proof the worktree is kept.
+//   the reflog files: the branch's log starts at its creation and never moved, and the worktree's HEAD log names
+//   no commit, moved from or moved to, that is not on the default branch. Without that proof the worktree is kept.
 //   Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
@@ -27,7 +27,7 @@ const IDLE_SECONDS = 24 * 60 * 60;
  * only the commit an entry moved to, and the commit it moved from can be the last trace of unlanded work.
  * It throws when the file is missing or a line does not parse.
  */
-export function reflogEntries(file) {
+function reflogEntries(file) {
 	return readFileSync(file, "utf8")
 		.split("\n")
 		.filter(Boolean)
@@ -145,7 +145,7 @@ function main() {
 			try {
 				const path = realpathSync(entry.path);
 				entry.current = here === path || here.startsWith(path + sep);
-				entry.dirty = git(["status", "--porcelain"], entry.path) !== "";
+				entry.dirty = git(["status", "--porcelain", "--untracked-files=normal"], entry.path) !== "";
 			} catch {
 				entry.prunable = true;
 			}
@@ -171,8 +171,9 @@ function main() {
 				const cutoff = Date.now() / 1000 - IDLE_SECONDS;
 				const branchLog = reflogEntries(join(commonDir, "logs", ref));
 				const headLog = reflogEntries(git(["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"], worktree.path));
-				const landedOnly = (entries) => entries.every((entry) => [entry.from, entry.to].every((oid) => /^0+$/.test(oid) || onDefault.has(oid)));
-				return branchLog.length > 0 && branchLog.every((entry) => entry.time <= cutoff) && landedOnly(branchLog) && headLog.length > 0 && landedOnly(headLog);
+				const created = /^0+$/.test(branchLog[0].from) && branchLog[0].to === tip && branchLog.slice(1).every((entry) => entry.from === tip && entry.to === tip);
+				const stayed = headLog.length > 0 && headLog.every((entry) => [entry.from, entry.to].every((oid) => /^0+$/.test(oid) || onDefault.has(oid)));
+				return created && stayed && branchLog.every((entry) => entry.time <= cutoff);
 			} catch {
 				return false;
 			}

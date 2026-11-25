@@ -140,6 +140,10 @@ before(() => {
 	const expired = join(root, "wt", "wandered-expired");
 	execFileSync("git", ["worktree", "add", "-q", "-b", "wandered-expired", expired, "main"], old);
 	writeFileSync(git(expired, "rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"), `${unlanded} ${tip} ${stamp}\tcheckout: moving from ${unlanded} to wandered-expired\n`);
+	// hidden-note: idle too, with an untracked file that this repository's status setting hides.
+	execFileSync("git", ["worktree", "add", "-q", "-b", "hidden-note", join(root, "wt", "hidden-note"), "main"], old);
+	writeFileSync(join(root, "wt", "hidden-note", "note"), "unsaved");
+	git(clone, "config", "status.showUntrackedFiles", "no");
 	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
@@ -150,7 +154,7 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 	const result = sweep(join(root, "wt", "here"));
 	assert.equal(result.status, 0, result.stderr);
 	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded", "idle"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
-	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr", "reset-long-ago", "reset-expired", "wandered", "wandered-expired"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr", "reset-long-ago", "reset-expired", "wandered", "wandered-expired", "hidden-note"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	assert.deepEqual(branches(), all);
 	assert.equal(existsSync(join(root, "wt", "merged-commit")), true);
 });
@@ -158,10 +162,10 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 test("with --apply it deletes landed branches and their clean worktrees, and keeps everything that may be in use", () => {
 	const result = sweep(join(root, "wt", "here"), "--apply");
 	assert.equal(result.status, 0, result.stderr);
-	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "reset-expired", "reset-long-ago", "unfinished", "wandered", "wandered-expired"]);
+	assert.deepEqual(branches(), ["dirty", "fresh", "here", "hidden-note", "main", "on-release", "release-pr", "reset-expired", "reset-long-ago", "unfinished", "wandered", "wandered-expired"]);
 	for (const name of ["merged-commit", "squashed", "fast-forwarded", "idle"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
-	for (const name of ["dirty", "unfinished", "here", "fresh", "reset-long-ago", "reset-expired", "wandered", "wandered-expired"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
-	assert.match(result.stdout, /deleted 5 of 16 local branches/);
+	for (const name of ["dirty", "unfinished", "here", "fresh", "reset-long-ago", "reset-expired", "wandered", "wandered-expired", "hidden-note"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
+	assert.match(result.stdout, /deleted 5 of 17 local branches/);
 });
 
 test("when GitHub cannot be asked, a squashed branch is kept", () => {
