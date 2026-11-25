@@ -31,7 +31,7 @@ description: 서로 다른 모델 계열의 플래그십 셋에게 같은 변경
 ## 3. 회차
 
 1. 세 위원을 한 응답에서 나란히 시작한다. `delegate_task`는 `role: "review"`, `mode: "async"`, `isolation: "worktree"`, `clientRequestId: "<slug>-council-<계열>-r<n>"`이고 회차마다 새로 부른다. `t3_thread_send`로 이어 보내지 않는다. 위원을 셸 백그라운드 프로세스로 돌리지 않는다.
-2. 턴을 끝내고 완료 알림을 기다린다. 위임 직전에 `review-loop`의 `scripts/tree-unchanged.sh snapshot`으로 공유 git 상태를 남기고, 결과가 오면 각 위원의 워크트리를 `tree-unchanged.sh check <워크트리> <시작 SHA> <스냅숏>`으로 확인한다. 실패하거나, 응답이 양식을 따르지 않거나, 시간이 초과되면 그 위원의 이번 회차는 `no score`다. 점수를 추측하지 않는다.
+2. 턴을 끝내고 완료 알림을 기다린다. 위임 직전에 `review-loop`의 `scripts/tree-unchanged.mjs snapshot`으로 공유 git 상태를 남기고, 결과가 오면 각 위원의 워크트리를 `tree-unchanged.mjs check <워크트리> <시작 SHA> <스냅숏>`으로 확인한다. 실패하거나, 응답이 양식을 따르지 않거나, 시간이 초과되면 그 위원의 이번 회차는 `no score`다. 점수를 추측하지 않는다.
 3. 응답을 `member-<계열>-r<n>.md`로 저장한다.
 
 ## 4. 판정과 수정

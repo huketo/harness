@@ -1029,7 +1029,7 @@
       ],
       "local_changes": [
         "Merge sol-loop into the harness review policy formerly in herdr-orchestrate: the tier classifier, escalation script, and criteria move to review-loop and set the budget (none 0, logic 3, security 5) instead of a fixed rule; herdr-orchestrate and t3-orchestrate share them.",
-        "Default reviewer is Codex Sol; inside T3 it and other providers run through delegate_task in a worktree with a tree-unchanged.sh snapshot check (never a background shell process), hstack:reviewer serves a Claude thread, and codex/review.ts resolves Sol at run time outside T3.",
+        "Default reviewer is Codex Sol; inside T3 it and other providers run through delegate_task in a worktree with a tree-unchanged.mjs snapshot check (never a background shell process), hstack:reviewer serves a Claude thread, and codex/review.ts resolves Sol at run time outside T3.",
         "Keep sol-loop's brief, VERDICT reply format, blocker/should/nit severities, ledger, scope-creep guard, and push rule; add TIER escalation and the harness criteria (intent, conventionality, AI slop, correctness)."
       ],
       "excluded_sources": []
@@ -1057,7 +1057,7 @@
       ],
       "local_changes": [
         "Use tstack council's multi-angle review: one flagship per model family, read-only, scores per round, loop until all satisfied.",
-        "Resolve members from orchestrator_capabilities, count families by model, report unavailable members instead of substituting, inline rules in the Antigravity brief because T3 isolates its Gemini config, and verify worktree reviewers with tree-unchanged.sh."
+        "Resolve members from orchestrator_capabilities, count families by model, report unavailable members instead of substituting, inline rules in the Antigravity brief because T3 isolates its Gemini config, and verify worktree reviewers with tree-unchanged.mjs."
       ],
       "excluded_sources": []
     },
