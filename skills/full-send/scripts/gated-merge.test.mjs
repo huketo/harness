@@ -99,7 +99,7 @@ const view = (over = {}) =>
 	});
 const merge = (...argv) => spawnSync("node", [SCRIPT, ...argv], { cwd: repo, env, encoding: "utf8" });
 const recorded = () => readFileSync(calls, "utf8").trim().split("\n").filter(Boolean);
-const VIEW_CALL = `pr view 12 -R ${KEY} --json number,url,state,headRefOid,body,statusCheckRollup`;
+const VIEW_CALL = `pr view 12 -R ${KEY} --json number,url,state,headRefOid,body,statusCheckRollup,mergeCommit`;
 const MERGE_CALL = `api --hostname github.com -X PUT repos/example-owner/harness/pulls/12/merge -f sha=${HEAD} -f merge_method=squash`;
 
 before(() => {
@@ -114,7 +114,7 @@ before(() => {
 	writeFileSync(join(config, "harness/full-send-repos"), "github.com/example-owner/*\ngitlab.example/team/*\n");
 	writeFileSync(
 		join(bin, "gh"),
-		`#!/bin/sh\necho "$*" >> "${calls}"\ncase "$*" in\n  "pr view"*) cat "${join(root, "view.json")}" ;;\n  *PUT*) cat "${join(root, "merge.json")}" ;;\nesac\nexit 0\n`,
+		`#!/bin/sh\necho "$*" >> "${calls}"\ncase "$*" in\n  "pr view"*) cat "${join(root, "view.json")}" ;;\n  *PUT*) if [ -f "${join(root, "after.json")}" ]; then mv "${join(root, "after.json")}" "${join(root, "view.json")}"; echo "gh: Server Error (HTTP 502)" >&2; exit 1; fi; cat "${join(root, "merge.json")}" ;;\nesac\nexit 0\n`,
 	);
 	chmodSync(join(bin, "gh"), 0o755);
 	env = { ...process.env, HOME: join(root, "home"), XDG_CONFIG_HOME: config, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_SSH_COMMAND: "false", PATH: `${bin}:${process.env.PATH}` };
@@ -139,6 +139,25 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	const queued = merge("12");
 	assert.equal(queued.status, 1);
 	assert.match(queued.stdout, /did not confirm/);
+	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL]);
+
+	// An error answer does not say whether the merge happened, so the PR is read once more.
+	const errored = (after) => {
+		writeFileSync(calls, "");
+		view();
+		answer("after.json", { number: 12, url: `https://${KEY}/pull/12`, state: "MERGED", headRefOid: HEAD, mergeCommit: { oid: "c".repeat(40) }, ...after });
+		return merge("12");
+	};
+	const landed = errored({});
+	assert.equal(landed.status, 0, landed.stdout + landed.stderr);
+	assert.match(landed.stdout, new RegExp(`^gated-merge: merged ${KEY} #12 at ${HEAD} as c{40} .*\\n[^]*sweep-landed: `));
+	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL, VIEW_CALL]);
+	for (const after of [{ state: "OPEN" }, { headRefOid: "d".repeat(40) }, { url: "https://github.com/upstream-owner/harness/pull/12" }]) {
+		const unsure = errored(after);
+		assert.equal(unsure.status, 1, unsure.stdout);
+		assert.match(unsure.stdout, /did not merge it now \(gh: Server Error \(HTTP 502\)\)/);
+		assert.doesNotMatch(unsure.stdout, /sweep/);
+	}
 
 	const denied = (over, pattern) => {
 		writeFileSync(calls, "");
