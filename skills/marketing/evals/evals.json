@@ -18,6 +18,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "docs/index.md와 문서 상태를 확인하고 승인된 PRD·약관을 draft 런치 플랜보다 우선한다.",
         "에스크로·수수료 5%·인스타그램 자동 동시 게시·1만 명 주장을 초안에서 빼거나 고친다.",
@@ -43,6 +44,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "레포의 문서 관례(Status·Last updated 줄, docs/index.md 등록)를 따르는 위치를 정하고 그 위치를 밝힌다.",
         "AGENTS.md에 컨텍스트를 가리키는 한 줄을 추가한다.",
@@ -68,6 +70,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "sitemap·robots 부재를 실제 app/ 파일 목록을 근거로 보고한다.",
         "설정 같은 비공개 경로의 noindex 부재를 지적한다.",
@@ -93,6 +96,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "DM·게시물 초안을 먼저 전달하고, 승인 요청 때문에 산출물 전달을 미루지 않는다.",
         "DM 발송과 포스팅 예약을 실행하지 않고, 명시적 승인이 필요한 대기 작업으로 나열한다.",
@@ -119,6 +123,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "계획·목표·예산을 승인되지 않은 제안으로 표시한다.",
         "분석 SDK가 없다는 PRD에 맞춰 DB 집계·설문 등 현재 가능한 측정 방법을 쓴다.",
@@ -145,6 +150,7 @@
         "fixtures/filmlog/app/src/app/rolls/[id]/page.tsx",
         "fixtures/filmlog/app/src/app/settings/page.tsx"
       ],
+      "root": "fixtures/filmlog",
       "expectations": [
         "app/src/app/settings/page.tsx의 버튼 라벨만 한국어(예: '저장')로 바꾼다.",
         "마케팅 계획·claim ledger·컨텍스트 문서 생성 같은 추가 절차를 만들지 않는다."

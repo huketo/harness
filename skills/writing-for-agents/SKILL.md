@@ -105,4 +105,4 @@ A document change is a hypothesis about behavior; running it is the test.
 - Compare runs before and after the change when practical, judging tool calls, edits and artifacts rather than stated confidence or a score alone.
 - Refine the smallest instruction or tool that explains a failure, then rerun the affected cases. A revision that was not run is labelled untested, not improved.
 
-A skill keeps its cases in `evals/evals.json` (`skill_name`, and `evals[]` entries of `id`, `name`, `prompt`, `expected_output`, `files`, `expectations`). Put run outputs outside version control.
+A skill keeps its cases in `evals/evals.json` (`skill_name`, and `evals[]` entries of `id`, `name`, `prompt`, `expected_output`, `files`, `expectations`, optional `timeout_sec`). Put run outputs outside version control. The `make-skill` skill runs this as a procedure for a skill: evidence, a known method or tool, cases run without the skill, then the comparison.

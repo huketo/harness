@@ -1,0 +1,95 @@
+{
+  "skill_name": "make-skill",
+  "evals": [
+    {
+      "id": 1,
+      "name": "known-method",
+      "timeout_sec": 2400,
+      "prompt": "장애 보고서를 쓰는 스킬을 만들어 주세요. 에이전트가 쓴 지난 두 번의 보고서와 리드의 교정이 notes/에 있습니다.",
+      "expected_output": "The skill rests on a named, sourced incident-review method adapted for an agent, ships cases drawn from the two corrected reports, and the report shows whether those cases were run without the skill.",
+      "files": [
+        "fixtures/postmortem/AGENTS.md",
+        "fixtures/postmortem/skills/commit-msg/SKILL.md",
+        "fixtures/postmortem/notes/2026-10-12-checkout-outage.md",
+        "fixtures/postmortem/notes/2026-11-03-queue-backlog.md"
+      ],
+      "root": "fixtures/postmortem",
+      "expectations": [
+        "The new skill's directory holds a record that names an established incident-review method, gives its source, and says what was changed for an agent and why.",
+        "The new skill's directory holds evals/evals.json with at least one case built from the corrected reports in notes/.",
+        "The final message shows the output of running a case without the skill, or says plainly that the cases were not run.",
+        "The skill's steps cover the lead's corrections: system causes instead of a person, a timeline, customer impact, and action items with an owner and a date."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "tool-first",
+      "timeout_sec": 2400,
+      "prompt": "성능이 떨어진 커밋을 찾는 스킬을 만들어 주세요. notes/corrections.md에 지금까지 있었던 일이 적혀 있습니다.",
+      "expected_output": "The result hands the search to git bisect driven by bench/run.sh, and the skill holds only what the tool does not already do.",
+      "files": [
+        "fixtures/regression/AGENTS.md",
+        "fixtures/regression/bench/run.sh",
+        "fixtures/regression/notes/corrections.md"
+      ],
+      "root": "fixtures/regression",
+      "expectations": [
+        "The search for the commit is done by `git bisect` (with `git bisect run` or an equivalent scripted measurement), not by a hand-written procedure for reading or halving commits.",
+        "The measurement uses bench/run.sh and states a threshold that separates a good commit from a bad one.",
+        "The skill does not re-explain how bisection works; its body is short and about when and how to drive the tool here.",
+        "The new skill's directory holds evals/evals.json with a case built from notes/corrections.md."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "no-evidence",
+      "prompt": "에이전트가 코드를 더 꼼꼼하게 보도록 하는 스킬을 하나 만들어 주세요.",
+      "expected_output": "No skill is written; the reply says no observed failure was found and names the evidence that would justify one.",
+      "files": [
+        "fixtures/vague/AGENTS.md",
+        "fixtures/vague/skills/commit-msg/SKILL.md"
+      ],
+      "root": "fixtures/vague",
+      "expectations": [
+        "No new skill directory or SKILL.md is created.",
+        "The final message says that no record of an actual failure was found in the workspace.",
+        "The final message names the concrete evidence it needs, such as two real cases where the agent missed something."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "check-not-skill",
+      "prompt": "에이전트가 console.log를 자꾸 남깁니다. notes/corrections.md를 보고 이걸 막는 스킬을 만들어 주세요.",
+      "expected_output": "The mistake is stopped by a lint rule in the existing ESLint configuration, and no skill is written for it.",
+      "files": [
+        "fixtures/lint/AGENTS.md",
+        "fixtures/lint/package.json",
+        "fixtures/lint/eslint.config.js",
+        "fixtures/lint/src/cart.ts",
+        "fixtures/lint/notes/corrections.md"
+      ],
+      "root": "fixtures/lint",
+      "expectations": [
+        "eslint.config.js gains a rule that rejects console.log (for example no-console or a restricted-syntax rule).",
+        "No new skill directory or SKILL.md is created.",
+        "The final message explains that a check enforces this better than a written procedure."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "routine-typo",
+      "prompt": "skills/commit-msg 스킬 설명에 오타가 있습니다. 고쳐 주세요.",
+      "expected_output": "Only the typo is fixed, with no added process.",
+      "files": [
+        "fixtures/typo/AGENTS.md",
+        "fixtures/typo/skills/commit-msg/SKILL.md"
+      ],
+      "root": "fixtures/typo",
+      "expectations": [
+        "The description reads \"Write a commit message for staged changes.\"",
+        "No other file is added or changed.",
+        "The final message is a few sentences and proposes no further procedure."
+      ]
+    }
+  ]
+}

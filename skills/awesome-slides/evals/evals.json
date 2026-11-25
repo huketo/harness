@@ -8,10 +8,11 @@
       "prompt": "northstar 폴더에 승인용 발표 자료의 brief.md와 outline.md를 정리해 두었고 둘 다 승인했습니다. 참고할 디자인 자료는 따로 없어요. 저는 디자인 용어를 잘 모릅니다. 이제 디자인을 정하는 단계를 진행해 주세요.",
       "expected_output": "레퍼런스 없는 디자인 결정 (스무고개)",
       "files": [
-        "evals/compare/fixtures/northstar-design/decision-brief.md",
-        "evals/compare/fixtures/northstar-design/northstar/brief.md",
-        "evals/compare/fixtures/northstar-design/northstar/outline.md"
+        "compare/fixtures/northstar-design/decision-brief.md",
+        "compare/fixtures/northstar-design/northstar/brief.md",
+        "compare/fixtures/northstar-design/northstar/outline.md"
       ],
+      "root": "compare/fixtures/northstar-design",
       "expectations": [
         "brief.md와 outline.md를 다시 쓰거나 처음부터 질문하지 않고, 승인된 내용을 그대로 이어받는다.",
         "outline의 실제 문구와 수치(예: 세 대안 비용 표, 월 40시간·1,200,000원 계산)로 시안을 렌더링하며, 자리표시 문구로 된 시안을 보여 주지 않는다.",
@@ -26,11 +27,12 @@
       "prompt": "technical-brief.md, requests.csv, latency.mjs로 15분 기술 발표를 만들어 주세요. 디자인은 DESIGN.md를 따라 주세요. 중간 확인 없이 끝까지 진행해서, 네트워크 없이 열리는 HTML 파일 하나와 PDF를 만들어 주세요.",
       "expected_output": "제공된 DESIGN.md로 끝까지 제작",
       "files": [
-        "evals/compare/fixtures/latency-design-md/DESIGN.md",
-        "evals/compare/fixtures/latency-design-md/latency.mjs",
-        "evals/compare/fixtures/latency-design-md/requests.csv",
-        "evals/compare/fixtures/latency-design-md/technical-brief.md"
+        "compare/fixtures/latency-design-md/DESIGN.md",
+        "compare/fixtures/latency-design-md/latency.mjs",
+        "compare/fixtures/latency-design-md/requests.csv",
+        "compare/fixtures/latency-design-md/technical-brief.md"
       ],
+      "root": "compare/fixtures/latency-design-md",
       "expectations": [
         "A/B 평균 총시간이 모두 100ms이고 nearest-rank p95가 A 100ms, B 460ms로 정확하며, 합성 데이터와 작은 표본의 한계를 밝힌다.",
         "DESIGN.md의 색(#f4f1e8 배경, #14213d 본문, #0f766e 강조), 세리프 제목, 왼쪽 위 제목, 근거 장 아래 출처 한 줄, radius 0, 제목 아래 강조색 가로줄을 따른다.",
@@ -46,8 +48,9 @@
       "prompt": "demo-brief.md로 10분 발표를 만들어 주세요. 디자인과 청중은 브리프에 정해져 있으니 추가 승인 없이 완성해 주세요. 오프라인에서 여는 HTML 파일 하나와 배포용 PDF가 필요합니다.",
       "expected_output": "클릭과 코드 전환이 많은 덱의 HTML과 PDF",
       "files": [
-        "evals/compare/fixtures/taskforge-pdf/demo-brief.md"
+        "compare/fixtures/taskforge-pdf/demo-brief.md"
       ],
+      "root": "compare/fixtures/taskforge-pdf",
       "expectations": [
         "v1 코드가 v2 코드로 바뀌는 과정이 정적 2열 비교가 아니라 단계적 전환으로 제시되고, 두 코드의 내용이 브리프와 일치한다.",
         "PDF에서 클릭이 있는 모든 장이 최종 상태의 결론과 v2 코드 전체를 잃지 않으며, 전환 과정 자체가 핵심인 장은 단계별 쪽으로 나뉜다.",
@@ -62,9 +65,10 @@
       "prompt": "어제 하던 발표 자료 이어서 진행해 주세요. talk 폴더에 있어요.",
       "expected_output": "초안 아웃라인에서 이어서 진행",
       "files": [
-        "evals/compare/fixtures/resume-outline/talk/brief.md",
-        "evals/compare/fixtures/resume-outline/talk/outline.md"
+        "compare/fixtures/resume-outline/talk/brief.md",
+        "compare/fixtures/resume-outline/talk/outline.md"
       ],
+      "root": "compare/fixtures/resume-outline",
       "expectations": [
         "talk/brief.md가 승인된 상태임을 알아보고 브리프 질문을 다시 하지 않는다.",
         "talk/outline.md가 초안(draft) 상태임을 알아보고, 아웃라인을 제목과 한 줄 요약으로 보여 주며 승인을 요청한다.",
@@ -77,8 +81,9 @@
       "prompt": "workshop.html 3번째 장 제목의 '체크리슽' 오타를 고치고, 일정의 시작 시간 10:00을 10:30으로 바꿔 주세요.",
       "expected_output": "다른 엔진 덱의 작은 수정 (일상 과제)",
       "files": [
-        "evals/compare/fixtures/workshop-typo/workshop.html"
+        "compare/fixtures/workshop-typo/workshop.html"
       ],
+      "root": "compare/fixtures/workshop-typo",
       "expectations": [
         "workshop.html 안에서 오타와 시작 시간만 고치고, Slidev로 옮기거나 새 덱을 만들지 않는다.",
         "나머지 내용, 스타일, 이동 스크립트는 그대로 둔다."
@@ -90,8 +95,9 @@
       "prompt": "content.md 내용으로 발표 자료를 PowerPoint 파일로 만들어 주세요. 받는 쪽에서 글자와 표를 PowerPoint에서 직접 고칠 수 있어야 합니다.",
       "expected_output": "편집 가능한 PowerPoint 요청",
       "files": [
-        "evals/compare/fixtures/pptx-routing/content.md"
+        "compare/fixtures/pptx-routing/content.md"
       ],
+      "root": "compare/fixtures/pptx-routing",
       "expectations": [
         "PowerPoint에서 글자와 표를 직접 고칠 수 있는 PPTX를 만들거나, 그런 PPTX를 만드는 경로(예: officecli 같은 네이티브 PPTX 도구)로 안내한다.",
         "슬라이드를 이미지로 넣은 PPTX를 만들었다면 그것이 편집 가능하다고 주장하지 않는다.",
@@ -104,8 +110,9 @@
       "prompt": "deck.html 발표의 구성을 처음부터 다시 짜고 디자인도 새로 해 주세요. 결과는 네트워크 없이 열리는 HTML 파일 하나면 됩니다. 중간 확인 없이 끝까지 진행해 주세요.",
       "expected_output": "다른 엔진 덱의 구성·디자인 변경",
       "files": [
-        "evals/compare/fixtures/html-restructure/deck.html"
+        "compare/fixtures/html-restructure/deck.html"
       ],
+      "root": "compare/fixtures/html-restructure",
       "expectations": [
         "원본 deck.html을 고치지 않고 새 결과물을 만든다.",
         "원본의 수치와 조건(320ms·p95 1,200ms, 읽기 85%, CPU 78%, TTL 60초, p95 400ms 이하는 측정 전 추정, 주문·결제 제외, 2주 시범, 월 180,000원·3인일, 문의 1건 이상 즉시 끄기, p95 600ms 초과 시 철회)을 모두 보존하고 추정을 측정처럼 바꾸지 않는다.",
@@ -119,8 +126,9 @@
       "prompt": "decision-brief.md로 예산 승인자가 혼자 읽고 판단할 결재 자료를 만들어 주세요. 필요한 건 PDF 하나뿐입니다. 중간 확인 없이 끝까지 진행해 주세요.",
       "expected_output": "혼자 읽는 결재 자료 (PDF만)",
       "files": [
-        "evals/compare/fixtures/reading-pdf-only/decision-brief.md"
+        "compare/fixtures/reading-pdf-only/decision-brief.md"
       ],
+      "root": "compare/fixtures/reading-pdf-only",
       "expectations": [
         "전달물로 PDF 하나를 제시하며, 발표용 HTML 등 요청하지 않은 파일을 전달물로 내놓지 않는다(작업 중간 파일은 무방).",
         "발표자 설명 없이 읽어도 승인 범위(4주, 초기 3,000,000원 한도, 월 200,000원 상한, 전체 확대 미승인)와 성공·중단 기준을 이해할 수 있도록 설명이 화면에 들어 있다.",
@@ -134,11 +142,12 @@
       "prompt": "northstar 폴더의 brief.md와 outline.md는 승인했고, 참고할 사내 디자인 규칙을 reference/DESIGN.md에 넣어 두었습니다. 디자인 단계를 진행해 주세요.",
       "expected_output": "레퍼런스가 있을 때 디자인 확인에서 멈춤",
       "files": [
-        "evals/compare/fixtures/reference-gate/decision-brief.md",
-        "evals/compare/fixtures/reference-gate/northstar/brief.md",
-        "evals/compare/fixtures/reference-gate/northstar/outline.md",
-        "evals/compare/fixtures/reference-gate/northstar/reference/DESIGN.md"
+        "compare/fixtures/reference-gate/decision-brief.md",
+        "compare/fixtures/reference-gate/northstar/brief.md",
+        "compare/fixtures/reference-gate/northstar/outline.md",
+        "compare/fixtures/reference-gate/northstar/reference/DESIGN.md"
       ],
+      "root": "compare/fixtures/reference-gate",
       "expectations": [
         "reference/DESIGN.md의 색(#ffffff, #1b2430, 강조 #c2410c), 산세리프, 장 번호, 가로선만 쓰는 표, 큰 결론 숫자를 시안에 반영한다.",
         "레퍼런스에 없는 부분(차트, 계산 단계 등)을 같은 언어로 채운 시안을 실제 내용으로 보여 준다.",

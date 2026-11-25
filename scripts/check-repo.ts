@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateEvals } from "./skill-eval/lib/evals.ts";
 
 export interface Problem {
 	path: string;
@@ -113,6 +114,42 @@ function markdownFiles(repo: string, dir: string, out: string[] = []): string[] 
 // Templates and eval fixtures hold links that resolve only after they are copied into another repository.
 const SKIPPED_DIRS = new Set(["node_modules", ".git", "archived", "var", "templates", "fixtures", "evals", "third-party"]);
 
+/** Skills that predate the cases rule, one name per line. The list only shrinks: a skill leaves it when it gains cases. */
+export const EVALS_OWED = "scripts/evals-owed.txt";
+
+/**
+ * Every shared skill carries cases in `evals/evals.json` that the skill-eval runner can execute, or is still
+ * listed in `EVALS_OWED`. A skill written without cases was never shown to change what an agent does.
+ */
+export function checkEvals(repo: string): Problem[] {
+	const problems: Problem[] = [];
+	if (!existsSync(join(repo, "skills"))) return problems;
+	const owedLines = existsSync(join(repo, EVALS_OWED)) ? readFileSync(join(repo, EVALS_OWED), "utf8").split("\n") : [];
+	const owed = new Map(owedLines.map((name, index) => [name.trim(), index + 1] as const).filter(([name]) => name !== "" && !name.startsWith("#")));
+	for (const entry of readdirSync(join(repo, "skills"), { withFileTypes: true })) {
+		if (!entry.isDirectory() || !existsSync(join(repo, "skills", entry.name, "SKILL.md"))) continue;
+		const path = join("skills", entry.name, "evals", "evals.json");
+		const line = owed.get(entry.name);
+		owed.delete(entry.name);
+		if (!existsSync(join(repo, path))) {
+			if (line === undefined)
+				problems.push({ path: join("skills", entry.name, "SKILL.md"), line: 1, message: `The skill has no ${path}. Follow the \`make-skill\` skill: write the cases, run them without the skill, and commit them with it.` });
+			continue;
+		}
+		if (line !== undefined) problems.push({ path: EVALS_OWED, line, message: `\`${entry.name}\` now has cases. Delete this line.` });
+		let data: unknown;
+		try {
+			data = JSON.parse(readFileSync(join(repo, path), "utf8"));
+		} catch (error) {
+			problems.push({ path, line: 1, message: `Not valid JSON (${(error as Error).message}). Fix the syntax.` });
+			continue;
+		}
+		for (const message of validateEvals(data, join(repo, "skills", entry.name))) problems.push({ path, line: 1, message: `${message}.` });
+	}
+	for (const [name, line] of owed) problems.push({ path: EVALS_OWED, line, message: `\`${name}\` is not a skill in skills/. Delete this line.` });
+	return problems;
+}
+
 export function checkRepo(repo: string): Problem[] {
 	const problems: Problem[] = [];
 	// Shared skills this checkout installs, and the project-local skills agents read while working here.
@@ -124,6 +161,8 @@ export function checkRepo(repo: string): Problem[] {
 			for (const problem of checkFrontmatter(readFileSync(join(repo, path), "utf8"), entry.name)) problems.push({ path, ...problem });
 		}
 	}
+
+	problems.push(...checkEvals(repo));
 
 	const roots = readdirSync(repo, { withFileTypes: true });
 	const files = roots.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name);
@@ -150,5 +189,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 		console.error(`check-repo: ${problems.length} problem${problems.length === 1 ? "" : "s"}`);
 		process.exit(1);
 	}
-	console.log("check-repo: skill frontmatter and relative links are consistent");
+	console.log("check-repo: skill frontmatter, skill cases, and relative links are consistent");
 }
