@@ -107,7 +107,7 @@ function main() {
 	}
 	try {
 		defaultBranch = git(["ls-remote", "--symref", "origin", "HEAD"]).match(/^ref: refs\/heads\/(\S+)\tHEAD$/m)[1];
-		git(["fetch", "--quiet", "--no-tags", "origin", defaultBranch]);
+		git(["fetch", "--quiet", "--no-tags", "origin", `refs/heads/${defaultBranch}`]);
 		upstream = git(["rev-parse", "--verify", "FETCH_HEAD^{commit}"]);
 	} catch {
 		process.stderr.write("sweep-landed: could not read and fetch origin's default branch; nothing deleted\n");
@@ -117,10 +117,14 @@ function main() {
 	const worktrees = new Map();
 	for (const entry of parseWorktrees(git(["worktree", "list", "--porcelain"]))) {
 		if (!entry.branch) continue;
-		if (!entry.prunable) {
-			const path = realpathSync(entry.path);
-			entry.current = here === path || here.startsWith(path + sep);
-			entry.dirty = git(["status", "--porcelain"], entry.path) !== "";
+		if (!entry.prunable && !entry.locked) {
+			try {
+				const path = realpathSync(entry.path);
+				entry.current = here === path || here.startsWith(path + sep);
+				entry.dirty = git(["status", "--porcelain"], entry.path) !== "";
+			} catch {
+				entry.prunable = true;
+			}
 		}
 		worktrees.set(entry.branch, entry);
 	}
@@ -128,14 +132,15 @@ function main() {
 	const onDefault = new Set(git(["rev-list", upstream]).split("\n"));
 	const merged = mergedPrCommits(repoKey(origin), defaultBranch, upstream, git, cwd);
 	if (merged === null) process.stdout.write("sweep-landed: merged PRs could not be read from GitHub, so only branches whose tip is on the default branch count as landed\n");
-	const branches = git(["for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads"]).split("\n").filter(Boolean);
+	const branches = git(["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads"]).split("\n").filter(Boolean);
 	let removed = 0;
 	let failed = 0;
 	const kept = new Map();
 	for (const line of branches) {
-		const [branch, tip] = line.split(" ");
+		const [ref, tip] = line.split(" ");
+		const branch = ref.slice("refs/heads/".length);
 		const worktree = worktrees.get(branch) ?? null;
-		const moves = worktree ? git(["reflog", "show", "--format=%H", `refs/heads/${branch}`]).split("\n").filter(Boolean).length : 0;
+		const moves = worktree ? new Set(git(["reflog", "show", "--format=%H", ref]).split("\n").filter(Boolean)).size : 0;
 		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, worktree });
 		if (!verdict.remove) {
 			kept.set(verdict.reason, [...(kept.get(verdict.reason) ?? []), branch]);
@@ -145,7 +150,8 @@ function main() {
 		if (apply) {
 			try {
 				if (worktree) git(["worktree", "remove", worktree.path]);
-				git(["update-ref", "-d", `refs/heads/${branch}`, tip]);
+				if (git(["worktree", "list", "--porcelain"]).split("\n").includes(`branch ${ref}`)) throw new Error("checked out in a worktree");
+				git(["update-ref", "-d", ref, tip]);
 			} catch (error) {
 				process.stdout.write(`failed  ${branch}${where}: ${String(error.stderr || error.message).trim().split("\n")[0]}\n`);
 				failed++;

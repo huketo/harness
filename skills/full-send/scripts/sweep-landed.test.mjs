@@ -105,8 +105,13 @@ before(() => {
 	// on-release: a commit that sits under a PR merged into another branch, and never reached the default branch.
 	git(clone, "branch", "on-release", "unfinished");
 	git(clone, "branch", "release-pr", "unfinished");
+	// On origin, a tag named like the default branch, on unmerged work; locally, a tag named like a landed branch.
+	git(clone, "push", "-q", "origin", "unfinished:refs/tags/main");
+	git(clone, "tag", "merged-commit", "main");
 	// fresh: a task that just started from the default branch and has no commit yet.
-	wt("fresh");
+	wt("fresh-old");
+	git(clone, "branch", "-m", "fresh-old", "fresh");
+	git(clone, "worktree", "move", join(root, "wt", "fresh-old"), join(root, "wt", "fresh"));
 	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
