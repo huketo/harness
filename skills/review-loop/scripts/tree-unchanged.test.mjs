@@ -2,7 +2,7 @@
 // worktree. Fixture commits do not inherit the workstation's signer, hooks, or global config.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -96,7 +96,8 @@ test("entries that the agent host, gh, glab, an editor, or a new branch add are 
 		restoreConfig,
 	);
 	assert.equal(result.status, 0, result.stdout);
-	assert.match(result.stdout, /^NOTE config entries that other tools keep \(not a failure\):\nconfig: \+ branch\.feat\.merge=refs\/heads\/feat\n/);
+	assert.match(result.stdout, /^NOTE config entries that other tools keep \(not a failure\):\nconfig: \+ /);
+	for (const line of ["+ branch.feat.merge=refs/heads/feat", "+ branch.review-r1.t3-merge-base=main", "+ remote.origin.glab-resolved-head=head"]) assert.equal(result.stdout.includes(`config: ${line}\n`), true, line);
 	assert.equal(result.stdout.split("\n").filter((line) => line.startsWith("config: + ")).length, 9);
 	assert.match(result.stdout, /UNCHANGED head /);
 });
@@ -108,16 +109,51 @@ test("every other config entry fails, and a command it names does not run during
 		assert.match(result.stdout, /CHANGED git control files\n/);
 		assert.match(result.stdout, pattern);
 	};
-	fails([["core.fsmonitor", `touch ${join(tmp, "pwned")}`]], /config: \+ core\.fsmonitor=/);
+	fails([["core.fsmonitor", `touch ${join(tmp, "pwned")}`]], /config: entries of core\.fsmonitor differ/);
 	assert.equal(existsSync(join(tmp, "pwned")), false);
-	fails([["core.hooksPath", "/tmp/elsewhere"]], /config: \+ core\.hookspath=/);
-	fails([["alias.status", "!sh -c true"]], /config: \+ alias\.status=/);
-	fails([["include.path", "/tmp/other.config"]], /config: \+ include\.path=/);
-	fails([["remote.origin.url", "https://example.invalid/other/repo.git"]], /config: - remote\.origin\.url=.*\nconfig: \+ remote\.origin\.url=/);
+	fails([["core.hooksPath", "/tmp/elsewhere"]], /config: entries of core\.hookspath differ/);
+	fails([["alias.status", "!sh -c true"]], /config: entries of alias\.status differ/);
+	fails([["include.path", "/tmp/other.config"]], /config: entries of include\.path differ/);
 	// An existing branch pointed at another remote is a change of value, not new tracking.
-	fails([["branch.main.remote", "elsewhere"]], /config: - branch\.main\.remote=origin\nconfig: \+ branch\.main\.remote=elsewhere/);
+	fails([["branch.main.remote", "elsewhere"]], /config: entries of branch\.main\.remote differ/);
 	// glab's note holds "base" or "head"; anything else could name another project.
-	fails([["remote.origin.glab-resolved", "other/project"]], /config: \+ remote\.origin\.glab-resolved=other\/project/);
+	fails([["remote.origin.glab-resolved", "other/project"]], /config: entries of remote\.origin\.glab-resolved differ/);
+	// A failure names the key and keeps both values out of the transcript: a remote url can hold a credential.
+	const url = during(() => withConfig(["remote.origin.url", "https://user:secret@example.invalid/other/repo.git"]), restoreConfig);
+	assert.match(url.stdout, /config: entries of remote\.origin\.url differ\n/);
+	assert.doesNotMatch(url.stdout, /example\.invalid|secret/);
+});
+
+test("a second value, a swapped order, a bare key made empty, and an unreadable config fail", () => {
+	const config = join(repo, ".git/config");
+	const rewritten = (edit) =>
+		during(
+			() => {
+				copyFileSync(config, join(tmp, "config.bak"));
+				edit();
+			},
+			restoreConfig,
+		);
+	// git reads the last value, so a second one changes where an existing branch pushes.
+	const second = rewritten(() => git(repo, "config", "--add", "branch.main.remote", "elsewhere"));
+	assert.match(second.stdout, /config: entries of branch\.main\.remote differ/);
+	// With two urls, git fetches from the first.
+	git(repo, "config", "--add", "remote.origin.url", "https://example.invalid/mirror/repo.git");
+	appendFileSync(config, "[probe]\n\tflag\n");
+	writeFileSync(snapshotFile, run("snapshot", repo).stdout);
+	const swapped = rewritten(() => {
+		git(repo, "config", "--unset-all", "remote.origin.url");
+		git(repo, "config", "--add", "remote.origin.url", "https://example.invalid/mirror/repo.git");
+		git(repo, "config", "--add", "remote.origin.url", "https://example.invalid/owner/repo.git");
+	});
+	assert.match(swapped.stdout, /config: entries of remote\.origin\.url differ/);
+	// `flag` alone reads as true, `flag =` as false.
+	const emptied = rewritten(() => writeFileSync(config, readFileSync(config, "utf8").replace("\tflag\n", "\tflag =\n")));
+	assert.match(emptied.stdout, /config: entries of probe\.flag differ/);
+	const broken = rewritten(() => appendFileSync(config, "[unterminated\n"));
+	assert.match(broken.stdout, /^CHANGED git cannot read this worktree's repository \(/);
+	for (const result of [second, swapped, emptied, broken]) assert.equal(result.status, 1, result.stdout);
+	assert.equal(check().status, 0);
 });
 
 test("a hook, a per-worktree config, or a redirected .git fails", () => {
@@ -142,7 +178,10 @@ test("a hook, a per-worktree config, or a redirected .git fails", () => {
 		assert.equal(result.status, 1, result.stdout);
 		assert.match(result.stdout, /CHANGED git control files\n/);
 	}
-	assert.match(results[2].stdout, /worktrees\/child\/config\.worktree: \+ core\.fsmonitor=x/);
+	assert.match(results[2].stdout, /worktrees\/child\/config\.worktree: absent -> sha256 /);
+	// A per-worktree config fails whatever it holds, a note included.
+	const noted = during(() => writeFileSync(perWorktree, "[branch \"child\"]\n\tt3-merge-base = main\n"), () => rmSync(perWorktree));
+	assert.equal(noted.status, 1, noted.stdout);
 	assert.match(results[3].stdout, /\ncommon-dir .* -> .*other\/\.git\n/);
 });
 
@@ -158,11 +197,16 @@ test("a missing snapshot or a wrong argument count exits 2", () => {
 	assert.equal(run("snapshot").status, 2);
 });
 
-test("a repeated value counts once per occurrence, and a note that is removed stays a note", () => {
+test("notes come and go in any number; everything else must keep its entries and their order", () => {
 	const fetch = ["remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"];
-	assert.deepEqual(configChanges([fetch], [fetch, fetch]).failures, [`+ ${fetch.join("=")}`]);
-	assert.deepEqual(configChanges([["branch.x.t3-merge-base", "main"], ["remote.origin.glab-resolved", "other/project"], ["branch.x.remote", "origin"]], []), {
-		notes: ["- branch.x.remote=origin", "- branch.x.t3-merge-base=main", "- remote.origin.glab-resolved=other/project"],
+	assert.deepEqual(configChanges([fetch], [fetch, fetch]).failures, ["entries of remote.origin.fetch differ"]);
+	assert.deepEqual(configChanges([["a.x", "1"], ["b.y", "2"]], [["b.y", "2"], ["a.x", "1"]]).failures, ["the order of the entries differs"]);
+	assert.deepEqual(configChanges([["branch.x.t3-merge-base", "main"], ["remote.origin.glab-resolved", "base"], ["branch.x.remote", "origin"], fetch], [fetch, ["branch.y.gh-merge-base", "main"]]), {
+		notes: ["- branch.x.t3-merge-base=main", "- remote.origin.glab-resolved=base", "- branch.x.remote=origin", "+ branch.y.gh-merge-base=main"],
 		failures: [],
 	});
+	// Removing a glab note that named a project is not a note, and neither is tracking that both sides have.
+	assert.deepEqual(configChanges([["remote.origin.glab-resolved", "other/project"]], []).failures, ["entries of remote.origin.glab-resolved differ"]);
+	assert.deepEqual(configChanges([["branch.x.remote", "origin"]], [["branch.x.remote", "origin"], ["branch.x.remote", "fork"]]).failures, ["entries of branch.x.remote differ"]);
+	assert.deepEqual(configChanges([["core.flag", null]], [["core.flag", ""]]).failures, ["entries of core.flag differ"]);
 });
