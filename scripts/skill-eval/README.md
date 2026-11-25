@@ -24,6 +24,20 @@ node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/awesome-interfac
 - 일부만 돌리려면 `--case <id,...>`, `--arm <key,...>`를 씁니다. 중단된 iteration은 `--iteration <n>`으로 이어 가며, 이미 끝난 run은 건너뜁니다.
 - 결과는 `benchmark.md`(arm별 요약, `ai` 기준 비교, case별 표, 한계)와 `viewer.html`(case별로 arm의 화면·응답·diff·판정을 나란히 보기)에서 봅니다. `var/`는 버전 관리하지 않습니다.
 
+## 스킬 자신의 사례 실행하기
+
+스킬마다 `skills/<name>/evals/evals.json`에 사례를 둡니다. 형식과 검증은 [`lib/evals.ts`](lib/evals.ts)가 소유하고, `scripts/check-repo.ts`가 추적되는 모든 파일을 같은 함수로 검사합니다. `files`의 경로는 `evals/`를 기준으로 합니다. `root`를 주면 그 디렉터리가 작업공간의 루트가 되고, 주지 않으면 경로가 적힌 그대로 놓입니다. 실행기는 파일만 복사하므로, git 저장소나 원격처럼 파일이 아닌 준비가 필요한 사례(`repo-init`의 세 사례)는 그 준비를 사람이 한 실행에서만 뜻이 있습니다.
+
+[`from-evals.ts`](from-evals.ts)는 이 파일을 실행기와 채점기가 읽는 스위트로 바꿉니다. 모델을 부르지 않으며, 결과는 `var/skill-eval/suites/<name>/`에 씁니다. 갈래는 `none`(스킬 없음)과 `skill`(HEAD의 스킬)이고, `--previous <gitref>`를 주면 `previous`(그 커밋의 스킬)가 더해집니다. `expected_output`이 판정자의 채점 기준이 됩니다.
+
+```bash
+node scripts/skill-eval/from-evals.ts --skill skills/tdd --previous HEAD~1
+node scripts/skill-eval/run.ts --suite var/skill-eval/suites/tdd/suite.json --effort high
+node scripts/skill-eval/grade.ts --iteration-dir var/skill-eval/tdd-cases/iteration-<n>
+```
+
+스킬을 만들거나 고치는 절차는 [`make-skill`](../../skills/make-skill/SKILL.md)이 소유합니다.
+
 ## 스킬을 고친 뒤 다시 비교하기
 
 1. 스킬 변경을 커밋합니다. 로컬 스킬은 작업 트리가 아니라 커밋에서 읽습니다.

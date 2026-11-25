@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { checkFrontmatter, checkRepo, relativeLinks } from "./check-repo.ts";
+import { checkEvals, checkFrontmatter, checkRepo, EVALS_OWED, relativeLinks } from "./check-repo.ts";
 
 function repoWith(files: Record<string, string>): string {
 	const repo = mkdtempSync(join(tmpdir(), "check-repo-"));
@@ -81,7 +81,7 @@ test("reads link targets outside code and skips URLs, anchors, and template plac
 test("reports a link whose target was removed and passes once the target exists", () => {
 	// The shape of docs/guides/installation.md → ../../install.sh after the installer moved (commit 5fd802f).
 	const files = {
-		"skills/demo/SKILL.md": skill("demo", "Demo skill."),
+		"skills/demo/SKILL.md": skill("demo", "Demo skill."), [EVALS_OWED]: "demo\n",
 		"docs/guides/installation.md": "Run [install.sh](../../install.sh).\n",
 		"skills/demo/templates/AGENTS.md": "[later](docs/agents/hitl.md)\n",
 	};
@@ -100,11 +100,61 @@ test("reports a link whose target was removed and passes once the target exists"
 });
 
 test("reports a skill whose frontmatter is broken, by path", () => {
-	const repo = repoWith({ "skills/demo/SKILL.md": skill("demo", "Use for: reviews.") });
+	const repo = repoWith({ "skills/demo/SKILL.md": skill("demo", "Use for: reviews."), [EVALS_OWED]: "demo\n" });
 	try {
 		assert.deepEqual(
 			checkRepo(repo).map(({ path, line }) => `${path}:${line}`),
 			["skills/demo/SKILL.md:3"],
+		);
+	} finally {
+		rmSync(repo, { recursive: true, force: true });
+	}
+});
+
+const cases = (name: string, patch: object = {}) =>
+	JSON.stringify({ skill_name: name, evals: [{ id: 1, name: "routine", prompt: "Do the thing.", expected_output: "The thing is done.", files: [], expectations: ["The thing is done."], ...patch }] });
+
+test("a skill without cases fails unless it is on the owed list, and the list only shrinks", () => {
+	const repo = repoWith({
+		"skills/fresh/SKILL.md": skill("fresh", "New."),
+		"skills/older/SKILL.md": skill("older", "Old."),
+		"skills/done/SKILL.md": skill("done", "Done."),
+		"skills/done/evals/evals.json": cases("done"),
+		[EVALS_OWED]: "# comment\nolder\ndone\ngone\n",
+	});
+	try {
+		assert.deepEqual(
+			checkEvals(repo).map(({ path, line, message }) => `${path}:${line}: ${message.split(".")[0]}`).sort(),
+			[
+				`${EVALS_OWED}:3: \`done\` now has cases`,
+				`${EVALS_OWED}:4: \`gone\` is not a skill in skills/`,
+				"skills/fresh/SKILL.md:1: The skill has no skills/fresh/evals/evals",
+			],
+		);
+		writeFileSync(join(repo, EVALS_OWED), "older\n");
+		mkdirSync(join(repo, "skills/fresh/evals"));
+		writeFileSync(join(repo, "skills/fresh/evals/evals.json"), cases("fresh"));
+		assert.deepEqual(checkEvals(repo), []);
+	} finally {
+		rmSync(repo, { recursive: true, force: true });
+	}
+});
+
+test("rejects cases the runner could not execute", () => {
+	const repo = repoWith({
+		"skills/demo/SKILL.md": skill("demo", "Demo."),
+		"skills/demo/evals/evals.json": cases("other", { name: "Has Spaces", files: ["fixtures/missing.md", "../SKILL.md"], expectations: [] }),
+	});
+	try {
+		assert.deepEqual(
+			checkRepo(repo).map(({ message }) => message),
+			[
+				'skill_name must equal the skill directory name "demo".',
+				"evals[0]: name must be lowercase kebab (/^[a-z0-9]+(?:-[a-z0-9]+)*$/); it names the case directory.",
+				"evals[0]: expectations must be a non-empty array of pass/fail statements.",
+				'evals[0]: file "fixtures/missing.md" must be an existing plain file under evals/, reached through no symbolic link.',
+				'evals[0]: file "../SKILL.md" must stay inside evals/.',
+			],
 		);
 	} finally {
 		rmSync(repo, { recursive: true, force: true });

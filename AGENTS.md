@@ -43,6 +43,7 @@ A rule that a check can enforce lives in the check, not in prose. This table pai
 | Rule | Enforced by |
 | --- | --- |
 | A skill's frontmatter names its directory, has a description, and holds no unquoted value that YAML would misread. | `scripts/check-repo.ts` (`mise run rules`) |
+| A skill carries cases the skill-eval runner can execute (`evals/evals.json`), or is still listed in `scripts/evals-owed.txt`, which only shrinks. | `scripts/check-repo.ts` (`mise run rules`) |
 | A relative Markdown link points at a file that exists. | `scripts/check-repo.ts` (`mise run rules`) |
 | The tracked plugin files match their sources. | `node plugin/build.mjs --host claude --check` (`mise run check`) |
 | `harness-mode` and the merge guard read the full-send allowlist the same way. | `plugin/hooks/allowlist.property.test.mjs` |

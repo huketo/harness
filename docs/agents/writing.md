@@ -30,7 +30,7 @@ English is the default for agent-maintenance files (`CONTRIBUTING.md` and `docs/
 
 ## Instructions
 
-Before creating or changing `AGENTS.md`, `CLAUDE.md`, a skill, or another agent-consumed instruction, read `skills/writing-for-agents/SKILL.md` or load the `writing-for-agents` skill. Root `AGENTS.md` is a short router: it carries durable repository-wide boundaries and trigger-rich pointers, not command catalogs or narrated architecture. A same-directory Claude adapter contains only `@AGENTS.md`.
+Before creating or changing `AGENTS.md`, `CLAUDE.md`, a skill, or another agent-consumed instruction, read `skills/writing-for-agents/SKILL.md` or load the `writing-for-agents` skill. Create a skill, or change a skill's body or description, with the `make-skill` procedure (`skills/make-skill/SKILL.md`). Root `AGENTS.md` is a short router: it carries durable repository-wide boundaries and trigger-rich pointers, not command catalogs or narrated architecture. A same-directory Claude adapter contains only `@AGENTS.md`.
 
 A topic rule has one owner. Other files link to it without paraphrasing it. Keep history and investigation diaries out of instruction files; place public policy in `docs/public-release.md`, ownership rationale in `docs/REPO.md`, and measured technical observations in `docs/FACTS.md`.
 

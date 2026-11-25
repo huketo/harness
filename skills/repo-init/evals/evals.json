@@ -29,6 +29,7 @@
         "fixtures/gitlab-claude/package.json",
         "fixtures/gitlab-claude/src/invoice.ts"
       ],
+      "root": "fixtures/gitlab-claude",
       "expectations": [
         "원격 호스트 gitlab.example.com을 근거로 GitLab(`glab`)을 권장 답으로 두고, `issue-tracker.md`에 `billing/invoice-api`와 그 호스트를 적는다.",
         "`README.md`가 한국어이므로 문서 언어를 묻지 않고 한국어로 정하며 그 근거를 제시한다. 명령, 경로, 식별자는 번역하지 않는다.",
@@ -59,6 +60,7 @@
         "fixtures/partial-docs/packages/tsconfig/package.json",
         "fixtures/partial-docs/pnpm-workspace.yaml"
       ],
+      "root": "fixtures/partial-docs",
       "expectations": [
         "기존 `AGENTS.md`를 덮어쓰지 않고 빠진 절(hitl 포인터, 주제 안내 목록, 규칙과 강제 장치의 표, 도메인 언어)만 더하자고 제안하며, `CLAUDE.md`는 `@AGENTS.md` 한 줄로 새로 만든다.",
         "기존 `docs/agents/workflow.md`와 `testing.md`를 덮어쓰지 않고, 이미 다루는 주제는 되풀이하지 않은 채 빠진 절만 제자리에 더하자고 제안하며 들어갈 위치를 밝힌다.",
