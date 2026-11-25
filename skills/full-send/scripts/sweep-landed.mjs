@@ -149,9 +149,12 @@ function main() {
 		const where = worktree ? ` and worktree ${worktree.path}` : "";
 		if (apply) {
 			try {
-				if (worktree) git(["worktree", "remove", worktree.path]);
+				if (worktree) {
+					if (git(["symbolic-ref", "HEAD"], worktree.path) !== ref || git(["rev-parse", "HEAD"], worktree.path) !== tip) throw new Error("its worktree moved since the sweep read it");
+					git(["worktree", "remove", worktree.path]);
+				}
 				if (git(["worktree", "list", "--porcelain"]).split("\n").includes(`branch ${ref}`)) throw new Error("checked out in a worktree");
-				git(["update-ref", "-d", ref, tip]);
+				git(["update-ref", "--no-deref", "-d", ref, tip]);
 			} catch (error) {
 				process.stdout.write(`failed  ${branch}${where}: ${String(error.stderr || error.message).trim().split("\n")[0]}\n`);
 				failed++;
