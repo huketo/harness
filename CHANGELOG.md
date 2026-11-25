@@ -1,5 +1,11 @@
 # hstack
 
+## 0.3.0
+
+### Minor Changes
+
+- [#15](https://github.com/huketo/harness/pull/15) [`08a0d95`](https://github.com/huketo/harness/commit/08a0d952f21f2fec9e0155dfe0160730978d5106) Thanks [@huketo](https://github.com/huketo)! - Add a question guard for Claude Code: a PreToolUse hook on `AskUserQuestion` returns a question that names code identifiers, source files, or ADR numbers to the agent, with instructions to ask in terms of what the person will see and do and to show the screen or prototype in an option preview.
+
 ## 0.2.0
 
 ### Minor Changes
