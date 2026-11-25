@@ -131,7 +131,7 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	assert.equal(ok.status, 0, ok.stdout + ok.stderr);
 	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL]);
 	// The sweep of landed branches runs after the merge line. Here it cannot reach the origin, which leaves the merge standing.
-	assert.match(ok.stdout, /gated-merge: merged .*\n[^]*sweep-landed: could not read and fetch origin's default branch[^]*\ngated-merge: the merge stands, but the sweep of landed branches did not finish; retry it with: node "[^"]+\/sweep-landed\.mjs" --apply\n$/);
+	assert.match(ok.stdout, /gated-merge: merged .*\n[^]*sweep-landed: could not read and fetch origin's default branch[^]*\ngated-merge: the merge stands, but the sweep of landed branches did not finish; retry it with: node '[^']+\/sweep-landed\.mjs' --apply\n$/);
 
 	// A merge queue or auto-merge would leave the PR open; anything but a confirmed merge is a failure.
 	writeFileSync(calls, "");
