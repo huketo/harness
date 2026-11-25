@@ -259,6 +259,9 @@ describe("agent", () => {
 		});
 		assert.deepEqual(outcome, { rc: null, timedOut: true });
 		const grandchild = Number(readFileSync(pidFile, "utf8"));
+		// The kill reaches the group at once, but each process dies when the kernel next schedules it.
+		const deadline = performance.now() + 2000;
+		while (running(grandchild) && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
 		assert.ok(!running(grandchild), `grandchild ${grandchild} still runs`);
 	});
 });
