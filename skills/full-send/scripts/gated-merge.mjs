@@ -157,9 +157,10 @@ function main() {
 	}
 	if (merged?.merged !== true) refuse("GitHub did not confirm the merge");
 	process.stdout.write(`gated-merge: merged ${key} #${args.number} at ${view.head} as ${merged.sha} (CI passed, review approved)\n`);
-	const sweep = spawnSync(process.execPath, [fileURLToPath(new URL("./sweep-landed.mjs", import.meta.url)), "--apply"], { cwd, encoding: "utf8", timeout: 300_000 });
+	const sweeper = fileURLToPath(new URL("./sweep-landed.mjs", import.meta.url));
+	const sweep = spawnSync(process.execPath, [sweeper, "--apply"], { cwd, encoding: "utf8", timeout: 300_000 });
 	process.stdout.write(`${sweep.stdout ?? ""}${sweep.stderr ?? ""}`);
-	if (sweep.status !== 0) process.stdout.write("gated-merge: the merge stands, but the sweep of landed branches did not finish; run sweep-landed.mjs --apply to retry it\n");
+	if (sweep.status !== 0) process.stdout.write(`gated-merge: the merge stands, but the sweep of landed branches did not finish; retry it with: node ${sweeper} --apply\n`);
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

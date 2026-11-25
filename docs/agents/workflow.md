@@ -50,7 +50,7 @@ A change is finished when it is merged, not when its PR/MR is open. After the ch
 
 1. Commit, push the task's branch, and open the PR/MR with the `file-mr` skill.
 2. Get an independent review with the `review-loop` skill and answer its findings until it approves.
-3. When CI passes on the reviewed head, merge as [`authority.md`](authority.md) allows, with the `full-send` skill's `scripts/gated-merge.mjs <number>`. After GitHub confirms the merge, that script runs the skill's `scripts/sweep-landed.mjs --apply` itself; after a merge made any other way, run the sweep yourself. The sweep deletes the local branches and worktrees of landed work, reviewer branches included, and keeps anything unfinished or in use; a worktree still running a task is removed by the next sweep.
+3. When CI passes on the reviewed head, merge as [`authority.md`](authority.md) allows, with the `full-send` skill's `scripts/gated-merge.mjs <number>`. After GitHub confirms the merge, that script runs the skill's `scripts/sweep-landed.mjs --apply` itself; after a merge made any other way, run the sweep yourself. The sweep deletes the local branches and worktrees of landed work, reviewer branches included, and keeps a branch with commits that have not landed, the worktree it runs in, and any worktree that is locked, has modified or untracked files, or has no commit of its own yet. A clean, unlocked worktree whose branch has landed is removed even when another agent still works from it, so lock a worktree that must outlive its merge (`git worktree lock`).
 
 Stop before the merge only for a reason: a review deadlock, a failing check, a refusal from the merge script, or an action `authority.md` puts behind a decision. Report that reason and the exact action that remains.
 
