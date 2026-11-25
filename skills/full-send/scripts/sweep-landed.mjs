@@ -6,7 +6,9 @@
 //   the default branch, the main worktree, the worktree this command runs in, a locked worktree, a worktree with
 //   modified or untracked files, a detached worktree, a worktree whose directory is missing, and a worktree whose
 //   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
-//   how a task that just started looks. Ignored files do not keep a worktree, as with `git worktree remove`.
+//   how a task that just started looks. That last one is kept for a day only: after 24 hours in which its branch
+//   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes.
+//   Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
 // It exits 1 when a deletion it attempted failed.
@@ -15,6 +17,8 @@ import { realpathSync } from "node:fs";
 import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoKey } from "../../../plugin/hooks/merge-guard.mjs";
+
+const IDLE_SECONDS = 24 * 60 * 60;
 
 /** The entries of `git worktree list --porcelain`; the first one is the main worktree. */
 export function parseWorktrees(porcelain) {
@@ -37,10 +41,11 @@ export function parseWorktrees(porcelain) {
 /**
  * What to do with one local branch: `{ remove, reason }`.
  * `landed` is whether the tip is a commit of the default branch or of a merged PR; `unmoved` is whether the
- * branch still sits where it was created, on a commit the default branch itself pointed at; `worktree` is the
+ * branch still sits where it was created, on a commit the default branch itself pointed at; `idle` is whether
+ * that branch's reflog has recorded nothing for 24 hours; `worktree` is the
  * branch's worktree entry with `current` and `dirty` added, or null.
  */
-export function decide({ branch, defaultBranch, landed, unmoved, worktree }) {
+export function decide({ branch, defaultBranch, landed, unmoved, idle, worktree }) {
 	const keep = (reason) => ({ remove: false, reason });
 	if (branch === defaultBranch) return keep("the default branch");
 	if (!landed) return keep("has commits that are not on the default branch or in a merged PR");
@@ -50,7 +55,8 @@ export function decide({ branch, defaultBranch, landed, unmoved, worktree }) {
 	if (worktree.current) return keep("this command runs in its worktree");
 	if (worktree.locked) return keep("its worktree is locked");
 	if (worktree.dirty) return keep("its worktree has modified or untracked files");
-	if (unmoved) return keep("its worktree has no commit of its own yet");
+	if (unmoved && !idle) return keep("its worktree has no commit of its own yet, and its branch was touched in the last 24 hours");
+	if (unmoved) return { remove: true, reason: "no commit of its own, idle for 24 hours" };
 	return { remove: true, reason: "landed, worktree clean" };
 }
 
@@ -140,8 +146,10 @@ function main() {
 		const [ref, tip] = line.split(" ");
 		const branch = ref.slice("refs/heads/".length);
 		const worktree = worktrees.get(branch) ?? null;
-		const moves = worktree ? new Set(git(["reflog", "show", "--format=%H", ref]).split("\n").filter(Boolean)).size : 0;
-		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, worktree });
+		const log = worktree ? git(["reflog", "show", "--date=unix", "--format=%H %gd", ref]).split("\n").filter(Boolean).map((entry) => [entry.split(" ")[0], Number(/@\{(\d+)\}$/.exec(entry)?.[1])]) : [];
+		const moves = new Set(log.map(([hash]) => hash)).size;
+		const idle = log.length > 0 && Date.now() / 1000 - Math.max(...log.map(([, time]) => time)) > IDLE_SECONDS;
+		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, idle, worktree });
 		if (!verdict.remove) {
 			kept.set(verdict.reason, [...(kept.get(verdict.reason) ?? []), branch]);
 			continue;

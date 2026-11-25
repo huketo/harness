@@ -40,6 +40,8 @@ test("a branch is removed only when it landed and nothing may still be using its
 	assert.match(d({ worktree: { ...clean, locked: true } }).reason, /locked/);
 	assert.match(d({ worktree: { ...clean, dirty: true } }).reason, /modified or untracked/);
 	assert.match(d({ worktree: clean, unmoved: true }).reason, /no commit of its own/);
+	assert.equal(d({ worktree: clean, unmoved: true, idle: true }).remove, true);
+	assert.match(d({ worktree: { ...clean, dirty: true }, unmoved: true, idle: true }).reason, /modified or untracked/);
 	for (const verdict of [d({ branch: "main" }), d({ landed: false }), d({ worktree: { ...clean, dirty: true } })]) assert.equal(verdict.remove, false);
 });
 
@@ -112,6 +114,9 @@ before(() => {
 	wt("fresh-old");
 	git(clone, "branch", "-m", "fresh-old", "fresh");
 	git(clone, "worktree", "move", join(root, "wt", "fresh-old"), join(root, "wt", "fresh"));
+	// idle: like fresh, but nothing has happened to its branch for two days, as with a reviewer that only read.
+	const twoDaysAgo = `@${Math.floor(Date.now() / 1000) - 2 * 86400} +0000`;
+	execFileSync("git", ["worktree", "add", "-q", "-b", "idle", join(root, "wt", "idle"), "main"], { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: twoDaysAgo } });
 	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
@@ -121,7 +126,7 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 	const all = branches();
 	const result = sweep(join(root, "wt", "here"));
 	assert.equal(result.status, 0, result.stderr);
-	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded", "idle"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	assert.deepEqual(branches(), all);
 	assert.equal(existsSync(join(root, "wt", "merged-commit")), true);
@@ -131,9 +136,9 @@ test("with --apply it deletes landed branches and their clean worktrees, and kee
 	const result = sweep(join(root, "wt", "here"), "--apply");
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "unfinished"]);
-	for (const name of ["merged-commit", "squashed", "fast-forwarded"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
+	for (const name of ["merged-commit", "squashed", "fast-forwarded", "idle"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
 	for (const name of ["dirty", "unfinished", "here", "fresh"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
-	assert.match(result.stdout, /deleted 4 of 11 local branches/);
+	assert.match(result.stdout, /deleted 5 of 12 local branches/);
 });
 
 test("when GitHub cannot be asked, a squashed branch is kept", () => {
