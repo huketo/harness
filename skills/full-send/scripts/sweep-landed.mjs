@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // sweep-landed — delete the local branches and worktrees of work that already landed on the default branch.
 // A branch has landed when its tip is a commit of the default branch, or a commit of a PR that GitHub reports as
-// merged (which covers squash merges and reviewer branches cut from a PR's commits).
+// merged into the default branch (which covers squash merges and reviewer branches cut from a PR's commits).
 // What is kept, whatever else holds:
 //   the default branch, the main worktree, the worktree this command runs in, a locked worktree, a worktree with
-//   modified or untracked files, a detached worktree, and a worktree whose branch has no commit of its own yet
-//   (its tip is a commit the default branch itself pointed at), because that is how a task that just started looks.
+//   modified or untracked files, a detached worktree, a worktree whose directory is missing, and a worktree whose
+//   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
+//   how a task that just started looks. Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
+// It exits 1 when a deletion it attempted failed.
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { sep } from "node:path";
@@ -34,20 +36,21 @@ export function parseWorktrees(porcelain) {
 
 /**
  * What to do with one local branch: `{ remove, reason }`.
- * `landed` is whether the tip is a commit of the default branch or of a merged PR; `onMainline` is whether the
- * tip is a commit the default branch itself pointed at; `worktree` is the branch's worktree entry with `current`
- * and `dirty` added, or null.
+ * `landed` is whether the tip is a commit of the default branch or of a merged PR; `unmoved` is whether the
+ * branch still sits where it was created, on a commit the default branch itself pointed at; `worktree` is the
+ * branch's worktree entry with `current` and `dirty` added, or null.
  */
-export function decide({ branch, defaultBranch, landed, onMainline, worktree }) {
+export function decide({ branch, defaultBranch, landed, unmoved, worktree }) {
 	const keep = (reason) => ({ remove: false, reason });
 	if (branch === defaultBranch) return keep("the default branch");
 	if (!landed) return keep("has commits that are not on the default branch or in a merged PR");
-	if (!worktree || worktree.prunable) return { remove: true, reason: "landed, no worktree" };
+	if (!worktree) return { remove: true, reason: "landed, no worktree" };
+	if (worktree.prunable) return keep("its worktree directory is missing (git worktree prune or repair)");
 	if (worktree.main) return keep("checked out in the main worktree");
 	if (worktree.current) return keep("this command runs in its worktree");
 	if (worktree.locked) return keep("its worktree is locked");
 	if (worktree.dirty) return keep("its worktree has modified or untracked files");
-	if (onMainline) return keep("its worktree has no commit of its own yet");
+	if (unmoved) return keep("its worktree has no commit of its own yet");
 	return { remove: true, reason: "landed, worktree clean" };
 }
 
@@ -55,12 +58,13 @@ function run(file, argv, cwd) {
 	return execFileSync(file, argv, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
 }
 
-/** Commits of merged GitHub PRs that are not on the default branch, or null when GitHub could not be asked. */
-function mergedPrCommits(key, upstream, git, cwd) {
+/** Commits of GitHub PRs merged into the default branch that are not on it, or null when GitHub could not be asked. */
+function mergedPrCommits(key, defaultBranch, upstream, git, cwd) {
 	if (key.split("/")[0] !== "github.com" || key.split("/").length !== 3) return null;
 	let prs;
 	try {
-		prs = JSON.parse(run("gh", ["pr", "list", "-R", key, "--state", "merged", "--limit", "1000", "--json", "number,headRefOid"], cwd));
+		prs = JSON.parse(run("gh", ["pr", "list", "-R", key, "--state", "merged", "--base", defaultBranch, "--limit", "1000", "--json", "number,headRefOid,baseRefName"], cwd));
+		prs = prs.filter((pr) => pr.baseRefName === defaultBranch);
 	} catch {
 		return null;
 	}
@@ -94,19 +98,19 @@ function main() {
 	const apply = argv.length === 1;
 	const cwd = process.cwd();
 	const git = (args, dir = cwd) => run("git", ["-c", "core.fsmonitor=false", ...args], dir).trim();
-	let origin, upstream;
+	let origin, defaultBranch, upstream;
 	try {
 		origin = git(["config", "--get", "remote.origin.url"]);
-		upstream = git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
 	} catch {
-		process.stderr.write("sweep-landed: needs a git worktree whose origin has a known default branch (git remote set-head origin --auto)\n");
+		process.stderr.write("sweep-landed: needs a git worktree with an origin remote\n");
 		process.exit(2);
 	}
-	const defaultBranch = upstream.replace(/^origin\//, "");
 	try {
+		defaultBranch = git(["ls-remote", "--symref", "origin", "HEAD"]).match(/^ref: refs\/heads\/(\S+)\tHEAD$/m)[1];
 		git(["fetch", "--quiet", "--no-tags", "origin", defaultBranch]);
+		upstream = git(["rev-parse", "--verify", "FETCH_HEAD^{commit}"]);
 	} catch {
-		process.stderr.write("sweep-landed: could not fetch the default branch; nothing deleted\n");
+		process.stderr.write("sweep-landed: could not read and fetch origin's default branch; nothing deleted\n");
 		process.exit(1);
 	}
 	const here = realpathSync(cwd);
@@ -122,27 +126,29 @@ function main() {
 	}
 	const mainline = new Set(git(["rev-list", "--first-parent", upstream]).split("\n"));
 	const onDefault = new Set(git(["rev-list", upstream]).split("\n"));
-	const merged = mergedPrCommits(repoKey(origin), upstream, git, cwd);
+	const merged = mergedPrCommits(repoKey(origin), defaultBranch, upstream, git, cwd);
 	if (merged === null) process.stdout.write("sweep-landed: merged PRs could not be read from GitHub, so only branches whose tip is on the default branch count as landed\n");
 	const branches = git(["for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads"]).split("\n").filter(Boolean);
 	let removed = 0;
+	let failed = 0;
 	const kept = new Map();
 	for (const line of branches) {
 		const [branch, tip] = line.split(" ");
 		const worktree = worktrees.get(branch) ?? null;
-		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), onMainline: mainline.has(tip), worktree });
+		const moves = worktree ? git(["reflog", "show", "--format=%H", `refs/heads/${branch}`]).split("\n").filter(Boolean).length : 0;
+		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, worktree });
 		if (!verdict.remove) {
 			kept.set(verdict.reason, [...(kept.get(verdict.reason) ?? []), branch]);
 			continue;
 		}
-		const where = worktree && !worktree.prunable ? ` and worktree ${worktree.path}` : "";
+		const where = worktree ? ` and worktree ${worktree.path}` : "";
 		if (apply) {
 			try {
-				if (worktree?.prunable) git(["worktree", "prune"]);
-				else if (worktree) git(["worktree", "remove", worktree.path]);
-				git(["branch", "-D", branch]);
+				if (worktree) git(["worktree", "remove", worktree.path]);
+				git(["update-ref", "-d", `refs/heads/${branch}`, tip]);
 			} catch (error) {
 				process.stdout.write(`failed  ${branch}${where}: ${String(error.stderr || error.message).trim().split("\n")[0]}\n`);
+				failed++;
 				continue;
 			}
 		}
@@ -151,6 +157,7 @@ function main() {
 	}
 	for (const [reason, names] of kept) process.stdout.write(`kept (${reason}): ${names.join(", ")}\n`);
 	process.stdout.write(`sweep-landed: ${apply ? "deleted" : "would delete"} ${removed} of ${branches.length} local branches${apply ? "" : "; run with --apply to delete them"}\n`);
+	if (failed > 0) process.exit(1);
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

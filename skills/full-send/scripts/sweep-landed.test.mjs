@@ -27,11 +27,11 @@ test("worktree entries carry the branch, the lock, and which one is the main wor
 
 test("a branch is removed only when it landed and nothing may still be using its worktree", () => {
 	const clean = { main: false, current: false, locked: false, dirty: false, prunable: false };
-	const d = (over = {}) => decide({ branch: "task", defaultBranch: "main", landed: true, onMainline: false, worktree: null, ...over });
+	const d = (over = {}) => decide({ branch: "task", defaultBranch: "main", landed: true, unmoved: false, worktree: null, ...over });
 	assert.equal(d().remove, true);
 	assert.equal(d({ worktree: clean }).remove, true);
-	assert.equal(d({ worktree: { ...clean, prunable: true } }).remove, true);
-	assert.equal(d({ onMainline: true }).remove, true);
+	assert.match(d({ worktree: { ...clean, prunable: true } }).reason, /missing/);
+	assert.equal(d({ unmoved: true }).remove, true);
 	assert.match(d({ branch: "main" }).reason, /default branch/);
 	assert.match(d({ landed: false }).reason, /not on the default branch/);
 	assert.match(d({ landed: false, worktree: clean }).reason, /not on the default branch/);
@@ -39,7 +39,7 @@ test("a branch is removed only when it landed and nothing may still be using its
 	assert.match(d({ worktree: { ...clean, current: true } }).reason, /runs in/);
 	assert.match(d({ worktree: { ...clean, locked: true } }).reason, /locked/);
 	assert.match(d({ worktree: { ...clean, dirty: true } }).reason, /modified or untracked/);
-	assert.match(d({ worktree: clean, onMainline: true }).reason, /no commit of its own/);
+	assert.match(d({ worktree: clean, unmoved: true }).reason, /no commit of its own/);
 	for (const verdict of [d({ branch: "main" }), d({ landed: false }), d({ worktree: { ...clean, dirty: true } })]) assert.equal(verdict.remove, false);
 });
 
@@ -73,13 +73,14 @@ before(() => {
 	git(clone, "remote", "add", "origin", URL);
 	commit(clone, "base");
 	git(clone, "push", "-q", "-u", "origin", "main");
-	git(clone, "remote", "set-head", "origin", "main");
 
 	// merged-commit: landed through a merge commit, clean worktree.
 	const wt = (name, start = "main") => {
 		git(clone, "worktree", "add", "-q", "-b", name, join(root, "wt", name), start);
 		return join(root, "wt", name);
 	};
+	// fast-forwarded: landed without a merge commit, so its tip is a commit the default branch pointed at.
+	git(clone, "merge", "-q", "--ff-only", commit(wt("fast-forwarded"), "ff"));
 	const mergedCommit = commit(wt("merged-commit"), "a");
 	// reviewer: cut from the first commit of the squashed PR, no worktree.
 	const squashedDir = wt("squashed");
@@ -101,9 +102,12 @@ before(() => {
 	git(clone, "merge", "-q", "--no-ff", "-m", "merge dirty", dirtyHead);
 	git(clone, "merge", "-q", "--no-ff", "-m", "merge here", hereHead);
 	git(clone, "push", "-q", "origin", "main");
+	// on-release: a commit that sits under a PR merged into another branch, and never reached the default branch.
+	git(clone, "branch", "on-release", "unfinished");
+	git(clone, "branch", "release-pr", "unfinished");
 	// fresh: a task that just started from the default branch and has no commit yet.
 	wt("fresh");
-	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead }]));
+	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -112,8 +116,8 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 	const all = branches();
 	const result = sweep(join(root, "wt", "here"));
 	assert.equal(result.status, 0, result.stderr);
-	for (const name of ["merged-commit", "squashed", "reviewer"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
-	for (const name of ["dirty", "unfinished", "here", "fresh", "main"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	assert.deepEqual(branches(), all);
 	assert.equal(existsSync(join(root, "wt", "merged-commit")), true);
 });
@@ -121,10 +125,10 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 test("with --apply it deletes landed branches and their clean worktrees, and keeps everything that may be in use", () => {
 	const result = sweep(join(root, "wt", "here"), "--apply");
 	assert.equal(result.status, 0, result.stderr);
-	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "unfinished"]);
-	for (const name of ["merged-commit", "squashed"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
+	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "unfinished"]);
+	for (const name of ["merged-commit", "squashed", "fast-forwarded"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
 	for (const name of ["dirty", "unfinished", "here", "fresh"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
-	assert.match(result.stdout, /deleted 3 of 8 local branches/);
+	assert.match(result.stdout, /deleted 4 of 11 local branches/);
 });
 
 test("when GitHub cannot be asked, a squashed branch is kept", () => {
@@ -141,6 +145,23 @@ test("when GitHub cannot be asked, a squashed branch is kept", () => {
 	assert.equal(branches().includes("later"), true);
 	// Run from the main worktree, `here` is no longer the current worktree and its landed branch goes.
 	assert.equal(branches().includes("here"), false);
+});
+
+test("a deletion that fails is reported and the sweep exits 1", () => {
+	const dir = join(root, "wt", "stuck");
+	git(clone, "worktree", "add", "-q", "-b", "stuck", dir, "main");
+	git(clone, "merge", "-q", "--no-ff", "-m", "merge stuck", commit(dir, "g"));
+	git(clone, "push", "-q", "origin", "main");
+	// Git refuses to delete this one ref, as it would when the branch moved after the sweep read it.
+	mkdirSync(join(root, "hooks"));
+	writeFileSync(join(root, "hooks", "reference-transaction"), "#!/bin/sh\n[ \"$1\" = prepared ] && grep -q ' refs/heads/stuck$' && exit 1\nexit 0\n");
+	chmodSync(join(root, "hooks", "reference-transaction"), 0o755);
+	git(clone, "config", "core.hooksPath", join(root, "hooks"));
+	const result = sweep(clone, "--apply");
+	git(clone, "config", "--unset", "core.hooksPath");
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stdout, /failed {2}stuck/);
+	assert.equal(branches().includes("stuck"), true);
 });
 
 test("any argument other than --apply is refused", () => {
