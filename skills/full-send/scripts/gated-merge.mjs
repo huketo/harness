@@ -160,7 +160,7 @@ function main() {
 	const sweeper = fileURLToPath(new URL("./sweep-landed.mjs", import.meta.url));
 	const sweep = spawnSync(process.execPath, [sweeper, "--apply"], { cwd, encoding: "utf8", timeout: 300_000 });
 	process.stdout.write(`${sweep.stdout ?? ""}${sweep.stderr ?? ""}`);
-	if (sweep.status !== 0) process.stdout.write(`gated-merge: the merge stands, but the sweep of landed branches did not finish; retry it with: node ${sweeper} --apply\n`);
+	if (sweep.status !== 0) process.stdout.write(`gated-merge: the merge stands, but the sweep of landed branches did not finish; retry it with: node ${JSON.stringify(sweeper)} --apply\n`);
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();
