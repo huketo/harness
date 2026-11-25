@@ -7,6 +7,8 @@ Read this before changing `SKILL.md` or the scripts. It records why the procedur
 - **Landed work was never cleaned up.** In a repository where agents had merged for weeks, most local branches were task and reviewer branches whose work had already landed. The agents gave two reasons for skipping the cleanup: the worktree they ran in could not delete itself, and the reviewer worktrees were not theirs.
 - **A prose step fixed it twice, and no further.** After `docs/agents/workflow.md` gained "then run `sweep-landed.mjs --apply`", the next two merges ran the sweep. `SKILL.md` did not carry the step, and a repository without that workflow file had nothing that asked for it.
 
+- **Reviewer worktrees were never swept.** A reviewer only reads, so its worktree keeps looking like a task that just started: clean, with a branch that never moved. The first merge that ran the sweep by itself kept four of them. `sweep-landed.mjs` now removes such a worktree once its branch has recorded nothing for 24 hours; `sweep-landed.test.mjs` holds the case.
+
 ## Chosen rung
 
 Rung 2, the tool. `scripts/gated-merge.mjs` runs `scripts/sweep-landed.mjs --apply` after GitHub confirms the merge, so the cleanup no longer depends on an agent remembering a step. One sentence in step 6 of `SKILL.md` covers the merges that do not go through that script (a GitLab MR, a repository's own merge route).

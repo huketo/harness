@@ -27,7 +27,7 @@ test("worktree entries carry the branch, the lock, and which one is the main wor
 
 test("a branch is removed only when it landed and nothing may still be using its worktree", () => {
 	const clean = { main: false, current: false, locked: false, dirty: false, prunable: false };
-	const d = (over = {}) => decide({ branch: "task", defaultBranch: "main", landed: true, unmoved: false, worktree: null, ...over });
+	const d = (over = {}) => decide({ branch: "task", defaultBranch: "main", landed: true, unmoved: false, idle: () => false, worktree: null, ...over });
 	assert.equal(d().remove, true);
 	assert.equal(d({ worktree: clean }).remove, true);
 	assert.match(d({ worktree: { ...clean, prunable: true } }).reason, /missing/);
@@ -40,6 +40,8 @@ test("a branch is removed only when it landed and nothing may still be using its
 	assert.match(d({ worktree: { ...clean, locked: true } }).reason, /locked/);
 	assert.match(d({ worktree: { ...clean, dirty: true } }).reason, /modified or untracked/);
 	assert.match(d({ worktree: clean, unmoved: true }).reason, /no commit of its own/);
+	assert.equal(d({ worktree: clean, unmoved: true, idle: () => true }).remove, true);
+	assert.match(d({ worktree: { ...clean, dirty: true }, unmoved: true, idle: () => assert.fail("asked before the keep rules") }).reason, /modified or untracked/);
 	for (const verdict of [d({ branch: "main" }), d({ landed: false }), d({ worktree: { ...clean, dirty: true } })]) assert.equal(verdict.remove, false);
 });
 
@@ -112,6 +114,36 @@ before(() => {
 	wt("fresh-old");
 	git(clone, "branch", "-m", "fresh-old", "fresh");
 	git(clone, "worktree", "move", join(root, "wt", "fresh-old"), join(root, "wt", "fresh"));
+	// idle: like fresh, but nothing has happened to its branch for two days, as with a reviewer that only read.
+	const twoDaysAgo = `@${Math.floor(Date.now() / 1000) - 2 * 86400} +0000`;
+	execFileSync("git", ["worktree", "add", "-q", "-b", "idle", join(root, "wt", "idle"), "main"], { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: twoDaysAgo } });
+	// reset-long-ago: idle too, but the only reflog entry left is a reset, so an earlier tip may live only in that reflog.
+	const old = { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: twoDaysAgo } };
+	execFileSync("git", ["worktree", "add", "-q", "-b", "reset-long-ago", join(root, "wt", "reset-long-ago"), "main"], old);
+	const tip = git(clone, "rev-parse", "main");
+	writeFileSync(join(git(clone, "rev-parse", "--path-format=absolute", "--git-common-dir"), "logs/refs/heads/reset-long-ago"), `${"1".repeat(40)} ${tip} t <t@example.invalid> ${twoDaysAgo.slice(1)}\treset: moving to main\n`);
+	// wandered: idle too, but a commit was made in it while detached, and only its HEAD reflog remembers that commit.
+	const wandered = join(root, "wt", "wandered");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "wandered", wandered, "main"], old);
+	execFileSync("git", ["checkout", "-q", "--detach"], { ...old, cwd: wandered });
+	writeFileSync(join(wandered, "side"), "side");
+	execFileSync("git", ["add", "-A"], { ...old, cwd: wandered });
+	execFileSync("git", ["commit", "-q", "-m", "side"], { ...old, cwd: wandered });
+	execFileSync("git", ["checkout", "-q", "wandered"], { ...old, cwd: wandered });
+	// reset-expired: its reflog kept the creation and a reset back to main, whose old side is an unlanded commit.
+	const logs = join(git(clone, "rev-parse", "--path-format=absolute", "--git-common-dir"), "logs");
+	const stamp = `t <t@example.invalid> ${twoDaysAgo.slice(1)}`;
+	const unlanded = git(clone, "rev-parse", "unfinished");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "reset-expired", join(root, "wt", "reset-expired"), "main"], old);
+	writeFileSync(join(logs, "refs/heads/reset-expired"), `${"0".repeat(40)} ${tip} ${stamp}\tbranch: Created from main\n${unlanded} ${tip} ${stamp}\treset: moving to main\n`);
+	// wandered-expired: its HEAD log kept only the checkout back from a detached commit, which is that entry's old side.
+	const expired = join(root, "wt", "wandered-expired");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "wandered-expired", expired, "main"], old);
+	writeFileSync(git(expired, "rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"), `${unlanded} ${tip} ${stamp}\tcheckout: moving from ${unlanded} to wandered-expired\n`);
+	// hidden-note: idle too, with an untracked file that this repository's status setting hides.
+	execFileSync("git", ["worktree", "add", "-q", "-b", "hidden-note", join(root, "wt", "hidden-note"), "main"], old);
+	writeFileSync(join(root, "wt", "hidden-note", "note"), "unsaved");
+	git(clone, "config", "status.showUntrackedFiles", "no");
 	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
@@ -121,8 +153,8 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 	const all = branches();
 	const result = sweep(join(root, "wt", "here"));
 	assert.equal(result.status, 0, result.stderr);
-	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
-	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded", "idle"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr", "reset-long-ago", "reset-expired", "wandered", "wandered-expired", "hidden-note"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	assert.deepEqual(branches(), all);
 	assert.equal(existsSync(join(root, "wt", "merged-commit")), true);
 });
@@ -130,10 +162,10 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 test("with --apply it deletes landed branches and their clean worktrees, and keeps everything that may be in use", () => {
 	const result = sweep(join(root, "wt", "here"), "--apply");
 	assert.equal(result.status, 0, result.stderr);
-	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "unfinished"]);
-	for (const name of ["merged-commit", "squashed", "fast-forwarded"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
-	for (const name of ["dirty", "unfinished", "here", "fresh"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
-	assert.match(result.stdout, /deleted 4 of 11 local branches/);
+	assert.deepEqual(branches(), ["dirty", "fresh", "here", "hidden-note", "main", "on-release", "release-pr", "reset-expired", "reset-long-ago", "unfinished", "wandered", "wandered-expired"]);
+	for (const name of ["merged-commit", "squashed", "fast-forwarded", "idle"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
+	for (const name of ["dirty", "unfinished", "here", "fresh", "reset-long-ago", "reset-expired", "wandered", "wandered-expired", "hidden-note"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
+	assert.match(result.stdout, /deleted 5 of 17 local branches/);
 });
 
 test("when GitHub cannot be asked, a squashed branch is kept", () => {
@@ -167,6 +199,18 @@ test("a deletion that fails is reported and the sweep exits 1", () => {
 	assert.equal(result.status, 1, result.stdout + result.stderr);
 	assert.match(result.stdout, /failed {2}stuck/);
 	assert.equal(branches().includes("stuck"), true);
+});
+
+test("a file that appears after the sweep read the worktree keeps it, even when the repository hides untracked files", () => {
+	const dir = join(root, "wt", "racer");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "racer", dir, "main"], { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: `@${Math.floor(Date.now() / 1000) - 2 * 86400} +0000` } });
+	// The stand-in for GitHub writes the file, which is after the sweep looked at every worktree.
+	writeFileSync(join(root, "bin", "gh"), `#!/bin/sh\necho late > "${join(dir, "note")}"\necho '[]'\n`);
+	const result = sweep(clone, "--apply");
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stdout, /failed {2}racer/);
+	assert.equal(existsSync(join(dir, "note")), true);
+	assert.equal(branches().includes("racer"), true);
 });
 
 test("any argument other than --apply is refused", () => {
