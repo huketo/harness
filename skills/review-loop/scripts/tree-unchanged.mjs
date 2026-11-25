@@ -53,13 +53,14 @@ export function configChanges(before, after) {
 			return at < 0;
 		});
 	};
-	const line = (sign) => ([key, value]) => Buffer.from(`${sign} ${key}${value === null ? "" : `=${value}`}`, "latin1").toString("utf8");
+	const text = (bytes) => Buffer.from(bytes, "latin1").toString("utf8");
+	const line = (sign) => ([key, value]) => text(`${sign} ${key}${value === null ? "" : `=${value}`}`);
 	const notes = [...only(was.notes, now.notes).map(line("-")), ...only(now.notes, was.notes).map(line("+"))];
 	const failures = [];
 	if (was.rest.map(id).join("\n") !== now.rest.map(id).join("\n")) {
 		const values = (entries, key) => id(entries.filter((entry) => entry[0] === key));
 		const changed = [...new Set([...was.rest, ...now.rest].map(([key]) => key))].filter((key) => values(was.rest, key) !== values(now.rest, key));
-		failures.push(...(changed.length > 0 ? changed.sort().map((key) => `entries of ${key} differ`) : ["the order of the entries differs"]));
+		failures.push(...(changed.length > 0 ? changed.sort().map((key) => `entries of ${text(key)} differ`) : ["the order of the entries differs"]));
 	}
 	return { notes, failures };
 }
@@ -125,7 +126,7 @@ function check(worktree, sha, beforeFile) {
 		now = snapshot(worktree);
 	} catch {
 		// git's own message can repeat a config value, so it is not printed.
-		stop(["CHANGED git cannot read this worktree's repository; run `git status` there to see why"]);
+		stop(["CHANGED git cannot read this worktree's repository"]);
 	}
 	const notes = [];
 	const failures = [];
