@@ -17,7 +17,7 @@ Within the requested scope these proceed without asking, and the final report na
 - creating local commits, pushing the task's branch, and opening or updating its PR/MR;
 - merging the task's PR/MR with the `full-send` skill's `scripts/gated-merge.mjs <number>`, which merges a GitHub PR only when CI passed on the current head, the description carries the `review-loop` approval line from a reviewer of another model family, and the repository is on the person's allowlist (`${XDG_CONFIG_HOME:-~/.config}/harness/full-send-repos`); when it refuses, as it does for every GitLab MR, the merge is a separate decision;
 - re-running a failed CI job of the task's PR/MR to diagnose the failure;
-- deleting the task's own branch and worktree after its PR/MR is merged.
+- deleting the task's own branch and worktree after its PR/MR is merged, and the local branches and worktrees that the `full-send` skill's `scripts/sweep-landed.mjs` finds landed.
 
 ## Approval that may cover one plan
 
