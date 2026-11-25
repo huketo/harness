@@ -14,7 +14,7 @@ The plugin version has one source: the `version` in the root `package.json`, whi
 
 ## Add a changeset
 
-A change needs a changeset when it changes what the plugin ships: `plugin/agents/`, `plugin/hooks/merge-guard.mjs`, `plugin/hooks/session-rules.mjs`, `plugin/rules/`, or the generated `plugin/.claude-plugin/plugin.json` and `plugin/hooks/hooks.json`, whether edited directly or through `manifest.json` or `build.mjs`. A change that leaves every shipped file identical, such as a test, a skill, the installer, or `.rulesync/`, needs none; skills and permissions reach a host through `mise run install`, not through a plugin version.
+A change needs a changeset when it changes what the plugin ships: `plugin/agents/`, `plugin/hooks/merge-guard.mjs`, `plugin/hooks/question-guard.mjs`, `plugin/hooks/session-rules.mjs`, `plugin/rules/`, or the generated `plugin/.claude-plugin/plugin.json` and `plugin/hooks/hooks.json`, whether edited directly or through `manifest.json` or `build.mjs`. A change that leaves every shipped file identical, such as a test, a skill, the installer, or `.rulesync/`, needs none; skills and permissions reach a host through `mise run install`, not through a plugin version.
 
 1. Run `mise run setup` once per checkout. The step is complete when `node_modules/.bin/changeset` exists.
 2. Run `npx changeset`, or write `.changeset/<short-name>.md` by hand:

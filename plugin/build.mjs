@@ -75,6 +75,10 @@ export function render(host, { hooks = true } = {}) {
 									},
 								],
 							},
+							{
+								matcher: "AskUserQuestion",
+								hooks: [{ type: "command", command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/question-guard.mjs"', timeout: 10 }],
+							},
 						],
 					},
 				});
