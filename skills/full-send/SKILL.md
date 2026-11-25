@@ -38,7 +38,7 @@ disable-model-invocation: true
 3. **리뷰를 받는다.** `review-loop`으로 검증한다. 사람이 요청했으면 `council`을 쓴다.
 4. **MR을 올린다.** 최신 기본 브랜치로 rebase한 뒤 `file-mr`로 올리고, 본문의 증거 절에 2단계의 증명을 넣는다.
 5. **감시한다.** `babysit-mr`로 실제 지적과 파이프라인 실패를 고친다. 수정마다 증명을 얻은 뒤 푸시한다.
-6. **머지한다.** 머지 관문을 통과하면 `scripts/harness-mode set full-send`를 다시 실행한다. 작업이나 rebase 도중에 CI 설정이나 검증 스킬이 없어졌으면 여기서 `full-stop`으로 낮아지며, 그때는 머지하지 않고 `full-stop` 스킬을 따른다. `mode=full-send`가 나오면 머지한다.
+6. **머지한다.** 머지 관문을 통과하면 `scripts/harness-mode set full-send`를 다시 실행한다. 작업이나 rebase 도중에 CI 설정이나 검증 스킬이 없어졌으면 여기서 `full-stop`으로 낮아지며, 그때는 머지하지 않고 `full-stop` 스킬을 따른다. `mode=full-send`가 나오면 머지한다. 머지된 뒤 `scripts/sweep-landed.mjs --apply`를 실행해 머지된 작업의 로컬 브랜치와 워크트리를 지우고, 출력의 마지막 줄을 보고에 넣는다.
 7. **보고한다.** 최종 메시지에 MR 링크, 머지 커밋, 증명, 사람 대신 내린 결정을 적는다. 마지막에 `scripts/harness-mode clear`를 실행한다.
 
 1단계부터 7단계까지 계속 움직인다. 검사나 봇을 기다리는 동안 턴을 끝내면 아무도 다시 부르지 않으므로 작업이 멈춘다. `babysit-mr`의 감시자(T3에서는 `watch_pull_request`)로 기다려서 MR이 바뀌면 깨어나게 한다. 머지 전에 멈추면 먼저 `unwatch_pull_request`를 부른다.

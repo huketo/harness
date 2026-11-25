@@ -117,7 +117,7 @@ before(() => {
 		`#!/bin/sh\necho "$*" >> "${calls}"\ncase "$*" in\n  "pr view"*) cat "${join(root, "view.json")}" ;;\n  *PUT*) cat "${join(root, "merge.json")}" ;;\nesac\nexit 0\n`,
 	);
 	chmodSync(join(bin, "gh"), 0o755);
-	env = { ...process.env, HOME: join(root, "home"), XDG_CONFIG_HOME: config, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", PATH: `${bin}:${process.env.PATH}` };
+	env = { ...process.env, HOME: join(root, "home"), XDG_CONFIG_HOME: config, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_SSH_COMMAND: "false", PATH: `${bin}:${process.env.PATH}` };
 	execFileSync("git", ["init", "-q", repo], { env });
 	execFileSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:example-owner/harness.git"], { env });
 });
@@ -130,6 +130,8 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	const ok = merge("12");
 	assert.equal(ok.status, 0, ok.stdout + ok.stderr);
 	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL]);
+	// The sweep of landed branches runs after the merge line. Here it cannot reach the origin, which leaves the merge standing.
+	assert.match(ok.stdout, /gated-merge: merged .*\n[^]*sweep-landed: could not read and fetch origin's default branch[^]*\ngated-merge: the merge stands, but the sweep /);
 
 	// A merge queue or auto-merge would leave the PR open; anything but a confirmed merge is a failure.
 	writeFileSync(calls, "");
@@ -158,6 +160,7 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	const dry = merge("12", "--dry-run");
 	assert.equal(dry.status, 0);
 	assert.match(dry.stdout, /would run: gh api /);
+	assert.doesNotMatch(dry.stdout + dry.stderr + queued.stdout + queued.stderr, /sweep/);
 	assert.deepEqual(recorded(), [VIEW_CALL]);
 
 	const offline = (setup, pattern) => {
