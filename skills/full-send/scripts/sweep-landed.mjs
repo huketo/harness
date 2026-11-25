@@ -8,8 +8,8 @@
 //   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
 //   how a task that just started looks. That last one is kept for a day only: after 24 hours in which its branch
 //   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes. That needs proof from
-//   the reflog files: the branch's starts at its creation, and neither it nor the worktree's HEAD log names a
-//   commit, moved from or moved to, that is not on the default branch. Without that proof the worktree is kept.
+//   the reflog files: neither the branch's log nor the worktree's HEAD log names a commit, moved from or moved to,
+//   that is not on the default branch. Without that proof the worktree is kept.
 //   Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
@@ -172,7 +172,7 @@ function main() {
 				const branchLog = reflogEntries(join(commonDir, "logs", ref));
 				const headLog = reflogEntries(git(["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"], worktree.path));
 				const landedOnly = (entries) => entries.every((entry) => [entry.from, entry.to].every((oid) => /^0+$/.test(oid) || onDefault.has(oid)));
-				return /^0+$/.test(branchLog[0].from) && branchLog.every((entry) => entry.time <= cutoff) && landedOnly(branchLog) && headLog.length > 0 && landedOnly(headLog);
+				return branchLog.length > 0 && branchLog.every((entry) => entry.time <= cutoff) && landedOnly(branchLog) && headLog.length > 0 && landedOnly(headLog);
 			} catch {
 				return false;
 			}
