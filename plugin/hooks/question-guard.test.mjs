@@ -1,6 +1,8 @@
 // Contract tests for plugin/hooks/question-guard.mjs. The first question is the one an agent really asked.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { decide, identifiers } from "./question-guard.mjs";
@@ -47,15 +49,26 @@ test("a question in the person's words is asked, and an option preview may show 
 	assert.deepEqual(decide(plain), { action: "allow" });
 });
 
+test("a name the session was already told about is not returned again", () => {
+	const ask = (question) => ({ questions: [{ header: "h", question, options: [] }] });
+	assert.deepEqual(decide(ask("Should we support iPhone first?")).terms, ["iPhone"]);
+	assert.equal(decide(ask("Should we support iPhone first?"), ["iPhone"]).action, "allow");
+	assert.deepEqual(decide(ask("iPhone, through parseJSON?"), ["iPhone"]).terms, ["iPhone", "parseJSON"]);
+});
+
 test("identifiers are code names, source files, ADR numbers, and calls; commands and plain words are not", () => {
 	assert.deepEqual(identifiers("save_concepts in internal/api/api.go calls render() per ADR-0020"), ["save_concepts", "internal/api/api.go", "render()", "ADR-0020"]);
+	assert.deepEqual(identifiers("parseJSON and app/styles.css"), ["parseJSON", "app/styles.css"]);
 	assert.deepEqual(identifiers("`docsa tui` 명령과 status, PR #150, GitHub, v2.1.2"), []);
 });
 
 test("the hook denies through Claude Code's PreToolUse output and stays silent otherwise", () => {
-	const denied = run({ tool_name: "AskUserQuestion", tool_input: asked });
+	const session_id = `test-${process.pid}`;
+	const denied = run({ session_id, tool_name: "AskUserQuestion", tool_input: asked });
 	assert.equal(denied.status, 0);
 	assert.equal(JSON.parse(denied.stdout).hookSpecificOutput.permissionDecision, "deny");
+	assert.equal(run({ session_id, tool_name: "AskUserQuestion", tool_input: asked }).stdout, "");
+	rmSync(join(tmpdir(), "hstack-question-guard", `${session_id}.json`));
 	assert.equal(run({ tool_name: "AskUserQuestion", tool_input: plain }).stdout, "");
 	assert.equal(run({ tool_name: "Bash", tool_input: { command: "saveConcepts" } }).stdout, "");
 });

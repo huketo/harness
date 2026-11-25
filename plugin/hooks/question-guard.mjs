@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // Claude Code PreToolUse hook for AskUserQuestion: returns a question to the agent when it names implementation
 // identifiers, so the person is asked in terms of what they will see and do (docs/agents/hitl.md, decision kind 2).
-// It reads only the tool input and decides from the text alone.
-import { readFileSync, realpathSync } from "node:fs";
+// A name is returned once per session: asked again with only names it already reported, the question goes through,
+// so a product name shaped like an identifier (iPhone) or a file the person must recognise costs one retry, not a loop.
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const IDENTIFIER = [
-	/\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]+)+\b/g, // camelCase
+	/\b[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*\b/g, // camelCase
 	/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g, // snake_case
-	/\b[A-Za-z_][\w-]*(?:\/[\w.-]+)*\.(?:go|ts|tsx|js|mjs|py|rs|sql|ya?ml|json|toml|md)\b/g, // a source file
+	/\b[A-Za-z_][\w-]*(?:\/[\w.-]+)*\.(?:go|ts|tsx|js|jsx|mjs|py|rs|rb|java|kt|c|h|cpp|sh|sql|css|scss|html|ya?ml|json|toml|md)\b/g, // a source file
 	/\bADR[ -]?\d+\b/g,
 	/\b[A-Za-z_]\w*\(\)/g, // a call
 ];
@@ -30,19 +33,21 @@ export function identifiers(text) {
 	return [...new Set(found.sort((a, b) => a[0] - b[0]).map(([, term]) => term))];
 }
 
-export function decide(input) {
+/** `reported` holds the names this session was already told about. */
+export function decide(input, reported = []) {
 	const terms = identifiers(questionText(input));
-	if (terms.length === 0) return { action: "allow" };
+	if (terms.every((term) => reported.includes(term))) return { action: "allow" };
 	return {
 		action: "deny",
+		terms,
 		reason: [
 			`harness question guard: this question names implementation identifiers (${terms.join(", ")}).`,
 			"The person decides from what they will see and be able to do, not from how it is built.",
 			"Rewrite it before asking again:",
 			"1. Say what each choice lets the person do and what can go wrong for them, without these identifiers.",
-			"2. If the choice is about how something looks or behaves, show it first: put the captured screen, terminal text, or running prototype in an option preview or send it to the person, then ask which is closer.",
+			"2. If the choice is about how something looks or behaves, show it first: put the captured screen or terminal text, or how to open the running prototype, in each option's preview, then ask which is closer.",
 			"3. If running the candidates can settle it, it is not a question: measure, choose, and report.",
-			"Keep an identifier only when the person must type or recognise that exact name, and then say what it is.",
+			"Keep a name only when the person must type or recognise that exact name, and then say what it is; a name reported here is not returned again in this session.",
 		].join("\n"),
 	};
 }
@@ -55,8 +60,17 @@ function main() {
 		return;
 	}
 	if (payload?.tool_name !== "AskUserQuestion") return;
-	const decision = decide(payload.tool_input);
+	const state = join(tmpdir(), "hstack-question-guard", `${String(payload.session_id ?? "none").replace(/[^\w-]/g, "_")}.json`);
+	let reported = [];
+	try {
+		reported = JSON.parse(readFileSync(state, "utf8"));
+	} catch {
+		// Nothing reported in this session yet.
+	}
+	const decision = decide(payload.tool_input, reported);
 	if (decision.action !== "deny") return;
+	mkdirSync(join(tmpdir(), "hstack-question-guard"), { recursive: true, mode: 0o700 });
+	writeFileSync(state, JSON.stringify([...new Set([...reported, ...decision.terms])]));
 	process.stdout.write(
 		`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: decision.reason } })}\n`,
 	);
