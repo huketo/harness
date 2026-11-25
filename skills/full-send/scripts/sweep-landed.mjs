@@ -188,7 +188,7 @@ function main() {
 			try {
 				if (worktree) {
 					if (git(["symbolic-ref", "HEAD"], worktree.path) !== ref || git(["rev-parse", "HEAD"], worktree.path) !== tip) throw new Error("its worktree moved since the sweep read it");
-					git(["worktree", "remove", worktree.path]);
+					git(["-c", "status.showUntrackedFiles=normal", "worktree", "remove", worktree.path]);
 				}
 				if (git(["worktree", "list", "--porcelain"]).split("\n").includes(`branch ${ref}`)) throw new Error("checked out in a worktree");
 				git(["update-ref", "--no-deref", "-d", ref, tip]);

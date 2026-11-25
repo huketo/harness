@@ -201,6 +201,18 @@ test("a deletion that fails is reported and the sweep exits 1", () => {
 	assert.equal(branches().includes("stuck"), true);
 });
 
+test("a file that appears after the sweep read the worktree keeps it, even when the repository hides untracked files", () => {
+	const dir = join(root, "wt", "racer");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "racer", dir, "main"], { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: `@${Math.floor(Date.now() / 1000) - 2 * 86400} +0000` } });
+	// The stand-in for GitHub writes the file, which is after the sweep looked at every worktree.
+	writeFileSync(join(root, "bin", "gh"), `#!/bin/sh\necho late > "${join(dir, "note")}"\necho '[]'\n`);
+	const result = sweep(clone, "--apply");
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stdout, /failed {2}racer/);
+	assert.equal(existsSync(join(dir, "note")), true);
+	assert.equal(branches().includes("racer"), true);
+});
+
 test("any argument other than --apply is refused", () => {
 	assert.equal(sweep(clone, "--force").status, 2);
 	assert.equal(sweep(clone, "--apply", "--apply").status, 2);
