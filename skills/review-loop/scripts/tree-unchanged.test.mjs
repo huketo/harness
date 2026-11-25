@@ -151,8 +151,18 @@ test("a second value, a swapped order, a bare key made empty, and an unreadable 
 	const emptied = rewritten(() => writeFileSync(config, readFileSync(config, "utf8").replace("\tflag\n", "\tflag =\n")));
 	assert.match(emptied.stdout, /config: entries of probe\.flag differ/);
 	const broken = rewritten(() => appendFileSync(config, "[unterminated\n"));
-	assert.match(broken.stdout, /^CHANGED git cannot read this worktree's repository \(/);
-	for (const result of [second, swapped, emptied, broken]) assert.equal(result.status, 1, result.stdout);
+	assert.equal(broken.stdout, "CHANGED git cannot read this worktree's repository; run `git status` there to see why\n");
+	// Two values that differ only in bytes that are not UTF-8 are different values.
+	git(repo, "config", "probe.path", "x");
+	const bytes = (hex) => writeFileSync(config, Buffer.concat([readFileSync(config).subarray(0, readFileSync(config).lastIndexOf("path = ")), Buffer.from("path = "), Buffer.from(hex, "hex"), Buffer.from("\n")]));
+	bytes("ff");
+	writeFileSync(snapshotFile, run("snapshot", repo).stdout);
+	const rebyted = rewritten(() => bytes("fe"));
+	assert.match(rebyted.stdout, /config: entries of probe\.path differ/);
+	// A note is printed as the text it is.
+	const named = rewritten(() => git(repo, "config", "branch.리뷰.t3-merge-base", "main"));
+	assert.equal(named.stdout.includes("config: + branch.리뷰.t3-merge-base=main\n"), true, named.stdout);
+	for (const result of [second, swapped, emptied, broken, rebyted]) assert.equal(result.status, 1, result.stdout);
 	assert.equal(check().status, 0);
 });
 

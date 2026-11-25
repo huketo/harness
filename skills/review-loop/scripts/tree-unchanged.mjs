@@ -53,7 +53,7 @@ export function configChanges(before, after) {
 			return at < 0;
 		});
 	};
-	const line = (sign) => ([key, value]) => `${sign} ${key}${value === null ? "" : `=${value}`}`;
+	const line = (sign) => ([key, value]) => Buffer.from(`${sign} ${key}${value === null ? "" : `=${value}`}`, "latin1").toString("utf8");
 	const notes = [...only(was.notes, now.notes).map(line("-")), ...only(now.notes, was.notes).map(line("+"))];
 	const failures = [];
 	if (was.rest.map(id).join("\n") !== now.rest.map(id).join("\n")) {
@@ -68,9 +68,10 @@ const env = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0" 
 const git = (worktree, ...argv) =>
 	execFileSync("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", worktree, ...argv], { encoding: "utf8", env, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
 
-/** The ordered `[key, value]` entries of a config file; a value is null for a key written without one. It throws when git cannot list the file. */
+/** The ordered `[key, value]` entries of a config file, one character per byte; a value is null for a key written without one. It throws when git cannot list the file. */
 function configEntries(file) {
-	const listed = execFileSync("git", ["config", "--file", file, "--list", "--null"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1024 * 1024 * 1024 });
+	// latin1 keeps every byte apart: decoded as UTF-8, two different invalid sequences would both become U+FFFD.
+	const listed = execFileSync("git", ["config", "--file", file, "--list", "--null"], { encoding: "latin1", env, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1024 * 1024 * 1024 });
 	return listed.split("\0").filter(Boolean).map((entry) => {
 		const cut = entry.indexOf("\n");
 		return cut < 0 ? [entry, null] : [entry.slice(0, cut), entry.slice(cut + 1)];
@@ -122,8 +123,9 @@ function check(worktree, sha, beforeFile) {
 	let now;
 	try {
 		now = snapshot(worktree);
-	} catch (error) {
-		stop([`CHANGED git cannot read this worktree's repository (${String(error.stderr || error.message).trim().split("\n")[0]})`]);
+	} catch {
+		// git's own message can repeat a config value, so it is not printed.
+		stop(["CHANGED git cannot read this worktree's repository; run `git status` there to see why"]);
 	}
 	const notes = [];
 	const failures = [];
