@@ -117,6 +117,19 @@ before(() => {
 	// idle: like fresh, but nothing has happened to its branch for two days, as with a reviewer that only read.
 	const twoDaysAgo = `@${Math.floor(Date.now() / 1000) - 2 * 86400} +0000`;
 	execFileSync("git", ["worktree", "add", "-q", "-b", "idle", join(root, "wt", "idle"), "main"], { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: twoDaysAgo } });
+	// reset-long-ago: idle too, but the only reflog entry left is a reset, so an earlier tip may live only in that reflog.
+	const old = { cwd: clone, env: { ...env, GIT_COMMITTER_DATE: twoDaysAgo } };
+	execFileSync("git", ["worktree", "add", "-q", "-b", "reset-long-ago", join(root, "wt", "reset-long-ago"), "main"], old);
+	const tip = git(clone, "rev-parse", "main");
+	writeFileSync(join(git(clone, "rev-parse", "--path-format=absolute", "--git-common-dir"), "logs/refs/heads/reset-long-ago"), `${"1".repeat(40)} ${tip} t <t@example.invalid> ${twoDaysAgo.slice(1)}\treset: moving to main\n`);
+	// wandered: idle too, but a commit was made in it while detached, and only its HEAD reflog remembers that commit.
+	const wandered = join(root, "wt", "wandered");
+	execFileSync("git", ["worktree", "add", "-q", "-b", "wandered", wandered, "main"], old);
+	execFileSync("git", ["checkout", "-q", "--detach"], { ...old, cwd: wandered });
+	writeFileSync(join(wandered, "side"), "side");
+	execFileSync("git", ["add", "-A"], { ...old, cwd: wandered });
+	execFileSync("git", ["commit", "-q", "-m", "side"], { ...old, cwd: wandered });
+	execFileSync("git", ["checkout", "-q", "wandered"], { ...old, cwd: wandered });
 	writeFileSync(join(root, "merged.json"), JSON.stringify([{ number: 7, headRefOid: squashedHead, baseRefName: "main" }, { number: 8, headRefOid: git(clone, "rev-parse", "release-pr"), baseRefName: "release" }]));
 });
 
@@ -127,7 +140,7 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 	const result = sweep(join(root, "wt", "here"));
 	assert.equal(result.status, 0, result.stderr);
 	for (const name of ["merged-commit", "squashed", "reviewer", "fast-forwarded", "idle"]) assert.match(result.stdout, new RegExp(`would delete {2}${name}\\b`));
-	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
+	for (const name of ["dirty", "unfinished", "here", "fresh", "main", "on-release", "release-pr", "reset-long-ago", "wandered"]) assert.doesNotMatch(result.stdout, new RegExp(`would delete {2}${name}\\b`));
 	assert.deepEqual(branches(), all);
 	assert.equal(existsSync(join(root, "wt", "merged-commit")), true);
 });
@@ -135,10 +148,10 @@ test("without --apply the sweep lists the landed branches and deletes nothing", 
 test("with --apply it deletes landed branches and their clean worktrees, and keeps everything that may be in use", () => {
 	const result = sweep(join(root, "wt", "here"), "--apply");
 	assert.equal(result.status, 0, result.stderr);
-	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "unfinished"]);
+	assert.deepEqual(branches(), ["dirty", "fresh", "here", "main", "on-release", "release-pr", "reset-long-ago", "unfinished", "wandered"]);
 	for (const name of ["merged-commit", "squashed", "fast-forwarded", "idle"]) assert.equal(existsSync(join(root, "wt", name)), false, name);
-	for (const name of ["dirty", "unfinished", "here", "fresh"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
-	assert.match(result.stdout, /deleted 5 of 12 local branches/);
+	for (const name of ["dirty", "unfinished", "here", "fresh", "reset-long-ago", "wandered"]) assert.equal(existsSync(join(root, "wt", name)), true, name);
+	assert.match(result.stdout, /deleted 5 of 14 local branches/);
 });
 
 test("when GitHub cannot be asked, a squashed branch is kept", () => {

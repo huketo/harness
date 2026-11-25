@@ -7,7 +7,8 @@
 //   modified or untracked files, a detached worktree, a worktree whose directory is missing, and a worktree whose
 //   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
 //   how a task that just started looks. That last one is kept for a day only: after 24 hours in which its branch
-//   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes.
+//   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes, unless its reflog no
+//   longer starts at the branch's creation or its HEAD once held a commit that is not on the default branch.
 //   Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
@@ -42,7 +43,8 @@ export function parseWorktrees(porcelain) {
  * What to do with one local branch: `{ remove, reason }`.
  * `landed` is whether the tip is a commit of the default branch or of a merged PR; `unmoved` is whether the
  * branch still sits where it was created, on a commit the default branch itself pointed at; `idle` is whether
- * that branch's reflog has recorded nothing for 24 hours; `worktree` is the
+ * that branch's reflog starts at its creation and has recorded nothing for 24 hours, and the worktree's HEAD never
+ * left the default branch's commits; `worktree` is the
  * branch's worktree entry with `current` and `dirty` added, or null.
  */
 export function decide({ branch, defaultBranch, landed, unmoved, idle, worktree }) {
@@ -55,7 +57,7 @@ export function decide({ branch, defaultBranch, landed, unmoved, idle, worktree 
 	if (worktree.current) return keep("this command runs in its worktree");
 	if (worktree.locked) return keep("its worktree is locked");
 	if (worktree.dirty) return keep("its worktree has modified or untracked files");
-	if (unmoved && !idle) return keep("its worktree has no commit of its own yet, and its branch was touched in the last 24 hours");
+	if (unmoved && !idle) return keep("its worktree has no commit of its own yet, and 24 idle hours could not be confirmed");
 	if (unmoved) return { remove: true, reason: "no commit of its own, idle for 24 hours" };
 	return { remove: true, reason: "landed, worktree clean" };
 }
@@ -146,9 +148,16 @@ function main() {
 		const [ref, tip] = line.split(" ");
 		const branch = ref.slice("refs/heads/".length);
 		const worktree = worktrees.get(branch) ?? null;
-		const log = worktree ? git(["reflog", "show", "--date=unix", "--format=%H %gd", ref]).split("\n").filter(Boolean).map((entry) => [entry.split(" ")[0], Number(/@\{(\d+)\}$/.exec(entry)?.[1])]) : [];
+		const log = worktree ? git(["reflog", "show", "--date=unix", "--format=%H %gd %gs", ref]).split("\n").filter(Boolean).map((entry) => entry.split(" ")) : [];
 		const moves = new Set(log.map(([hash]) => hash)).size;
-		const idle = log.length > 0 && Date.now() / 1000 - Math.max(...log.map(([, time]) => time)) > IDLE_SECONDS;
+		const cutoff = Date.now() / 1000 - IDLE_SECONDS;
+		// Idle only on evidence: the reflog still starts at the branch's creation, every entry is older than the cutoff,
+		// and the worktree's own HEAD never visited a commit outside the default branch (a commit made while detached).
+		const idle =
+			log.at(-1)?.slice(2, 4).join(" ") === "branch: Created" &&
+			log.every(([, selector]) => Number(/@\{(\d+)\}$/.exec(selector)?.[1]) <= cutoff) &&
+			!worktree.prunable &&
+			git(["reflog", "show", "--format=%H", "HEAD"], worktree.path).split("\n").filter(Boolean).every((hash) => onDefault.has(hash));
 		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, idle, worktree });
 		if (!verdict.remove) {
 			kept.set(verdict.reason, [...(kept.get(verdict.reason) ?? []), branch]);
