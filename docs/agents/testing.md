@@ -94,7 +94,6 @@ For an edited shell script, first check the exact file with Bash's parser, for e
 ```bash
 bash -n skills/full-send/scripts/harness-mode
 bash skills/review-loop/scripts/review-tier.test.sh
-bash skills/review-loop/scripts/tree-unchanged.test.sh
 ```
 
 Use `shellcheck` only when it is available; it is not a repository-installed mandatory tool. Parser or static-analysis success does not prove link ownership, backup behavior, installed tool versions, or live configuration.
