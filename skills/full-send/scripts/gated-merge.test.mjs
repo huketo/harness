@@ -139,6 +139,7 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	const queued = merge("12");
 	assert.equal(queued.status, 1);
 	assert.match(queued.stdout, /did not confirm/);
+	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL]);
 
 	// An error answer does not say whether the merge happened, so the PR is read once more.
 	const errored = (after) => {
@@ -151,7 +152,7 @@ test("end to end: a passing, approved PR merges through the pinned call and noth
 	assert.equal(landed.status, 0, landed.stdout + landed.stderr);
 	assert.match(landed.stdout, new RegExp(`^gated-merge: merged ${KEY} #12 at ${HEAD} as c{40} .*\\n[^]*sweep-landed: `));
 	assert.deepEqual(recorded(), [VIEW_CALL, MERGE_CALL, VIEW_CALL]);
-	for (const after of [{ state: "OPEN", mergeCommit: null }, { headRefOid: "d".repeat(40) }, { url: "https://github.com/upstream-owner/harness/pull/12" }]) {
+	for (const after of [{ state: "OPEN" }, { headRefOid: "d".repeat(40) }, { url: "https://github.com/upstream-owner/harness/pull/12" }]) {
 		const unsure = errored(after);
 		assert.equal(unsure.status, 1, unsure.stdout);
 		assert.match(unsure.stdout, /did not merge it now \(gh: Server Error \(HTTP 502\)\)/);
