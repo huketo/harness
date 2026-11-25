@@ -7,19 +7,35 @@
 //   modified or untracked files, a detached worktree, a worktree whose directory is missing, and a worktree whose
 //   branch has not moved since it was created on a commit the default branch itself pointed at, because that is
 //   how a task that just started looks. That last one is kept for a day only: after 24 hours in which its branch
-//   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes, unless its reflog no
-//   longer starts at the branch's creation or its HEAD once held a commit that is not on the default branch.
+//   recorded nothing, it is how a reviewer that only read looks once it is done, and it goes. That needs proof from
+//   the reflog files: the branch's starts at its creation, and neither it nor the worktree's HEAD log names a
+//   commit, moved from or moved to, that is not on the default branch. Without that proof the worktree is kept.
 //   Ignored files do not keep a worktree, as with `git worktree remove`.
 // Usage: sweep-landed.mjs [--apply]
 // Without --apply it prints what it would delete and deletes nothing. It never touches a remote.
 // It exits 1 when a deletion it attempted failed.
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
-import { sep } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoKey } from "../../../plugin/hooks/merge-guard.mjs";
 
 const IDLE_SECONDS = 24 * 60 * 60;
+
+/**
+ * The lines of a reflog file, oldest first, as `{ from, to, time }`. It reads the file because `git reflog` shows
+ * only the commit an entry moved to, and the commit it moved from can be the last trace of unlanded work.
+ * It throws when the file is missing or a line does not parse.
+ */
+export function reflogEntries(file) {
+	return readFileSync(file, "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => {
+			const [, from, to, time] = /^([0-9a-f]{40,64}) ([0-9a-f]{40,64}) .*> (\d+) [+-]\d{4}(?:\t|$)/.exec(line);
+			return { from, to, time: Number(time) };
+		});
+}
 
 /** The entries of `git worktree list --porcelain`; the first one is the main worktree. */
 export function parseWorktrees(porcelain) {
@@ -42,9 +58,9 @@ export function parseWorktrees(porcelain) {
 /**
  * What to do with one local branch: `{ remove, reason }`.
  * `landed` is whether the tip is a commit of the default branch or of a merged PR; `unmoved` is whether the
- * branch still sits where it was created, on a commit the default branch itself pointed at; `idle` is whether
- * that branch's reflog starts at its creation and has recorded nothing for 24 hours, and the worktree's HEAD never
- * left the default branch's commits; `worktree` is the
+ * branch still sits where it was created, on a commit the default branch itself pointed at; `idle` is a
+ * function, called only when every other rule would delete, that says whether the reflogs prove a day of
+ * nothing (see `main`); `worktree` is the
  * branch's worktree entry with `current` and `dirty` added, or null.
  */
 export function decide({ branch, defaultBranch, landed, unmoved, idle, worktree }) {
@@ -57,7 +73,7 @@ export function decide({ branch, defaultBranch, landed, unmoved, idle, worktree 
 	if (worktree.current) return keep("this command runs in its worktree");
 	if (worktree.locked) return keep("its worktree is locked");
 	if (worktree.dirty) return keep("its worktree has modified or untracked files");
-	if (unmoved && !idle) return keep("its worktree has no commit of its own yet, and 24 idle hours could not be confirmed");
+	if (unmoved && !idle()) return keep("its worktree has no commit of its own yet, and 24 idle hours could not be confirmed");
 	if (unmoved) return { remove: true, reason: "no commit of its own, idle for 24 hours" };
 	return { remove: true, reason: "landed, worktree clean" };
 }
@@ -138,6 +154,7 @@ function main() {
 	}
 	const mainline = new Set(git(["rev-list", "--first-parent", upstream]).split("\n"));
 	const onDefault = new Set(git(["rev-list", upstream]).split("\n"));
+	const commonDir = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
 	const merged = mergedPrCommits(repoKey(origin), defaultBranch, upstream, git, cwd);
 	if (merged === null) process.stdout.write("sweep-landed: merged PRs could not be read from GitHub, so only branches whose tip is on the default branch count as landed\n");
 	const branches = git(["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads"]).split("\n").filter(Boolean);
@@ -148,16 +165,18 @@ function main() {
 		const [ref, tip] = line.split(" ");
 		const branch = ref.slice("refs/heads/".length);
 		const worktree = worktrees.get(branch) ?? null;
-		const log = worktree ? git(["reflog", "show", "--date=unix", "--format=%H %gd %gs", ref]).split("\n").filter(Boolean).map((entry) => entry.split(" ")) : [];
-		const moves = new Set(log.map(([hash]) => hash)).size;
-		const cutoff = Date.now() / 1000 - IDLE_SECONDS;
-		// Idle only on evidence: the reflog still starts at the branch's creation, every entry is older than the cutoff,
-		// and the worktree's own HEAD never visited a commit outside the default branch (a commit made while detached).
-		const idle =
-			log.at(-1)?.slice(2, 4).join(" ") === "branch: Created" &&
-			log.every(([, selector]) => Number(/@\{(\d+)\}$/.exec(selector)?.[1]) <= cutoff) &&
-			!worktree.prunable &&
-			git(["reflog", "show", "--format=%H", "HEAD"], worktree.path).split("\n").filter(Boolean).every((hash) => onDefault.has(hash));
+		const moves = worktree ? new Set(git(["reflog", "show", "--format=%H", ref]).split("\n").filter(Boolean)).size : 0;
+		const idle = () => {
+			try {
+				const cutoff = Date.now() / 1000 - IDLE_SECONDS;
+				const branchLog = reflogEntries(join(commonDir, "logs", ref));
+				const headLog = reflogEntries(git(["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"], worktree.path));
+				const landedOnly = (entries) => entries.every((entry) => [entry.from, entry.to].every((oid) => /^0+$/.test(oid) || onDefault.has(oid)));
+				return /^0+$/.test(branchLog[0].from) && branchLog.every((entry) => entry.time <= cutoff) && landedOnly(branchLog) && headLog.length > 0 && landedOnly(headLog);
+			} catch {
+				return false;
+			}
+		};
 		const verdict = decide({ branch, defaultBranch, landed: onDefault.has(tip) || (merged?.has(tip) ?? false), unmoved: mainline.has(tip) && moves <= 1, idle, worktree });
 		if (!verdict.remove) {
 			kept.set(verdict.reason, [...(kept.get(verdict.reason) ?? []), branch]);
