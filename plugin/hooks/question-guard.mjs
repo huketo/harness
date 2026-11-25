@@ -4,14 +4,14 @@
 // A name is returned once per session: asked again with only names it already reported, the question goes through,
 // so a product name shaped like an identifier (iPhone) or a file the person must recognise costs one retry, not a loop.
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const IDENTIFIER = [
 	/\b[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*\b/g, // camelCase
 	/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g, // snake_case
-	/\b[A-Za-z_][\w-]*(?:\/[\w.-]+)*\.(?:go|ts|tsx|js|jsx|mjs|py|rs|rb|java|kt|c|h|cpp|sh|sql|css|scss|html|ya?ml|json|toml|md)\b/g, // a source file
+	/\b[A-Za-z_][\w-]*(?:[/.][\w-]+)*\.(?:go|ts|tsx|mts|cts|js|jsx|mjs|py|rs|rb|java|kt|c|h|cpp|sh|sql|css|scss|html|ya?ml|json|toml|md)\b/g, // a source file
 	/\bADR[ -]?\d+\b/g,
 	/\b[A-Za-z_]\w*\(\)/g, // a call
 ];
@@ -35,8 +35,10 @@ export function identifiers(text) {
 
 /** `reported` holds the names this session was already told about. */
 export function decide(input, reported = []) {
-	const terms = identifiers(questionText(input));
-	if (terms.every((term) => reported.includes(term))) return { action: "allow" };
+	const wellFormed = (question) => typeof question?.question === "string" && Array.isArray(question.options);
+	if (!Array.isArray(input?.questions) || !input.questions.every(wellFormed)) return { action: "allow" };
+	const terms = identifiers(questionText(input)).filter((term) => !reported.includes(term));
+	if (terms.length === 0) return { action: "allow" };
 	return {
 		action: "deny",
 		terms,
@@ -60,7 +62,8 @@ function main() {
 		return;
 	}
 	if (payload?.tool_name !== "AskUserQuestion") return;
-	const state = join(tmpdir(), "hstack-question-guard", `${String(payload.session_id ?? "none").replace(/[^\w-]/g, "_")}.json`);
+	const dir = join(process.env.XDG_STATE_HOME || join(homedir(), ".local", "state"), "harness", "question-guard");
+	const state = join(dir, `${String(payload.session_id ?? "none").replace(/[^\w-]/g, "_")}.json`);
 	let reported = [];
 	try {
 		reported = JSON.parse(readFileSync(state, "utf8"));
@@ -69,7 +72,7 @@ function main() {
 	}
 	const decision = decide(payload.tool_input, reported);
 	if (decision.action !== "deny") return;
-	mkdirSync(join(tmpdir(), "hstack-question-guard"), { recursive: true, mode: 0o700 });
+	mkdirSync(dir, { recursive: true, mode: 0o700 });
 	writeFileSync(state, JSON.stringify([...new Set([...reported, ...decision.terms])]));
 	process.stdout.write(
 		`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: decision.reason } })}\n`,
